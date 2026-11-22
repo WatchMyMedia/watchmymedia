@@ -1228,12 +1228,20 @@ extension Components {
             public var subtitle: Swift.String?
             /// - Remark: Generated from `#/components/schemas/BrowseItem/title`.
             public var title: Swift.String
+            /// The movie's or show's TMDB id, which saving it to a watchlist takes. Absent for a title TMDB hasn't matched, which can't be saved.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BrowseItem/tmdbId`.
+            public var tmdbId: Swift.Int64?
             /// Bytes across present files.
             ///
             /// - Remark: Generated from `#/components/schemas/BrowseItem/totalSize`.
             public var totalSize: Swift.Int64
             /// - Remark: Generated from `#/components/schemas/BrowseItem/watched`.
             public var watched: Swift.Bool
+            /// It is on one of the signed-in person's watchlists: a card's menu offers Remove from Watchlist rather than Add.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BrowseItem/watchlisted`.
+            public var watchlisted: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/BrowseItem/year`.
             public var year: Swift.Int64?
             /// Creates a new `BrowseItem`.
@@ -1266,8 +1274,10 @@ extension Components {
             ///   - status:
             ///   - subtitle:
             ///   - title:
+            ///   - tmdbId: The movie's or show's TMDB id, which saving it to a watchlist takes. Absent for a title TMDB hasn't matched, which can't be saved.
             ///   - totalSize: Bytes across present files.
             ///   - watched:
+            ///   - watchlisted: It is on one of the signed-in person's watchlists: a card's menu offers Remove from Watchlist rather than Add.
             ///   - year:
             public init(
                 addedAt: Foundation.Date,
@@ -1297,8 +1307,10 @@ extension Components {
                 status: Swift.String? = nil,
                 subtitle: Swift.String? = nil,
                 title: Swift.String,
+                tmdbId: Swift.Int64? = nil,
                 totalSize: Swift.Int64,
                 watched: Swift.Bool,
+                watchlisted: Swift.Bool? = nil,
                 year: Swift.Int64? = nil
             ) {
                 self.addedAt = addedAt
@@ -1328,8 +1340,10 @@ extension Components {
                 self.status = status
                 self.subtitle = subtitle
                 self.title = title
+                self.tmdbId = tmdbId
                 self.totalSize = totalSize
                 self.watched = watched
+                self.watchlisted = watchlisted
                 self.year = year
             }
             public enum CodingKeys: String, CodingKey {
@@ -1360,8 +1374,10 @@ extension Components {
                 case status
                 case subtitle
                 case title
+                case tmdbId
                 case totalSize
                 case watched
+                case watchlisted
                 case year
             }
         }
@@ -7014,6 +7030,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/MediaList/owner`.
             public var owner: Swift.String
+            /// Watchlists: a title leaves once the person finishes it (Watchlist.removeWatched). False for other lists.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MediaList/removeWatched`.
+            public var removeWatched: Swift.Bool?
             /// The screen its row was made on and first shows on: home or library-<id>.
             ///
             /// - Remark: Generated from `#/components/schemas/MediaList/screen`.
@@ -7048,6 +7068,7 @@ extension Components {
             ///   - nextFetchAt: Absent for imports and library lists, which are not fetched.
             ///   - notFound: Imports: entries TMDB could not find.
             ///   - owner: me (the person's own) or everyone (the household's). A plain string.
+            ///   - removeWatched: Watchlists: a title leaves once the person finishes it (Watchlist.removeWatched). False for other lists.
             ///   - screen: The screen its row was made on and first shows on: home or library-<id>.
             ///   - source:
             ///   - sourceName: The words for From <name>, as ScreenRowSource.name.
@@ -7069,6 +7090,7 @@ extension Components {
                 nextFetchAt: Foundation.Date? = nil,
                 notFound: Swift.Int64? = nil,
                 owner: Swift.String,
+                removeWatched: Swift.Bool? = nil,
                 screen: Swift.String,
                 source: Components.Schemas.MediaListSource,
                 sourceName: Swift.String? = nil,
@@ -7090,6 +7112,7 @@ extension Components {
                 self.nextFetchAt = nextFetchAt
                 self.notFound = notFound
                 self.owner = owner
+                self.removeWatched = removeWatched
                 self.screen = screen
                 self.source = source
                 self.sourceName = sourceName
@@ -7112,6 +7135,7 @@ extension Components {
                 case nextFetchAt
                 case notFound
                 case owner
+                case removeWatched
                 case screen
                 case source
                 case sourceName
@@ -7162,6 +7186,10 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/MediaListEntry`.
         public struct MediaListEntry: Codable, Hashable, Sendable {
+            /// Watchlists: when the title was saved.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MediaListEntry/addedAt`.
+            public var addedAt: Foundation.Date?
             /// False for an imported title TMDB could not find: show it as Not found.
             ///
             /// - Remark: Generated from `#/components/schemas/MediaListEntry/found`.
@@ -7180,7 +7208,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/MediaListEntry/posterPath`.
             public var posterPath: Swift.String?
-            /// 1 for the first.
+            /// 1 for the first. A watchlist's entries are numbered in the order sent.
             ///
             /// - Remark: Generated from `#/components/schemas/MediaListEntry/rank`.
             public var rank: Swift.Int64
@@ -7194,22 +7222,29 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/MediaListEntry/tmdbId`.
             public var tmdbId: Swift.Int64?
+            /// The title is on one of the signed-in person's watchlists.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MediaListEntry/watchlisted`.
+            public var watchlisted: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/MediaListEntry/year`.
             public var year: Swift.Int64?
             /// Creates a new `MediaListEntry`.
             ///
             /// - Parameters:
+            ///   - addedAt: Watchlists: when the title was saved.
             ///   - found: False for an imported title TMDB could not find: show it as Not found.
             ///   - imdbId:
             ///   - item: The library's movie or show, when it has the title.
             ///   - mediaType: movie or tv.
             ///   - posterPath: TMDB's poster, for titles the library doesn't have.
-            ///   - rank: 1 for the first.
+            ///   - rank: 1 for the first. A watchlist's entries are numbered in the order sent.
             ///   - requestState: requestable, requested, downloading or available, as Requestable.state, when the person may request. Absent when requests aren't set up. A plain string.
             ///   - title:
             ///   - tmdbId: Absent when TMDB could not find the title (imports).
+            ///   - watchlisted: The title is on one of the signed-in person's watchlists.
             ///   - year:
             public init(
+                addedAt: Foundation.Date? = nil,
                 found: Swift.Bool,
                 imdbId: Swift.String? = nil,
                 item: Components.Schemas.BrowseItem? = nil,
@@ -7219,8 +7254,10 @@ extension Components {
                 requestState: Swift.String? = nil,
                 title: Swift.String,
                 tmdbId: Swift.Int64? = nil,
+                watchlisted: Swift.Bool? = nil,
                 year: Swift.Int64? = nil
             ) {
+                self.addedAt = addedAt
                 self.found = found
                 self.imdbId = imdbId
                 self.item = item
@@ -7230,9 +7267,11 @@ extension Components {
                 self.requestState = requestState
                 self.title = title
                 self.tmdbId = tmdbId
+                self.watchlisted = watchlisted
                 self.year = year
             }
             public enum CodingKeys: String, CodingKey {
+                case addedAt
                 case found
                 case imdbId
                 case item
@@ -7242,6 +7281,7 @@ extension Components {
                 case requestState
                 case title
                 case tmdbId
+                case watchlisted
                 case year
             }
         }
@@ -7271,7 +7311,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/MediaListSource/genres`.
             public var genres: [Swift.Int64]?
-            /// tmdb, mdblist, library or import. A plain string: show a list whose kind you don't know, and don't offer to edit it.
+            /// tmdb, mdblist, library, import or watchlist (from API level 33; one of the person's watchlists, which listWatchlists and the watchlist operations change). A plain string: show a list whose kind you don't know, and don't offer to edit it.
             ///
             /// - Remark: Generated from `#/components/schemas/MediaListSource/kind`.
             public var kind: Swift.String
@@ -7324,7 +7364,7 @@ extension Components {
             ///   - format: import, in replies: what the text was read as: imdb, letterboxd or lines.
             ///   - genre: library: one of the library's genres.
             ///   - genres: tmdb discover: TMDB genre IDs (from getMediaListSources), all of which must match.
-            ///   - kind: tmdb, mdblist, library or import. A plain string: show a list whose kind you don't know, and don't offer to edit it.
+            ///   - kind: tmdb, mdblist, library, import or watchlist (from API level 33; one of the person's watchlists, which listWatchlists and the watchlist operations change). A plain string: show a list whose kind you don't know, and don't offer to edit it.
             ///   - language: tmdb discover: original language, ISO 639-1 (ko, fr).
             ///   - libraryId: library: the library to filter.
             ///   - minRating: tmdb discover: TMDB rating at least this.
@@ -8005,6 +8045,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/MovieDetail/watch`.
             public var watch: Components.Schemas.WatchState?
+            /// The signed-in person's watchlists that hold the movie (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MovieDetail/watchlists`.
+            public var watchlists: [Swift.Int64]?
             /// - Remark: Generated from `#/components/schemas/MovieDetail/year`.
             public var year: Swift.Int64?
             /// Creates a new `MovieDetail`.
@@ -8037,6 +8081,7 @@ extension Components {
             ///   - totalSize:
             ///   - trailers: The movie's trailers, best first: trailer files in the library, then YouTube trailers while they are on. Apps play the first one whose source they know. Absent when it has none, and on older servers.
             ///   - watch: The signed-in user's progress.
+            ///   - watchlists: The signed-in person's watchlists that hold the movie (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33.
             ///   - year:
             public init(
                 addedAt: Foundation.Date? = nil,
@@ -8066,6 +8111,7 @@ extension Components {
                 totalSize: Swift.Int64,
                 trailers: [Components.Schemas.MovieTrailer]? = nil,
                 watch: Components.Schemas.WatchState? = nil,
+                watchlists: [Swift.Int64]? = nil,
                 year: Swift.Int64? = nil
             ) {
                 self.addedAt = addedAt
@@ -8095,6 +8141,7 @@ extension Components {
                 self.totalSize = totalSize
                 self.trailers = trailers
                 self.watch = watch
+                self.watchlists = watchlists
                 self.year = year
             }
             public enum CodingKeys: String, CodingKey {
@@ -8125,6 +8172,7 @@ extension Components {
                 case totalSize
                 case trailers
                 case watch
+                case watchlists
                 case year
             }
         }
@@ -10751,6 +10799,10 @@ extension Components {
             public var title: Swift.String
             /// - Remark: Generated from `#/components/schemas/Requestable/tmdbId`.
             public var tmdbId: Swift.Int64
+            /// It is on one of the signed-in person's watchlists.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Requestable/watchlisted`.
+            public var watchlisted: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/Requestable/year`.
             public var year: Swift.Int64?
             /// Creates a new `Requestable`.
@@ -10766,6 +10818,7 @@ extension Components {
             ///   - state:
             ///   - title:
             ///   - tmdbId:
+            ///   - watchlisted: It is on one of the signed-in person's watchlists.
             ///   - year:
             public init(
                 mediaType: Components.Schemas.Requestable.MediaTypePayload,
@@ -10778,6 +10831,7 @@ extension Components {
                 state: Components.Schemas.Requestable.StatePayload,
                 title: Swift.String,
                 tmdbId: Swift.Int64,
+                watchlisted: Swift.Bool? = nil,
                 year: Swift.Int64? = nil
             ) {
                 self.mediaType = mediaType
@@ -10790,6 +10844,7 @@ extension Components {
                 self.state = state
                 self.title = title
                 self.tmdbId = tmdbId
+                self.watchlisted = watchlisted
                 self.year = year
             }
             public enum CodingKeys: String, CodingKey {
@@ -10803,6 +10858,7 @@ extension Components {
                 case state
                 case title
                 case tmdbId
+                case watchlisted
                 case year
             }
         }
@@ -11065,12 +11121,14 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/RowsChanged`.
         public struct RowsChanged: Codable, Hashable, Sendable {
+            /// The screen whose layout changed: home or library-<id>. home also when a watchlist was made, renamed or deleted, which changes every screen.
+            ///
             /// - Remark: Generated from `#/components/schemas/RowsChanged/screen`.
             public var screen: Swift.String
             /// Creates a new `RowsChanged`.
             ///
             /// - Parameters:
-            ///   - screen:
+            ///   - screen: The screen whose layout changed: home or library-<id>. home also when a watchlist was made, renamed or deleted, which changes every screen.
             public init(screen: Swift.String) {
                 self.screen = screen
             }
@@ -12646,6 +12704,10 @@ extension Components {
             public var totalEpisodes: Swift.Int64
             /// - Remark: Generated from `#/components/schemas/ShowDetail/totalSize`.
             public var totalSize: Swift.Int64
+            /// The signed-in person's watchlists that hold the show (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ShowDetail/watchlists`.
+            public var watchlists: [Swift.Int64]?
             /// - Remark: Generated from `#/components/schemas/ShowDetail/year`.
             public var year: Swift.Int64?
             /// Creates a new `ShowDetail`.
@@ -12679,6 +12741,7 @@ extension Components {
             ///   - tmdbId:
             ///   - totalEpisodes: Episodes across all seasons, as the seasons' episodeCount counts them.
             ///   - totalSize:
+            ///   - watchlists: The signed-in person's watchlists that hold the show (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33.
             ///   - year:
             public init(
                 addedAt: Foundation.Date? = nil,
@@ -12709,6 +12772,7 @@ extension Components {
                 tmdbId: Swift.Int64,
                 totalEpisodes: Swift.Int64,
                 totalSize: Swift.Int64,
+                watchlists: [Swift.Int64]? = nil,
                 year: Swift.Int64? = nil
             ) {
                 self.addedAt = addedAt
@@ -12739,6 +12803,7 @@ extension Components {
                 self.tmdbId = tmdbId
                 self.totalEpisodes = totalEpisodes
                 self.totalSize = totalSize
+                self.watchlists = watchlists
                 self.year = year
             }
             public enum CodingKeys: String, CodingKey {
@@ -12770,6 +12835,7 @@ extension Components {
                 case tmdbId
                 case totalEpisodes
                 case totalSize
+                case watchlists
                 case year
             }
         }
@@ -13577,6 +13643,31 @@ extension Components {
                 case mode
             }
         }
+        /// - Remark: Generated from `#/components/schemas/UpdateWatchlistInputBody`.
+        public struct UpdateWatchlistInputBody: Codable, Hashable, Sendable {
+            /// Different from the person's other watchlists' names, whatever the case.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateWatchlistInputBody/name`.
+            public var name: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/UpdateWatchlistInputBody/removeWatched`.
+            public var removeWatched: Swift.Bool?
+            /// Creates a new `UpdateWatchlistInputBody`.
+            ///
+            /// - Parameters:
+            ///   - name: Different from the person's other watchlists' names, whatever the case.
+            ///   - removeWatched:
+            public init(
+                name: Swift.String? = nil,
+                removeWatched: Swift.Bool? = nil
+            ) {
+                self.name = name
+                self.removeWatched = removeWatched
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case removeWatched
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/User`.
         public struct User: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/User/id`.
@@ -14000,6 +14091,292 @@ extension Components {
                 case folders
                 case state
                 case unwatched
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/Watchlist`.
+        public struct Watchlist: Codable, Hashable, Sendable {
+            /// With mediaType and tmdbId in listWatchlists' query: it holds that title. False otherwise.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Watchlist/contains`.
+            public var contains: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/Watchlist/createdAt`.
+            public var createdAt: Foundation.Date
+            /// The watchlist's ID, which is also its list's: getMediaList and listMediaListEntries take it, and its rows are list:<id>.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Watchlist/id`.
+            public var id: Swift.Int64
+            /// Titles on it that some library has now.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Watchlist/inLibrary`.
+            public var inLibrary: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/Watchlist/name`.
+            public var name: Swift.String
+            /// The poster paths of its first four titles that have one, in its order: TMDB paths, as posterPath elsewhere.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Watchlist/posters`.
+            public var posters: [Swift.String]
+            /// A title leaves once the person finishes it: a movie when it is watched, a show when every episode in the library is. Off, watched titles stay.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Watchlist/removeWatched`.
+            public var removeWatched: Swift.Bool
+            /// Titles on it, in the library or not.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Watchlist/titles`.
+            public var titles: Swift.Int64
+            /// When it was renamed or its titles last changed.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Watchlist/updatedAt`.
+            public var updatedAt: Foundation.Date
+            /// Creates a new `Watchlist`.
+            ///
+            /// - Parameters:
+            ///   - contains: With mediaType and tmdbId in listWatchlists' query: it holds that title. False otherwise.
+            ///   - createdAt:
+            ///   - id: The watchlist's ID, which is also its list's: getMediaList and listMediaListEntries take it, and its rows are list:<id>.
+            ///   - inLibrary: Titles on it that some library has now.
+            ///   - name:
+            ///   - posters: The poster paths of its first four titles that have one, in its order: TMDB paths, as posterPath elsewhere.
+            ///   - removeWatched: A title leaves once the person finishes it: a movie when it is watched, a show when every episode in the library is. Off, watched titles stay.
+            ///   - titles: Titles on it, in the library or not.
+            ///   - updatedAt: When it was renamed or its titles last changed.
+            public init(
+                contains: Swift.Bool? = nil,
+                createdAt: Foundation.Date,
+                id: Swift.Int64,
+                inLibrary: Swift.Int64,
+                name: Swift.String,
+                posters: [Swift.String],
+                removeWatched: Swift.Bool,
+                titles: Swift.Int64,
+                updatedAt: Foundation.Date
+            ) {
+                self.contains = contains
+                self.createdAt = createdAt
+                self.id = id
+                self.inLibrary = inLibrary
+                self.name = name
+                self.posters = posters
+                self.removeWatched = removeWatched
+                self.titles = titles
+                self.updatedAt = updatedAt
+            }
+            public enum CodingKeys: String, CodingKey {
+                case contains
+                case createdAt
+                case id
+                case inLibrary
+                case name
+                case posters
+                case removeWatched
+                case titles
+                case updatedAt
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/WatchlistBody`.
+        public struct WatchlistBody: Codable, Hashable, Sendable {
+            /// Different from the person's other watchlists' names, whatever the case.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchlistBody/name`.
+            public var name: Swift.String
+            /// Remove titles once watched. On when left out.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchlistBody/removeWatched`.
+            public var removeWatched: Swift.Bool?
+            /// Creates a new `WatchlistBody`.
+            ///
+            /// - Parameters:
+            ///   - name: Different from the person's other watchlists' names, whatever the case.
+            ///   - removeWatched: Remove titles once watched. On when left out.
+            public init(
+                name: Swift.String,
+                removeWatched: Swift.Bool? = nil
+            ) {
+                self.name = name
+                self.removeWatched = removeWatched
+            }
+            public enum CodingKeys: String, CodingKey {
+                case name
+                case removeWatched
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/WatchlistList`.
+        public struct WatchlistList: Codable, Hashable, Sendable {
+            /// In the order they were made.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchlistList/items`.
+            public var items: [Components.Schemas.Watchlist]
+            /// Most watchlists one person may have.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchlistList/max`.
+            public var max: Swift.Int64
+            /// Most titles one watchlist holds.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchlistList/maxTitles`.
+            public var maxTitles: Swift.Int64
+            /// Creates a new `WatchlistList`.
+            ///
+            /// - Parameters:
+            ///   - items: In the order they were made.
+            ///   - max: Most watchlists one person may have.
+            ///   - maxTitles: Most titles one watchlist holds.
+            public init(
+                items: [Components.Schemas.Watchlist],
+                max: Swift.Int64,
+                maxTitles: Swift.Int64
+            ) {
+                self.items = items
+                self.max = max
+                self.maxTitles = maxTitles
+            }
+            public enum CodingKeys: String, CodingKey {
+                case items
+                case max
+                case maxTitles
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/WatchlistTitleChange`.
+        public struct WatchlistTitleChange: Codable, Hashable, Sendable {
+            /// saveToOnlyWatchlist: the person had none, and Watchlist was made for this save.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchlistTitleChange/created`.
+            public var created: Swift.Bool?
+            /// removeFromWatchlists: the watchlists it was taken off, for Undo.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchlistTitleChange/removed`.
+            public var removed: [Swift.Int64]?
+            /// saveToWatchlist, removeFromWatchlist and saveToOnlyWatchlist: the watchlist it was saved to or taken from, as it is now (for its name in Saved to Watchlist).
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchlistTitleChange/watchlist`.
+            public var watchlist: Components.Schemas.Watchlist?
+            /// The person's watchlists that hold the title now, in the order they were made: what MovieDetail.watchlists and ShowDetail.watchlists now say.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchlistTitleChange/watchlists`.
+            public var watchlists: [Swift.Int64]
+            /// Creates a new `WatchlistTitleChange`.
+            ///
+            /// - Parameters:
+            ///   - created: saveToOnlyWatchlist: the person had none, and Watchlist was made for this save.
+            ///   - removed: removeFromWatchlists: the watchlists it was taken off, for Undo.
+            ///   - watchlist: saveToWatchlist, removeFromWatchlist and saveToOnlyWatchlist: the watchlist it was saved to or taken from, as it is now (for its name in Saved to Watchlist).
+            ///   - watchlists: The person's watchlists that hold the title now, in the order they were made: what MovieDetail.watchlists and ShowDetail.watchlists now say.
+            public init(
+                created: Swift.Bool? = nil,
+                removed: [Swift.Int64]? = nil,
+                watchlist: Components.Schemas.Watchlist? = nil,
+                watchlists: [Swift.Int64]
+            ) {
+                self.created = created
+                self.removed = removed
+                self.watchlist = watchlist
+                self.watchlists = watchlists
+            }
+            public enum CodingKeys: String, CodingKey {
+                case created
+                case removed
+                case watchlist
+                case watchlists
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/WatchlistTitleDetails`.
+        public struct WatchlistTitleDetails: Codable, Hashable, Sendable {
+            /// TMDB's poster path, as Requestable.posterPath. Kept only in TMDB's shape: a slash, then letters, digits, _ or -, then .jpg or .png.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchlistTitleDetails/posterPath`.
+            public var posterPath: Swift.String?
+            /// Needed for a title the server has no record of: without one the save is refused.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchlistTitleDetails/title`.
+            public var title: Swift.String?
+            /// Kept when it is between 1870 and 2100.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchlistTitleDetails/year`.
+            public var year: Swift.Int64?
+            /// Creates a new `WatchlistTitleDetails`.
+            ///
+            /// - Parameters:
+            ///   - posterPath: TMDB's poster path, as Requestable.posterPath. Kept only in TMDB's shape: a slash, then letters, digits, _ or -, then .jpg or .png.
+            ///   - title: Needed for a title the server has no record of: without one the save is refused.
+            ///   - year: Kept when it is between 1870 and 2100.
+            public init(
+                posterPath: Swift.String? = nil,
+                title: Swift.String? = nil,
+                year: Swift.Int64? = nil
+            ) {
+                self.posterPath = posterPath
+                self.title = title
+                self.year = year
+            }
+            public enum CodingKeys: String, CodingKey {
+                case posterPath
+                case title
+                case year
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/WatchlistsConflict`.
+        public struct WatchlistsConflict: Codable, Hashable, Sendable {
+            /// A human-readable explanation specific to this occurrence of the problem.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchlistsConflict/detail`.
+            public var detail: Swift.String?
+            /// Optional list of individual error details
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchlistsConflict/errors`.
+            public var errors: [Components.Schemas.ErrorDetail]?
+            /// A URI reference that identifies the specific occurrence of the problem.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchlistsConflict/instance`.
+            public var instance: Swift.String?
+            /// HTTP status code
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchlistsConflict/status`.
+            public var status: Swift.Int64?
+            /// A short, human-readable summary of the problem type. This value should not change between occurrences of the error.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchlistsConflict/title`.
+            public var title: Swift.String?
+            /// A URI reference to human-readable documentation for the error.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchlistsConflict/type`.
+            public var _type: Swift.String?
+            /// The person's watchlists, as listWatchlists sends them for this title (with contains): what the picker shows.
+            ///
+            /// - Remark: Generated from `#/components/schemas/WatchlistsConflict/watchlists`.
+            public var watchlists: [Components.Schemas.Watchlist]
+            /// Creates a new `WatchlistsConflict`.
+            ///
+            /// - Parameters:
+            ///   - detail: A human-readable explanation specific to this occurrence of the problem.
+            ///   - errors: Optional list of individual error details
+            ///   - instance: A URI reference that identifies the specific occurrence of the problem.
+            ///   - status: HTTP status code
+            ///   - title: A short, human-readable summary of the problem type. This value should not change between occurrences of the error.
+            ///   - _type: A URI reference to human-readable documentation for the error.
+            ///   - watchlists: The person's watchlists, as listWatchlists sends them for this title (with contains): what the picker shows.
+            public init(
+                detail: Swift.String? = nil,
+                errors: [Components.Schemas.ErrorDetail]? = nil,
+                instance: Swift.String? = nil,
+                status: Swift.Int64? = nil,
+                title: Swift.String? = nil,
+                _type: Swift.String? = nil,
+                watchlists: [Components.Schemas.Watchlist]
+            ) {
+                self.detail = detail
+                self.errors = errors
+                self.instance = instance
+                self.status = status
+                self.title = title
+                self._type = _type
+                self.watchlists = watchlists
+            }
+            public enum CodingKeys: String, CodingKey {
+                case detail
+                case errors
+                case instance
+                case status
+                case title
+                case _type = "type"
+                case watchlists
             }
         }
     }

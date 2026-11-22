@@ -64,6 +64,8 @@ type MovieDetail struct {
 	// Trailers are the movie's trailer files in the library, then its
 	// YouTube trailers from TMDB, APILevel 20.
 	Trailers []MovieTrailer `json:"trailers,omitempty" required:"false" nullable:"false" doc:"The movie's trailers, best first: trailer files in the library, then YouTube trailers while they are on. Apps play the first one whose source they know. Absent when it has none, and on older servers."`
+	// Watchlists is from API level 33.
+	Watchlists []int64 `json:"watchlists" required:"false" nullable:"false" doc:"The signed-in person's watchlists that hold the movie (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33."`
 }
 
 // Show is a matched series with at least one present episode file.
@@ -127,6 +129,8 @@ type ShowDetail struct {
 	ManagedBy   string       `json:"managedBy,omitempty" required:"false" doc:"The Sonarr connection that has the show."`
 	// Following is from API level 29.
 	Following bool `json:"following" required:"false" doc:"The signed-in person follows the show (followShow). Absent on servers below API level 29."`
+	// Watchlists is from API level 33.
+	Watchlists []int64 `json:"watchlists" required:"false" nullable:"false" doc:"The signed-in person's watchlists that hold the show (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33."`
 }
 
 type NextEpisode struct {

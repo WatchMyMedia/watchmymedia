@@ -354,12 +354,51 @@ open class ListsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     }
 
     /**
+     * enum for parameter sort
+     */
+     enum class SortListMediaListEntries(val value: kotlin.String) {
+         @SerialName(value = "added") added("added"),
+         @SerialName(value = "title") title("title"),
+         @SerialName(value = "released") released("released"),
+         @SerialName(value = "unknown_default_open_api") unknown_default_open_api("unknown_default_open_api");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
+     * enum for parameter mediaType
+     */
+     enum class MediaTypeListMediaListEntries(val value: kotlin.String) {
+         @SerialName(value = "movie") movie("movie"),
+         @SerialName(value = "tv") tv("tv"),
+         @SerialName(value = "unknown_default_open_api") unknown_default_open_api("unknown_default_open_api");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
      * GET /api/lists/{id}/entries
      * Every title on a list in order, with the library&#39;s item where it has one
      * The list&#39;s See all page. Missing titles carry requestState when the person may request.
      * @param id List ID.
      * @param limit  (optional, default to 100L)
      * @param offset  (optional, default to 0L)
+     * @param sort added: a watchlist&#39;s own order, newest first, a title counting from when it reached the library if that was after it was saved (the default for a watchlist; other lists keep their order). title: by title. released: newest release (or first air date) first. From API level 33. (optional)
+     * @param mediaType Only movies or only shows; total and inLibrary count those. From API level 33. (optional)
      * @return MediaListEntries
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -369,8 +408,8 @@ open class ListsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    suspend fun listMediaListEntries(id: kotlin.Long, limit: kotlin.Long? = 100L, offset: kotlin.Long? = 0L) : MediaListEntries = withContext(Dispatchers.IO) {
-        val localVarResponse = listMediaListEntriesWithHttpInfo(id = id, limit = limit, offset = offset)
+    suspend fun listMediaListEntries(id: kotlin.Long, limit: kotlin.Long? = 100L, offset: kotlin.Long? = 0L, sort: SortListMediaListEntries? = null, mediaType: MediaTypeListMediaListEntries? = null) : MediaListEntries = withContext(Dispatchers.IO) {
+        val localVarResponse = listMediaListEntriesWithHttpInfo(id = id, limit = limit, offset = offset, sort = sort, mediaType = mediaType)
 
         return@withContext when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as MediaListEntries
@@ -394,14 +433,16 @@ open class ListsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @param id List ID.
      * @param limit  (optional, default to 100L)
      * @param offset  (optional, default to 0L)
+     * @param sort added: a watchlist&#39;s own order, newest first, a title counting from when it reached the library if that was after it was saved (the default for a watchlist; other lists keep their order). title: by title. released: newest release (or first air date) first. From API level 33. (optional)
+     * @param mediaType Only movies or only shows; total and inLibrary count those. From API level 33. (optional)
      * @return ApiResponse<MediaListEntries?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    suspend fun listMediaListEntriesWithHttpInfo(id: kotlin.Long, limit: kotlin.Long?, offset: kotlin.Long?) : ApiResponse<MediaListEntries?> = withContext(Dispatchers.IO) {
-        val localVariableConfig = listMediaListEntriesRequestConfig(id = id, limit = limit, offset = offset)
+    suspend fun listMediaListEntriesWithHttpInfo(id: kotlin.Long, limit: kotlin.Long?, offset: kotlin.Long?, sort: SortListMediaListEntries?, mediaType: MediaTypeListMediaListEntries?) : ApiResponse<MediaListEntries?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = listMediaListEntriesRequestConfig(id = id, limit = limit, offset = offset, sort = sort, mediaType = mediaType)
 
         return@withContext request<Unit, MediaListEntries>(
             localVariableConfig
@@ -414,9 +455,11 @@ open class ListsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @param id List ID.
      * @param limit  (optional, default to 100L)
      * @param offset  (optional, default to 0L)
+     * @param sort added: a watchlist&#39;s own order, newest first, a title counting from when it reached the library if that was after it was saved (the default for a watchlist; other lists keep their order). title: by title. released: newest release (or first air date) first. From API level 33. (optional)
+     * @param mediaType Only movies or only shows; total and inLibrary count those. From API level 33. (optional)
      * @return RequestConfig
      */
-    fun listMediaListEntriesRequestConfig(id: kotlin.Long, limit: kotlin.Long?, offset: kotlin.Long?) : RequestConfig<Unit> {
+    fun listMediaListEntriesRequestConfig(id: kotlin.Long, limit: kotlin.Long?, offset: kotlin.Long?, sort: SortListMediaListEntries?, mediaType: MediaTypeListMediaListEntries?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
@@ -425,6 +468,12 @@ open class ListsApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
                 }
                 if (offset != null) {
                     put("offset", listOf(offset.toString()))
+                }
+                if (sort != null) {
+                    put("sort", listOf(sort.value))
+                }
+                if (mediaType != null) {
+                    put("mediaType", listOf(mediaType.value))
                 }
             }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()

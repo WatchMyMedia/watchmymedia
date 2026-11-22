@@ -34,12 +34,13 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * @param screen
+ * @param screen The screen whose layout changed: home or library-<id>. home also when a watchlist was made, renamed or deleted, which changes every screen.
  */
 @Serializable
 
 data class RowsChanged (
 
+    /* The screen whose layout changed: home or library-<id>. home also when a watchlist was made, renamed or deleted, which changes every screen. */
     @SerialName(value = "screen")
     val screen: kotlin.String
 

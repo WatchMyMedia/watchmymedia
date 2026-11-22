@@ -35,6 +35,9 @@ const newWindow = metadata.NewWindow
 type BrowseItem struct {
 	Kind      string   `json:"kind" enum:"movie,show,unmatched"`
 	ID        int64    `json:"id"`
+	// TMDBID and Watchlisted are from API level 33.
+	TMDBID      int64 `json:"tmdbId,omitempty" required:"false" doc:"The movie's or show's TMDB id, which saving it to a watchlist takes. Absent for a title TMDB hasn't matched, which can't be saved."`
+	Watchlisted bool  `json:"watchlisted,omitempty" required:"false" doc:"It is on one of the signed-in person's watchlists: a card's menu offers Remove from Watchlist rather than Add."`
 	LibraryID int64    `json:"libraryId"`
 	Title     string   `json:"title"`
 	Year      int64    `json:"year,omitempty"`

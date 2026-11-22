@@ -53,6 +53,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param fetchedAt The last fetch that worked.
  * @param nextFetchAt Absent for imports and library lists, which are not fetched.
  * @param notFound Imports: entries TMDB could not find.
+ * @param removeWatched Watchlists: a title leaves once the person finishes it (Watchlist.removeWatched). False for other lists.
  * @param sourceName The words for From <name>, as ScreenRowSource.name.
  * @param sourceUrl The list's page on TMDB or mdblist.com, when it has one.
  */
@@ -125,6 +126,10 @@ data class MediaList (
     /* Imports: entries TMDB could not find. */
     @SerialName(value = "notFound")
     val notFound: kotlin.Long? = null,
+
+    /* Watchlists: a title leaves once the person finishes it (Watchlist.removeWatched). False for other lists. */
+    @SerialName(value = "removeWatched")
+    val removeWatched: kotlin.Boolean? = null,
 
     /* The words for From <name>, as ScreenRowSource.name. */
     @SerialName(value = "sourceName")

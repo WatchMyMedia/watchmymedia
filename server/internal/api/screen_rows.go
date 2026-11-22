@@ -106,7 +106,7 @@ type UpdateRowLayoutInput struct {
 // RowsChanged is the rows.changed event, sent to the person alone after
 // their layout for a screen changes (or the household default, to everyone).
 type RowsChanged struct {
-	Screen string `json:"screen"`
+	Screen string `json:"screen" doc:"The screen whose layout changed: home or library-<id>. home also when a watchlist was made, renamed or deleted, which changes every screen."`
 }
 
 // RowsChangedEvent is the rows.changed event.

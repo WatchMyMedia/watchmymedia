@@ -58,6 +58,8 @@ type Requestable struct {
 	Request *integrations.RequestState `json:"request,omitempty" doc:"The newest open request."`
 	// Seasons are a show's seasons, from the lookup only.
 	Seasons []RequestableSeason `json:"seasons,omitempty"`
+	// Watchlisted is from API level 33.
+	Watchlisted bool `json:"watchlisted,omitempty" required:"false" doc:"It is on one of the signed-in person's watchlists."`
 }
 
 type RequestableSeason struct {

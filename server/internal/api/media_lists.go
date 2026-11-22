@@ -33,7 +33,7 @@ const (
 // One flat object for every kind: each kind reads
 // the fields it names and ignores the rest.
 type MediaListSource struct {
-	Kind string `json:"kind" doc:"tmdb, mdblist, library or import. A plain string: show a list whose kind you don't know, and don't offer to edit it."`
+	Kind string `json:"kind" doc:"tmdb, mdblist, library, import or watchlist (from API level 33; one of the person's watchlists, which listWatchlists and the watchlist operations change). A plain string: show a list whose kind you don't know, and don't offer to edit it."`
 
 	// TMDB.
 	Chart     string  `json:"chart,omitempty" required:"false" doc:"tmdb: trending-day, trending-week, popular, top-rated, now-playing (movies), upcoming (movies), on-the-air (TV), airing-today (TV), discover, list or collection."`
@@ -82,6 +82,9 @@ type MediaList struct {
 
 	SourceName string `json:"sourceName,omitempty" required:"false" example:"TMDB" doc:"The words for From <name>, as ScreenRowSource.name."`
 	SourceURL  string `json:"sourceUrl,omitempty" required:"false" doc:"The list's page on TMDB or mdblist.com, when it has one."`
+
+	// RemoveWatched is from API level 33.
+	RemoveWatched bool `json:"removeWatched" required:"false" doc:"Watchlists: a title leaves once the person finishes it (Watchlist.removeWatched). False for other lists."`
 }
 
 type MediaListOutput struct{ Body MediaList }
@@ -94,7 +97,7 @@ type MediaListsOutput struct {
 
 // MediaListEntry is one title on a list, in the list's order.
 type MediaListEntry struct {
-	Rank       int    `json:"rank" doc:"1 for the first."`
+	Rank       int    `json:"rank" doc:"1 for the first. A watchlist's entries are numbered in the order sent."`
 	MediaType  string `json:"mediaType" doc:"movie or tv."`
 	TMDBID     int64  `json:"tmdbId,omitempty" required:"false" doc:"Absent when TMDB could not find the title (imports)."`
 	IMDbID     string `json:"imdbId,omitempty" required:"false"`
@@ -107,6 +110,9 @@ type MediaListEntry struct {
 	// RequestState is what Request would do, as Requestable.state, when the
 	// person may request and the server has somewhere to send requests.
 	RequestState string `json:"requestState,omitempty" required:"false" doc:"requestable, requested, downloading or available, as Requestable.state, when the person may request. Absent when requests aren't set up. A plain string."`
+	// Watchlisted and AddedAt are from API level 33.
+	Watchlisted bool       `json:"watchlisted,omitempty" required:"false" doc:"The title is on one of the signed-in person's watchlists."`
+	AddedAt     *time.Time `json:"addedAt,omitempty" required:"false" doc:"Watchlists: when the title was saved."`
 }
 
 type MediaListEntries struct {
@@ -125,6 +131,9 @@ type MediaListEntriesInput struct {
 	ID     int64 `path:"id" doc:"List ID."`
 	Limit  int   `query:"limit" default:"100" minimum:"1" maximum:"250"`
 	Offset int   `query:"offset" default:"0" minimum:"0"`
+	// Sort and MediaType are from API level 33.
+	Sort      string `query:"sort" required:"false" enum:"added,title,released" doc:"added: a watchlist's own order, newest first, a title counting from when it reached the library if that was after it was saved (the default for a watchlist; other lists keep their order). title: by title. released: newest release (or first air date) first. From API level 33."`
+	MediaType string `query:"mediaType" required:"false" enum:"movie,tv" doc:"Only movies or only shows; total and inLibrary count those. From API level 33."`
 }
 
 // MediaListBody is what makes a list, for createMediaList and previewMediaList.

@@ -43,6 +43,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param castAppId The Google Cast receiver application the web UI launches; absent when it shows no Cast button.
  * @param casting The server issues cast tokens (POST /auth/cast-token), so apps may offer casting.
  * @param host The platform a container install runs on, when the server can tell: unraid. Settings word updates and GPU setup for it. Absent otherwise and on older servers.
+ * @param install How the server was installed: macos-app, windows-app, docker, deb, rpm or binary. The web words folder permissions and GPU setup for it. A plain string: ignore values you don't know. Absent on older servers.
  * @param platform Server operating system, such as windows, darwin or linux. Used for server-side folder path examples; absent on older servers.
  */
 @Serializable
@@ -83,6 +84,10 @@ data class ServerInfo (
     /* The platform a container install runs on, when the server can tell: unraid. Settings word updates and GPU setup for it. Absent otherwise and on older servers. */
     @SerialName(value = "host")
     val host: kotlin.String? = null,
+
+    /* How the server was installed: macos-app, windows-app, docker, deb, rpm or binary. The web words folder permissions and GPU setup for it. A plain string: ignore values you don't know. Absent on older servers. */
+    @SerialName(value = "install")
+    val install: kotlin.String? = null,
 
     /* Server operating system, such as windows, darwin or linux. Used for server-side folder path examples; absent on older servers. */
     @SerialName(value = "platform")

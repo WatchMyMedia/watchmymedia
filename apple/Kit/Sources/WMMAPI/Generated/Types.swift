@@ -393,6 +393,62 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /api/me/rows/{screen}`.
     /// - Remark: Generated from `#/paths//api/me/rows/{screen}/delete(resetRowLayout)`.
     func resetRowLayout(_ input: Operations.ResetRowLayout.Input) async throws -> Operations.ResetRowLayout.Output
+    /// Save a movie or show to the person's watchlist, when they have one
+    ///
+    /// The Watchlist button pressed once. With no watchlist it makes one called Watchlist (created) and saves there; with one it saves there; with two or more it saves nothing and answers 409 with the watchlists (WatchlistsConflict), and the app opens the picker. The body is saveToWatchlist's. From API level 33.
+    ///
+    /// - Remark: HTTP `PUT /api/me/watchlist/titles/{mediaType}/{tmdbId}`.
+    /// - Remark: Generated from `#/paths//api/me/watchlist/titles/{mediaType}/{tmdbId}/put(saveToOnlyWatchlist)`.
+    func saveToOnlyWatchlist(_ input: Operations.SaveToOnlyWatchlist.Input) async throws -> Operations.SaveToOnlyWatchlist.Output
+    /// Take a movie or show off every one of the person's watchlists
+    ///
+    /// On Watchlist pressed again. Succeeds when no watchlist holds it. Sends lists.changed for each watchlist it left. From API level 33.
+    ///
+    /// - Remark: HTTP `DELETE /api/me/watchlist/titles/{mediaType}/{tmdbId}`.
+    /// - Remark: Generated from `#/paths//api/me/watchlist/titles/{mediaType}/{tmdbId}/delete(removeFromWatchlists)`.
+    func removeFromWatchlists(_ input: Operations.RemoveFromWatchlists.Input) async throws -> Operations.RemoveFromWatchlists.Output
+    /// The signed-in person's watchlists
+    ///
+    /// Apps read it when they start and again on rows.changed, and press Watchlist with saveToOnlyWatchlist when there is at most one, else open the picker. From API level 33.
+    ///
+    /// - Remark: HTTP `GET /api/me/watchlists`.
+    /// - Remark: Generated from `#/paths//api/me/watchlists/get(listWatchlists)`.
+    func listWatchlists(_ input: Operations.ListWatchlists.Input) async throws -> Operations.ListWatchlists.Output
+    /// Make a watchlist
+    ///
+    /// 422 when the person has 25, or another of theirs has the name. Its rows go on Home after Continue watching and New from shows you follow, and first on Movies and TV screens. Sends rows.changed to the person. From API level 33.
+    ///
+    /// - Remark: HTTP `POST /api/me/watchlists`.
+    /// - Remark: Generated from `#/paths//api/me/watchlists/post(createWatchlist)`.
+    func createWatchlist(_ input: Operations.CreateWatchlist.Input) async throws -> Operations.CreateWatchlist.Output
+    /// Rename a watchlist, or turn Remove titles once watched on or off
+    ///
+    /// 422 for a name another of the person's watchlists has. Another person's watchlist is not found, for admins too. Sends rows.changed to the person. From API level 33.
+    ///
+    /// - Remark: HTTP `PATCH /api/me/watchlists/{id}`.
+    /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/patch(updateWatchlist)`.
+    func updateWatchlist(_ input: Operations.UpdateWatchlist.Input) async throws -> Operations.UpdateWatchlist.Output
+    /// Delete a watchlist
+    ///
+    /// Its titles stay in the library; its rows leave every screen. deleteMediaList does the same. Sends rows.changed to the person. From API level 33.
+    ///
+    /// - Remark: HTTP `DELETE /api/me/watchlists/{id}`.
+    /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/delete(deleteWatchlist)`.
+    func deleteWatchlist(_ input: Operations.DeleteWatchlist.Input) async throws -> Operations.DeleteWatchlist.Output
+    /// Save a movie or show to a watchlist
+    ///
+    /// Any title, the library's or not. The body describes a title the server has no record of (one only Request search has shown); it is ignored when the server knows the title. A title already there keeps its place. 422 when the watchlist holds 500. Sends lists.changed to the person. From API level 33.
+    ///
+    /// - Remark: HTTP `PUT /api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}`.
+    /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/put(saveToWatchlist)`.
+    func saveToWatchlist(_ input: Operations.SaveToWatchlist.Input) async throws -> Operations.SaveToWatchlist.Output
+    /// Take a movie or show off a watchlist
+    ///
+    /// Succeeds when it is not there. Sends lists.changed to the person. From API level 33.
+    ///
+    /// - Remark: HTTP `DELETE /api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}`.
+    /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/delete(removeFromWatchlist)`.
+    func removeFromWatchlist(_ input: Operations.RemoveFromWatchlist.Input) async throws -> Operations.RemoveFromWatchlist.Output
     /// Get a movie with its files
     ///
     /// - Remark: HTTP `GET /api/movies/{id}`.
@@ -1464,6 +1520,132 @@ extension APIProtocol {
         headers: Operations.ResetRowLayout.Input.Headers = .init()
     ) async throws -> Operations.ResetRowLayout.Output {
         try await resetRowLayout(Operations.ResetRowLayout.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Save a movie or show to the person's watchlist, when they have one
+    ///
+    /// The Watchlist button pressed once. With no watchlist it makes one called Watchlist (created) and saves there; with one it saves there; with two or more it saves nothing and answers 409 with the watchlists (WatchlistsConflict), and the app opens the picker. The body is saveToWatchlist's. From API level 33.
+    ///
+    /// - Remark: HTTP `PUT /api/me/watchlist/titles/{mediaType}/{tmdbId}`.
+    /// - Remark: Generated from `#/paths//api/me/watchlist/titles/{mediaType}/{tmdbId}/put(saveToOnlyWatchlist)`.
+    public func saveToOnlyWatchlist(
+        path: Operations.SaveToOnlyWatchlist.Input.Path,
+        headers: Operations.SaveToOnlyWatchlist.Input.Headers = .init(),
+        body: Operations.SaveToOnlyWatchlist.Input.Body? = nil
+    ) async throws -> Operations.SaveToOnlyWatchlist.Output {
+        try await saveToOnlyWatchlist(Operations.SaveToOnlyWatchlist.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Take a movie or show off every one of the person's watchlists
+    ///
+    /// On Watchlist pressed again. Succeeds when no watchlist holds it. Sends lists.changed for each watchlist it left. From API level 33.
+    ///
+    /// - Remark: HTTP `DELETE /api/me/watchlist/titles/{mediaType}/{tmdbId}`.
+    /// - Remark: Generated from `#/paths//api/me/watchlist/titles/{mediaType}/{tmdbId}/delete(removeFromWatchlists)`.
+    public func removeFromWatchlists(
+        path: Operations.RemoveFromWatchlists.Input.Path,
+        headers: Operations.RemoveFromWatchlists.Input.Headers = .init()
+    ) async throws -> Operations.RemoveFromWatchlists.Output {
+        try await removeFromWatchlists(Operations.RemoveFromWatchlists.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// The signed-in person's watchlists
+    ///
+    /// Apps read it when they start and again on rows.changed, and press Watchlist with saveToOnlyWatchlist when there is at most one, else open the picker. From API level 33.
+    ///
+    /// - Remark: HTTP `GET /api/me/watchlists`.
+    /// - Remark: Generated from `#/paths//api/me/watchlists/get(listWatchlists)`.
+    public func listWatchlists(
+        query: Operations.ListWatchlists.Input.Query = .init(),
+        headers: Operations.ListWatchlists.Input.Headers = .init()
+    ) async throws -> Operations.ListWatchlists.Output {
+        try await listWatchlists(Operations.ListWatchlists.Input(
+            query: query,
+            headers: headers
+        ))
+    }
+    /// Make a watchlist
+    ///
+    /// 422 when the person has 25, or another of theirs has the name. Its rows go on Home after Continue watching and New from shows you follow, and first on Movies and TV screens. Sends rows.changed to the person. From API level 33.
+    ///
+    /// - Remark: HTTP `POST /api/me/watchlists`.
+    /// - Remark: Generated from `#/paths//api/me/watchlists/post(createWatchlist)`.
+    public func createWatchlist(
+        headers: Operations.CreateWatchlist.Input.Headers = .init(),
+        body: Operations.CreateWatchlist.Input.Body
+    ) async throws -> Operations.CreateWatchlist.Output {
+        try await createWatchlist(Operations.CreateWatchlist.Input(
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Rename a watchlist, or turn Remove titles once watched on or off
+    ///
+    /// 422 for a name another of the person's watchlists has. Another person's watchlist is not found, for admins too. Sends rows.changed to the person. From API level 33.
+    ///
+    /// - Remark: HTTP `PATCH /api/me/watchlists/{id}`.
+    /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/patch(updateWatchlist)`.
+    public func updateWatchlist(
+        path: Operations.UpdateWatchlist.Input.Path,
+        headers: Operations.UpdateWatchlist.Input.Headers = .init(),
+        body: Operations.UpdateWatchlist.Input.Body
+    ) async throws -> Operations.UpdateWatchlist.Output {
+        try await updateWatchlist(Operations.UpdateWatchlist.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Delete a watchlist
+    ///
+    /// Its titles stay in the library; its rows leave every screen. deleteMediaList does the same. Sends rows.changed to the person. From API level 33.
+    ///
+    /// - Remark: HTTP `DELETE /api/me/watchlists/{id}`.
+    /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/delete(deleteWatchlist)`.
+    public func deleteWatchlist(
+        path: Operations.DeleteWatchlist.Input.Path,
+        headers: Operations.DeleteWatchlist.Input.Headers = .init()
+    ) async throws -> Operations.DeleteWatchlist.Output {
+        try await deleteWatchlist(Operations.DeleteWatchlist.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Save a movie or show to a watchlist
+    ///
+    /// Any title, the library's or not. The body describes a title the server has no record of (one only Request search has shown); it is ignored when the server knows the title. A title already there keeps its place. 422 when the watchlist holds 500. Sends lists.changed to the person. From API level 33.
+    ///
+    /// - Remark: HTTP `PUT /api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}`.
+    /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/put(saveToWatchlist)`.
+    public func saveToWatchlist(
+        path: Operations.SaveToWatchlist.Input.Path,
+        headers: Operations.SaveToWatchlist.Input.Headers = .init(),
+        body: Operations.SaveToWatchlist.Input.Body? = nil
+    ) async throws -> Operations.SaveToWatchlist.Output {
+        try await saveToWatchlist(Operations.SaveToWatchlist.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Take a movie or show off a watchlist
+    ///
+    /// Succeeds when it is not there. Sends lists.changed to the person. From API level 33.
+    ///
+    /// - Remark: HTTP `DELETE /api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}`.
+    /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/delete(removeFromWatchlist)`.
+    public func removeFromWatchlist(
+        path: Operations.RemoveFromWatchlist.Input.Path,
+        headers: Operations.RemoveFromWatchlist.Input.Headers = .init()
+    ) async throws -> Operations.RemoveFromWatchlist.Output {
+        try await removeFromWatchlist(Operations.RemoveFromWatchlist.Input(
             path: path,
             headers: headers
         ))

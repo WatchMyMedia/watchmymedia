@@ -5874,17 +5874,46 @@ public enum Operations {
                 public var limit: Swift.Int64?
                 /// - Remark: Generated from `#/paths/api/lists/{id}/entries/GET/query/offset`.
                 public var offset: Swift.Int64?
+                /// added: a watchlist's own order, newest first, a title counting from when it reached the library if that was after it was saved (the default for a watchlist; other lists keep their order). title: by title. released: newest release (or first air date) first. From API level 33.
+                ///
+                /// - Remark: Generated from `#/paths/api/lists/{id}/entries/GET/query/sort`.
+                @frozen public enum SortPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case added = "added"
+                    case title = "title"
+                    case released = "released"
+                }
+                /// added: a watchlist's own order, newest first, a title counting from when it reached the library if that was after it was saved (the default for a watchlist; other lists keep their order). title: by title. released: newest release (or first air date) first. From API level 33.
+                ///
+                /// - Remark: Generated from `#/paths/api/lists/{id}/entries/GET/query/sort`.
+                public var sort: Operations.ListMediaListEntries.Input.Query.SortPayload?
+                /// Only movies or only shows; total and inLibrary count those. From API level 33.
+                ///
+                /// - Remark: Generated from `#/paths/api/lists/{id}/entries/GET/query/mediaType`.
+                @frozen public enum MediaTypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case movie = "movie"
+                    case tv = "tv"
+                }
+                /// Only movies or only shows; total and inLibrary count those. From API level 33.
+                ///
+                /// - Remark: Generated from `#/paths/api/lists/{id}/entries/GET/query/mediaType`.
+                public var mediaType: Operations.ListMediaListEntries.Input.Query.MediaTypePayload?
                 /// Creates a new `Query`.
                 ///
                 /// - Parameters:
                 ///   - limit:
                 ///   - offset:
+                ///   - sort: added: a watchlist's own order, newest first, a title counting from when it reached the library if that was after it was saved (the default for a watchlist; other lists keep their order). title: by title. released: newest release (or first air date) first. From API level 33.
+                ///   - mediaType: Only movies or only shows; total and inLibrary count those. From API level 33.
                 public init(
                     limit: Swift.Int64? = nil,
-                    offset: Swift.Int64? = nil
+                    offset: Swift.Int64? = nil,
+                    sort: Operations.ListMediaListEntries.Input.Query.SortPayload? = nil,
+                    mediaType: Operations.ListMediaListEntries.Input.Query.MediaTypePayload? = nil
                 ) {
                     self.limit = limit
                     self.offset = offset
+                    self.sort = sort
+                    self.mediaType = mediaType
                 }
             }
             public var query: Operations.ListMediaListEntries.Input.Query
@@ -11826,6 +11855,1611 @@ public enum Operations {
             /// - Throws: An error if `self` is not `.`default``.
             /// - SeeAlso: `.`default``.
             public var `default`: Operations.ResetRowLayout.Output.Default {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Save a movie or show to the person's watchlist, when they have one
+    ///
+    /// The Watchlist button pressed once. With no watchlist it makes one called Watchlist (created) and saves there; with one it saves there; with two or more it saves nothing and answers 409 with the watchlists (WatchlistsConflict), and the app opens the picker. The body is saveToWatchlist's. From API level 33.
+    ///
+    /// - Remark: HTTP `PUT /api/me/watchlist/titles/{mediaType}/{tmdbId}`.
+    /// - Remark: Generated from `#/paths//api/me/watchlist/titles/{mediaType}/{tmdbId}/put(saveToOnlyWatchlist)`.
+    public enum SaveToOnlyWatchlist {
+        public static let id: Swift.String = "saveToOnlyWatchlist"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/PUT/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/PUT/path/mediaType`.
+                @frozen public enum MediaTypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case movie = "movie"
+                    case tv = "tv"
+                }
+                /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/PUT/path/mediaType`.
+                public var mediaType: Operations.SaveToOnlyWatchlist.Input.Path.MediaTypePayload
+                /// The title's TMDB id.
+                ///
+                /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/PUT/path/tmdbId`.
+                public var tmdbId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - mediaType:
+                ///   - tmdbId: The title's TMDB id.
+                public init(
+                    mediaType: Operations.SaveToOnlyWatchlist.Input.Path.MediaTypePayload,
+                    tmdbId: Swift.Int64
+                ) {
+                    self.mediaType = mediaType
+                    self.tmdbId = tmdbId
+                }
+            }
+            public var path: Operations.SaveToOnlyWatchlist.Input.Path
+            /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/PUT/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SaveToOnlyWatchlist.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SaveToOnlyWatchlist.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.SaveToOnlyWatchlist.Input.Headers
+            /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/PUT/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/PUT/requestBody/content/application\/json`.
+                case json(Components.Schemas.WatchlistTitleDetails)
+            }
+            public var body: Operations.SaveToOnlyWatchlist.Input.Body?
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.SaveToOnlyWatchlist.Input.Path,
+                headers: Operations.SaveToOnlyWatchlist.Input.Headers = .init(),
+                body: Operations.SaveToOnlyWatchlist.Input.Body? = nil
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/PUT/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/PUT/responses/200/content/application\/json`.
+                    case json(Components.Schemas.WatchlistTitleChange)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.WatchlistTitleChange {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.SaveToOnlyWatchlist.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.SaveToOnlyWatchlist.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//api/me/watchlist/titles/{mediaType}/{tmdbId}/put(saveToOnlyWatchlist)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.SaveToOnlyWatchlist.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.SaveToOnlyWatchlist.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Conflict: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/PUT/responses/409/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/PUT/responses/409/content/application\/problem+json`.
+                    case applicationProblemJson(Components.Schemas.WatchlistsConflict)
+                    /// The associated value of the enum case if `self` is `.applicationProblemJson`.
+                    ///
+                    /// - Throws: An error if `self` is not `.applicationProblemJson`.
+                    /// - SeeAlso: `.applicationProblemJson`.
+                    public var applicationProblemJson: Components.Schemas.WatchlistsConflict {
+                        get throws {
+                            switch self {
+                            case let .applicationProblemJson(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.SaveToOnlyWatchlist.Output.Conflict.Body
+                /// Creates a new `Conflict`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.SaveToOnlyWatchlist.Output.Conflict.Body) {
+                    self.body = body
+                }
+            }
+            /// The person has two or more watchlists: choose one.
+            ///
+            /// - Remark: Generated from `#/paths//api/me/watchlist/titles/{mediaType}/{tmdbId}/put(saveToOnlyWatchlist)/responses/409`.
+            ///
+            /// HTTP response code: `409 conflict`.
+            case conflict(Operations.SaveToOnlyWatchlist.Output.Conflict)
+            /// The associated value of the enum case if `self` is `.conflict`.
+            ///
+            /// - Throws: An error if `self` is not `.conflict`.
+            /// - SeeAlso: `.conflict`.
+            public var conflict: Operations.SaveToOnlyWatchlist.Output.Conflict {
+                get throws {
+                    switch self {
+                    case let .conflict(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "conflict",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Default: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/PUT/responses/default/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/PUT/responses/default/content/application\/problem+json`.
+                    case applicationProblemJson(Components.Schemas.ErrorModel)
+                    /// The associated value of the enum case if `self` is `.applicationProblemJson`.
+                    ///
+                    /// - Throws: An error if `self` is not `.applicationProblemJson`.
+                    /// - SeeAlso: `.applicationProblemJson`.
+                    public var applicationProblemJson: Components.Schemas.ErrorModel {
+                        get throws {
+                            switch self {
+                            case let .applicationProblemJson(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.SaveToOnlyWatchlist.Output.Default.Body
+                /// Creates a new `Default`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.SaveToOnlyWatchlist.Output.Default.Body) {
+                    self.body = body
+                }
+            }
+            /// Error
+            ///
+            /// - Remark: Generated from `#/paths//api/me/watchlist/titles/{mediaType}/{tmdbId}/put(saveToOnlyWatchlist)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Operations.SaveToOnlyWatchlist.Output.Default)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Operations.SaveToOnlyWatchlist.Output.Default {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Take a movie or show off every one of the person's watchlists
+    ///
+    /// On Watchlist pressed again. Succeeds when no watchlist holds it. Sends lists.changed for each watchlist it left. From API level 33.
+    ///
+    /// - Remark: HTTP `DELETE /api/me/watchlist/titles/{mediaType}/{tmdbId}`.
+    /// - Remark: Generated from `#/paths//api/me/watchlist/titles/{mediaType}/{tmdbId}/delete(removeFromWatchlists)`.
+    public enum RemoveFromWatchlists {
+        public static let id: Swift.String = "removeFromWatchlists"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/DELETE/path`.
+            public struct Path: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/DELETE/path/mediaType`.
+                @frozen public enum MediaTypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case movie = "movie"
+                    case tv = "tv"
+                }
+                /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/DELETE/path/mediaType`.
+                public var mediaType: Operations.RemoveFromWatchlists.Input.Path.MediaTypePayload
+                /// The title's TMDB id.
+                ///
+                /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/DELETE/path/tmdbId`.
+                public var tmdbId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - mediaType:
+                ///   - tmdbId: The title's TMDB id.
+                public init(
+                    mediaType: Operations.RemoveFromWatchlists.Input.Path.MediaTypePayload,
+                    tmdbId: Swift.Int64
+                ) {
+                    self.mediaType = mediaType
+                    self.tmdbId = tmdbId
+                }
+            }
+            public var path: Operations.RemoveFromWatchlists.Input.Path
+            /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/DELETE/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RemoveFromWatchlists.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RemoveFromWatchlists.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.RemoveFromWatchlists.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.RemoveFromWatchlists.Input.Path,
+                headers: Operations.RemoveFromWatchlists.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/DELETE/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/DELETE/responses/200/content/application\/json`.
+                    case json(Components.Schemas.WatchlistTitleChange)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.WatchlistTitleChange {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RemoveFromWatchlists.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.RemoveFromWatchlists.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//api/me/watchlist/titles/{mediaType}/{tmdbId}/delete(removeFromWatchlists)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.RemoveFromWatchlists.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.RemoveFromWatchlists.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Default: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/DELETE/responses/default/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/me/watchlist/titles/{mediaType}/{tmdbId}/DELETE/responses/default/content/application\/problem+json`.
+                    case applicationProblemJson(Components.Schemas.ErrorModel)
+                    /// The associated value of the enum case if `self` is `.applicationProblemJson`.
+                    ///
+                    /// - Throws: An error if `self` is not `.applicationProblemJson`.
+                    /// - SeeAlso: `.applicationProblemJson`.
+                    public var applicationProblemJson: Components.Schemas.ErrorModel {
+                        get throws {
+                            switch self {
+                            case let .applicationProblemJson(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RemoveFromWatchlists.Output.Default.Body
+                /// Creates a new `Default`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.RemoveFromWatchlists.Output.Default.Body) {
+                    self.body = body
+                }
+            }
+            /// Error
+            ///
+            /// - Remark: Generated from `#/paths//api/me/watchlist/titles/{mediaType}/{tmdbId}/delete(removeFromWatchlists)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Operations.RemoveFromWatchlists.Output.Default)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Operations.RemoveFromWatchlists.Output.Default {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// The signed-in person's watchlists
+    ///
+    /// Apps read it when they start and again on rows.changed, and press Watchlist with saveToOnlyWatchlist when there is at most one, else open the picker. From API level 33.
+    ///
+    /// - Remark: HTTP `GET /api/me/watchlists`.
+    /// - Remark: Generated from `#/paths//api/me/watchlists/get(listWatchlists)`.
+    public enum ListWatchlists {
+        public static let id: Swift.String = "listWatchlists"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/api/me/watchlists/GET/query`.
+            public struct Query: Sendable, Hashable {
+                /// With tmdbId: each watchlist says whether it holds this title (contains), for the picker.
+                ///
+                /// - Remark: Generated from `#/paths/api/me/watchlists/GET/query/mediaType`.
+                @frozen public enum MediaTypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case movie = "movie"
+                    case tv = "tv"
+                }
+                /// With tmdbId: each watchlist says whether it holds this title (contains), for the picker.
+                ///
+                /// - Remark: Generated from `#/paths/api/me/watchlists/GET/query/mediaType`.
+                public var mediaType: Operations.ListWatchlists.Input.Query.MediaTypePayload?
+                /// The title's TMDB id, with mediaType.
+                ///
+                /// - Remark: Generated from `#/paths/api/me/watchlists/GET/query/tmdbId`.
+                public var tmdbId: Swift.Int64?
+                /// Creates a new `Query`.
+                ///
+                /// - Parameters:
+                ///   - mediaType: With tmdbId: each watchlist says whether it holds this title (contains), for the picker.
+                ///   - tmdbId: The title's TMDB id, with mediaType.
+                public init(
+                    mediaType: Operations.ListWatchlists.Input.Query.MediaTypePayload? = nil,
+                    tmdbId: Swift.Int64? = nil
+                ) {
+                    self.mediaType = mediaType
+                    self.tmdbId = tmdbId
+                }
+            }
+            public var query: Operations.ListWatchlists.Input.Query
+            /// - Remark: Generated from `#/paths/api/me/watchlists/GET/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListWatchlists.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.ListWatchlists.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.ListWatchlists.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - query:
+            ///   - headers:
+            public init(
+                query: Operations.ListWatchlists.Input.Query = .init(),
+                headers: Operations.ListWatchlists.Input.Headers = .init()
+            ) {
+                self.query = query
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlists/GET/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/me/watchlists/GET/responses/200/content/application\/json`.
+                    case json(Components.Schemas.WatchlistList)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.WatchlistList {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ListWatchlists.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ListWatchlists.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//api/me/watchlists/get(listWatchlists)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.ListWatchlists.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.ListWatchlists.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Default: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlists/GET/responses/default/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/me/watchlists/GET/responses/default/content/application\/problem+json`.
+                    case applicationProblemJson(Components.Schemas.ErrorModel)
+                    /// The associated value of the enum case if `self` is `.applicationProblemJson`.
+                    ///
+                    /// - Throws: An error if `self` is not `.applicationProblemJson`.
+                    /// - SeeAlso: `.applicationProblemJson`.
+                    public var applicationProblemJson: Components.Schemas.ErrorModel {
+                        get throws {
+                            switch self {
+                            case let .applicationProblemJson(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.ListWatchlists.Output.Default.Body
+                /// Creates a new `Default`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.ListWatchlists.Output.Default.Body) {
+                    self.body = body
+                }
+            }
+            /// Error
+            ///
+            /// - Remark: Generated from `#/paths//api/me/watchlists/get(listWatchlists)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Operations.ListWatchlists.Output.Default)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Operations.ListWatchlists.Output.Default {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Make a watchlist
+    ///
+    /// 422 when the person has 25, or another of theirs has the name. Its rows go on Home after Continue watching and New from shows you follow, and first on Movies and TV screens. Sends rows.changed to the person. From API level 33.
+    ///
+    /// - Remark: HTTP `POST /api/me/watchlists`.
+    /// - Remark: Generated from `#/paths//api/me/watchlists/post(createWatchlist)`.
+    public enum CreateWatchlist {
+        public static let id: Swift.String = "createWatchlist"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/api/me/watchlists/POST/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateWatchlist.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.CreateWatchlist.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.CreateWatchlist.Input.Headers
+            /// - Remark: Generated from `#/paths/api/me/watchlists/POST/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlists/POST/requestBody/content/application\/json`.
+                case json(Components.Schemas.WatchlistBody)
+            }
+            public var body: Operations.CreateWatchlist.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - headers:
+            ///   - body:
+            public init(
+                headers: Operations.CreateWatchlist.Input.Headers = .init(),
+                body: Operations.CreateWatchlist.Input.Body
+            ) {
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Created: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlists/POST/responses/201/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/me/watchlists/POST/responses/201/content/application\/json`.
+                    case json(Components.Schemas.Watchlist)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.Watchlist {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.CreateWatchlist.Output.Created.Body
+                /// Creates a new `Created`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.CreateWatchlist.Output.Created.Body) {
+                    self.body = body
+                }
+            }
+            /// Created
+            ///
+            /// - Remark: Generated from `#/paths//api/me/watchlists/post(createWatchlist)/responses/201`.
+            ///
+            /// HTTP response code: `201 created`.
+            case created(Operations.CreateWatchlist.Output.Created)
+            /// The associated value of the enum case if `self` is `.created`.
+            ///
+            /// - Throws: An error if `self` is not `.created`.
+            /// - SeeAlso: `.created`.
+            public var created: Operations.CreateWatchlist.Output.Created {
+                get throws {
+                    switch self {
+                    case let .created(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "created",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Default: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlists/POST/responses/default/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/me/watchlists/POST/responses/default/content/application\/problem+json`.
+                    case applicationProblemJson(Components.Schemas.ErrorModel)
+                    /// The associated value of the enum case if `self` is `.applicationProblemJson`.
+                    ///
+                    /// - Throws: An error if `self` is not `.applicationProblemJson`.
+                    /// - SeeAlso: `.applicationProblemJson`.
+                    public var applicationProblemJson: Components.Schemas.ErrorModel {
+                        get throws {
+                            switch self {
+                            case let .applicationProblemJson(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.CreateWatchlist.Output.Default.Body
+                /// Creates a new `Default`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.CreateWatchlist.Output.Default.Body) {
+                    self.body = body
+                }
+            }
+            /// Error
+            ///
+            /// - Remark: Generated from `#/paths//api/me/watchlists/post(createWatchlist)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Operations.CreateWatchlist.Output.Default)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Operations.CreateWatchlist.Output.Default {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Rename a watchlist, or turn Remove titles once watched on or off
+    ///
+    /// 422 for a name another of the person's watchlists has. Another person's watchlist is not found, for admins too. Sends rows.changed to the person. From API level 33.
+    ///
+    /// - Remark: HTTP `PATCH /api/me/watchlists/{id}`.
+    /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/patch(updateWatchlist)`.
+    public enum UpdateWatchlist {
+        public static let id: Swift.String = "updateWatchlist"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/PATCH/path`.
+            public struct Path: Sendable, Hashable {
+                /// The watchlist's ID.
+                ///
+                /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/PATCH/path/id`.
+                public var id: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - id: The watchlist's ID.
+                public init(id: Swift.Int64) {
+                    self.id = id
+                }
+            }
+            public var path: Operations.UpdateWatchlist.Input.Path
+            /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/PATCH/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateWatchlist.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.UpdateWatchlist.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.UpdateWatchlist.Input.Headers
+            /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/PATCH/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/PATCH/requestBody/content/application\/json`.
+                case json(Components.Schemas.UpdateWatchlistInputBody)
+            }
+            public var body: Operations.UpdateWatchlist.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.UpdateWatchlist.Input.Path,
+                headers: Operations.UpdateWatchlist.Input.Headers = .init(),
+                body: Operations.UpdateWatchlist.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/PATCH/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/PATCH/responses/200/content/application\/json`.
+                    case json(Components.Schemas.Watchlist)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.Watchlist {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.UpdateWatchlist.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.UpdateWatchlist.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/patch(updateWatchlist)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.UpdateWatchlist.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.UpdateWatchlist.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Default: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/PATCH/responses/default/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/PATCH/responses/default/content/application\/problem+json`.
+                    case applicationProblemJson(Components.Schemas.ErrorModel)
+                    /// The associated value of the enum case if `self` is `.applicationProblemJson`.
+                    ///
+                    /// - Throws: An error if `self` is not `.applicationProblemJson`.
+                    /// - SeeAlso: `.applicationProblemJson`.
+                    public var applicationProblemJson: Components.Schemas.ErrorModel {
+                        get throws {
+                            switch self {
+                            case let .applicationProblemJson(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.UpdateWatchlist.Output.Default.Body
+                /// Creates a new `Default`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.UpdateWatchlist.Output.Default.Body) {
+                    self.body = body
+                }
+            }
+            /// Error
+            ///
+            /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/patch(updateWatchlist)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Operations.UpdateWatchlist.Output.Default)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Operations.UpdateWatchlist.Output.Default {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Delete a watchlist
+    ///
+    /// Its titles stay in the library; its rows leave every screen. deleteMediaList does the same. Sends rows.changed to the person. From API level 33.
+    ///
+    /// - Remark: HTTP `DELETE /api/me/watchlists/{id}`.
+    /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/delete(deleteWatchlist)`.
+    public enum DeleteWatchlist {
+        public static let id: Swift.String = "deleteWatchlist"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/DELETE/path`.
+            public struct Path: Sendable, Hashable {
+                /// The watchlist's ID.
+                ///
+                /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/DELETE/path/id`.
+                public var id: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - id: The watchlist's ID.
+                public init(id: Swift.Int64) {
+                    self.id = id
+                }
+            }
+            public var path: Operations.DeleteWatchlist.Input.Path
+            /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/DELETE/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteWatchlist.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteWatchlist.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.DeleteWatchlist.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.DeleteWatchlist.Input.Path,
+                headers: Operations.DeleteWatchlist.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct NoContent: Sendable, Hashable {
+                /// Creates a new `NoContent`.
+                public init() {}
+            }
+            /// No Content
+            ///
+            /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/delete(deleteWatchlist)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            case noContent(Operations.DeleteWatchlist.Output.NoContent)
+            /// No Content
+            ///
+            /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/delete(deleteWatchlist)/responses/204`.
+            ///
+            /// HTTP response code: `204 noContent`.
+            public static var noContent: Self {
+                .noContent(.init())
+            }
+            /// The associated value of the enum case if `self` is `.noContent`.
+            ///
+            /// - Throws: An error if `self` is not `.noContent`.
+            /// - SeeAlso: `.noContent`.
+            public var noContent: Operations.DeleteWatchlist.Output.NoContent {
+                get throws {
+                    switch self {
+                    case let .noContent(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "noContent",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Default: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/DELETE/responses/default/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/DELETE/responses/default/content/application\/problem+json`.
+                    case applicationProblemJson(Components.Schemas.ErrorModel)
+                    /// The associated value of the enum case if `self` is `.applicationProblemJson`.
+                    ///
+                    /// - Throws: An error if `self` is not `.applicationProblemJson`.
+                    /// - SeeAlso: `.applicationProblemJson`.
+                    public var applicationProblemJson: Components.Schemas.ErrorModel {
+                        get throws {
+                            switch self {
+                            case let .applicationProblemJson(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.DeleteWatchlist.Output.Default.Body
+                /// Creates a new `Default`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.DeleteWatchlist.Output.Default.Body) {
+                    self.body = body
+                }
+            }
+            /// Error
+            ///
+            /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/delete(deleteWatchlist)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Operations.DeleteWatchlist.Output.Default)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Operations.DeleteWatchlist.Output.Default {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Save a movie or show to a watchlist
+    ///
+    /// Any title, the library's or not. The body describes a title the server has no record of (one only Request search has shown); it is ignored when the server knows the title. A title already there keeps its place. 422 when the watchlist holds 500. Sends lists.changed to the person. From API level 33.
+    ///
+    /// - Remark: HTTP `PUT /api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}`.
+    /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/put(saveToWatchlist)`.
+    public enum SaveToWatchlist {
+        public static let id: Swift.String = "saveToWatchlist"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/PUT/path`.
+            public struct Path: Sendable, Hashable {
+                /// The watchlist's ID.
+                ///
+                /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/PUT/path/id`.
+                public var id: Swift.Int64
+                /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/PUT/path/mediaType`.
+                @frozen public enum MediaTypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case movie = "movie"
+                    case tv = "tv"
+                }
+                /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/PUT/path/mediaType`.
+                public var mediaType: Operations.SaveToWatchlist.Input.Path.MediaTypePayload
+                /// The title's TMDB id: BrowseItem.tmdbId, MovieDetail.tmdbId, ShowDetail.tmdbId, MediaListEntry.tmdbId or Requestable.tmdbId.
+                ///
+                /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/PUT/path/tmdbId`.
+                public var tmdbId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - id: The watchlist's ID.
+                ///   - mediaType:
+                ///   - tmdbId: The title's TMDB id: BrowseItem.tmdbId, MovieDetail.tmdbId, ShowDetail.tmdbId, MediaListEntry.tmdbId or Requestable.tmdbId.
+                public init(
+                    id: Swift.Int64,
+                    mediaType: Operations.SaveToWatchlist.Input.Path.MediaTypePayload,
+                    tmdbId: Swift.Int64
+                ) {
+                    self.id = id
+                    self.mediaType = mediaType
+                    self.tmdbId = tmdbId
+                }
+            }
+            public var path: Operations.SaveToWatchlist.Input.Path
+            /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/PUT/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SaveToWatchlist.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SaveToWatchlist.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.SaveToWatchlist.Input.Headers
+            /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/PUT/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/PUT/requestBody/content/application\/json`.
+                case json(Components.Schemas.WatchlistTitleDetails)
+            }
+            public var body: Operations.SaveToWatchlist.Input.Body?
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.SaveToWatchlist.Input.Path,
+                headers: Operations.SaveToWatchlist.Input.Headers = .init(),
+                body: Operations.SaveToWatchlist.Input.Body? = nil
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/PUT/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/PUT/responses/200/content/application\/json`.
+                    case json(Components.Schemas.WatchlistTitleChange)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.WatchlistTitleChange {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.SaveToWatchlist.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.SaveToWatchlist.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/put(saveToWatchlist)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.SaveToWatchlist.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.SaveToWatchlist.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Default: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/PUT/responses/default/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/PUT/responses/default/content/application\/problem+json`.
+                    case applicationProblemJson(Components.Schemas.ErrorModel)
+                    /// The associated value of the enum case if `self` is `.applicationProblemJson`.
+                    ///
+                    /// - Throws: An error if `self` is not `.applicationProblemJson`.
+                    /// - SeeAlso: `.applicationProblemJson`.
+                    public var applicationProblemJson: Components.Schemas.ErrorModel {
+                        get throws {
+                            switch self {
+                            case let .applicationProblemJson(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.SaveToWatchlist.Output.Default.Body
+                /// Creates a new `Default`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.SaveToWatchlist.Output.Default.Body) {
+                    self.body = body
+                }
+            }
+            /// Error
+            ///
+            /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/put(saveToWatchlist)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Operations.SaveToWatchlist.Output.Default)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Operations.SaveToWatchlist.Output.Default {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Take a movie or show off a watchlist
+    ///
+    /// Succeeds when it is not there. Sends lists.changed to the person. From API level 33.
+    ///
+    /// - Remark: HTTP `DELETE /api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}`.
+    /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/delete(removeFromWatchlist)`.
+    public enum RemoveFromWatchlist {
+        public static let id: Swift.String = "removeFromWatchlist"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/DELETE/path`.
+            public struct Path: Sendable, Hashable {
+                /// The watchlist's ID.
+                ///
+                /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/DELETE/path/id`.
+                public var id: Swift.Int64
+                /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/DELETE/path/mediaType`.
+                @frozen public enum MediaTypePayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case movie = "movie"
+                    case tv = "tv"
+                }
+                /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/DELETE/path/mediaType`.
+                public var mediaType: Operations.RemoveFromWatchlist.Input.Path.MediaTypePayload
+                /// The title's TMDB id: BrowseItem.tmdbId, MovieDetail.tmdbId, ShowDetail.tmdbId, MediaListEntry.tmdbId or Requestable.tmdbId.
+                ///
+                /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/DELETE/path/tmdbId`.
+                public var tmdbId: Swift.Int64
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - id: The watchlist's ID.
+                ///   - mediaType:
+                ///   - tmdbId: The title's TMDB id: BrowseItem.tmdbId, MovieDetail.tmdbId, ShowDetail.tmdbId, MediaListEntry.tmdbId or Requestable.tmdbId.
+                public init(
+                    id: Swift.Int64,
+                    mediaType: Operations.RemoveFromWatchlist.Input.Path.MediaTypePayload,
+                    tmdbId: Swift.Int64
+                ) {
+                    self.id = id
+                    self.mediaType = mediaType
+                    self.tmdbId = tmdbId
+                }
+            }
+            public var path: Operations.RemoveFromWatchlist.Input.Path
+            /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/DELETE/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RemoveFromWatchlist.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.RemoveFromWatchlist.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.RemoveFromWatchlist.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.RemoveFromWatchlist.Input.Path,
+                headers: Operations.RemoveFromWatchlist.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/DELETE/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/DELETE/responses/200/content/application\/json`.
+                    case json(Components.Schemas.WatchlistTitleChange)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.WatchlistTitleChange {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RemoveFromWatchlist.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.RemoveFromWatchlist.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/delete(removeFromWatchlist)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.RemoveFromWatchlist.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.RemoveFromWatchlist.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Default: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/DELETE/responses/default/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/DELETE/responses/default/content/application\/problem+json`.
+                    case applicationProblemJson(Components.Schemas.ErrorModel)
+                    /// The associated value of the enum case if `self` is `.applicationProblemJson`.
+                    ///
+                    /// - Throws: An error if `self` is not `.applicationProblemJson`.
+                    /// - SeeAlso: `.applicationProblemJson`.
+                    public var applicationProblemJson: Components.Schemas.ErrorModel {
+                        get throws {
+                            switch self {
+                            case let .applicationProblemJson(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.RemoveFromWatchlist.Output.Default.Body
+                /// Creates a new `Default`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.RemoveFromWatchlist.Output.Default.Body) {
+                    self.body = body
+                }
+            }
+            /// Error
+            ///
+            /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/delete(removeFromWatchlist)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Operations.RemoveFromWatchlist.Output.Default)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Operations.RemoveFromWatchlist.Output.Default {
                 get throws {
                     switch self {
                     case let .`default`(_, response):

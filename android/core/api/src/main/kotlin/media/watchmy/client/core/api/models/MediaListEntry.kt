@@ -37,13 +37,15 @@ import kotlinx.serialization.encoding.Encoder
 /**
  * @param found False for an imported title TMDB could not find: show it as Not found.
  * @param mediaType movie or tv.
- * @param rank 1 for the first.
+ * @param rank 1 for the first. A watchlist's entries are numbered in the order sent.
  * @param title
+ * @param addedAt Watchlists: when the title was saved.
  * @param imdbId
  * @param item
  * @param posterPath TMDB's poster, for titles the library doesn't have.
  * @param requestState requestable, requested, downloading or available, as Requestable.state, when the person may request. Absent when requests aren't set up. A plain string.
  * @param tmdbId Absent when TMDB could not find the title (imports).
+ * @param watchlisted The title is on one of the signed-in person's watchlists.
  * @param year
  */
 @Serializable
@@ -58,12 +60,16 @@ data class MediaListEntry (
     @SerialName(value = "mediaType")
     val mediaType: kotlin.String,
 
-    /* 1 for the first. */
+    /* 1 for the first. A watchlist's entries are numbered in the order sent. */
     @SerialName(value = "rank")
     val rank: kotlin.Long,
 
     @SerialName(value = "title")
     val title: kotlin.String,
+
+    /* Watchlists: when the title was saved. */
+    @SerialName(value = "addedAt")
+    val addedAt: kotlin.String? = null,
 
     @SerialName(value = "imdbId")
     val imdbId: kotlin.String? = null,
@@ -82,6 +88,10 @@ data class MediaListEntry (
     /* Absent when TMDB could not find the title (imports). */
     @SerialName(value = "tmdbId")
     val tmdbId: kotlin.Long? = null,
+
+    /* The title is on one of the signed-in person's watchlists. */
+    @SerialName(value = "watchlisted")
+    val watchlisted: kotlin.Boolean? = null,
 
     @SerialName(value = "year")
     val year: kotlin.Long? = null
