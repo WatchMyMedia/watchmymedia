@@ -8,7 +8,7 @@ import { Movie } from './pages/Movie'
 import { Search } from './pages/Search'
 import { ShowPage } from './pages/ShowPage'
 import { validateHistorySearch, validateStatsSearch } from './pages/activity/shared'
-import { episodeRedirect, validateBrowseSearch, validateEditSearch, validateGuideSearch, validateNewListSearch, validatePlaySearch, validateSeasonSearch, type BrowseSearch } from './lib/routeSearch'
+import { episodeRedirect, validateBrowseSearch, validateEditSearch, validateGuideSearch, validateListSearch, validateNewListSearch, validatePlaySearch, validateSeasonSearch, type BrowseSearch } from './lib/routeSearch'
 import { validateSetupSearch } from './lib/setupRules'
 import { settingsRedirect } from './lib/settingsRoutes'
 
@@ -41,6 +41,7 @@ const ListsSettings = lazyRouteComponent(() => import('./pages/settings/Lists'),
 const AboutSettings = lazyRouteComponent(() => import('./pages/settings/About'), 'AboutSettings')
 const NotificationsSettings = lazyRouteComponent(() => import('./pages/settings/Notifications'), 'NotificationsSettings')
 const ListPage = lazyRouteComponent(() => import('./pages/ListPage'), 'ListPage')
+const WatchlistsPage = lazyRouteComponent(() => import('./pages/Watchlists'), 'Watchlists')
 const MakeListPage = lazyRouteComponent(() => import('./pages/MakeList'), 'MakeListPage')
 const EditListPage = lazyRouteComponent(() => import('./pages/MakeList'), 'EditListPage')
 const Setup = lazyRouteComponent(() => import('./pages/Setup'), 'Setup')
@@ -167,15 +168,24 @@ const searchRoute = createRoute({
   },
 })
 
-// A list's See all page: every title in order, the missing ones dimmed.
+// A list's See all page: every title in order, the missing ones dimmed. A
+// watchlist's takes the type and sort it shows.
 const listRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/lists/$listId',
+  validateSearch: validateListSearch,
   loader: ({ context, params }) => void context.queryClient.prefetchQuery(mediaListQuery(Number(params.listId))),
   component: rendering(function ListRoute() {
     const { listId } = listRoute.useParams()
-    return <ListPage key={listId} listId={Number(listId)} />
+    return <ListPage key={listId} listId={Number(listId)} search={listRoute.useSearch()} />
   }, ListPage),
+})
+
+// The person's watchlists, from the account menu.
+const watchlistsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/watchlists',
+  component: WatchlistsPage,
 })
 
 // Make a list: from Add a row, or Settings › Lists for the household.
@@ -406,6 +416,7 @@ const routeTree = rootRoute.addChildren([
   setupRoute,
   searchRoute,
   listRoute,
+  watchlistsRoute,
   newListRoute,
   editListRoute,
   libraryFilesRoute,

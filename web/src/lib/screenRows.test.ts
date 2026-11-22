@@ -129,6 +129,8 @@ describe('See all', () => {
     expect(seeAllTarget({ seeAll: { kind: 'list', listId: 9 } }, libraries)).toEqual({ kind: 'list', listId: 9 })
     expect(seeAllTarget({ seeAll: { kind: 'list' }, listId: 4 }, libraries)).toEqual({ kind: 'list', listId: 4 })
     expect(seeAllTarget({ seeAll: { kind: 'list' } }, libraries)).toBeUndefined()
+    // From a Movies or TV screen, a list's page opens on that type.
+    expect(seeAllTarget({ seeAll: { kind: 'list', listId: 9 } }, libraries, 'tv')).toEqual({ kind: 'list', listId: 9, type: 'tv' })
   })
 
   it('opens the library’s grid with the link’s sort and filter', () => {

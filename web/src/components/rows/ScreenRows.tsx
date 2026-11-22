@@ -14,11 +14,11 @@ type LibraryRef = { id: number; type: string }
  * Rows with nothing in them, live (the web has no
  * Live TV row yet) and styles the web doesn't know draw nothing.
  */
-export function ScreenRows({ rows, libraries }: { rows: readonly ScreenRow[]; libraries: readonly LibraryRef[] }) {
+export function ScreenRows({ rows, libraries, screenType }: { rows: readonly ScreenRow[]; libraries: readonly LibraryRef[]; screenType?: 'movie' | 'tv' }) {
   return (
     <>
       {rows.filter(drawable).map((row) => (
-        <ScreenRowView key={row.id} row={row} libraries={libraries} />
+        <ScreenRowView key={row.id} row={row} libraries={libraries} screenType={screenType} />
       ))}
     </>
   )
@@ -29,10 +29,10 @@ export function ScreenRows({ rows, libraries }: { rows: readonly ScreenRow[]; li
  * poster-shaped in a poster row, 16:9 in an
  * episode or wide row. Continue watching has no link, so no card.
  */
-function ScreenRowView({ row, libraries }: { row: ScreenRow; libraries: readonly LibraryRef[] }) {
+function ScreenRowView({ row, libraries, screenType }: { row: ScreenRow; libraries: readonly LibraryRef[]; screenType?: 'movie' | 'tv' }) {
   const [title, muted] = titleParts(row)
   const line = row.source || row.subtitle ? <RowLine row={row} /> : muted
-  const target = seeAllTarget(row, libraries)
+  const target = seeAllTarget(row, libraries, screenType)
   const link = target && seeAllLink(target)
   const words = target && seeAllWords(target, row.title)
   const shape = row.style === 'poster' ? 'poster' : row.style === 'episode' || row.style === 'wide' ? 'wide' : undefined
@@ -65,6 +65,6 @@ function RowLine({ row }: { row: ScreenRow }) {
 }
 
 function seeAllLink(target: SeeAllTarget): LinkProps {
-  if (target.kind === 'list') return { to: '/lists/$listId', params: { listId: String(target.listId) } }
+  if (target.kind === 'list') return { to: '/lists/$listId', params: { listId: String(target.listId) }, search: { type: target.type } }
   return { to: target.type === 'tv' ? '/tv' : '/movies', search: target.search }
 }

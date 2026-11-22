@@ -10,6 +10,7 @@ import { screenLibraryId, webLink } from './screenRows'
 export type MediaList = components['schemas']['MediaList']
 export type MediaListSource = components['schemas']['MediaListSource']
 export type MediaListEntry = components['schemas']['MediaListEntry']
+export type MediaListEntries = components['schemas']['MediaListEntries']
 export type MediaListGenre = components['schemas']['MediaListGenre']
 type UpdateMediaList = components['schemas']['UpdateMediaListInputBody']
 type PreviewBody = components['schemas']['PreviewMediaListInputBody']
@@ -25,6 +26,23 @@ export const listKinds: readonly ListKind[] = ['tmdb', 'mdblist', 'library', 'im
 export function knownKind(kind: string): kind is ListKind {
   return (listKinds as readonly string[]).includes(kind)
 }
+
+/**
+ * A watchlist: a list the person fills by hand, title by title, with no
+ * source to fetch from. Its page has its own actions, and none of a
+ * fetched list's lines.
+ */
+export function isWatchlist(list: { source: Pick<MediaListSource, 'kind'> } | undefined): boolean {
+  return list?.source.kind === 'watchlist'
+}
+
+/** Where Edit goes: a watchlist is changed on its own page, other lists in the builder. */
+export function listEditPath(list: Pick<MediaList, 'id' | 'source'>): string {
+  return isWatchlist(list) ? `/lists/${list.id}` : `/lists/${list.id}/edit`
+}
+
+/** The apps' line in Add a row, which says which lists: watchlists are made in the apps too. */
+export const LISTS_MADE_ON_WEB = 'Lists from TMDB, MDBList and imports are made in WatchMyMedia on the web.'
 
 export type MediaType = 'movie' | 'tv' | 'all'
 
@@ -383,6 +401,7 @@ export function sourceLink(s: MediaListSource, mediaType: string): string | unde
 /** The list page's line on fetching: when it last worked, and when it failed and why. */
 export function refreshWords(list: Pick<MediaList, 'source' | 'fetchedAt' | 'nextFetchAt' | 'error' | 'errorAt' | 'fetching' | 'createdAt'>): { fetched?: string; error?: string } {
   const kind = list.source.kind
+  if (kind === 'watchlist') return {}
   let fetched: string | undefined
   if (list.fetching) fetched = 'Fetching now…'
   else if (kind === 'library') fetched = 'Follows your library as it changes'
@@ -445,6 +464,7 @@ export function sourceWords(s: Pick<MediaListSource, 'kind'>): string {
     case 'mdblist': return 'From MDBList'
     case 'library': return 'From your library'
     case 'import': return 'Imported'
+    case 'watchlist': return ''
     default: return `From ${s.kind}`
   }
 }
@@ -463,12 +483,28 @@ export function notFoundWords(n: number): string {
 type EntryRef = { id: string; kind: string; owner?: string; style: string; hidden: boolean }
 
 /**
+ * A watchlist in Edit rows and Add a row: called Watchlist where other
+ * lists are Your list, with what it holds as the Watchlists page says it,
+ * and no screen it was made on, since its row is on every screen.
+ */
+function watchlistLine(l: Pick<MediaList, 'entries' | 'inLibrary'>): string {
+  return `Watchlist · ${titlesInLibraryWords(l.entries, l.inLibrary)}`
+}
+
+/** "12 titles · 9 in your library", "6 titles · 6 in your library": a watchlist's counts wherever it is listed. */
+export function titlesInLibraryWords(total: number, inLibrary: number): string {
+  if (total === 0) return 'No titles yet'
+  return `${total.toLocaleString()} ${total === 1 ? 'title' : 'titles'} · ${inLibrary.toLocaleString()} in your library`
+}
+
+/**
  * The line under a row in Edit rows: "Built-in", or a list's owner, where
  * it was made when that is another screen, how much the library has and
  * where it comes from ("Your list · made on Movies · 9 of 50 · From TMDB").
  */
 export function editorLine(r: EntryRef, list: MediaList | undefined, screen: string, libraries: readonly LibraryRef[]): string {
   if (r.kind !== 'list') return r.style === 'live' ? 'Built-in · drawn in the TV and phone apps, not on the web yet' : 'Built-in'
+  if (list && isWatchlist(list)) return watchlistLine(list)
   const owner = r.owner === 'everyone' ? 'For everyone' : r.owner === 'me' ? 'Your list' : 'List'
   if (!list) return owner
   const made = list.screen !== screen ? `made on ${screenName(list.screen, libraries)}` : ''
@@ -479,6 +515,7 @@ export function editorLine(r: EntryRef, list: MediaList | undefined, screen: str
 export function catalogueLine(r: EntryRef, list: MediaList | undefined, screen: string, libraries: readonly LibraryRef[]): string {
   if (r.kind !== 'list') return r.style === 'live' ? 'Built-in · drawn in the TV and phone apps' : 'Built-in · hidden by you'
   if (!list) return ''
+  if (isWatchlist(list)) return watchlistLine(list)
   const made = list.screen !== screen ? `Made on ${screenName(list.screen, libraries)}` : ''
   const chart = list.source.kind === 'tmdb' && list.source.chart && !['discover', 'list', 'collection'].includes(list.source.chart) ? chartLabel(list.source.chart).toLowerCase() : ''
   return [made, sourceWords(list.source), chart, holdsWords(list, true)].filter(Boolean).join(' · ')
@@ -564,6 +601,8 @@ export function listFromLine(l: Pick<MediaList, 'source'>, libraries: readonly L
  */
 export function listMeta(l: Pick<MediaList, 'source' | 'mediaType' | 'fetchedAt' | 'fetching' | 'createdAt'>): { from: string; href?: string; updated: string; type: string } {
   const type = l.mediaType === 'movie' ? 'Movies' : l.mediaType === 'tv' ? 'TV shows' : 'Movies and TV shows'
+  // A watchlist isn't fetched from anywhere: no source, no Updated.
+  if (l.source.kind === 'watchlist') return { from: '', updated: '', type }
   if (l.source.kind === 'import') {
     const read = importFormatLabel(l.source.format)
     return { from: `Imported ${formatDate(l.createdAt)}`, updated: read ? capital(read) : 'Read once', type }
@@ -571,6 +610,12 @@ export function listMeta(l: Pick<MediaList, 'source' | 'mediaType' | 'fetchedAt'
   if (l.source.kind === 'library') return { from: 'From your library', updated: 'Follows the library', type }
   const updated = l.fetching ? 'Fetching now…' : l.fetchedAt ? `Updated ${relativeTime(l.fetchedAt)}` : 'Not fetched yet'
   return { from: sourceWords(l.source), href: sourceLink(l.source, l.mediaType), updated, type }
+}
+
+/** What an empty list's page says: nothing on it yet, or not fetched yet. */
+export function emptyListWords(l: Pick<MediaList, 'source' | 'fetchedAt'>): string {
+  if (l.source.kind === 'watchlist') return 'Nothing on this watchlist yet.'
+  return l.fetchedAt || l.source.kind === 'import' || l.source.kind === 'library' ? 'Nothing is on this list.' : 'The list hasn’t been fetched yet.'
 }
 
 /** "50 titles in the list’s order · 18 in your library · 29 missing · 3 not found". */

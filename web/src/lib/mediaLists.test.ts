@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   byteLength, sentence, canEditList, canRefresh, catalogueLine, listCountWords, listMeta, chartLabel, chartLine, editorLine, listFromLine, previewFromLine, previewHaveWords, previewRestWords, retryWords, tmdbMode, holdsWords, notFoundWords, sourceWords, chartsFor, draftFromList, draftProblem, emptyDraft, entryLimit, entryView, hashText, importFormatLabel, inLibraryWords,
-  knownKind, listMediaType, listPatch, mediaTypeChoices, previewKey, refreshWords, sameSource, screenName, sourceLink, sourceName, sourceOf, suggestName,
+  emptyListWords, isWatchlist, knownKind, listEditPath, listMediaType, listPatch, mediaTypeChoices, previewKey, refreshWords, sameSource, screenName, sourceLink, sourceName, sourceOf, suggestName,
   MAX_IMPORT_BYTES, type MediaList, type MediaListEntry,
 } from './mediaLists'
 
@@ -320,6 +320,43 @@ describe('the list page’s lines', () => {
   it('counts the list', () => {
     expect(listCountWords(50, 18, 3)).toBe('50 titles in the list’s order · 18 in your library · 29 missing · 3 not found')
     expect(listCountWords(26, 26)).toBe('26 titles in the list’s order · 26 in your library')
+  })
+})
+
+describe('a watchlist', () => {
+  const watchlist = (over: Partial<MediaList> = {}) =>
+    list({ name: 'Halloween', source: { kind: 'watchlist' }, mediaType: 'all', limit: 500, entries: 12, inLibrary: 9, fetchedAt: '2026-11-20T00:00:00Z', ...over })
+  const row = { id: 'list:5', kind: 'list', owner: 'me', style: 'poster', hidden: false }
+
+  it('says nothing about a source, fetching or updating', () => {
+    expect(isWatchlist(watchlist())).toBe(true)
+    expect(isWatchlist(list())).toBe(false)
+    expect(listMeta(watchlist())).toEqual({ from: '', updated: '', type: 'Movies and TV shows' })
+    expect(refreshWords(watchlist())).toEqual({})
+    expect(sourceWords({ kind: 'watchlist' })).toBe('')
+  })
+
+  it('is changed on its own page, never in the builder or by a refresh', () => {
+    expect(canEditList(watchlist())).toBe(false)
+    expect(canRefresh(watchlist())).toBe(false)
+    expect(listEditPath(watchlist())).toBe('/lists/5')
+    expect(listEditPath(list())).toBe('/lists/5/edit')
+  })
+
+  it.each([
+    ['a watchlist', { source: { kind: 'watchlist' } }, 'Nothing on this watchlist yet.'],
+    ['a list fetched', { fetchedAt: '2026-11-20T00:00:00Z' }, 'Nothing is on this list.'],
+    ['a list not fetched yet', {}, 'The list hasn’t been fetched yet.'],
+  ] as const)('says what is on %s with no titles', (_case, over, words) => {
+    expect(emptyListWords(list(over))).toBe(words)
+  })
+
+  it.each([
+    ['Edit rows', editorLine],
+    ['Add a row', catalogueLine],
+  ])('is called Watchlist in %s, with its counts and no screen it was made on', (_where, line) => {
+    expect(line(row, watchlist({ screen: 'home' }), 'library-2', libraries)).toBe('Watchlist · 12 titles · 9 in your library')
+    expect(line(row, watchlist({ entries: 0, inLibrary: 0 }), 'home', libraries)).toBe('Watchlist · No titles yet')
   })
 })
 

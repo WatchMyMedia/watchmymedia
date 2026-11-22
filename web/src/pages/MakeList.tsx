@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link, Navigate, useNavigate } from '@tanstack/react-router'
 import { itemsQuery, librariesQuery, mediaListPreviewQuery, mediaListQuery, mediaListSourcesQuery, useCreateMediaList, useUpdateMediaList } from '../api/queries'
 import type { components } from '../api/schema'
 import { Poster } from '../components/Poster'
@@ -8,7 +8,7 @@ import { filterOptions, sortOptions, type ItemFilter, type ItemSort } from '../l
 import { formatBytes, languageName } from '../lib/format'
 import {
   DEFAULT_ENTRIES, MAX_ENTRIES, MAX_IMPORT_BYTES, chartLabel, chartLine, chartsFor, discoverLanguages, discoverSorts, draftFromList, draftProblem, emptyDraft, entryLimit,
-  importFormatLabel, knownKind, sentence, listMediaType, listPatch, mediaTypeLabel, previewFromLine, previewHaveWords, previewKey, previewRestWords, sourceOf, suggestName, tmdbMode,
+  importFormatLabel, isWatchlist, knownKind, sentence, listMediaType, listPatch, mediaTypeLabel, previewFromLine, previewHaveWords, previewKey, previewRestWords, sourceOf, suggestName, tmdbMode,
   type ListKind, type MediaList, type MediaListEntry, type MediaType, type SourceDraft,
 } from '../lib/mediaLists'
 import { screenLibraryId, screenTarget } from '../lib/screenRows'
@@ -38,6 +38,8 @@ export function EditListPage({ listId }: { listId: number }) {
   const list = useQuery(mediaListQuery(listId))
   if (list.isError) return <p className="text-red-400">{list.error.message}</p>
   if (!list.data) return <p className="text-neutral-400">Loading…</p>
+  // A watchlist has no source to edit: Rename and its switch are on its page.
+  if (isWatchlist(list.data)) return <Navigate to="/lists/$listId" params={{ listId: String(listId) }} replace />
   return <Loaded>{(sources, libraries) => <Builder screen={list.data.screen} list={list.data} sources={sources} libraries={libraries} />}</Loaded>
 }
 
