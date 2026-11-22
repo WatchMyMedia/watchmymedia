@@ -1,7 +1,7 @@
 -- name: ListMovieItems :many
 -- A library's movies with present files, for its grid. The columns are the
 -- ones a poster card shows: credits, the largest, stay out.
-SELECT m.id, m.library_id, m.title, m.year, m.release_date, m.overview, m.runtime_min, m.genres, m.rating,
+SELECT m.id, m.library_id, m.tmdb_id, m.title, m.year, m.release_date, m.overview, m.runtime_min, m.genres, m.rating,
     m.poster_path, m.backdrop_path, m.content_rating,
     COUNT(f.id) AS file_count,
     MAX(f.added_at) AS added_at,
@@ -15,7 +15,7 @@ GROUP BY m.id;
 
 -- name: ListRecentlyAddedMovieItems :many
 -- ListMovieItems' newest few, by their newest file, for Recently added.
-SELECT m.id, m.library_id, m.title, m.year, m.release_date, m.overview, m.runtime_min, m.genres, m.rating,
+SELECT m.id, m.library_id, m.tmdb_id, m.title, m.year, m.release_date, m.overview, m.runtime_min, m.genres, m.rating,
     m.poster_path, m.backdrop_path, m.content_rating,
     COUNT(f.id) AS file_count,
     MAX(f.added_at) AS added_at,
@@ -32,7 +32,7 @@ LIMIT ?;
 -- name: ListRecentlyReleasedMovieItems :many
 -- ListMovieItems' latest few releases, for Recently released; among movies
 -- released the same day the newest added comes first.
-SELECT m.id, m.library_id, m.title, m.year, m.release_date, m.overview, m.runtime_min, m.genres, m.rating,
+SELECT m.id, m.library_id, m.tmdb_id, m.title, m.year, m.release_date, m.overview, m.runtime_min, m.genres, m.rating,
     m.poster_path, m.backdrop_path, m.content_rating,
     COUNT(f.id) AS file_count,
     MAX(f.added_at) AS added_at,
@@ -54,7 +54,7 @@ WHERE m.library_id = ? AND EXISTS (SELECT 1 FROM media_files f WHERE f.movie_id 
 -- name: ListShowItems :many
 -- A library's shows with present episode files, for its grid; as
 -- ListMovieItems, without credits.
-SELECT s.id, s.library_id, s.title, s.year, s.overview, s.status, s.genres, s.rating, s.poster_path, s.backdrop_path,
+SELECT s.id, s.library_id, s.tmdb_id, s.title, s.year, s.overview, s.status, s.genres, s.rating, s.poster_path, s.backdrop_path,
     s.last_air_date, s.next_air_date, s.content_rating,
     COUNT(DISTINCT e.id) AS episode_count,
     MAX(f.added_at) AS added_at,
@@ -70,7 +70,7 @@ GROUP BY s.id;
 
 -- name: ListShowItemsByIDs :many
 -- ListShowItems for a few shows, such as Recently added's.
-SELECT s.id, s.library_id, s.title, s.year, s.overview, s.status, s.genres, s.rating, s.poster_path, s.backdrop_path,
+SELECT s.id, s.library_id, s.tmdb_id, s.title, s.year, s.overview, s.status, s.genres, s.rating, s.poster_path, s.backdrop_path,
     s.last_air_date, s.next_air_date, s.content_rating,
     COUNT(DISTINCT e.id) AS episode_count,
     MAX(f.added_at) AS added_at,
