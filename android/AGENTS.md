@@ -96,6 +96,14 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   through a StateFlow lost characters to fast typing and paste. The TV's
   `OnScreenKeyboard(field = …)` edits the same state and offers "Use the
   TV's keyboard".
+- **Watchlists.** Saving goes through one `WatchlistRepository`, whose
+  `held` says where titles saved or removed on this device now are, and one
+  session-wide `WatchlistViewModel`, which the nav hosts hand to every
+  screen as `LocalWatchlistControls` (core:ui). A card that shows a movie
+  or show gets its menu entry from it: `withWatchlist(item)` on the phone,
+  `holdFor(item, …)` on the TV; a new card type that skips them has no
+  Add to Watchlist. Lay `held` over what a screen read, never the reverse:
+  a reply begun before a press would undo it (`known` takes a `since`).
 - **Live TV polling.** The channel list is polled only while a screen that
   shows channels is on screen: such a screen or row calls
   `ShowsLiveChannels()` (core:ui) once. Nothing else polls it.
