@@ -45,4 +45,26 @@ import WMMModel
         let refusal = await #expect(throws: APIError.self) { try await watchlists.saveToOnly(title) }
         #expect(refusal?.status == 409)
     }
+
+    /// A watchlist through the lists' own routes, as a level-33 server sends it.
+    @Test func aWatchlistReadsAsAListOfItsOwnKind() async throws {
+        try await ready()
+        let rows = h.services.rows
+        h.router.on("GET /api/lists/9101", .json("""
+            { "id": 9101, "name": "Watchlist", "mediaType": "all", "source": { "kind": "watchlist" }, "owner": "me", "canEdit": true,
+              "screen": "home", "limit": 500, "entries": 1, "inLibrary": 0, "fetching": false, "fetchedAt": "2026-11-22T06:08:21.087Z",
+              "createdAt": "2026-11-22T06:08:21.087Z", "updatedAt": "2026-11-22T06:08:21.087Z", "removeWatched": true }
+            """))
+        h.router.on("GET /api/lists/9101/entries", .json("""
+            { "items": [ { "rank": 1, "mediaType": "movie", "tmdbId": 91001, "title": "Amberline", "year": 2026, "found": true,
+                           "watchlisted": true, "addedAt": "2026-11-22T06:08:21.087Z" } ],
+              "total": 1, "inLibrary": 0, "limit": 100, "offset": 0 }
+            """))
+        let list = try await rows.list(id: 9101)
+        #expect(list.isWatchlist && list.removeWatched && !list.refreshable)
+        let entries = try await rows.entries(listID: 9101, offset: 0, limit: 250, sort: .title, mediaType: .movie)
+        #expect(entries.items.first?.watchlisted == true && entries.items.first?.addedAt != nil)
+        let asked = try #require(h.router.requests("GET /api/lists/9101/entries").last?.url?.query)
+        #expect(asked.contains("sort=title") && asked.contains("mediaType=movie"))
+    }
 }
