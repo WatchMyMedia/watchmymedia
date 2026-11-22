@@ -7,6 +7,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.combine
 import media.watchmy.client.model.AppServices
 import media.watchmy.client.model.BrowseRequests
+import media.watchmy.client.model.WATCHLISTS_API_LEVEL
 import media.watchmy.client.model.CastService
 import media.watchmy.client.model.DownloadRepository
 import media.watchmy.client.model.RequestBackend
@@ -38,9 +39,10 @@ class FakeAppServices(
     private val level = { servers.current.value?.server?.apiLevel ?: 0 }
     override val requests = FakeRequestRepository({ auth.user.value }, arr, backend = if (seerr) RequestBackend.Seerr else RequestBackend.Arr, level = level)
     override val follows = FakeFollowsRepository(level)
-    private val rowsData = FakeRowsData(requestState = requests::requestState, follows = follows)
+    private val rowsData = FakeRowsData(requestState = requests::requestState, follows = follows, watchlistsOn = { level() >= WATCHLISTS_API_LEVEL })
     override val library = FakeLibraryRepository(arr, level, rowsData, user = { auth.user.value?.name }, following = follows::following, servers = servers).also { it.offline = offline }
     override val rows = FakeRowsRepository(rowsData, level)
+    override val watchlists = FakeWatchlistRepository(rowsData, level)
     override val live = FakeLiveRepository(level, { auth.user.value }).also { it.offline = offline }
     override val livePlayback = LivePlaybackControllerFactory {
         val server = servers.current.value?.server?.id

@@ -22,6 +22,9 @@ interface AppServices {
     /** Following shows and their new episodes; [FollowsRepository.Unavailable] where there is none. */
     val follows: FollowsRepository get() = FollowsRepository.Unavailable
 
+    /** The person's watchlists; [WatchlistRepository.Unavailable] where there are none. */
+    val watchlists: WatchlistRepository get() = WatchlistRepository.Unavailable
+
     /** Requests and problem reports; [RequestRepository.Unavailable] where there are none. */
     val requests: RequestRepository get() = RequestRepository.Unavailable
 

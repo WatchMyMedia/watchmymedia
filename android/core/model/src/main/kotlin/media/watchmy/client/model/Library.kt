@@ -52,6 +52,10 @@ data class BrowseItem(
     val episodeId: Long? = null,
     /** That episode's season. */
     val episodeSeason: Int? = null,
+    /** The title's TMDB id, which saving it to a watchlist takes; null when unmatched, or from servers below [WATCHLISTS_API_LEVEL]. */
+    val tmdbId: Long? = null,
+    /** On one of the person's watchlists, as the server read it ([WatchlistRepository.held] has what changed since). */
+    val watchlisted: Boolean = false,
 )
 
 /** An episode card (Recently aired, search results). */
@@ -243,6 +247,8 @@ data class ShowDetail(
     val managedBy: String? = null,
     /** The person follows the show (Notify me); null from a server below [FOLLOWS_API_LEVEL]. */
     val following: Boolean? = null,
+    /** The person's watchlists that hold the show; null from a server below [WATCHLISTS_API_LEVEL], where the page has no Watchlist button. */
+    val watchlists: List<Long>? = null,
 )
 
 /** One version (file) of a movie or episode. */
@@ -348,6 +354,8 @@ data class MovieDetail(
     val managedBy: String? = null,
     /** Best first; empty on servers below [TRAILERS_API_LEVEL] and for movies with none. */
     val trailers: List<Trailer> = emptyList(),
+    /** The person's watchlists that hold the movie; null from a server below [WATCHLISTS_API_LEVEL], where the page has no Watchlist button. */
+    val watchlists: List<Long>? = null,
 )
 
 data class SearchResults(val movies: List<BrowseItem>, val shows: List<BrowseItem>, val episodes: List<EpisodeCard>)

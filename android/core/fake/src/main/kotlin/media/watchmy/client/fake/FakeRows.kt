@@ -25,6 +25,16 @@ import media.watchmy.client.model.RowsRepository
 import media.watchmy.client.model.ScreenRow
 import media.watchmy.client.model.HomeData
 import media.watchmy.client.model.ItemSort
+import media.watchmy.client.model.ListSort
+import media.watchmy.client.model.MAX_WATCHLISTS
+import media.watchmy.client.model.MAX_WATCHLIST_TITLES
+import media.watchmy.client.model.WATCHLIST_KIND
+import media.watchmy.client.model.Watchlist
+import media.watchmy.client.model.WatchlistKey
+import media.watchmy.client.model.WatchlistTitle
+import media.watchmy.client.model.WatchlistWords
+import media.watchmy.client.model.nameTaken
+import media.watchmy.client.model.watchlistTitle
 
 /**
  * The fakes' rows and lists: every person's layouts on the
@@ -37,8 +47,13 @@ class FakeRowsData(
     private val requestState: (MediaType, Long) -> RequestableState? = { _, _ -> null },
     /** New from shows you follow, a Home row from [media.watchmy.client.model.FOLLOWS_API_LEVEL]; none without it. */
     private val follows: FakeFollowsRepository? = null,
+    /** The server has watchlists ([media.watchmy.client.model.WATCHLISTS_API_LEVEL]): without them the person's three aren't there. */
+    private val watchlistsOn: () -> Boolean = { false },
+    private val clock: () -> Long = System::currentTimeMillis,
 ) {
-    private class Entry(val type: MediaType, val title: String, val year: Int, val tmdbId: Long? = null, val found: Boolean = true)
+    private class Entry(val type: MediaType, val title: String, val year: Int, val tmdbId: Long? = null, val found: Boolean = true, val addedAtMs: Long? = null) {
+        val key: WatchlistKey? get() = tmdbId?.takeIf { found }?.let { WatchlistKey(type, it) }
+    }
 
     private class FakeList(
         val list: MediaList,
@@ -50,7 +65,14 @@ class FakeRowsData(
     private val show = { title: String -> inLibrary(FakeData.shows.first { it.title == title }) }
     private val movie = { title: String -> inLibrary(FakeData.movies.first { it.title == title }) }
 
-    private val lists = mutableListOf(
+    /** The person's watchlists' entries, newest saved first, a day apart. */
+    private fun saved(vararg entries: Entry): List<Entry> = entries.mapIndexed { i, e -> Entry(e.type, e.title, e.year, e.tmdbId, e.found, clock() - (i + 1) * DAY) }
+
+    private fun watchlist(id: Long, name: String, removeWatched: Boolean = true) =
+        MediaList(id, name, "all", WATCHLIST_KIND, ListOwner.Me, canEdit = true, screen = RowScreens.HOME, limit = 500, entries = 0, inLibrary = 0, removeWatched = removeWatched)
+
+    /** Every list, watchlists included; [lists] is what the server in use has. */
+    private val stored = mutableListOf(
         FakeList(
             MediaList(SCI_FI, "Science fiction worth staying up for", "all", "tmdb", ListOwner.Everyone, canEdit = true, screen = RowScreens.HOME, limit = 50, entries = 0, inLibrary = 0, fetchedAtMs = System.currentTimeMillis() - 3 * HOUR, sourceName = "TMDB", sourceUrl = "https://www.themoviedb.org/"),
             listOf(
@@ -78,7 +100,28 @@ class FakeRowsData(
             MediaList(UNWATCHED_4K, "Unwatched in 4K", "movie", "library", ListOwner.Everyone, canEdit = false, screen = RowScreens.library(FakeData.MOVIE_LIBRARY), limit = 50, entries = 0, inLibrary = 0),
             FakeData.movies.filter { it.quality == "4K" && !it.watched }.map { inLibrary(it) },
         ),
+        // The person's watchlists: three of Watchlist's twelve titles and one of With the kids' four aren't in the library.
+        FakeList(
+            watchlist(FIRST_WATCHLIST, "Watchlist"),
+            saved(
+                Entry(MediaType.Movie, "Harbor Saints", 2020, 70202), movie("Tin Sky"), show("Harbor Lights"), movie("Ninety Fathoms"),
+                show("Orbital Decay"), Entry(MediaType.Tv, "Harborside", 2017, 70104), movie("Signal to Noise"), show("Kestrel Station"),
+                movie("The Paper Kite"), Entry(MediaType.Movie, "Harbor of Glass", 2023, 70203), show("Glass Country"), movie("A Lesser Moon"),
+            ),
+        ),
+        FakeList(
+            watchlist(HALLOWEEN, "Halloween", removeWatched = false),
+            saved(movie("Cold Harbour Road"), movie("The Archivist"), show("Hollow Pines"), show("Pale Water"), movie("Low Tide at Carrow"), show("Midnight Cartography")),
+        ),
+        FakeList(
+            watchlist(WITH_THE_KIDS, "With the kids"),
+            saved(movie("Tin Sky"), movie("Dead Reckoning Bay"), Entry(MediaType.Movie, "Harbour Bells", 2022, 70205), show("Second Ascent")),
+        ),
     )
+
+    private val lists: List<FakeList> get() = stored.filter { !it.list.isWatchlist || watchlistsOn() }
+
+    private val watchlistRows: List<Pair<String, Boolean>> get() = lists.filter { it.list.isWatchlist }.map { RowIds.list(it.list.id) to false }
 
     private val builtinTitles = mapOf(
         RowIds.CONTINUE to (RowStyle.Continue to "Continue watching"),
@@ -99,13 +142,13 @@ class FakeRowsData(
             RowIds.CONTINUE to false, RowIds.LIVE to false, RowIds.RECENTLY_ADDED_SHOWS to false, RowIds.list(SCI_FI) to false,
             RowIds.RECENTLY_AIRED to false, RowIds.RECENTLY_ADDED_MOVIES to false, RowIds.list(FESTIVAL) to false, RowIds.RECENTLY_RELEASED to false,
             (RowIds.FOLLOWED to false).takeIf { follows?.supported == true },
-            RowIds.list(WATCHLIST) to true, RowIds.list(UNWATCHED_4K) to true,
-        )
+        ) + watchlistRows + listOf(RowIds.list(WATCHLIST) to true, RowIds.list(UNWATCHED_4K) to true)
+        // The server puts watchlists first on a library's screen; the fakes put them after the rows the
+        // library screens' tests walk through, as Home's do.
         RowScreens.library(FakeData.MOVIE_LIBRARY) -> listOf(
             RowIds.RECENTLY_ADDED to false, RowIds.list(UNWATCHED_4K) to false, RowIds.RECENTLY_RELEASED to false,
-            RowIds.list(FESTIVAL) to true, RowIds.list(SCI_FI) to true,
-        )
-        RowScreens.library(FakeData.TV_LIBRARY) -> listOf(RowIds.RECENTLY_ADDED to false, RowIds.RECENTLY_AIRED to false, RowIds.list(SCI_FI) to true)
+        ) + watchlistRows + listOf(RowIds.list(FESTIVAL) to true, RowIds.list(SCI_FI) to true)
+        RowScreens.library(FakeData.TV_LIBRARY) -> listOf(RowIds.RECENTLY_ADDED to false, RowIds.RECENTLY_AIRED to false) + watchlistRows + listOf(RowIds.list(SCI_FI) to true)
         else -> throw ApiException(404, "No such screen.")
     }
 
@@ -140,7 +183,23 @@ class FakeRowsData(
         all.firstOrNull { FakeData.tmdbId(it.id) == e.tmdbId }
     }
 
-    private fun FakeList.current(): MediaList = list.copy(entries = entries.size, inLibrary = items().size)
+    private fun FakeList.current(): MediaList = list.copy(entries = entries.size, inLibrary = items().size, fetchedAtMs = if (list.isWatchlist) entries.firstOrNull()?.addedAtMs else list.fetchedAtMs)
+
+    /** On one of the person's watchlists. */
+    fun watchlisted(key: WatchlistKey?): Boolean = key != null && lists.any { l -> l.list.isWatchlist && l.entries.any { it.key == key } }
+
+    /** [item] as the server sends it from [media.watchmy.client.model.WATCHLISTS_API_LEVEL]: with its TMDB id and mark. */
+    fun marked(item: BrowseItem): BrowseItem {
+        if (!watchlistsOn() || item.kind == media.watchmy.client.model.ItemKind.Unmatched) return item
+        val withId = item.copy(tmdbId = FakeData.tmdbId(item.id))
+        return withId.copy(watchlisted = watchlisted(withId.watchlistTitle()?.key))
+    }
+
+    /** The watchlists that hold [key], in the order made; null without watchlists, as an older server leaves it out. */
+    fun holding(key: WatchlistKey?): List<Long>? {
+        if (!watchlistsOn()) return null
+        return lists.filter { l -> l.list.isWatchlist && key != null && l.entries.any { it.key == key } }.map { it.list.id }
+    }
 
     /** What the screen draws: the rows in order that have something to show (and Live TV, which the app fills). */
     fun rows(screen: String, home: HomeData): List<ScreenRow> = order(screen).filterNot { it.second }.mapNotNull { (id, _) ->
@@ -156,7 +215,18 @@ class FakeRowsData(
             RowIds.RECENTLY_ADDED_MOVIES -> row.copy(items = home.recentlyAddedMovies, seeAll = RowLink.Library(FakeData.MOVIE_LIBRARY, sort = ItemSort.Added))
             RowIds.RECENTLY_RELEASED -> row.copy(items = home.recentlyReleased, seeAll = RowLink.Library(FakeData.MOVIE_LIBRARY, sort = ItemSort.Released), title = if (libraryId != null) "Recently released" else row.title)
             RowIds.RECENTLY_ADDED -> row.copy(items = if (movies) home.recentlyAddedMovies else home.recentlyAddedShows, seeAll = libraryId?.let { RowLink.Library(it, sort = ItemSort.Added) })
-            else -> listFor(id)?.let { l ->
+            else -> listFor(id)?.takeIf { it.list.isWatchlist }?.let { l ->
+                // On Home, what Continue watching shows isn't drawn a second time.
+                val started = if (libraryId == null) home.continueWatching.flatMap { listOfNotNull(it.movieId, it.showId) }.toSet() else emptySet()
+                val fits = l.entries.filter { libraryId == null || it.type == (if (movies) MediaType.Movie else MediaType.Tv) }
+                val have = l.items().filter { libraryId == null || it.libraryId == libraryId }
+                row.copy(
+                    items = have.filter { it.id !in started }.take(20).map(::marked),
+                    subtitle = "${have.size} of ${fits.size} in your library".takeIf { have.size < fits.size },
+                    seeAll = RowLink.ToList(l.list.id),
+                    listId = l.list.id,
+                )
+            } ?: listFor(id)?.let { l ->
                 val current = l.current()
                 val source = when (current.sourceKind) {
                     "tmdb" -> RowSource("tmdb", "TMDB", "https://www.themoviedb.org/")
@@ -165,7 +235,7 @@ class FakeRowsData(
                     else -> RowSource("import", "an import")
                 }
                 row.copy(
-                    items = l.items().filter { libraryId == null || it.libraryId == libraryId }.take(20),
+                    items = l.items().filter { libraryId == null || it.libraryId == libraryId }.take(20).map(::marked),
                     subtitle = "${current.inLibrary} of ${current.entries} · From ${source.name}",
                     seeAll = RowLink.ToList(current.id),
                     source = source,
@@ -186,7 +256,7 @@ class FakeRowsData(
                     id = id, title = title(id), style = style(id).wire,
                     kind = if (list != null) RowLayoutEntry.Kind.List else RowLayoutEntry.Kind.Builtin,
                     hidden = hidden, shown = !hidden && id in drawn,
-                    note = "Nothing from this list is in your library yet".takeIf { list != null && !hidden && id !in drawn },
+                    note = (if (list?.isWatchlist == true) "None of these are in your library yet" else "Nothing from this list is in your library yet").takeIf { list != null && !hidden && id !in drawn },
                     listId = list?.id, owner = list?.owner,
                 )
             },
@@ -212,33 +282,97 @@ class FakeRowsData(
 
     fun list(id: Long): MediaList = lists.firstOrNull { it.list.id == id }?.current() ?: throw ApiException(404, "No such list.")
 
-    fun entries(id: Long, offset: Int, limit: Int): MediaListEntries {
+    fun entries(id: Long, offset: Int, limit: Int, sort: ListSort? = null, type: MediaType? = null): MediaListEntries {
         val l = lists.firstOrNull { it.list.id == id } ?: throw ApiException(404, "No such list.")
-        val all = l.entries.mapIndexed { i, e ->
+        val shown = l.entries.filter { type == null || it.type == type }.let { all ->
+            when (sort) {
+                ListSort.Title -> all.sortedBy { it.title.lowercase(java.util.Locale.ROOT).removePrefix("the ") }
+                ListSort.Released -> all.sortedByDescending { it.year }
+                ListSort.Added, null -> all
+            }
+        }
+        val all = shown.mapIndexed { i, e ->
             val item = (if (e.type == MediaType.Movie) FakeData.movies else FakeData.shows).firstOrNull { FakeData.tmdbId(it.id) == e.tmdbId }
             MediaListEntry(
                 rank = i + 1, mediaType = e.type, tmdbId = e.tmdbId, title = e.title, year = e.year.takeIf { it > 0 }, posterPath = null, found = e.found,
-                item = item, requestState = if (item == null && e.found && e.tmdbId != null) requestState(e.type, e.tmdbId) else null,
+                item = item?.let(::marked), requestState = if (item == null && e.found && e.tmdbId != null) requestState(e.type, e.tmdbId) else null,
+                watchlisted = watchlistsOn() && watchlisted(e.key), addedAtMs = e.addedAtMs,
             )
         }
         return MediaListEntries(all.drop(offset).take(limit), all.size, all.count { it.item != null })
     }
 
     fun refresh(id: Long): MediaList {
-        val i = lists.indexOfFirst { it.list.id == id }
+        val i = stored.indexOfFirst { it.list.id == id }
         if (i < 0) throw ApiException(404, "No such list.")
-        val l = lists[i]
+        val l = stored[i]
         if (!l.list.refreshable) throw ApiException(422, "Only TMDB and MDBList lists are fetched again.")
-        lists[i] = FakeList(l.list.copy(fetchedAtMs = System.currentTimeMillis(), error = null, errorAtMs = null), l.entries)
+        stored[i] = FakeList(l.list.copy(fetchedAtMs = System.currentTimeMillis(), error = null, errorAtMs = null), l.entries)
         changes.tryEmit(RowsChange.Lists(id))
-        return lists[i].current()
+        return stored[i].current()
     }
 
     fun delete(id: Long) {
         val l = lists.firstOrNull { it.list.id == id } ?: throw ApiException(404, "No such list.")
         if (!l.list.canEdit) throw ApiException(403, "Only an admin can delete the household’s lists.")
-        lists.remove(l)
+        stored.remove(l)
         changes.tryEmit(RowsChange.Lists(id))
+        if (l.list.isWatchlist) changes.tryEmit(RowsChange.Layout(RowScreens.HOME))
+    }
+
+    // The person's watchlists, as /api/me/watchlists keeps them.
+
+    private fun watchlistOf(id: Long): FakeList = lists.firstOrNull { it.list.id == id && it.list.isWatchlist } ?: throw ApiException(404, "No such watchlist.")
+
+    private fun FakeList.asWatchlist(key: WatchlistKey? = null): Watchlist {
+        val current = current()
+        return Watchlist(
+            current.id, current.name, current.entries, current.inLibrary, current.removeWatched,
+            posters = emptyList(), contains = key != null && entries.any { it.key == key },
+        )
+    }
+
+    fun watchlists(key: WatchlistKey? = null): List<Watchlist> = lists.filter { it.list.isWatchlist }.map { it.asWatchlist(key) }
+
+    fun createWatchlist(name: String): Watchlist {
+        val mine = watchlists()
+        if (mine.size >= MAX_WATCHLISTS) throw ApiException(422, WatchlistWords.limit(MAX_WATCHLISTS))
+        if (mine.nameTaken(name)) throw ApiException(422, WatchlistWords.taken(name))
+        val id = (stored.maxOf { it.list.id } + 1).coerceAtLeast(FIRST_WATCHLIST)
+        stored += FakeList(watchlist(id, name.trim()), emptyList())
+        changes.tryEmit(RowsChange.Layout(RowScreens.HOME))
+        return watchlistOf(id).asWatchlist()
+    }
+
+    fun updateWatchlist(id: Long, name: String?, removeWatched: Boolean?): Watchlist {
+        val l = watchlistOf(id)
+        if (name != null && watchlists().nameTaken(name, except = id)) throw ApiException(422, WatchlistWords.taken(name))
+        replace(l, l.entries, l.list.copy(name = name?.trim() ?: l.list.name, removeWatched = removeWatched ?: l.list.removeWatched))
+        if (name != null) changes.tryEmit(RowsChange.Layout(RowScreens.HOME))
+        return watchlistOf(id).asWatchlist()
+    }
+
+    /** Saves [title] to [id], newest first; one already there keeps its place. */
+    fun saveTitle(id: Long, title: WatchlistTitle): Watchlist {
+        val l = watchlistOf(id)
+        if (l.entries.none { it.key == title.key }) {
+            if (l.entries.size >= MAX_WATCHLIST_TITLES) throw ApiException(422, "A watchlist holds up to $MAX_WATCHLIST_TITLES titles.")
+            val known = (if (title.key.type == MediaType.Movie) FakeData.movies else FakeData.shows).firstOrNull { FakeData.tmdbId(it.id) == title.key.tmdbId }
+            val entry = Entry(title.key.type, known?.title ?: title.title, known?.year ?: title.year ?: 0, title.key.tmdbId, addedAtMs = clock())
+            replace(l, listOf(entry) + l.entries)
+        }
+        return watchlistOf(id).asWatchlist()
+    }
+
+    fun removeTitle(id: Long, key: WatchlistKey): Watchlist {
+        val l = watchlistOf(id)
+        replace(l, l.entries.filter { it.key != key })
+        return watchlistOf(id).asWatchlist()
+    }
+
+    private fun replace(l: FakeList, entries: List<Entry>, list: MediaList = l.list) {
+        stored[stored.indexOf(l)] = FakeList(list, entries)
+        changes.tryEmit(RowsChange.Lists(l.list.id))
     }
 
     companion object {
@@ -246,7 +380,13 @@ class FakeRowsData(
         const val FESTIVAL = 2L
         const val WATCHLIST = 3L
         const val UNWATCHED_4K = 4L
+
+        /** The person's watchlists: Watchlist, Halloween (which keeps watched titles) and With the kids. */
+        const val FIRST_WATCHLIST = 11L
+        const val HALLOWEEN = 12L
+        const val WITH_THE_KIDS = 13L
         private const val HOUR = 3_600_000L
+        private const val DAY = 24 * HOUR
     }
 }
 
@@ -277,7 +417,7 @@ class FakeRowsRepository(
 
     override suspend fun list(id: Long): MediaList = call { data.list(id) }
 
-    override suspend fun entries(id: Long, offset: Int, limit: Int): MediaListEntries = call { data.entries(id, offset, limit) }
+    override suspend fun entries(id: Long, offset: Int, limit: Int, sort: ListSort?, type: MediaType?): MediaListEntries = call { data.entries(id, offset, limit, sort, type) }
 
     override suspend fun refreshList(id: Long): MediaList = call { data.refresh(id) }
 

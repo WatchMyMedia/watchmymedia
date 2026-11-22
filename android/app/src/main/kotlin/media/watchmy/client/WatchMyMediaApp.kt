@@ -42,6 +42,7 @@ import media.watchmy.client.model.ClientInfo
 import media.watchmy.client.model.Diagnostics
 import media.watchmy.client.model.DownloadRepository
 import media.watchmy.client.model.FollowsRepository
+import media.watchmy.client.model.WatchlistRepository
 import media.watchmy.client.model.LIVE_CAST_API_LEVEL
 import media.watchmy.client.model.LibraryRepository
 import media.watchmy.client.model.LivePlaybackControllerFactory
@@ -301,4 +302,5 @@ private class RealAppServices(
     override val live: LiveRepository get() = data.live
     override val rows: RowsRepository get() = data.rows
     override val follows: FollowsRepository get() = data.follows
+    override val watchlists: WatchlistRepository get() = data.watchlists
 }

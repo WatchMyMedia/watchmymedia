@@ -253,7 +253,7 @@ fun ListOwner.label(): String = when (this) {
 fun RowLayoutEntry.editorLine(list: MediaList? = null): String {
     val line = when {
         !drawable -> "Shown in newer versions of the app"
-        kind == RowLayoutEntry.Kind.List -> listOfNotNull(owner?.label() ?: "List", list?.countLine(), list?.fromLine()).joinToString(" · ")
+        kind == RowLayoutEntry.Kind.List -> listOfNotNull(WatchlistWords.KICKER.takeIf { list?.isWatchlist == true } ?: owner?.label() ?: "List", list?.countLine(), list?.fromLine()).joinToString(" · ")
         style == RowStyle.Live.wire -> "Built in · On now, or Watch a channel"
         else -> "Built in"
     }
@@ -277,6 +277,7 @@ fun RowLayoutEntry.addLine(list: MediaList? = null): String {
         }
         return listOfNotNull(list.fromLine(), plural(list.inLibrary, noun)).joinToString(" · ")
     }
+    if (list.isWatchlist) return listOf(WatchlistWords.KICKER, "${list.countLine()} in your library").joinToString(" · ")
     return listOfNotNull(list.fromLine(), "${list.countLine()} in your library").joinToString(" · ")
 }
 
@@ -308,8 +309,8 @@ fun addRowGroups(entries: List<RowLayoutEntry>, lists: List<MediaList>): List<Ad
     )
 }
 
-/** Add a row's line about making lists, which phones, tablets and TVs don't do. */
-const val LISTS_ON_THE_WEB = "Lists are made in WatchMyMedia on the web."
+/** Add a row's line about making lists, which phones, tablets and TVs don't do (watchlists they do). */
+const val LISTS_ON_THE_WEB = "Lists from TMDB, MDBList and imports are made in WatchMyMedia on the web."
 
 /** The TMDB notice its terms ask for, in About. */
 const val TMDB_NOTICE = "This product uses the TMDB API but is not endorsed or certified by TMDB."
@@ -341,9 +342,14 @@ data class MediaList(
     val sourceName: String? = null,
     /** The list's page on TMDB or mdblist.com, when it has one. */
     val sourceUrl: String? = null,
+    /** Watchlists: a finished title leaves it. */
+    val removeWatched: Boolean = false,
 ) {
     /** Fetched again from its source; imports and library lists are not. */
     val refreshable: Boolean get() = sourceKind == "tmdb" || sourceKind == "mdblist"
+
+    /** One of the person's watchlists, which they save to and change here. */
+    val isWatchlist: Boolean get() = sourceKind == WATCHLIST_KIND
 }
 
 /** "TMDB", "MDBList": a source's name as people read it; null for one this app doesn't know. */
@@ -361,8 +367,8 @@ fun MediaList.fromLine(): String? = when (sourceKind) {
     else -> (sourceName?.takeIf { it.isNotBlank() } ?: listSourceName(sourceKind))?.let { "From $it" }
 }
 
-/** The list page's kicker: "List · For everyone", "Your list". */
-fun MediaList.kicker(): String = when (owner) {
+/** The list page's kicker: "List · For everyone", "Your list", "Watchlist". */
+fun MediaList.kicker(): String = if (isWatchlist) WatchlistWords.KICKER else when (owner) {
     ListOwner.Me -> "Your list"
     ListOwner.Everyone -> "List · For everyone"
     null -> "List"
@@ -370,6 +376,8 @@ fun MediaList.kicker(): String = when (owner) {
 
 /** "From TMDB · Updated 3 h ago", "Imported Nov 2 · from an IMDb export", "From your library": under the list page's name. */
 fun MediaList.sourceLine(now: Long = System.currentTimeMillis()): String? {
+    // A watchlist is the person's own: it comes from nowhere and is never fetched.
+    if (isWatchlist) return null
     if (sourceKind == "import") {
         val imported = listOfNotNull("Imported", createdAtMs?.let { monthDay(java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault())) }).joinToString(" ")
         return listOfNotNull(imported, sourceName?.takeIf { it.isNotBlank() }?.let { "from $it" }).joinToString(" · ")
@@ -379,8 +387,22 @@ fun MediaList.sourceLine(now: Long = System.currentTimeMillis()): String? {
     return listOfNotNull(from, updated).joinToString(" · ")
 }
 
-/** "18 of 50 in your library · 2 not found". */
-fun MediaList.summaryLine(): String = listOfNotNull("$inLibrary of $entries in your library", notFound.takeIf { it > 0 }?.let { "$it not found" }).joinToString(" · ")
+/** The question Delete asks: "Delete Halloween?". */
+fun MediaList.deleteQuestion(): String = WatchlistWords.deleteQuestion(name)
+
+/**
+ * What deleting the list does, under the question: a watchlist's titles
+ * stay in the library; another list's row goes from every screen, for
+ * everyone only when it is the household's.
+ */
+fun MediaList.deleteBody(): String = when {
+    isWatchlist -> WatchlistWords.deleteBody(inLibrary)
+    owner == ListOwner.Everyone -> "Its row goes from every screen, for everyone who sees it. This can’t be undone."
+    else -> "Its row goes from every screen. This can’t be undone."
+}
+
+/** "18 of 50 in your library · 2 not found"; a watchlist's "12 titles · 9 in your library". */
+fun MediaList.summaryLine(): String = if (isWatchlist) WatchlistWords.line(entries, inLibrary) else listOfNotNull("$inLibrary of $entries in your library", notFound.takeIf { it > 0 }?.let { "$it not found" }).joinToString(" · ")
 
 /** "Couldn’t update this list: MDBList refused the key. It’s shown as it was 2 days ago." when the last fetch failed. */
 fun MediaList.errorLine(now: Long = System.currentTimeMillis()): String? = error?.let { e ->
@@ -405,6 +427,10 @@ data class MediaListEntry(
     val item: BrowseItem? = null,
     /** What Request would do; null when the person may not request or requests aren't set up. */
     val requestState: RequestableState? = null,
+    /** On one of the person's watchlists, as the server read it. */
+    val watchlisted: Boolean = false,
+    /** Watchlists: when the title was saved. */
+    val addedAtMs: Long? = null,
 ) {
     val inLibrary: Boolean get() = item != null
 
@@ -444,9 +470,13 @@ sealed interface RowsChange {
     /** A list was made, changed, deleted or refreshed with new entries; [listId] null after a reconnection. */
     data class Lists(val listId: Long?) : RowsChange
 
-    /** Whether a screen showing [screen] reads again: its layout, or any list (a list's row may be on it). */
+    /**
+     * Whether a screen showing [screen] reads again: its layout, or any list
+     * (a list's row may be on it). Home's also comes when a watchlist is
+     * made, renamed or deleted, which is a row on every screen.
+     */
     fun affects(screen: String): Boolean = when (this) {
-        is Layout -> this.screen == null || this.screen == screen
+        is Layout -> this.screen == null || this.screen == screen || this.screen == RowScreens.HOME
         is Lists -> true
     }
 }
@@ -473,7 +503,12 @@ interface RowsRepository {
 
     suspend fun list(id: Long): MediaList
 
-    suspend fun entries(id: Long, offset: Int = 0, limit: Int = MAX_LIST_ENTRIES): MediaListEntries
+    /**
+     * A page of the list's entries. [sort] and [type] (a watchlist's page's
+     * sorts and chips, from [WATCHLISTS_API_LEVEL]) are left out when null,
+     * so older servers are asked as before.
+     */
+    suspend fun entries(id: Long, offset: Int = 0, limit: Int = MAX_LIST_ENTRIES, sort: ListSort? = null, type: MediaType? = null): MediaListEntries
 
     /** Fetches the list again now (409 while a fetch runs). */
     suspend fun refreshList(id: Long): MediaList
@@ -503,7 +538,7 @@ interface RowsRepository {
 
         override suspend fun list(id: Long): MediaList = none()
 
-        override suspend fun entries(id: Long, offset: Int, limit: Int): MediaListEntries = none()
+        override suspend fun entries(id: Long, offset: Int, limit: Int, sort: ListSort?, type: MediaType?): MediaListEntries = none()
 
         override suspend fun refreshList(id: Long): MediaList = none()
 

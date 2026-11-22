@@ -105,7 +105,7 @@ class HomeFocusTest {
 
     @Test
     fun `The last screen offers Edit rows and Back to the top`() {
-        repeat(12) { press(Key.DirectionDown) } // More presses than rows: the end screen swallows the rest.
+        repeat(16) { press(Key.DirectionDown) } // More presses than rows (the watchlists' too): the end screen swallows the rest.
         assertEquals("Edit rows", focused())
         compose.onNodeWithText("That's everything on Home").assertExists()
         press(Key.DirectionRight)
