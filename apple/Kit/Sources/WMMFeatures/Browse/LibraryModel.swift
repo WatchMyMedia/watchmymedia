@@ -308,6 +308,8 @@ public final class LibraryModel {
     public func open(_ link: RowLink) async {
         switch link {
         case .list(let id):
+            // A watchlist's page opens on this screen's kind of title.
+            navigator.listOpenedOn = (id, type == .tv ? .tv : .movie)
             navigator.open(.mediaList(id: id))
         case .library:
             choose(link)

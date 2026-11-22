@@ -273,7 +273,8 @@ struct EpisodeRowCard: View {
     }
 }
 
-/// A title's long press: Mark watched or unwatched, when it can be marked.
+/// A title's long press: Mark watched or unwatched, when it can be marked;
+/// then Add to Watchlist, Remove from Watchlist or Save to watchlist….
 struct WatchMenu: View {
     let item: BrowseItem
     let actions: RowActions
@@ -282,6 +283,8 @@ struct WatchMenu: View {
         if let target = item.watchTarget {
             WatchToggleButton(watched: item.watched) { await actions.setWatched(target, $0) }
         }
+        Divider()
+        WatchlistMenuButton(item)
     }
 }
 

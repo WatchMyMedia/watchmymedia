@@ -67,10 +67,12 @@ enum ServicesFactory {
             rows: arguments.contains("-fakesRows"),
             follows: arguments.contains("-fakesFollows"),
             related: arguments.contains("-fakesRelated"),
+            watchlists: arguments.contains("-fakesWatchlists"),
             several: arguments.contains("-fakesServers")
         )
         (services.library as? FakeLibraryRepository)?.firstRun = FakeFirstRunState.from(arguments)
         if arguments.contains("-fakesSlowServer") { (services.library as? FakeLibraryRepository)?.otherServerDelay = .milliseconds(2500) }
+        if arguments.contains("-fakesOneWatchlist") { (services.watchlists as? FakeWatchlistsRepository)?.keepOnlyFirst() }
         if let i = arguments.firstIndex(of: "-fakesAudioLanguages"), arguments.indices.contains(i + 1), !arguments[i + 1].hasPrefix("-") {
             (services.preferences as? FakePreferencesRepository)?.seedLanguages(arguments[i + 1].split(separator: ",").map(String.init))
         }

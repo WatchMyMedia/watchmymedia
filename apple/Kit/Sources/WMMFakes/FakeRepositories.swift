@@ -355,6 +355,8 @@ public final class FakeLibraryRepository: LibraryRepository {
     public var rows: FakeRowsRepository?
     /// Follows, so a show's page says whether Sam follows it (API level 29).
     public var follows: FakeFollowsRepository?
+    /// Watchlists, so a title's page says which hold it (API level 33).
+    public var watchlists: FakeWatchlistsRepository?
     /// The fake server, whose API level says whether related titles are
     /// offered (``ServerFeatures/related``); without one they are.
     public var servers: FakeServerRepository?
@@ -529,6 +531,7 @@ public final class FakeLibraryRepository: LibraryRepository {
             return copy
         }
         if let follows, follows.available { show.following = follows.following(showID: id) }
+        if let watchlists, watchlists.available, let key = show.watchlistTitle?.key { show.watchlists = watchlists.holding(key) }
         return show
     }
 
@@ -586,6 +589,7 @@ public final class FakeLibraryRepository: LibraryRepository {
         if let mark = marks[.movie(id: id)] {
             movie.watch = mark ? WatchProgress(positionMs: 0, durationMs: (movie.runtimeMin ?? 100) * 60_000, completed: true) : nil
         }
+        if let watchlists, watchlists.available, let key = movie.watchlistTitle?.key { movie.watchlists = watchlists.holding(key) }
         return movie
     }
 

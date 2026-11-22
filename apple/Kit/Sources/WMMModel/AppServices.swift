@@ -31,8 +31,10 @@ public final class AppServices {
     public let rows: any RowsRepository
     /// Following shows and their new episodes; ``UnavailableFollows`` below ``followsAPILevel``.
     public let follows: any FollowsRepository
+    /// The person's watchlists; ``UnavailableWatchlists`` below ``watchlistsAPILevel``.
+    public let watchlists: any WatchlistsRepository
 
-    public init(servers: any ServerRepository, auth: any AuthRepository, library: any LibraryRepository, requests: any RequestsRepository, preferences: any PreferencesRepository, playback: any PlaybackControllerFactory, images: any ImageLoader, client: ClientInfo, liveTV: (any LiveTVRepository)? = nil, livePlayback: (any LivePlaybackControllerFactory)? = nil, downloads: any DownloadRepository = UnavailableDownloads(), casting: any CastGateway = UnavailableCastGateway(), rows: (any RowsRepository)? = nil, follows: (any FollowsRepository)? = nil) {
+    public init(servers: any ServerRepository, auth: any AuthRepository, library: any LibraryRepository, requests: any RequestsRepository, preferences: any PreferencesRepository, playback: any PlaybackControllerFactory, images: any ImageLoader, client: ClientInfo, liveTV: (any LiveTVRepository)? = nil, livePlayback: (any LivePlaybackControllerFactory)? = nil, downloads: any DownloadRepository = UnavailableDownloads(), casting: any CastGateway = UnavailableCastGateway(), rows: (any RowsRepository)? = nil, follows: (any FollowsRepository)? = nil, watchlists: (any WatchlistsRepository)? = nil) {
         self.servers = servers
         self.auth = auth
         self.library = library
@@ -47,5 +49,6 @@ public final class AppServices {
         self.casting = casting
         self.rows = rows ?? UnavailableRows()
         self.follows = follows ?? UnavailableFollows()
+        self.watchlists = watchlists ?? UnavailableWatchlists()
     }
 }

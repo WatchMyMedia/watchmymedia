@@ -19,6 +19,7 @@ struct MainTabs: View {
     @Environment(AppServices.self) private var services
     @Environment(LiveExtrasStore.self) private var extras
     @Environment(ServersModel.self) private var servers
+    @Environment(WatchlistStore.self) private var watchlists
     @Environment(AppFlow.self) private var flow
 
     /// What the tab bar selects: one of the app's tabs, or the account, whose page is Servers.
@@ -74,9 +75,15 @@ struct MainTabs: View {
                 }
             }.id(target.id)
         }
+        // Save to watchlist, from a title's button or a card's long press: the whole screen.
+        .fullScreenCover(item: Binding(get: { watchlists.picker }, set: { if $0 == nil { watchlists.picker?.close() } })) { picker in
+            TVWatchlistPicker(picker: picker)
+        }
         // A note left by a page that has gone ("Deleted").
         .messagePill(Binding(get: { navigator.toast }, set: { navigator.toast = $0 }))
         .messagePill(Binding(get: { extras.message }, set: { extras.message = $0 }))
+        // Why a watchlist change went back.
+        .messagePill(Binding(get: { watchlists.message }, set: { watchlists.message = $0 }))
         // A Live TV reminder over the tabs (TvLiveReminder's `banner`); the Live TV player shows its own.
         .overlay(alignment: .topTrailing) {
             if navigator.playbackPresentation == nil, let reminder = extras.banner {
@@ -170,6 +177,7 @@ struct MainTabs: View {
         case .liveReminders: TVLiveRemindersScreen()
         case .liveSearch: SearchScreen()
         case .mediaList(let id): TVMediaListScreen(id: id)
+        case .watchlists: TVWatchlistsScreen()
         }
     }
 }

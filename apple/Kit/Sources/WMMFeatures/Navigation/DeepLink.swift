@@ -5,7 +5,7 @@ import Foundation
 /// episode's page), `movies/{id}` (with `?play=1`, plays the movie: Top
 /// Shelf's Play/Pause), `link?code=` (a TV's pairing code),
 /// `requests` (Your requests), `inbox` (the admins' Inbox), `downloads`
-/// (Settings › Downloads, iPhone and iPad), `lists/{id}` (a list's page),
+/// (Settings › Downloads, iPhone and iPad), `lists/{id}` (a list's page), `watchlists`,
 /// `search` (Search, with the cursor in its field) and `home` (Home at its
 /// top, where Continue watching is: the quick actions'),
 /// as android/mobile/.../DeepLinks.kt reads them.
@@ -35,6 +35,8 @@ public enum DeepLink: Hashable, Sendable {
     /// (Top Shelf's Play/Pause on a Recently added movie).
     case playMovie(id: Int)
     case mediaList(id: Int)
+    /// The person's watchlists.
+    case watchlists
     case linkTV(code: String?)
     case myRequests
     case inbox
@@ -61,6 +63,7 @@ public enum DeepLink: Hashable, Sendable {
             guard let id else { return nil }
             self = value("play") == "1" ? .playMovie(id: id) : .movie(id: id)
         case "lists": guard let id else { return nil }; self = .mediaList(id: id)
+        case "watchlists": self = .watchlists
         case "link": self = .linkTV(code: value("code"))
         case "requests": self = .myRequests
         case "inbox": self = .inbox
@@ -98,6 +101,8 @@ public enum DeepLink: Hashable, Sendable {
         case .mediaList(let id):
             c.host = "lists"
             c.path = "/\(id)"
+        case .watchlists:
+            c.host = "watchlists"
         case .linkTV(let code):
             c.host = "link"
             items = code.map { [URLQueryItem(name: "code", value: $0)] } ?? []

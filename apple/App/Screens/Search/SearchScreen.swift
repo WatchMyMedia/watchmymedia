@@ -324,6 +324,7 @@ private struct SearchView: View {
                             if found.server == nil, found.watchTarget != nil {
                                 WatchToggleButton(watched: found.watched) { await model.setWatched(found.item, $0) }
                             }
+                            if found.server == nil { WatchlistMenuButton(found.item) }
                         }
                     }
                 }
@@ -373,6 +374,7 @@ private struct SearchView: View {
             if found.server == nil, found.watchTarget != nil {
                 WatchToggleButton(watched: found.watched) { await model.setWatched(found.item, $0) }
             }
+            if found.server == nil { WatchlistMenuButton(found.item) }
         }
     }
 

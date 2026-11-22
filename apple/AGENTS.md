@@ -451,6 +451,11 @@ server, and on iPad in both a regular and a compact width.
   element inside it, so its own `hasFocus` stays false, and its items are
   cells with each item's identifier on a view inside: find what has focus
   (`hasFocus == true`) and compare frames (`TVUITests/FirstRunAndSubtitleTests.swift`).
+  A button with `.accessibilityAddTraits(.isToggle)` (the Watchlist button,
+  Save to watchlist's checks) is a `Switch` to XCUI, not a button, and its
+  state is its `value`, "1" when on: find it with
+  `descendants(matching: .any)[id]`, and don't set an `accessibilityValue`
+  on it, which hides that state (`UITests/WatchlistsTests.swift`).
   A poster card's Button still lists its title as a `StaticText` to XCUI
   (iOS 27.2), though the card ignores its children for VoiceOver, so a
   page's title also matches a card of it in a related row: tell pages

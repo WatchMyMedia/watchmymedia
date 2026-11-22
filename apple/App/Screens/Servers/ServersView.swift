@@ -136,6 +136,7 @@ struct ServersView: View {
     @Environment(AppFlow.self) private var flow
     @Environment(Navigator.self) private var navigator
     @Environment(CastService.self) private var cast
+    @Environment(WatchlistStore.self) private var watchlists
     /// What the rows take, so a popover is as tall as its list and no taller than the screen allows.
     @State private var contentHeight: CGFloat = 0
 
@@ -160,6 +161,21 @@ struct ServersView: View {
                 if let failure = servers.failure { failureBanner(failure) }
                 RoundedGroup {
                     ForEach(servers.rows) { row($0) }
+                }
+                // The person's watchlists on the server in use, in a group of their own: this sheet has no Settings row to sit beside.
+                if watchlists.available {
+                    RoundedGroup {
+                        Button(action: openWatchlists) {
+                            ServersRowLabel(icon: "bookmark.fill", gold: true, title: WatchlistWords.title) {
+                                HStack(spacing: 6) {
+                                    if watchlists.loaded { Text(formatCount(watchlists.lists.count)).foregroundStyle(Palette.muted) }
+                                    RowChevron()
+                                }
+                            }
+                        }
+                        .buttonStyle(SettingsRowStyle())
+                        .accessibilityIdentifier("servers-watchlists")
+                    }
                 }
                 RoundedGroup {
                     Button(action: add) {
@@ -325,6 +341,12 @@ struct ServersView: View {
     private func add() {
         let tab = navigator.tab
         flow.afterServersClose { flow.startAddingServer(services, from: tab) }
+        servers.presented = false
+    }
+
+    /// Watchlists: pushed where Servers was opened, once it has gone.
+    private func openWatchlists() {
+        flow.afterServersClose { navigator.open(.watchlists) }
         servers.presented = false
     }
 

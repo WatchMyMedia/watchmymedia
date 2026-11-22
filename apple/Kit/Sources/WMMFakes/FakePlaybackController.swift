@@ -287,9 +287,10 @@ extension AppServices {
     /// `liveGuide` adds the guide boards' listings to Live TV (it implies `liveTV`).
     /// `downloads` gives the iPhone and iPad app its fake downloads; the Apple TV app has none.
     /// `related` puts the server at API level 30: movie and show pages end in ``FakeRelated``'s rows.
-    public static func fake(signedIn: Bool = true, chosen: Bool = true, client: ClientInfo = .fakePhone, admin: Bool = true, seerr: Bool = false, seerrLinked: Bool = true, liveTV: Bool = false, liveGuide: FakeLiveGuide? = nil, downloads: Bool = false, apiLevel: Int? = nil, recordings: Bool = false, liveAutomatic: Bool = false, rows: Bool = false, follows: Bool = false, related: Bool = false, several: Bool = false) -> AppServices {
+    /// `watchlists` puts it at API level 33, with ``FakeWatchlistsRepository``'s three watchlists.
+    public static func fake(signedIn: Bool = true, chosen: Bool = true, client: ClientInfo = .fakePhone, admin: Bool = true, seerr: Bool = false, seerrLinked: Bool = true, liveTV: Bool = false, liveGuide: FakeLiveGuide? = nil, downloads: Bool = false, apiLevel: Int? = nil, recordings: Bool = false, liveAutomatic: Bool = false, rows: Bool = false, follows: Bool = false, related: Bool = false, watchlists: Bool = false, several: Bool = false) -> AppServices {
         let liveTV = liveTV || liveGuide != nil || liveAutomatic
-        let level = related ? ServerFeatures.Level.related : follows ? ServerFeatures.Level.follows : rows ? ServerFeatures.Level.rows : nil
+        let level = watchlists ? ServerFeatures.Level.watchlists : related ? ServerFeatures.Level.related : follows ? ServerFeatures.Level.follows : rows ? ServerFeatures.Level.rows : nil
         let servers = FakeServerRepository(signedIn: signedIn, chosen: chosen, admin: admin, liveTV: liveTV, liveGuide: liveGuide != nil,
                                            liveExtras: liveGuide?.extras ?? false,
                                            apiLevel: apiLevel ?? level, several: several)
@@ -302,6 +303,9 @@ extension AppServices {
         let followsRepository = FakeFollowsRepository(servers: servers)
         library.follows = followsRepository
         rowsRepository.follows = followsRepository
+        let watchlistsRepository = FakeWatchlistsRepository(servers: servers)
+        library.watchlists = watchlistsRepository
+        rowsRepository.watchlists = watchlistsRepository
         let downloadRepository: any DownloadRepository = downloads ? FakeDownloadRepository(servers: servers) : UnavailableDownloads()
         let liveRepository = liveTV ? FakeLiveTVRepository(servers: servers, guide: liveGuide) : nil
         if liveAutomatic { liveRepository?.offered.automatic = true }
@@ -319,7 +323,8 @@ extension AppServices {
             livePlayback: liveTV ? FakeLivePlaybackFactory(automatic: liveAutomatic && ServerFeatures(apiLevel: servers.current?.server.apiLevel).liveAutomatic) : nil,
             downloads: downloadRepository,
             rows: rowsRepository,
-            follows: followsRepository
+            follows: followsRepository,
+            watchlists: watchlistsRepository
         )
         // `-fakesSaveFails` and `-fakesPasswordFails`, read here as `-fakesLargeLibrary` is.
         services.applyFakeRefusals(ProcessInfo.processInfo.arguments)

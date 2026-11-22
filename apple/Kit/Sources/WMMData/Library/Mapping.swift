@@ -107,7 +107,9 @@ extension Components.Schemas.BrowseItem {
             fileName: Mapping.nonBlank(fileName),
             fileCount: fileCount.map(Int.init),
             episodeID: Mapping.positive(episodeId),
-            seasonNumber: episodeId == nil ? nil : seasonNumber.map(Int.init)
+            seasonNumber: episodeId == nil ? nil : seasonNumber.map(Int.init),
+            tmdbID: Mapping.positive(tmdbId),
+            watchlisted: watchlisted ?? false
         )
     }
 }
@@ -347,7 +349,8 @@ extension Components.Schemas.ShowDetail {
             contentRating: Mapping.nonBlank(contentRating),
             tmdbID: Mapping.positive(tmdbId),
             managedBy: Mapping.nonBlank(managedBy),
-            following: following
+            following: following,
+            watchlists: watchlists?.map(Int.init)
         )
     }
 }
@@ -416,7 +419,9 @@ extension Components.Schemas.MovieDetail {
             contentRating: Mapping.nonBlank(contentRating),
             managedBy: Mapping.nonBlank(managedBy),
             download: download.flatMap(\.model),
-            trailers: (trailers ?? []).compactMap(\.model)
+            trailers: (trailers ?? []).compactMap(\.model),
+            tmdbID: Mapping.positive(tmdbId),
+            watchlists: watchlists?.map(Int.init)
         )
     }
 }

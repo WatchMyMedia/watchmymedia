@@ -57,8 +57,14 @@ final class RealRowsRepository: RowsRepository {
         try await store.call { try await $0.getMediaList(path: .init(id: Int64(id))).ok.body.json }.model
     }
 
-    func entries(listID: Int, offset: Int, limit: Int) async throws -> MediaListEntries {
-        let query = Operations.ListMediaListEntries.Input.Query(limit: Int64(min(max(limit, 1), Self.maxEntries)), offset: Int64(max(offset, 0)))
+    func entries(listID: Int, offset: Int, limit: Int, sort: ListSort?, mediaType: MediaType?) async throws -> MediaListEntries {
+        // Older servers refuse what they don't know, so the sort and filter go only to those with watchlists.
+        let current = store.features.watchlists
+        let query = Operations.ListMediaListEntries.Input.Query(
+            limit: Int64(min(max(limit, 1), Self.maxEntries)), offset: Int64(max(offset, 0)),
+            sort: current ? sort.flatMap { .init(rawValue: $0.rawValue) } : nil,
+            mediaType: current ? mediaType.flatMap { .init(rawValue: $0.rawValue) } : nil
+        )
         return try await store.call { try await $0.listMediaListEntries(path: .init(id: Int64(listID)), query: query).ok.body.json }.model
     }
 

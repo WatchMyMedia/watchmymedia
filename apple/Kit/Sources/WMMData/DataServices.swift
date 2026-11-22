@@ -49,6 +49,7 @@ public final class DataServices {
     public let rows: any RowsRepository
     /// Following shows and their new episodes.
     public let follows: any FollowsRepository
+    public let watchlists: any WatchlistsRepository
 
     let store: LocalStore
     let serverRepository: RealServerRepository
@@ -108,6 +109,7 @@ public final class DataServices {
         casting = RealCastGateway(store: store, reader: serverInfo)
         rows = RealRowsRepository(store: store, events: events)
         follows = RealFollowsRepository(store: store, events: events)
+        watchlists = RealWatchlistsRepository(store: store, events: events)
         images = CachedImageLoader(
             session: imageSession ?? session,
             signIn: { [weak store] url in store?.signedIn(for: url) }
@@ -220,7 +222,7 @@ public final class DataServices {
 
     /// The services for the screens, with `playback` from WMMPlayback and `downloads` from WMMDownloads.
     public func makeAppServices(playback: any PlaybackControllerFactory, livePlayback: (any LivePlaybackControllerFactory)? = nil, downloads: any DownloadRepository = UnavailableDownloads()) -> AppServices {
-        AppServices(servers: servers, auth: auth, library: library, requests: requests, preferences: preferences, playback: playback, images: images, client: client, liveTV: liveTV, livePlayback: livePlayback, downloads: downloads, casting: casting, rows: rows, follows: follows)
+        AppServices(servers: servers, auth: auth, library: library, requests: requests, preferences: preferences, playback: playback, images: images, client: client, liveTV: liveTV, livePlayback: livePlayback, downloads: downloads, casting: casting, rows: rows, follows: follows, watchlists: watchlists)
     }
 
     /// The account and its playback settings, side by side.

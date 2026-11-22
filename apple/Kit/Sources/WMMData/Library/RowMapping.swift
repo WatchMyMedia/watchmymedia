@@ -89,7 +89,8 @@ extension Components.Schemas.MediaList {
             canEdit: canEdit, screen: RowScreen(key: screen), limit: Int(limit), entries: Int(entries), inLibrary: Int(inLibrary),
             notFound: notFound.map(Int.init) ?? 0, fetching: fetching, fetchedAt: fetchedAt, nextFetchAt: nextFetchAt,
             error: Mapping.nonBlank(error), errorAt: errorAt, createdAt: createdAt,
-            url: Mapping.nonBlank(sourceUrl).flatMap(URL.init(string:))
+            url: Mapping.nonBlank(sourceUrl).flatMap(URL.init(string:)),
+            removeWatched: removeWatched ?? false
         )
     }
 }
@@ -99,7 +100,8 @@ extension Components.Schemas.MediaListEntry {
         MediaListEntry(
             rank: Int(rank), mediaType: MediaType(rawValue: mediaType), tmdbID: Mapping.positive(tmdbId), title: title,
             year: Mapping.positive(year), posterPath: Mapping.nonBlank(posterPath), found: found, item: item?.model,
-            requestState: requestState.flatMap(Requestable.State.init(rawValue:))
+            requestState: requestState.flatMap(Requestable.State.init(rawValue:)),
+            watchlisted: watchlisted ?? false, addedAt: addedAt
         )
     }
 }

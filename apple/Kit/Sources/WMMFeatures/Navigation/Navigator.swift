@@ -61,6 +61,8 @@ public enum Route: Hashable, Sendable, Codable {
     case liveSearch
     /// A list's page: every title on it, in rank order, from a list row's See all.
     case mediaList(id: Int)
+    /// The person's watchlists, from the account menu.
+    case watchlists
 }
 
 /// One player presentation, with separate domain targets and lifecycles.
@@ -97,6 +99,10 @@ public final class Navigator {
     /// A note for whichever screen is showing ("Deleted"), after the one that
     /// had it has gone.
     public var toast: String?
+
+    /// A list's page opened from a Movies or TV Shows screen: a watchlist's
+    /// page opens on that kind of title. Taken by the page that opens.
+    @ObservationIgnored public var listOpenedOn: (listID: Int, mediaType: MediaType)?
 
     /// ⌘F asked for Search: the Search screen puts the cursor in its field, then clears this.
     public var searchFieldRequested = false
@@ -264,6 +270,9 @@ public final class Navigator {
         case .mediaList(let id):
             closePlayer()
             open(.mediaList(id: id))
+        case .watchlists:
+            closePlayer()
+            open(.watchlists)
         case .linkTV(let code):
             closePlayer()
             tab = .settings

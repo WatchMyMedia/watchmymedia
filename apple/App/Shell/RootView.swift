@@ -108,6 +108,7 @@ struct RootView: View {
     @Environment(LiveExtrasStore.self) private var extras
     @Environment(NotificationRouter.self) private var router
     @Environment(FollowsStore.self) private var follows
+    @Environment(WatchlistStore.self) private var watchlists
     @Environment(NewEpisodeNotifier.self) private var newEpisodes
     @Environment(ServersModel.self) private var servers
     private var notifier: LiveReminderNotifier { .shared }
@@ -189,8 +190,10 @@ struct RootView: View {
             guard scenePhase == .active else { return }
             await services.servers.refreshCurrent()
             newEpisodes.refreshBackgroundStatus()
-            let services = services, extras = extras, follows = follows, newEpisodes = newEpisodes
+            let services = services, extras = extras, follows = follows, newEpisodes = newEpisodes, watchlists = watchlists
             await together(
+                // The count of watchlists decides between the toggle and the picker.
+                { await watchlists.refresh() },
                 { await services.requests.refreshOptions() },
                 // Live TV's access, then its reminders, which need it.
                 { try? await services.liveTV.refresh(); await extras.refresh() },

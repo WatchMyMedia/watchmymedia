@@ -24,6 +24,13 @@ public final class FakeRowsRepository: RowsRepository {
     public var twoMovieLibraries = false
     /// From API level 29, Home's New from shows you follow is filled from these follows.
     public var follows: FakeFollowsRepository?
+    /// From API level 33, each watchlist is a row: on Home after Continue
+    /// watching and New from shows you follow, first on Movies and TV Shows.
+    public var watchlists: FakeWatchlistsRepository? {
+        didSet { watchlists?.rows = self }
+    }
+
+    private var watchlistIDs: [Int] { watchlists.map { $0.available ? $0.ids : [] } ?? [] }
 
     public init(servers: FakeServerRepository? = nil, admin: Bool = true, now: Date = .now) {
         self.servers = servers
@@ -51,7 +58,7 @@ public final class FakeRowsRepository: RowsRepository {
 
     private static func movie(_ id: Int) -> Entry {
         let m = FakeData.movies.first { $0.id == id }!
-        return Entry(title: m.title, year: m.year ?? 0, type: .movie, item: m, tmdbID: 80_000 + id, state: .available)
+        return Entry(title: m.title, year: m.year ?? 0, type: .movie, item: m, tmdbID: FakeData.tmdbID(movieID: id), state: .available)
     }
 
     private static func show(_ id: Int) -> Entry {
@@ -109,6 +116,7 @@ public final class FakeRowsRepository: RowsRepository {
     ]
 
     private func list(_ id: Int) -> MediaList? {
+        if watchlistIDs.contains(id) { return watchlists?.mediaList(id) }
         guard !deleted.contains(id), let entries = Self.entries[id] else { return nil }
         let inLibrary = entries.filter { $0.item != nil }.count
         let hour: TimeInterval = 3600
@@ -144,24 +152,26 @@ public final class FakeRowsRepository: RowsRepository {
             let entry = RowLayoutEntry(id: "list:\(id)", title: list.name, style: .poster, kind: .list, hidden: hidden, shown: !hidden, listID: id, owner: list.owner)
             return (entry, hidden)
         }
+        let watchlistRows = watchlistIDs.compactMap { listRow($0) }
         switch screen {
         case .home:
             let followed = follows.map { ServerFeatures(apiLevel: servers?.current?.server.apiLevel).follows && $0.available } ?? false
             return [
                 builtin("continue", "Continue watching", .continue),
                 followed ? builtin("followed", "New from shows you follow", .episode) : nil,
+            ].compactMap { $0 } + watchlistRows + [
                 builtin("live", "Live TV", .live),
                 builtin("recentlyAddedShows", "Recently added · TV Shows", .poster), listRow(Self.sciFi),
                 builtin("recentlyAired", "Recently aired · Episodes", .episode), builtin("recentlyAddedMovies", "Recently added · Movies", .poster),
                 listRow(Self.rainySunday), builtin("recentlyReleased", "Recently released · Movies", .wide), listRow(Self.trending, hidden: true),
             ].compactMap { $0 }
         case .library(FakeData.movieLibrary):
-            return [
+            return watchlistRows + [
                 builtin("recentlyAdded", "Recently added", .poster), listRow(Self.best2026), builtin("recentlyReleased", "Recently released", .wide),
                 listRow(Self.sciFi, hidden: true), listRow(Self.rainySunday, hidden: true),
             ].compactMap { $0 }
         case .library(FakeData.tvLibrary):
-            return [builtin("recentlyAdded", "Recently added", .poster), builtin("recentlyAired", "Recently aired", .episode), listRow(Self.sciFi, hidden: true)].compactMap { $0 }
+            return watchlistRows + [builtin("recentlyAdded", "Recently added", .poster), builtin("recentlyAired", "Recently aired", .episode), listRow(Self.sciFi, hidden: true)].compactMap { $0 }
         case .library:
             return []
         }
@@ -213,13 +223,19 @@ public final class FakeRowsRepository: RowsRepository {
             case (.library(let id), "recentlyAdded"):
                 ScreenRow(id: entry.id, style: .poster, title: entry.title, items: id == FakeData.tvLibrary ? home.recentlyAddedShows : home.recentlyAddedMovies,
                           seeAll: link(id, .added))
-            default: entry.listID.flatMap { listRow($0, screen: screen) }
+            default: entry.listID.flatMap { listRow($0, screen: screen, home: home) }
             }
             return row.flatMap { $0.isEmpty ? nil : $0 }
         }
     }
 
-    private func listRow(_ id: Int, screen: RowScreen) -> ScreenRow? {
+    private func listRow(_ id: Int, screen: RowScreen, home: HomeData) -> ScreenRow? {
+        if let watchlists, watchlistIDs.contains(id) {
+            // Home leaves out what its Continue watching row is showing, when that row is shown.
+            let continueShown = screen == .home && merged(.home).contains { $0.id == "continue" && !$0.hidden }
+            let started = continueShown ? Set(home.continueWatching.flatMap { [$0.movieID, $0.showID].compactMap { $0 } }) : []
+            return watchlists.row(id, screen: screen, started: started)
+        }
         guard let list = list(id), let entries = Self.entries[id] else { return nil }
         var items = entries.compactMap(\.item)
         if case .library(let libraryID) = screen { items = items.filter { $0.libraryID == libraryID } }
@@ -264,7 +280,7 @@ public final class FakeRowsRepository: RowsRepository {
     public func lists() async throws -> [MediaList] {
         await FakeLatency.wait()
         guard available else { return [] }
-        let all = [Self.rainySunday, Self.sciFi, Self.trending, Self.best2026].compactMap(list)
+        let all = (watchlistIDs + [Self.rainySunday, Self.sciFi, Self.trending, Self.best2026]).compactMap(list)
         return all.filter { $0.owner == .me } + all.filter { $0.owner != .me }
     }
 
@@ -274,8 +290,12 @@ public final class FakeRowsRepository: RowsRepository {
         return list
     }
 
-    public func entries(listID: Int, offset: Int, limit: Int) async throws -> MediaListEntries {
+    public func entries(listID: Int, offset: Int, limit: Int, sort: ListSort?, mediaType: MediaType?) async throws -> MediaListEntries {
         await FakeLatency.wait()
+        if watchlistIDs.contains(listID), let entries = watchlists?.entries(listID, sort: sort, mediaType: mediaType) {
+            return MediaListEntries(items: Array(entries.dropFirst(offset).prefix(limit)), total: entries.count,
+                                    inLibrary: entries.filter(\.inLibrary).count, offset: offset)
+        }
         guard list(listID) != nil, let entries = Self.entries[listID] else { throw APIError(status: 404, message: "That list was deleted.") }
         let page = entries.enumerated().dropFirst(offset).prefix(limit).map { index, e in
             MediaListEntry(
@@ -297,6 +317,7 @@ public final class FakeRowsRepository: RowsRepository {
 
     public func delete(listID: Int) async throws {
         await FakeLatency.wait()
+        if watchlists?.deleteFromLists(listID) == true { return }
         guard list(listID)?.canEdit == true else { throw APIError(status: 403, message: "Only an admin can delete the household’s lists.") }
         deleted.insert(listID)
         changed()

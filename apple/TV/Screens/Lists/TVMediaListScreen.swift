@@ -12,13 +12,19 @@ import WMMUI
 /// list whose last fetch failed says so, with Try again for whoever may.
 /// Page Up and Page Down move two rows, as on the library grids
 /// (`GridPaging`).
+///
+/// A watchlist's page has Rename, Delete and Remove titles once watched at
+/// its top, then All, Movies and TV shows and the sort; its titles carry no
+/// rank, and a card's long press removes it.
 struct TVMediaListScreen: View {
     let id: Int
     @Environment(AppServices.self) private var services
     @Environment(Navigator.self) private var navigator
+    @Environment(WatchlistStore.self) private var watchlists
 
     var body: some View {
-        TVMediaListView(model: MediaListModel(listID: id, rows: services.rows, library: services.library, requests: services.requests, navigator: navigator))
+        TVMediaListView(model: MediaListModel(listID: id, rows: services.rows, library: services.library, requests: services.requests, navigator: navigator,
+                                              watchlists: watchlists))
     }
 }
 
@@ -27,6 +33,9 @@ private struct TVMediaListView: View {
     @Environment(AppServices.self) private var services
     /// The focused title's rank, for Page Up and Page Down.
     @FocusState private var focusedRank: Int?
+    @State private var renaming = false
+    @State private var newName = ""
+    @State private var confirmingDelete = false
 
     private static let columnCount = 7
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 24, alignment: .top), count: TVMediaListView.columnCount)
@@ -40,7 +49,7 @@ private struct TVMediaListView: View {
 
     /// Two rows back or on from the focused title, in the same column.
     private func page(by pages: Int, _ proxy: ScrollViewProxy) {
-        guard let rank = focusedRank, let entries = model.state.value?.entries,
+        guard let rank = focusedRank, case let entries = model.entries,
               let place = entries.firstIndex(where: { $0.rank == rank }),
               let target = GridPaging.target(from: place, pages: pages, columns: Self.columnCount, count: entries.count) else { return }
         let id = entries[target].rank
@@ -60,10 +69,15 @@ private struct TVMediaListView: View {
                         if let failure = model.failureLine() { callout(failure).frame(width: 700) }
                     }
                     .focusSection()
-                    LazyVGrid(columns: columns, alignment: .leading, spacing: 36) {
-                        ForEach(page.entries) { entry in card(entry).focused($focusedRank, equals: entry.rank) }
+                    if model.isWatchlist { watchlistControls }
+                    if model.isWatchlist && model.countsLine == nil {
+                        TVEmptyState(systemImage: "bookmark", title: WatchlistWords.emptyTitle, message: WatchlistWords.emptyMessage).padding(.top, 40)
+                    } else {
+                        LazyVGrid(columns: columns, alignment: .leading, spacing: 36) {
+                            ForEach(model.entries) { entry in card(entry).focused($focusedRank, equals: entry.rank) }
+                        }
+                        .focusSection()
                     }
-                    .focusSection()
                 }
                 .padding(.horizontal, TVLayout.gutter)
                 .padding(.top, 16)
@@ -82,9 +96,16 @@ private struct TVMediaListView: View {
         }
     }
 
-    /// The name, then "From TMDB · Updated 3 h ago · 18 of 50 in your library · For everyone".
+    /// The name, then "From TMDB · Updated 3 h ago · 18 of 50 in your library · For everyone";
+    /// a watchlist's with Watchlist over it.
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if model.isWatchlist {
+                Text(WatchlistWords.kicker.uppercased())
+                    .font(.system(size: 20, weight: .bold))
+                    .tracking(1)
+                    .foregroundStyle(Palette.gold)
+            }
             Text(model.title)
                 .font(.system(size: 56, weight: .heavy))
                 .tracking(-1.1)
@@ -116,26 +137,108 @@ private struct TVMediaListView: View {
     }
 
     @ViewBuilder private func card(_ entry: MediaListEntry) -> some View {
+        let ranked = !model.isWatchlist
         if let item = entry.item {
             Button { model.open(entry) } label: {
-                EntryFace(entry: entry, imageURL: services.library.imageURL(item.posterPath, size: .w500))
+                EntryFace(entry: entry, imageURL: services.library.imageURL(item.posterPath, size: .w500), ranked: ranked)
             }
             .buttonStyle(.borderless)
             .playPauseCard(.card(item)) { model.open(entry) }
-            .accessibilityLabel(entry.accessibilityLine)
+            .accessibilityLabel(entry.accessibilityLine(ranked: ranked))
             .contextMenu {
+                watchlistItem(entry)
                 if let target = item.watchTarget {
                     WatchToggleButton(watched: item.watched) { await model.setWatched(target, $0) }
                 }
             }
         } else {
             Button { model.openRequest(entry) } label: {
-                EntryFace(entry: entry, imageURL: services.library.imageURL(entry.posterPath, size: .w500), canRequest: model.canRequest(entry))
+                EntryFace(entry: entry, imageURL: services.library.imageURL(entry.posterPath, size: .w500), canRequest: model.canRequest(entry), ranked: ranked)
             }
             .buttonStyle(.borderless)
-            .accessibilityLabel(entry.accessibilityLine)
+            .accessibilityLabel(entry.accessibilityLine(ranked: ranked))
             .accessibilityHint(model.canRequest(entry) ? "Opens the request" : "")
             .accessibilityIdentifier("entry-\(entry.rank)")
+            .contextMenu {
+                watchlistItem(entry)
+                if model.canRequest(entry) {
+                    Button { model.openRequest(entry) } label: { Label("Request", systemImage: "plus") }
+                }
+            }
+        }
+    }
+
+    /// Remove from this watchlist, first in a card's menu; on another list, Add to Watchlist.
+    @ViewBuilder private func watchlistItem(_ entry: MediaListEntry) -> some View {
+        if model.isWatchlist {
+            Button(role: .destructive) { Task { await model.remove(entry) } } label: {
+                Label(WatchlistWords.remove(from: model.title), systemImage: "bookmark.slash")
+            }
+        } else {
+            TVWatchlistMenuButton(title: entry.watchlistTitle, said: entry.watchlisted)
+        }
+    }
+
+    /// Rename, Delete and the switch, with what it does under them; then All, Movies, TV shows and the sort.
+    private var watchlistControls: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            HStack(spacing: 18) {
+                Button { newName = model.title; renaming = true } label: { Text("\(Image(systemName: "pencil"))  \(WatchlistWords.rename)") }
+                    .buttonStyle(TVButtonStyle(height: 62, fontSize: 22))
+                    .accessibilityIdentifier("watchlist-rename")
+                Button { confirmingDelete = true } label: { Text("\(Image(systemName: "trash"))  \(WatchlistWords.delete)") }
+                    .buttonStyle(TVButtonStyle(kind: .redText, height: 62, fontSize: 22))
+                    .accessibilityIdentifier("watchlist-delete")
+                Button { Task { await model.setRemovesWatched(!model.removesWatched) } } label: {
+                    HStack(spacing: 14) {
+                        Text(WatchlistWords.removeWatched)
+                        TVSwitch(on: model.removesWatched, compact: true)
+                    }
+                }
+                .buttonStyle(TVButtonStyle(height: 62, fontSize: 22))
+                .accessibilityValue(model.removesWatched ? "On" : "Off")
+                .accessibilityHint(WatchlistWords.removeWatchedDetail)
+                .accessibilityIdentifier("watchlist-switch")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .focusSection()
+            Text(WatchlistWords.removeWatchedDetail).font(.system(size: 20)).foregroundStyle(Palette.muted)
+            if model.countsLine != nil {
+                HStack(spacing: 14) {
+                    ForEach([nil, MediaType.movie, .tv], id: \.self) { type in
+                        Button(WatchlistWords.filterName(type)) { model.filter = type }
+                            .buttonStyle(TVChipStyle(selected: model.filter == type))
+                            .accessibilityAddTraits(model.filter == type ? .isSelected : [])
+                    }
+                    Text("Sort").font(.system(size: 19)).foregroundStyle(Palette.muted).padding(.leading, 24)
+                    Menu {
+                        Picker("Sort", selection: Binding(get: { model.sort }, set: { sort in Task { await model.setSort(sort) } })) {
+                            ForEach(ListSort.allCases, id: \.self) { Text(WatchlistWords.sortName($0)).tag($0) }
+                        }
+                    } label: {
+                        ChipMenuLabel(title: WatchlistWords.sortName(model.sort))
+                    }
+                    .buttonStyle(TVChipStyle(selected: false))
+                    .accessibilityLabel("Sort")
+                    .accessibilityValue(WatchlistWords.sortName(model.sort))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .focusSection()
+            }
+        }
+        .alert(WatchlistWords.rename, isPresented: $renaming) {
+            TextField(WatchlistWords.name, text: $newName)
+            Button(WatchlistWords.cancel, role: .cancel) {}
+            Button(WatchlistWords.done) {
+                let name = newName
+                Task { if let problem = await model.rename(to: name) { model.message = problem } }
+            }
+        }
+        .alert(model.deletePrompt, isPresented: $confirmingDelete) {
+            Button(WatchlistWords.cancel, role: .cancel) {}
+            Button(WatchlistWords.delete, role: .destructive) { Task { await model.delete() } }
+        } message: {
+            Text(model.deleteMessage)
         }
     }
 }
@@ -147,6 +250,8 @@ private struct EntryFace: View {
     let entry: MediaListEntry
     let imageURL: URL?
     var canRequest = false
+    /// A list's titles wear their rank; a watchlist's don't.
+    var ranked = true
     @Environment(\.isFocused) private var focused
     @Environment(\.displayScale) private var scale
 
@@ -156,7 +261,7 @@ private struct EntryFace: View {
         VStack(alignment: .leading, spacing: 0) {
             artwork
                 .frame(width: width, height: (width * 1.5).rounded())
-                .overlay(alignment: .topLeading) { rank.padding(10) }
+                .overlay(alignment: .topLeading) { if ranked { rank.padding(10) } }
                 .overlay { FocusSheen(focused: focused) }
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .focusRim(focused, cornerRadius: 16)

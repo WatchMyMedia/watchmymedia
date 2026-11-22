@@ -43,6 +43,8 @@ private enum PageFocus: Hashable {
     case about(Int)
     /// Notify me, first among them.
     case bell
+    /// Watchlist, beside Notify me.
+    case watchlist
 }
 
 private struct ShowPageView: View {
@@ -55,6 +57,7 @@ private struct ShowPageView: View {
     @State private var rowBumps = 0
     @Environment(AppServices.self) private var services
     @Environment(FollowsStore.self) private var follows
+    @Environment(WatchlistStore.self) private var watchlists
 
     var body: some View {
         TVLoadable(model.state, retry: model.retry) { show in page(show) }
@@ -124,9 +127,10 @@ private struct ShowPageView: View {
         }
     }
 
-    /// The first of About the show's buttons: Notify me, where the server offers it.
+    /// The first of About the show's buttons: Notify me, where the server offers it, then Watchlist.
     private var aboutFirst: PageFocus? {
         if let show = model.show, follows.canFollow(show) { return .bell }
+        if watchlists.available, model.show?.watchlistTitle != nil { return .watchlist }
         return model.canMarkShow ? .about(0) : model.canRequestMissingSeasons ? .about(1) : model.canShowMissing ? .about(2) : nil
     }
 
@@ -166,7 +170,8 @@ private struct ShowPageView: View {
                     canShowMissing: model.canShowMissing, showMissing: model.showMissing,
                     busy: model.busy, model: model, focus: $focus,
                     canFollow: follows.canFollow(show), following: follows.isFollowing(show),
-                    followFailure: follows.failureLine(for: show), bellFocused: focus == .bell, follows: follows
+                    followFailure: follows.failureLine(for: show), bellFocused: focus == .bell, follows: follows,
+                    watchlist: watchlists.available ? show.watchlistTitle : nil
                 )
                 .equatable()
                 .padding(.horizontal, TVLayout.gutter)
@@ -570,13 +575,15 @@ private struct AboutShow: View, Equatable {
     let followFailure: String?
     let bellFocused: Bool
     let follows: FollowsStore
+    /// The show as a watchlist keeps it, where the server keeps watchlists.
+    let watchlist: WatchlistTitle?
 
     nonisolated static func == (a: Self, b: Self) -> Bool {
         a.show == b.show && a.posterURL == b.posterURL && a.canMarkShow == b.canMarkShow && a.showToggleLabel == b.showToggleLabel
             && a.canRequestMissingSeasons == b.canRequestMissingSeasons && a.canShowMissing == b.canShowMissing
             && a.showMissing == b.showMissing && a.busy == b.busy && a.model === b.model
             && a.canFollow == b.canFollow && a.following == b.following && a.followFailure == b.followFailure
-            && a.bellFocused == b.bellFocused && a.follows === b.follows
+            && a.bellFocused == b.bellFocused && a.follows === b.follows && a.watchlist == b.watchlist
     }
 
     var body: some View {
@@ -612,6 +619,10 @@ private struct AboutShow: View, Equatable {
                         .focused(focus, equals: .bell)
                         .accessibilityLabel(NewEpisodeWords.bellLabel(following: following, show: show.title))
                         .accessibilityIdentifier("show-notify")
+                    }
+                    if let watchlist {
+                        TVWatchlistButton(title: watchlist, said: show.watchlists)
+                            .focused(focus, equals: .watchlist)
                     }
                     if canMarkShow {
                         Button(showToggleLabel) { Task { await model.toggleShowWatched() } }

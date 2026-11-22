@@ -9,6 +9,12 @@ import WMMModel
 /// existing request sheet), or Not found for an imported title TMDB couldn't
 /// find. Whoever may change the list can refresh it now or delete it; it is
 /// changed on the web.
+///
+/// A watchlist's page has no source, no "Updated" and no ranks: its titles
+/// are newest saved first, or by title or release year, with All, Movies
+/// and TV shows over them. Each can be removed, and the watchlist renamed,
+/// deleted or told to keep watched titles, through the app's
+/// ``WatchlistStore``.
 @MainActor
 @Observable
 public final class MediaListModel {
@@ -27,8 +33,15 @@ public final class MediaListModel {
     public var requestSheet: RequestSheetModel?
     public private(set) var working = false
 
-    /// The server keeps at most 250 entries a list, so one page holds them all.
+    /// The server sends at most 250 entries a page; a list keeps at most 250
+    /// and a watchlist 500, so two pages hold them all.
     public static let pageSize = 250
+    static let maxPages = 2
+
+    /// A watchlist's chips: every title, or only movies or only shows.
+    public var filter: MediaType?
+    /// A watchlist's order; changing it reads the page again.
+    public private(set) var sort: ListSort = .added
 
     @ObservationIgnored private let rows: any RowsRepository
     @ObservationIgnored private let library: any LibraryRepository
@@ -36,20 +49,84 @@ public final class MediaListModel {
     @ObservationIgnored private let navigator: Navigator
     @ObservationIgnored private let changes: ScreenChanges
     @ObservationIgnored private let loads = LoadController<Page>()
+    /// The person's watchlists: a watchlist's own actions, and Add to Watchlist on another list's titles.
+    @ObservationIgnored public let watchlists: WatchlistStore?
 
     public init(listID: Int, rows: any RowsRepository, library: any LibraryRepository, requests: (any RequestsRepository)?, navigator: Navigator,
-                now: @escaping @MainActor () -> Date = { Date() }) {
+                watchlists: WatchlistStore? = nil, now: @escaping @MainActor () -> Date = { Date() }) {
         changes = ScreenChanges(now: now)
         self.listID = listID
         self.rows = rows
         self.library = library
         self.requests = requests
         self.navigator = navigator
+        self.watchlists = watchlists
+        if let opened = navigator.listOpenedOn, opened.listID == listID {
+            filter = opened.mediaType
+            navigator.listOpenedOn = nil
+        }
+    }
+
+    // MARK: A watchlist
+
+    /// The page is one of the person's watchlists.
+    public var isWatchlist: Bool { state.value?.list.isWatchlist == true }
+
+    /// The watchlist as the store has it, once loaded: its name and switch follow a change here at once.
+    private var kept: Watchlist? { isWatchlist ? watchlists?.watchlist(listID) : nil }
+
+    /// Remove titles once watched.
+    public var removesWatched: Bool { kept?.removeWatched ?? state.value?.list.removeWatched ?? true }
+
+    /// The titles the page draws: a watchlist's, those still on it and of the chosen kind.
+    public var entries: [MediaListEntry] {
+        guard let page = state.value else { return [] }
+        guard isWatchlist else { return page.entries }
+        return kept(page).filter { filter == nil || $0.mediaType == filter }
+    }
+
+    /// A watchlist's titles that are still on it, whatever the chips say.
+    private func kept(_ page: Page) -> [MediaListEntry] {
+        guard let watchlists else { return page.entries }
+        return page.entries.filter { entry in entry.watchlistTitle.map { watchlists.isOn($0.key, listID: listID) } ?? true }
+    }
+
+    /// Sort by Date added, Title or Release year.
+    public func setSort(_ sort: ListSort) async {
+        guard sort != self.sort else { return }
+        self.sort = sort
+        await load(quiet: true)
+    }
+
+    /// Remove from the watchlist, from a card's menu.
+    public func remove(_ entry: MediaListEntry) async {
+        guard isWatchlist, let key = entry.watchlistTitle?.key else { return }
+        await watchlists?.remove(key, from: listID)
+    }
+
+    public func setRemovesWatched(_ on: Bool) async {
+        await watchlists?.setRemoveWatched(listID, on)
+    }
+
+    /// Rename: nil once done, else why not.
+    public func rename(to name: String) async -> String? {
+        await watchlists?.rename(listID, to: name)
+    }
+
+    /// The card's long press on another list's title: Add to Watchlist and the rest.
+    public func watchlistItem(_ entry: MediaListEntry) -> WatchlistStore.MenuItem? {
+        guard !isWatchlist, let key = entry.watchlistTitle?.key else { return nil }
+        return watchlists?.menuItem(key, said: entry.watchlisted)
+    }
+
+    public func pressWatchlist(_ entry: MediaListEntry) async {
+        guard let title = entry.watchlistTitle else { return }
+        await watchlists?.press(title, cardSaid: entry.watchlisted)
     }
 
     // MARK: Wording
 
-    public var title: String { state.value?.list.name ?? "" }
+    public var title: String { kept?.name ?? state.value?.list.name ?? "" }
 
     /// "From TMDB", in gold, with a link out when the source has one.
     public var sourceLine: String? { state.value?.list.sourceLine }
@@ -59,10 +136,14 @@ public final class MediaListModel {
     /// "Updated 3 h ago", "Refreshing…", or an import's "Imported Nov 2".
     public func whenLine(now: Date = .now) -> String? { state.value?.list.whenLine(now: now) }
 
-    /// "4 of 12 in your library · For everyone".
+    /// "4 of 12 in your library · For everyone"; a watchlist's "12 titles ·
+    /// 9 in your library", nothing while it is empty.
     public var countsLine: String? {
         guard let page = state.value else { return nil }
-        return page.list.countsLine(total: page.total, inLibrary: page.inLibrary)
+        guard page.list.isWatchlist else { return page.list.countsLine(total: page.total, inLibrary: page.inLibrary) }
+        let titles = kept(page)
+        guard !titles.isEmpty else { return nil }
+        return WatchlistWords.counts(titles: titles.count, inLibrary: titles.filter(\.inLibrary).count)
     }
 
     /// Why the last fetch failed, over the list it kept.
@@ -148,7 +229,13 @@ public final class MediaListModel {
             // The list and its entries at once.
             let list = Task { try await self.rows.list(id: self.listID) }
             defer { list.cancel() }
-            let entries = try await self.rows.entries(listID: self.listID, offset: 0, limit: Self.pageSize)
+            var entries = try await self.rows.entries(listID: self.listID, offset: 0, limit: Self.pageSize, sort: self.sort, mediaType: nil)
+            // A watchlist holds up to 500: its second page.
+            for _ in 1..<Self.maxPages where entries.items.count < entries.total {
+                let more = try await self.rows.entries(listID: self.listID, offset: entries.items.count, limit: Self.pageSize, sort: self.sort, mediaType: nil)
+                guard !more.items.isEmpty else { break }
+                entries.items += more.items
+            }
             return Page(list: try await list.value, entries: entries.items, total: entries.total, inLibrary: entries.inLibrary)
         }
         guard let result else { return }
@@ -209,7 +296,11 @@ public final class MediaListModel {
         working = true
         defer { working = false }
         do {
-            try await rows.delete(listID: listID)
+            if isWatchlist, let watchlists {
+                guard await watchlists.delete(listID) else { return }
+            } else {
+                try await rows.delete(listID: listID)
+            }
             let tab = navigator.tab
             var path = navigator.path(for: tab)
             if path.last == .mediaList(id: listID) { path.removeLast() }
@@ -221,10 +312,11 @@ public final class MediaListModel {
     }
 
     /// The delete confirmation's words.
-    public var deletePrompt: String { "Delete “\(title)”?" }
+    public var deletePrompt: String { isWatchlist ? WatchlistWords.deletePrompt(title) : "Delete “\(title)”?" }
 
     public var deleteMessage: String {
-        state.value?.list.owner == .everyone
+        if isWatchlist, let page = state.value { return WatchlistWords.deleteMessage(titles: kept(page).count) }
+        return state.value?.list.owner == .everyone
             ? "Its row goes from everyone’s screens. This can’t be undone."
             : "Its row goes from your screens. This can’t be undone."
     }

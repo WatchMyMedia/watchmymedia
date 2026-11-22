@@ -261,6 +261,7 @@ private struct LibraryView: View {
                         .focused($focus, equals: .item(item.id))
                         .playPauseCard(.card(item)) { model.open(item) }
                         .contextMenu {
+                            TVWatchlistMenuButton(item)
                             if item.watchTarget != nil {
                                 WatchToggleButton(watched: item.watched) { await model.setWatched(item, $0) }
                             }

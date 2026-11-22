@@ -3,9 +3,7 @@ import Foundation
 // How arranged rows and lists are worded, word for word as
 // the boards say it, the same on iPhone, iPad and Apple TV.
 
-/// Add a row's note: lists are made on the web.
-public let listsMadeOnTheWeb = "Lists are made in WatchMyMedia on the web."
-/// Under it on iPhone and iPad.
+/// Under Add a row's note (``listsMadeOnTheWeb``) on iPhone and iPad.
 public let listsMadeOnTheWebDetail = "A list made there shows up here, ready to add."
 
 /// "From TMDB", "From MDBList", "From your library", "From an import"; nil for a source this app doesn't know.
@@ -45,6 +43,7 @@ public func listMediaTypeLine(_ mediaType: String) -> String? {
 extension MediaList {
     /// "From TMDB", "From an IMDb export": the server's name when it sends one, else by kind.
     public var sourceLine: String? {
+        if isWatchlist { return nil }
         if let sourceName, !sourceName.isEmpty { return "From \(sourceName)" }
         return listSourceLine(kind: sourceKind)
     }
@@ -56,8 +55,10 @@ extension MediaList {
         return "\(formatCount(inLibrary)) of \(formatCount(entries))"
     }
 
-    /// When it was last read: "Refreshing…", "Updated 3 h ago", or an import's "Imported Nov 2".
+    /// When it was last read: "Refreshing…", "Updated 3 h ago", or an
+    /// import's "Imported Nov 2". Nothing for a watchlist, which is never fetched.
     public func whenLine(now: Date = .now, calendar: Calendar = .current) -> String? {
+        guard !isWatchlist else { return nil }
         if fetching { return "Refreshing…" }
         if sourceKind == "import", let made = createdAt ?? fetchedAt {
             return "Imported \(shortDate(made, now: now, calendar: calendar))"
@@ -66,9 +67,11 @@ extension MediaList {
     }
 
     /// "18 of 50 in your library · For everyone"; an import adds what TMDB
-    /// couldn't find: "9 of 14 in your library · 2 not found · Your list".
+    /// couldn't find: "9 of 14 in your library · 2 not found · Your list". A
+    /// watchlist: "12 titles · 9 in your library".
     public func countsLine(total: Int? = nil, inLibrary: Int? = nil) -> String {
-        [
+        if isWatchlist { return WatchlistWords.counts(titles: total ?? entries, inLibrary: inLibrary ?? self.inLibrary) }
+        return [
             listCountLine(inLibrary: inLibrary ?? self.inLibrary, total: total ?? entries),
             notFound > 0 ? "\(formatCount(notFound)) not found" : nil,
             listOwnerLine(owner),
@@ -113,9 +116,12 @@ extension MediaListEntry {
     }
 
     /// The card's spoken label: "3. Paper Moons, 2021", or with where a missing title stands.
-    public var accessibilityLine: String {
+    public var accessibilityLine: String { accessibilityLine(ranked: true) }
+
+    /// A watchlist's cards have no rank: "Paper Moons, 2021".
+    public func accessibilityLine(ranked: Bool) -> String {
         let line = item == nil ? missingLine : year.map(String.init)
-        return ["\(rank). \(title)", line].compactMap { $0 }.joined(separator: ", ")
+        return [ranked ? "\(rank). \(title)" : title, line].compactMap { $0 }.joined(separator: ", ")
     }
 }
 
