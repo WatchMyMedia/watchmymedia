@@ -75,6 +75,7 @@ function Frame({ nav, entries, arrival, exit }: { nav: NavStack<Route>; entries:
     openSection: (route) => { if (!nav.openSection(route)) input.focus.focusContent() },
     back: () => { if (!nav.back()) setLeaving(true) },
     play: (play) => nav.push({ name: 'player', play }),
+    servers: () => setServers('screen'),
   }), [nav, input])
 
   // A search result on a server that couldn't be switched to: Servers says so, with Try again.

@@ -34,6 +34,8 @@ export type Nav = {
   back(): void
   /** Starts playback: opens the player route (the player engine draws it). */
   play(request: PlayRequest): void
+  /** Opens the Servers panel, as the menu's account row does (Choose another server). */
+  servers(): void
 }
 
 function need<T>(value: T | null, name: string): T {

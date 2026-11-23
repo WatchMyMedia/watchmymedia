@@ -325,7 +325,7 @@ function EmptyHome({ libraries, liveTV, onRetry }: { libraries: components['sche
   return <ProblemScreen title={words.title} extra={address && <p className="home-address">{address}</p>} actions={[
     { id: 'home/retry', label: 'Check again', onPress: onRetry },
     ...(liveTV ? [{ id: 'home/live', label: 'Live TV', onPress: () => nav.openSection({ name: 'live' }) }] : []),
-    ...(app.store.list().length > 1 ? [] : [{ id: 'home/servers', label: 'Choose another server', onPress: () => app.addServer() }]),
+    { id: 'home/servers', label: 'Choose another server', onPress: () => (app.store.list().length > 1 ? nav.servers() : app.addServer()) },
   ]}>
     {words.body}
   </ProblemScreen>
