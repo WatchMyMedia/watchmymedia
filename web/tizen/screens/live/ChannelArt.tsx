@@ -16,7 +16,7 @@ export function ChannelLogo({ channel, className = 'live-logo' }: { channel: Pic
   return <Img src={media.mediaUrl(channel.logoUrl)} className={className}/>
 }
 
-export type ArtSize = 'card' | 'row' | 'banner' | 'panel' | 'hero' | 'thumb'
+export type ArtSize = 'card' | 'row' | 'banner' | 'panel' | 'hero' | 'thumb' | 'strip'
 
 /**
  * A programme's 16:9 picture as the boards draw it: the series card or the

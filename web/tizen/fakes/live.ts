@@ -101,15 +101,15 @@ class LiveStore {
   sessions = new Map<string, Session & { tunedAt: number; pausedAt?: number; ends?: { at: number; reason: string } }>()
   private serial = 0
 
-  constructor(readonly listingsOn: boolean, readonly member: boolean) {
+  constructor(readonly listingsOn: boolean, readonly member: boolean, readonly noTuner = false) {
     const from = localMidnight(this.opened) - 3 * HOUR
     this.listedThrough = localMidnight(this.opened) + 2 * 24 * HOUR + 19 * HOUR
     const halfHour = Math.floor(this.opened / (30 * MIN)) * 30 * MIN
     // The game starts on the next 5 minutes, at least a minute away: its 5-minute reminder is due at once.
     const game = Math.ceil((this.opened + MIN) / (5 * MIN)) * 5 * MIN
     this.channels = LINEUP.map((c) => ({
-      id: idOf(c.number), sourceId: 'hdhr-1', number: c.number, name: c.name, enabled: true, available: c.available !== false,
-      ...(c.available === false ? { reason: 'not_in_lineup' } : {}),
+      id: idOf(c.number), sourceId: 'hdhr-1', number: c.number, name: c.name, enabled: true, available: !noTuner && c.available !== false,
+      ...(noTuner || c.available === false ? { reason: 'not_in_lineup' } : {}),
       ...(c.shows ? { logoUrl: `/api/live-tv/art/logo-${idOf(c.number)}.png` } : {}),
     }))
     for (const c of LINEUP) {
@@ -177,6 +177,8 @@ class LiveStore {
     this.recordings = [
       recordingNow, clash, vaneRec, gameRec, weather,
       done('Inspector Vane', '4.2', past(1, 21), 60, 'done', { season: 3, episode: 5, episodeTitle: 'Lantern Street', series: true, ruleId: vaneRule.id, mediaFileId: 7105 }),
+      done('Inspector Vane', '4.2', past(8, 21), 60, 'done', { season: 3, episode: 4, episodeTitle: 'The Night Ferry', series: true, ruleId: vaneRule.id, mediaFileId: 7108 }),
+      done('Inspector Vane', '4.2', past(15, 21), 60, 'done', { season: 3, episode: 3, episodeTitle: 'A Quiet Village', series: true, ruleId: vaneRule.id, mediaFileId: 7109 }),
       done('Conference Football', '4.1', past(1, 21), 90, 'partial', { userName: 'Sam', episodeTitle: 'Ridgeway at Lakeport', mediaFileId: 7106, gaps: [{ start: iso(past(1, 21) + 12 * MIN), end: iso(past(1, 21) + 14 * MIN), reason: 'signal_lost' }] }),
       done('Penvale Tonight', '9.1', past(1, 22), 30, 'failed', { reason: 'missed' }),
       done('Harbor Evening News', '2.1', past(2, 18), 60, 'done', { ruleId: newsRule.id, series: true, mediaFileId: 7107 }),
@@ -227,7 +229,8 @@ function sessionView(store: LiveStore, s: Session & { tunedAt: number; pausedAt?
 }
 
 export function registerLive(server: FakeServer, mode: string) {
-  const store = new LiveStore(mode !== 'nolistings', mode === 'member')
+  // ?fakes=notuner: the tuner can't be found, so no channel can play.
+  const store = new LiveStore(mode !== 'nolistings', mode === 'member', mode === 'notuner')
   const pauseSeconds = 60
   server.route('GET', '/api/live-tv/capabilities', () => ({
     enabled: mode !== 'notv', allowed: mode !== 'notv', playback: true, guide: mode !== 'nolistings', setupComplete: true,

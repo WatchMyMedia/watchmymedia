@@ -69,17 +69,18 @@ export function OptionsPage({ series, number, options, onChange, onSave, onBack,
 }
 
 /**
- * The record side panel, opened from Hold OK on
- * a programme: Just this episode, Every new episode, Every episode and the
- * options; what is set already (Don't record, Stop, Edit series); and the
- * clash, where one of the recordings holding the tuners can give way.
+ * The record panel, from a programme's panel (More ways to record, or a
+ * recording's options): Just this episode, Every new episode, Every
+ * episode and the options; what is set already (Don't record, Stop, Edit
+ * series); and the clash, where one of the recordings holding the tuners
+ * can give way. `clash` opens it on a clash just made.
  */
-export function RecordPanel({ channel, programme, onClose, onNote, onWatchRecording }: {
-  channel: LiveChannel; programme: LiveProgramme; onClose(): void; onNote(text: string): void; onWatchRecording(id: string, title: string): void
+export function RecordPanel({ channel, programme, clash: made, onClose, onNote, onWatchRecording }: {
+  channel: LiveChannel; programme: LiveProgramme; clash?: Recording; onClose(): void; onNote(text: string): void; onWatchRecording(id: string, title: string): void
 }) {
   const now = useNow()
   const focus = useFocus()
-  const [page, setPage] = useState<Page>({ kind: 'choice' })
+  const [page, setPage] = useState<Page>(made ? { kind: 'clash', recording: made } : { kind: 'choice' })
   const [options, setOptions] = useState<RecordOptions>(DEFAULT_OPTIONS)
   const mark = markHoldsRecord(programme.recording) ? programme.recording : undefined
   const recording = useQuery({ ...liveTVRecordingQuery(mark?.id ?? ''), enabled: !!mark })
@@ -140,8 +141,8 @@ export function RecordPanel({ channel, programme, onClose, onNote, onWatchRecord
     : mark ? recordSet(programme, channel, recording.data, rule, now)
       : recordChoice(programme, channel, now, options)
   const optionsPage = page.kind === 'options'
-  return <Modal onClose={onClose} className="live-panel-host">
-    <aside role="dialog" aria-modal="true" aria-label={`${view.eyebrow}: ${view.title}`} className="live-panel">
+  return <Modal onClose={onClose} className="">
+    <aside role="dialog" aria-modal="true" aria-label={`${view.eyebrow}: ${view.title}`} className="tv-panel live-panel">
       <div className="live-panel__head">
         <ProgrammeArt channel={channel} programme={programme} size="panel" overlay={false}/>
         <span className="live-panel__titles">
@@ -158,9 +159,9 @@ export function RecordPanel({ channel, programme, onClose, onNote, onWatchRecord
           {view.lines && view.lines.length > 0 && <div className="live-panel__lines">{view.lines.map((l) => <span key={l}><span className="live-mark live-mark--dot" aria-hidden="true"/>{l}</span>)}</div>}
           {/* What is set decides the choices: none until it has loaded, so focus starts on the first real one. */}
           {mark && !clash && recording.isPending ? <p className="tv-note">Loading the recording…</p> : <div className="live-panel__choices" role="group" aria-label={view.title}>
-            {view.choices.map((c, i) => <button key={c.id} type="button" className="live-opt" data-focus={`record/${c.id}`} data-autofocus={i === 0 || undefined} aria-disabled={busy || undefined} onClick={() => pick(c)}>
-              <span className="live-opt__text"><span className="live-opt__label">{c.label}</span>{c.detail && <span className="live-opt__detail">{c.detail}</span>}</span>
-              {c.more && <LiveIcon name="chevron" className="live-opt__more"/>}
+            {view.choices.map((c, i) => <button key={c.id} type="button" className="tv-option" data-focus={`record/${c.id}`} data-autofocus={i === 0 || undefined} aria-busy={busy || undefined} onClick={() => pick(c)}>
+              <span className="tv-option__text"><span className="tv-option__label">{c.label}</span>{c.detail && <span className="tv-option__detail">{c.detail}</span>}</span>
+              {c.more && <span className="tv-option__end"><LiveIcon name="chevron"/></span>}
             </button>)}
           </div>}
         </>}
