@@ -25,6 +25,9 @@ type StatsQuery struct {
 	ByTime    bool
 	UserID    int64
 	LibraryID int64
+	// Conversions also counts why the plays were converted, which reads
+	// another index: only the pages that show it ask.
+	Conversions bool
 }
 
 // StatItem is one entry of a top list.
@@ -71,7 +74,7 @@ type Cards struct {
 	Peak          Peaks        `json:"peak"`
 	Recent        []HistoryRow `json:"recent" nullable:"false"`
 	// Conversions is from API level 34.
-	Conversions Conversions `json:"conversions" required:"false" doc:"Why the period's plays were converted rather than played directly (API level 34)."`
+	Conversions *Conversions `json:"conversions,omitempty" required:"false" doc:"With conversions=true: why the period's plays were converted rather than played directly (API level 34)."`
 }
 
 // Conversions counts the reasons a period's plays were not played
@@ -153,7 +156,7 @@ func (t *Tracker) Cards(ctx context.Context, q StatsQuery) (Cards, error) {
 
 func (t *Tracker) cards(ctx context.Context, q StatsQuery) (Cards, error) {
 	c := Cards{TopShows: []StatItem{}, TopMovies: []StatItem{}, PopularShows: []StatItem{}, PopularMovies: []StatItem{},
-		TopUsers: []StatItem{}, TopDevices: []StatItem{}, Recent: []HistoryRow{}, Conversions: Conversions{Reasons: []ConversionReason{}}}
+		TopUsers: []StatItem{}, TopDevices: []StatItem{}, Recent: []HistoryRow{}}
 	if t.db == nil {
 		return c, nil
 	}
@@ -185,8 +188,12 @@ func (t *Tracker) cards(ctx context.Context, q StatsQuery) (Cards, error) {
 		return c, err
 	}
 	c.Recent = recent.Items
-	if c.Conversions, err = t.conversions(ctx, where, args); err != nil {
-		return c, err
+	if q.Conversions {
+		conv, err := t.conversions(ctx, where, args)
+		if err != nil {
+			return c, err
+		}
+		c.Conversions = &conv
 	}
 	return c, nil
 }

@@ -279,9 +279,15 @@ func TestStatsCountWhyPlaysWereConverted(t *testing.T) {
 	c.add(time.Minute)
 	stop(2, box)
 
-	cards, err := tr.Cards(ctx, StatsQuery{Days: 30})
+	if plain, err := tr.Cards(ctx, StatsQuery{Days: 30}); err != nil || plain.Conversions != nil {
+		t.Fatalf("cards not asked for conversions counted them: %+v, %v", plain.Conversions, err)
+	}
+	cards, err := tr.Cards(ctx, StatsQuery{Days: 30, Conversions: true})
 	if err != nil {
 		t.Fatal(err)
+	}
+	if cards.Conversions == nil {
+		t.Fatal("no conversions")
 	}
 	got := map[string]int64{}
 	for _, r := range cards.Conversions.Reasons {

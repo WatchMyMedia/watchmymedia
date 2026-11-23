@@ -244,6 +244,12 @@ func TestHistorySpeed(t *testing.T) {
 		{"cards, 30 days", 50 * time.Millisecond, fresh(func() error { _, err := tr.Cards(ctx, StatsQuery{Days: 30}); return err })},
 		// 250,000 plays put 50,000 in a year, five times a busy household's.
 		{"cards, 365 days", 60 * time.Millisecond, fresh(func() error { _, err := tr.Cards(ctx, StatsQuery{Days: 365}); return err })},
+		// Counting conversions reads their own index after the cards': 10 ms
+		// more for a year at this size.
+		{"cards and conversions, 365 days", 75 * time.Millisecond, fresh(func() error {
+			_, err := tr.Cards(ctx, StatsQuery{Days: 365, Conversions: true})
+			return err
+		})},
 		{"series by day, 90 days", 50 * time.Millisecond, fresh(func() error { _, err := tr.Series(ctx, SeriesQuery{Days: 90, Split: "type"}); return err })},
 		{"series by month, all time", 50 * time.Millisecond, fresh(func() error {
 			_, err := tr.Series(ctx, SeriesQuery{Split: "mode", Bucket: "month"})

@@ -3882,7 +3882,7 @@ export interface components {
             tailnet: number;
         };
         ActivityCards: {
-            /** @description Why the period's plays were converted rather than played directly (API level 34). */
+            /** @description With conversions=true: why the period's plays were converted rather than played directly (API level 34). */
             conversions?: components["schemas"]["ActivityConversions"];
             peak: components["schemas"]["ActivityPeaks"];
             /** Format: int64 */
@@ -18366,6 +18366,8 @@ export interface operations {
                 /** @description Admins only; others always see their own. */
                 user?: number;
                 library?: number;
+                /** @description Also count why the period's plays were converted (conversions). From API level 34. */
+                conversions?: boolean;
             };
             header?: never;
             path?: never;
