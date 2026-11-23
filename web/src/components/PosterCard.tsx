@@ -4,6 +4,8 @@ import { CardLine, CardPicture, CardTitle } from './CardParts'
 import { Poster } from './Poster'
 import type { components } from '../api/schema'
 import { posterLinks } from '../lib/cardLinks'
+import { PeekHost } from './PeekCard'
+import { CheckIcon } from './icons'
 
 export type BrowseItem = components['schemas']['BrowseItem']
 
@@ -16,31 +18,50 @@ export type BrowseItem = components['schemas']['BrowseItem']
  * subtitle is the plain end of the second
  * line; without it the line is the year and count.
  */
-export function PosterCard({ item, inRow = false, subtitle, showCount = false, rank }: { item: BrowseItem; inRow?: boolean; subtitle?: string; showCount?: boolean; rank?: number }) {
+export function PosterCard({ item, inRow = false, subtitle, showCount = false, rank, peek = inRow }: { item: BrowseItem; inRow?: boolean; subtitle?: string; showCount?: boolean; rank?: number; peek?: boolean }) {
   if (item.kind === 'unmatched') return <UnmatchedCard item={item} inRow={inRow} />
+  return <MatchedCard item={item} inRow={inRow} subtitle={subtitle} showCount={showCount} rank={rank} peek={peek} />
+}
+
+function MatchedCard({ item, inRow, subtitle, showCount, rank, peek }: { item: BrowseItem; inRow: boolean; subtitle?: string; showCount: boolean; rank?: number; peek: boolean }) {
   const links = posterLinks(item, subtitle)
   return (
-    <div className={`shrink-0 snap-start ${inRow ? 'w-[168px]' : ''}`}>
+    <PeekHost item={item} enabled={peek} className={`shrink-0 snap-start ${inRow ? 'w-[124px] md:w-[168px]' : ''}`}>
       <CardPicture {...links.picture}>
         <Poster path={item.posterPath} alt={item.title} />
-        {rank !== undefined ? <RankBadge rank={rank} /> : item.isNew && <Badge tone="accent" className="absolute left-1.5 top-1.5">New</Badge>}
+        {rank !== undefined ? <RankBadge rank={rank} /> : item.isNew && <CardFlag>New</CardFlag>}
         {showCount && item.kind === 'show' && item.episodeCount ? (
           <Badge className="absolute bottom-1.5 left-1.5">{item.episodeCount} ep</Badge>
         ) : null}
-        {item.watched && (
-          <span className="absolute bottom-1.5 right-1.5 grid h-5 w-5 place-items-center rounded-full bg-accent text-[11px] font-bold text-black" title="Watched">
-            ✓
-          </span>
-        )}
-        {!item.watched && item.progress ? (
-          <div className="absolute inset-x-0 bottom-0 h-1 bg-black/60">
-            <div className="h-full bg-accent" style={{ width: `${Math.round(item.progress * 100)}%` }} />
-          </div>
-        ) : null}
+        {item.watched && <WatchedTick />}
+        {!item.watched && item.progress ? <CardProgress pct={Math.round(item.progress * 100)} /> : null}
       </CardPicture>
       <CardTitle {...links.title} />
       <CardLine segments={links.line} />
-    </div>
+    </PeekHost>
+  )
+}
+
+/** A gold flag in a picture's top-left corner: New, a count. */
+export function CardFlag({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <span className={`absolute left-2 top-2 rounded-[5px] bg-accent px-[7px] py-0.5 text-[11px] font-bold tracking-[.02em] text-ground ${className}`}>{children}</span>
+}
+
+/** Watched: a gold tick in a picture's top-right corner. */
+export function WatchedTick() {
+  return (
+    <span role="img" aria-label="Watched" title="Watched" className="absolute right-2 top-2 grid size-[22px] place-items-center rounded-full bg-ground/80 text-accent ring-1 ring-inset ring-accent/70">
+      <CheckIcon size={13} />
+    </span>
+  )
+}
+
+/** How far in: a gold bar along a picture's foot. */
+export function CardProgress({ pct }: { pct: number }) {
+  return (
+    <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1 bg-black/60">
+      <span className="block h-full bg-accent" style={{ width: `${pct}%` }} />
+    </span>
   )
 }
 

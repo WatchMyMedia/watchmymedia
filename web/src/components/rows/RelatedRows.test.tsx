@@ -65,7 +65,7 @@ async function draw(kind: 'movie' | 'show', id: number): Promise<string> {
 }
 
 const headings = (html: string) => [...html.matchAll(/<h2[^>]*>([^<]*)/g)].map((m) => m[1])
-const titles = (html: string) => [...html.matchAll(/<div class="mt-1\.5[^"]*"><a [^>]*>([^<]*)<\/a>/g)].map((m) => m[1])
+const titles = (html: string) => [...html.matchAll(/<div class="mt-2[^"]*"><a [^>]*>([^<]*)<\/a>/g)].map((m) => m[1])
 const links = (html: string) => [...new Set([...html.matchAll(/href="([^"]*)"/g)].map((m) => m[1]))]
 
 describe('the end of a movie page', () => {
