@@ -71,7 +71,15 @@ extension ContinueItem {
 
     /// "Go to movie" or "Go to show".
     public var pageLabel: String { kind == .movie ? "Go to movie" : "Go to show" }
+
+    /// The movie's or episode's id, which Remove from Continue watching names it by.
+    public var watchID: Int? { kind == .movie ? movieID : episodeID }
 }
+
+/// Continue watching's card menu: Remove from Continue watching, and the
+/// note after it. The place is kept, so playing it again brings it back.
+public let removeFromContinueLabel = "Remove from Continue watching"
+public let continueRemovedNote = "Removed from Continue watching. Your place is kept."
 
 extension Hero {
     /// The episode's page, or the show or movie it belongs to.
@@ -98,6 +106,16 @@ extension Hero {
 }
 
 extension HomeData {
+    /// Home without `item` in Continue watching, the fixed row and the arranged one.
+    public mutating func removeFromContinue(_ item: ContinueItem) {
+        continueWatching.removeAll { $0.id == item.id }
+        rows = rows?.map { row in
+            var copy = row
+            copy.continueItems.removeAll { $0.id == item.id }
+            return copy
+        }
+    }
+
     /// Nothing scanned yet: no hero and no rows (a Live TV row doesn't count).
     public var isEmpty: Bool {
         if let rows { return hero == nil && rows.allSatisfy { $0.style == .live || $0.isEmpty } }

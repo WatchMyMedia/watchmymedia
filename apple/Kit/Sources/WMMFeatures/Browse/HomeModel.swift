@@ -22,16 +22,19 @@ public final class HomeModel {
     @ObservationIgnored private let auth: any AuthRepository
     @ObservationIgnored private let navigator: Navigator
     @ObservationIgnored private let rows: (any RowsRepository)?
+    @ObservationIgnored private let servers: (any ServerRepository)?
     @ObservationIgnored private let changes: ScreenChanges
     @ObservationIgnored private let loads = LoadController<HomeData>()
 
     /// `rows` brings the person's other devices' changes to the layout and lists (rows.changed, lists.changed).
+    /// `servers` says what the server in use offers (Remove from Continue watching).
     public init(library: any LibraryRepository, auth: any AuthRepository, navigator: Navigator, rows: (any RowsRepository)? = nil,
-                now: @escaping @MainActor () -> Date = { Date() }) {
+                servers: (any ServerRepository)? = nil, now: @escaping @MainActor () -> Date = { Date() }) {
         self.library = library
         self.auth = auth
         self.navigator = navigator
         self.rows = rows
+        self.servers = servers
         changes = ScreenChanges(now: now)
     }
 
@@ -152,6 +155,33 @@ public final class HomeModel {
     /// The mark's own notice reloads Home, as it does every screen showing it.
     public func setWatched(_ target: WatchTarget, _ watched: Bool) async {
         message = await markWatched(target, watched, in: library)
+    }
+
+    /// Continue watching's cards offer Remove from Continue watching: the
+    /// server keeps the place (``ServerFeatures/hideFromContinueWatching``).
+    public var canRemoveFromContinueWatching: Bool {
+        servers?.current?.server.features.hideFromContinueWatching == true
+    }
+
+    /// Takes the card off Continue watching at once; the server keeps the
+    /// place, and playing the title again brings it back. A refusal puts the
+    /// card back with a note.
+    public func removeFromContinueWatching(_ item: ContinueItem) async {
+        guard let id = item.watchID else { return }
+        let before = state
+        if var home = state.value {
+            home.removeFromContinue(item)
+            state = .loaded(home)
+        }
+        do {
+            try await library.setHiddenFromContinueWatching(item.kind, id: id, hidden: true)
+            message = continueRemovedNote
+        } catch is CancellationError {
+            state = before
+        } catch {
+            state = before
+            message = error.displayMessage
+        }
     }
 
     /// `quiet` keeps what is on screen: a failure then is a message, not an

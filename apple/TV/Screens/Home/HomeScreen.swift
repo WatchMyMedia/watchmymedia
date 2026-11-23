@@ -21,7 +21,7 @@ struct HomeScreen: View {
     @Environment(Navigator.self) private var navigator
 
     var body: some View {
-        HomeView(model: HomeModel(library: services.library, auth: services.auth, navigator: navigator, rows: services.rows))
+        HomeView(model: HomeModel(library: services.library, auth: services.auth, navigator: navigator, rows: services.rows, servers: services.servers))
     }
 }
 
@@ -298,6 +298,7 @@ private extension TVRowActions {
             resume: { model.resume($0) },
             openPage: { model.openPage(of: $0) },
             setWatched: { await model.setWatched($0, $1) },
+            removeFromContinue: model.canRemoveFromContinueWatching ? { await model.removeFromContinueWatching($0) } : nil,
             seeAll: { row in
                 guard let link = row.seeAll, let words = model.seeAll(row) else { return nil }
                 return TVRowSeeAll(words: words) {

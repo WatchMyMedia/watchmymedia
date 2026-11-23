@@ -11,6 +11,8 @@ struct TVRowActions {
     var resume: (ContinueItem) -> Void = { _ in }
     var openPage: (ContinueItem) -> Void = { _ in }
     var setWatched: (WatchTarget, Bool) async -> Void
+    /// Remove from Continue watching, where the server offers it.
+    var removeFromContinue: ((ContinueItem) async -> Void)?
     /// The row's See all: what its card says and what Select
     /// on it does, or nil for a row without one.
     var seeAll: (ScreenRow) -> TVRowSeeAll? = { _ in nil }
@@ -126,6 +128,9 @@ struct TVArrangedRow: View {
             }
             if item.pageRoute != nil {
                 Button { actions.openPage(item) } label: { Label(item.pageLabel, systemImage: "info.circle") }
+            }
+            if let remove = actions.removeFromContinue {
+                Button { Task { await remove(item) } } label: { Label(removeFromContinueLabel, systemImage: "minus.circle") }
             }
         }
     }
