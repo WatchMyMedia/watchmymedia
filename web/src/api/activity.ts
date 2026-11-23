@@ -116,7 +116,8 @@ export function historyCSV(f: HistoryFilters): string {
 
 export type StatsParams = { days: number; by: 'plays' | 'time'; user?: number; library?: number }
 
-export const cardsQuery = (p: StatsParams) =>
+/** The statistics cards; conversions adds why plays were converted (API level 34), which only Stats shows. */
+export const cardsQuery = (p: StatsParams & { conversions?: boolean }) =>
   queryOptions({
     queryKey: ['activity', 'cards', p],
     queryFn: async () => unwrap(await api.GET('/api/stats/cards', { params: { query: p } })),
