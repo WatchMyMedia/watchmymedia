@@ -1,6 +1,7 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type FocusEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { fileQuery, liveTVRecordingQuery, movieQuery, preferencesQuery, seasonQuery } from '../../../src/api/queries'
+import { AUTO } from '../../../src/lib/quality'
 import type { components } from '../../../src/api/schema'
 import { useFocus, useKeys, useNav, useSession } from '../../app/hooks'
 import type { KeyInput } from '../../app/keys'
@@ -14,9 +15,9 @@ import { PlayerChrome, TitleBlock, type ChromeActions, type ChromeModel, type Op
 import { EpisodesPanel } from './Episodes'
 import { episodeContext, episodeFile, playableEpisodes, playingEpisode, previousEpisode } from './episodeList'
 import { areaOf, backAction, HIDE_CONTROLS_MS, overlayOf, PLAY_PAUSE_ID, RELEASE_AFTER_MS, routeKey, SCRUBBER_ID, SeekHold, seekKey, SKIP_ID, type Overlay } from './keys'
-import { adBreaksWords, audioDetail, episodeCode, episodeLine, qualityDetail, recordingLine, subtitleDetail, type PlayerKind } from './labels'
+import { adBreaksWords, episodeLine, otherVersion, qualityDetail, recordingLine, shortCode, tracksDetail, type PlayerKind } from './labels'
 import { PickerPanel, type Picker } from './Pickers'
-import { AdminStop, NextCard, Note, PlayError, PROMPT_FOCUS, Spinner, StillWatching } from './PlayerOverlays'
+import { AdminStop, NextCard, Note, PlayError, PROMPT_FOCUS, Spinner, Starting, StillWatching } from './PlayerOverlays'
 import { playbackMedia, PlayerSession, type Heading } from './playerSession'
 import { atRecordingEdge } from './scrubber'
 import { useSelect } from './select'
@@ -28,7 +29,7 @@ type Episode = components['schemas']['Episode']
 /** What the screen draws from, without the position and the countdowns, which only the small parts read. */
 function modelOf(s: FilePlaybackState) {
   return {
-    phase: s.phase, request: s.request, title: s.title, stream: s.stream,
+    phase: s.phase, request: s.request, title: s.title, stream: s.stream, mode: s.mode, video: s.video,
     audio: s.audio, quality: s.quality, note: s.note, trickplay: s.trickplay, recording: s.recording,
     subtitles: { options: s.subtitles.options, selected: s.subtitles.selected, online: s.subtitles.online },
     skipId: s.skip?.segmentId,
@@ -37,6 +38,7 @@ function modelOf(s: FilePlaybackState) {
     segments: s.segments, upNext: s.upNext,
     scrubbing: !!s.scrub, holding: !!s.scrub?.holding,
     writtenMinutes: s.recording?.now ? Math.floor(s.durationMs / 60_000) : undefined,
+    durationMs: Math.floor(s.durationMs / 60_000) * 60_000,
   }
 }
 
@@ -46,6 +48,9 @@ type Panel = Picker | 'episodes'
 const focusedId = () => (document.activeElement as HTMLElement | null)?.dataset?.focus
 
 const waiting = (phase: FilePlaybackState['phase']) => phase === 'loading' || phase === 'buffering'
+
+/** The time a key came, for telling a held seek from a quick press (read in the key handlers, never while drawing). */
+const keyTime = () => performance.now()
 
 /**
  * Files, recordings and trailer files over the engine's
@@ -67,6 +72,8 @@ export function FilePlayer({ play, request, player }: { play: PlayRequest; reque
   const [serial, setSerial] = useState(0)
   const [focusId, setFocusId] = useState<string>()
   const [shown, setShown] = useState(m.request)
+  // Whether this play has got going: until then the screen says where it starts, with Cancel.
+  const [started, setStarted] = useState<FileRequest>()
   const leaving = useRef(false)
   const wanted = useRef<string>(undefined)
   const quietTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -97,6 +104,8 @@ export function FilePlayer({ play, request, player }: { play: PlayRequest; reque
     setControls(true)
     setPanel(undefined)
   }
+  if (m.request && started !== m.request && (m.phase === 'playing' || m.phase === 'paused' || m.phase === 'ended' || m.phase === 'error')) setStarted(m.request)
+  const starting = !!m.request && started !== m.request && waiting(m.phase)
 
   // What the file is: an episode's show and season (the Episodes panel, Previous), a trailer's movie, a recording's channel.
   const fileId = m.request?.kind === 'file' ? m.request.fileId : undefined
@@ -106,12 +115,14 @@ export function FilePlayer({ play, request, player }: { play: PlayRequest; reque
   const episodes = playableEpisodes(season.data?.episodes)
   const previous = previousEpisode(episodes, fileId)
   const movie = useQuery({ ...movieQuery(play.kind === 'trailer' ? play.movieId : 0), enabled: play.kind === 'trailer' })
+  // When a file can't play: its movie's other versions, to offer one that may.
+  const failedMovie = useQuery({ ...movieQuery(file.data?.movieId ?? 0), enabled: !!file.data?.movieId && m.phase === 'error' })
   const recording = useQuery({ ...liveTVRecordingQuery(play.kind === 'recording' ? play.id : ''), enabled: play.kind === 'recording' })
 
   const kind: PlayerKind = m.request?.kind === 'recording' ? 'recording' : m.request?.kind === 'trailer' ? 'trailer' : context ? 'episode' : 'file'
   const heading = headingFor(ps.heading(m), kind, {
     episode: context && playingEpisode(episodes, fileId), context,
-    movieTitle: movie.data?.title, recording: recording.data, recordingNow: !!m.recording?.now,
+    movieTitle: movie.data?.title, recording: recording.data,
   })
 
   const panelOpen = panel === 'episodes' ? !!context && fileId !== undefined : !!panel
@@ -120,7 +131,7 @@ export function FilePlayer({ play, request, player }: { play: PlayRequest; reque
   useEffect(() => { if (m.failure) recordFailure(m.failure) }, [m.failure])
 
   const overlay: Overlay = overlayOf(m, panelOpen)
-  const chromeVisible = controls && overlay === 'none'
+  const chromeVisible = controls && overlay === 'none' && !starting
   const skipShown = !!m.skipId && overlay === 'none' && !(m.scrubbing && m.trickplay)
 
   const leave = () => {
@@ -166,6 +177,13 @@ export function FilePlayer({ play, request, player }: { play: PlayRequest; reque
     if (overlay === 'next') focus.focusId('next/play')
     else if (overlay === 'still' || overlay === 'message') focus.focusId(PROMPT_FOCUS)
   }, [overlay, focus])
+  // While it starts, Cancel holds focus; once it plays, Play/Pause.
+  // (Not as the screen first draws: the shell's own restore finds Cancel then, by its autofocus.)
+  useLayoutEffect(() => {
+    if (!mounted.current) return
+    if (starting) focus.focusId(STARTING_ID)
+    else if (chromeVisible && focusedId() === undefined) focus.focusId(PLAY_PAUSE_ID)
+  }, [starting, focus]) // eslint-disable-line react-hooks/exhaustive-deps
   // Skip takes focus as a segment's button comes, not each time it shows again after a seek.
   useLayoutEffect(() => {
     if (mounted.current && m.skipId !== undefined && skipShown) focus.focusId(SKIP_ID)
@@ -200,6 +218,11 @@ export function FilePlayer({ play, request, player }: { play: PlayRequest; reque
     setSerial((n) => n + 1)
     const s = playback.snapshot()
     const over = overlayOf(s, panelOpen)
+    // Starting: Return or Stop cancels and leaves; OK presses Cancel; nothing else does anything yet.
+    if (starting && over === 'none') {
+      if (input.action === 'back' || input.action === 'stop') { leave(); return true }
+      return input.action !== 'ok'
+    }
     if (input.action === 'back') {
       switch (backAction(over, controls, hold.holding || !!s.scrub?.holding)) {
         case 'leave': leave(); break
@@ -217,18 +240,21 @@ export function FilePlayer({ play, request, player }: { play: PlayRequest; reque
       case 'pass': return false
       case 'swallow': return true
       case 'show': showControls(); return true
+      case 'toControls': focus.focusId(PLAY_PAUSE_ID); return true
       case 'seek': {
         const key = seekKey(input.action)
         if (!key) return true
-        if (hold.down(key, action.direction, performance.now()) === 'begin') playback.beginScrub(action.direction)
+        if (hold.down(key, action.direction, keyTime()) === 'begin') playback.beginScrub(action.direction)
         else playback.scrubStep(action.direction)
         clearTimeout(quietTimer.current)
-        quietTimer.current = setTimeout(() => { if (hold.quiet(performance.now())) commit() }, RELEASE_AFTER_MS + 50)
+        quietTimer.current = setTimeout(() => { if (hold.quiet(keyTime())) commit() }, RELEASE_AFTER_MS + 50)
         if (over === 'none' && area !== 'scrubber') wanted.current = SCRUBBER_ID
         setControls(true)
         return true
       }
       case 'toggle':
+        // While seeking, OK plays from the target.
+        if (s.scrub) { hold.cancel(); commit(); return true }
         playback.togglePause()
         if (over === 'none') showControls()
         return true
@@ -255,23 +281,28 @@ export function FilePlayer({ play, request, player }: { play: PlayRequest; reque
     playNext: () => playback.playNext(),
   }
   const model: ChromeModel = {
-    kind, heading, stream: m.stream,
+    kind, heading,
     playing: m.phase === 'playing' || waiting(m.phase),
     recordingMs: m.writtenMinutes === undefined ? undefined : m.writtenMinutes * 60_000,
     goToNow: !!m.recording?.goToNow, atEdge: atRecordingEdge(m.recording),
-    episodes: context && season.data ? episodeCode(context.season, context.episode) : undefined,
-    audio: m.audio.options.length ? audioDetail(m.audio) : undefined,
-    subtitles: m.subtitles.options.length || m.subtitles.online?.available ? subtitleDetail(m.subtitles) : undefined,
+    episodes: !!context && !!season.data,
+    tracks: m.audio.options.length || m.subtitles.options.length || m.subtitles.online?.available ? tracksDetail(m.audio, m.subtitles) : undefined,
     quality: qualityDetail(m.quality),
-    next: m.upNext ? episodeCode(m.upNext.seasonNumber, m.upNext.episodeNumber) : undefined,
+    next: !!m.upNext,
     foot: kind === 'recording' ? adBreaksWords(m.segments, !!m.recording?.now) : undefined,
     seeking: m.scrubbing, scrubberFocused: focusId === SCRUBBER_ID,
   }
   const onFocus = (e: FocusEvent) => setFocusId((e.target as HTMLElement).dataset.focus)
   const onBlur = () => setFocusId(undefined)
   const retry = () => { if (m.stream) playback.resume(); else if (m.request) void playback.play(m.request) }
-  const backTo = kind === 'trailer' ? 'Back to the movie' : kind === 'recording' ? 'Back to Recordings' : 'Back'
-  const upNextHeading = m.upNext && `${episodeCode(m.upNext.seasonNumber, m.upNext.episodeNumber)} · ${m.upNext.title}`
+  const backTo = kind === 'trailer' ? 'Back to the movie' : 'Go back'
+  // Another version of what failed: the movie's other files, or the episode's.
+  const playingEp = context ? playingEpisode(episodes, fileId) : undefined
+  const other = fileId === undefined || kind === 'trailer' ? undefined
+    : otherVersion(kind === 'episode' ? playingEp?.files : failedMovie.data?.files, fileId)
+  const playOther = () => { if (other) ps.playVersion(other.fileId, heading, playback.snapshot().positionMs) }
+  // The line at the foot while the credits roll: the show and the episode, short.
+  const creditsWhat = context ? [shortCode(context.season, context.episode), playingEp?.title].filter(Boolean).join(' · ') : heading.line
 
   /** Keys while a panel is open: the viewer is there, and Play/Pause works under it. */
   const onPanelKey = (input: KeyInput): boolean => {
@@ -287,16 +318,20 @@ export function FilePlayer({ play, request, player }: { play: PlayRequest; reque
   return <div className="pl" onFocus={onFocus} onBlur={onBlur}>
     <Cues playback={playback} raised={chromeVisible || overlay === 'next'}/>
     {chromeVisible && <PlayerChrome playback={playback} model={model} actions={actions}/>}
-    {overlay === 'panel' && <TitleBlock heading={heading} dim paused={m.phase === 'paused'}/>}
+    {(overlay === 'panel' || overlay === 'still' || overlay === 'message' || starting) && <>
+      <div className="pl-shade pl-shade--top"/>
+      <TitleBlock heading={heading} dim={overlay === 'panel'} paused={overlay === 'panel' && m.phase === 'paused'}/>
+    </>}
     {skipShown && <SkipButton playback={playback}/>}
     {chromeVisible && kind === 'recording' && model.atEdge && !skipShown && <div className="pl-atnow" role="status"><span className="pl-dot pl-dot--live"/>At now. More plays as it records.</div>}
-    {overlay === 'next' && m.next && <NextCard playback={playback} episode={m.next.episode} heading={m.next.heading}/>}
-    {waiting(m.phase) && overlay !== 'message' && overlay !== 'still' && <Spinner starting={m.recording?.starting}/>}
+    {overlay === 'next' && m.next && <NextCard playback={playback} episode={m.next.episode} title={heading.title} line={creditsWhat}/>}
+    {starting && overlay === 'none' && <Starting startMs={m.request && 'startMs' in m.request ? m.request.startMs : undefined} durationMs={m.durationMs} recording={kind === 'recording' && !!m.recording?.starting} onCancel={leave}/>}
+    {!starting && waiting(m.phase) && overlay !== 'message' && overlay !== 'still' && <Spinner automatic={m.quality.id === AUTO}/>}
     {m.note && (overlay === 'none' || overlay === 'next') && <Note text={m.note}/>}
-    {overlay === 'still' && <StillWatching episode={m.upNext} heading={upNextHeading} onKeep={() => playback.keepWatching()} onStop={leave}/>}
+    {overlay === 'still' && <StillWatching title={m.upNext?.showTitle ?? heading.title} onKeep={() => playback.keepWatching()} onStop={leave}/>}
     {overlay === 'message' && (m.adminStop
       ? <AdminStop message={m.adminStop.message} onOk={leave}/>
-      : <PlayError message={m.error ?? 'Playback couldn’t start. Try again.'} backLabel={backTo} onRetry={retry} onBack={leave}/>)}
+      : <PlayError message={m.error ?? 'Playback couldn’t start. Try again.'} other={other?.label} backLabel={backTo} onOther={playOther} onRetry={retry} onBack={leave}/>)}
     {overlay === 'panel' && panel === 'episodes' && context && fileId !== undefined &&
       <EpisodesPanel playback={playback} context={context} fileId={fileId} onPlay={playEpisode} onClose={closePanel} onKey={onPanelKey}/>}
     {overlay === 'panel' && panel && panel !== 'episodes' &&
@@ -304,13 +339,16 @@ export function FilePlayer({ play, request, player }: { play: PlayRequest; reque
   </div>
 }
 
-/** The heading, with what the route didn't say filled in from the library: an episode's line, a trailer's movie, a recording's channel and times. */
+/** The id of Cancel while a play starts. */
+const STARTING_ID = 'starting/cancel'
+
+/** The heading, with what the route didn't say filled in from the library: an episode's line in words, a trailer's movie, a recording's channel and times. */
 function headingFor(h: Heading, kind: PlayerKind, o: {
   episode?: Episode; context?: { season: number; episode: number }; movieTitle?: string
-  recording?: components['schemas']['LiveTVRecording']; recordingNow: boolean
+  recording?: components['schemas']['LiveTVRecording']
 }): Heading {
   if (kind === 'trailer') return o.movieTitle && o.movieTitle !== h.title ? { title: h.title, line: o.movieTitle } : h
-  if (kind === 'recording') return o.recording ? { title: h.title, line: recordingLine(o.recording, o.recordingNow) } : h
-  if (kind === 'episode' && !h.line && o.episode && o.context) return { title: h.title, line: episodeLine(o.context.season, o.context.episode, o.episode.title) }
+  if (kind === 'recording') return o.recording ? { title: h.title, line: recordingLine(o.recording) } : h
+  if (kind === 'episode' && o.context) return { title: h.title, line: episodeLine(o.context.season, o.context.episode, o.episode?.title ?? '') }
   return h
 }

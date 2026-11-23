@@ -120,6 +120,12 @@ export class PlayerSession {
     void this.controller.play({ kind: 'file', fileId, title: heading.title })
   }
 
+  /** Plays another version of the same title from where it was, after one couldn't play. */
+  playVersion(fileId: number, heading: Heading, startMs: number) {
+    this.headings.set(`file:${fileId}`, heading)
+    void this.controller.play({ kind: 'file', fileId, startMs, title: heading.title })
+  }
+
   heading(state: Pick<FilePlaybackState, 'request' | 'title'>): Heading {
     return this.headings.get(playKey(state.request)) ?? { title: state.title ?? 'Playing' }
   }

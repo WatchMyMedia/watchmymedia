@@ -35,12 +35,13 @@ export function EpisodesPanel({ playback, context, fileId, onPlay, onClose, onKe
   const tabs = seasonTabList(show.data?.seasons, context.season)
   const title = show.data?.title ?? ''
   const hint = episodesOkHint(onTab, !!playing && focused === playing.id)
-  return <PlayerPanel title="Episodes" wide onClose={onClose} onKey={onKey} okHint={hint}
+  return <PlayerPanel title="Episodes" sub={title || '\u00a0'} wide onClose={onClose} onKey={onKey} foot={hint}
     aside={<>
-      {title && <p className="pl-episodes__show">{title}</p>}
+      {/* Held open while the show loads, so the list under it doesn't move after it has scrolled to the episode playing. */}
+      {show.isPending && <div className="pl-episodes__tabs" aria-hidden="true"/>}
       {tabs.length > 1 && <div className="pl-episodes__tabs" role="tablist" aria-label="Seasons" data-row data-group="seasons">
         {tabs.map((t) => <button key={t.number} type="button" role="tab" aria-selected={t.number === season} data-focus={`season/${t.number}`}
-          className={`pl-tab${t.number === season ? ' pl-tab--on' : ''}`} onFocus={() => { setOnTab(true); setSeason(t.number) }} onClick={() => setSeason(t.number)}>{t.name}</button>)}
+          className="tv-chip pl-tab" aria-pressed={t.number === season} onFocus={() => { setOnTab(true); setSeason(t.number) }} onClick={() => setSeason(t.number)}>{t.name}</button>)}
       </div>}
     </>}>
     {episodes.isPending && <p className="pl-panel__credit">Loading…</p>}

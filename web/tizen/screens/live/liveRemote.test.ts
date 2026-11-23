@@ -11,7 +11,8 @@ describe('the Live TV player’s remote', () => {
     expect(liveKeyAction('up', hidden)).toBe('channelUp')
     expect(liveKeyAction('down', hidden)).toBe('channelDown')
     expect(liveKeyAction('channelUp', shown)).toBe('channelUp')
-    expect(liveKeyAction('up', shown)).toBe('pass')
+    expect(liveKeyAction('up', shown)).toBe('swallow')
+    expect(liveKeyAction('down', shown)).toBe('swallow')
     expect(liveKeyAction('previousChannel', hidden)).toBe('previousChannel')
   })
 
