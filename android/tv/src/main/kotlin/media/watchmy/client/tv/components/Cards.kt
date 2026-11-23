@@ -1,8 +1,6 @@
 package media.watchmy.client.tv.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,7 +8,6 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -19,7 +16,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -56,7 +52,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.tv.material3.Icon
 import androidx.tv.material3.Text
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.Artwork
@@ -64,7 +59,6 @@ import media.watchmy.client.ui.components.Badge
 import media.watchmy.client.ui.components.BadgeStyle
 import media.watchmy.client.ui.components.ProgressStrip
 import media.watchmy.client.ui.components.WatchedCheck
-import media.watchmy.client.ui.components.WmmIcons
 import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -105,6 +99,8 @@ fun MediaCard(
     seed: String = title,
     /** A line between the title and the grey line: the server a search result is on. */
     line: (@Composable () -> Unit)? = null,
+    /** False for a card that carries its title alone (a grid's poster): no grey line, and no room kept for one. */
+    subtitleLine: Boolean = true,
     overlay: @Composable BoxScope.() -> Unit = {},
 ) {
     val row = LocalCardRowFocus.current
@@ -144,13 +140,14 @@ fun MediaCard(
                 title,
                 // The picture grows over the gap when focused, so the title moves down with it.
                 modifier = Modifier.padding(top = if (focused) CardTitleGap + artHeight * ((focusedScale - 1f) / 2f) else CardTitleGap),
-                style = TvType.Body.copy(fontWeight = FontWeight.SemiBold),
+                // A poster's title is a step smaller, so more of it fits across 216.
+                style = (if (artWidth <= PosterWidth) TvType.Second else TvType.Body).copy(fontWeight = FontWeight.SemiBold),
                 color = WmmColors.Text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             line?.invoke()
-            Text(
+            if (subtitleLine || subtitle != null) Text(
                 subtitle.orEmpty(),
                 modifier = Modifier.padding(top = 2.dp),
                 style = TvType.Caption,
@@ -317,21 +314,6 @@ fun BoxScope.ArtProgress(progress: Float?) {
 @Composable
 fun BoxScope.ArtWatched(watched: Boolean, size: Dp = 38.dp) {
     if (watched) WatchedCheck(Modifier.align(Alignment.TopEnd).padding(10.dp), size = size)
-}
-
-/** The round play mark in the middle of a Continue watching card. */
-@Composable
-fun BoxScope.PlayMark() {
-    Box(
-        Modifier
-            .align(Alignment.Center)
-            .size(56.dp)
-            .background(Color.Black.copy(alpha = 0.45f), CircleShape)
-            .border(2.dp, Color.White.copy(alpha = 0.7f), CircleShape),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(WmmIcons.Play, contentDescription = null, tint = WmmColors.Text, modifier = Modifier.size(26.dp))
-    }
 }
 
 /**

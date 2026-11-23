@@ -63,20 +63,19 @@ class SeeAllTvTest {
 
     @Test
     fun `Recently aired ends in See all, which opens TV Shows by last aired at its grid, and Back returns to it`() {
-        repeat(5) { press(Key.DirectionDown) } // Hero, Continue watching, Live TV, Recently added shows, a list, then Recently aired.
+        repeat(4) { press(Key.DirectionDown) } // From Continue watching: Live TV, Recently added shows, a list, then Recently aired.
         compose.onNodeWithText("Row 5 of ", substring = true, useUnmergedTree = true).assertExists()
         repeat(home.recentlyAired.size) { if (focused() != "See all TV shows") press(Key.DirectionRight) }
         assertEquals("See all TV shows", focused())
         assertEquals("See all TV shows, by last aired", spoken())
-        // The panel above the row says it too, and what OK does.
+        // The panel above the row says it too.
         assertTrue(compose.onAllNodesWithText("See all TV shows", useUnmergedTree = true).fetchSemanticsNodes().size >= 2)
         assertTrue(compose.onAllNodesWithText("By last aired", useUnmergedTree = true).fetchSemanticsNodes().size >= 2)
-        compose.onNodeWithText("opens the library", substring = true, useUnmergedTree = true).assertExists()
 
         val aired = firstBy(FakeData.TV_LIBRARY, ItemSort.Aired)
         assertNotEquals("the fakes' first show differs by sort", firstBy(FakeData.TV_LIBRARY, ItemSort.Added), aired)
         press(Key.DirectionCenter)
-        compose.onNodeWithText("Last aired", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Sort: Last aired", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("All shows", useUnmergedTree = true).assertExists()
         assertEquals("focus is on the grid's first card, not the rows above it", aired, focused())
 
@@ -87,28 +86,28 @@ class SeeAllTvTest {
 
     @Test
     fun `the rail's TV Shows afterwards opens as it always does`() {
-        repeat(5) { press(Key.DirectionDown) }
+        repeat(4) { press(Key.DirectionDown) }
         repeat(home.recentlyAired.size) { if (focused() != "See all TV shows") press(Key.DirectionRight) }
         press(Key.DirectionCenter)
-        compose.onNodeWithText("Last aired", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Sort: Last aired", useUnmergedTree = true).assertExists()
         back()
 
         openTvShows()
         assertTrue("focus starts on the rows, as it always does", focused() in home.recentlyAddedShows.map { it.title })
         // Down past the rows to the grid's heading, which the screen draws once it is near.
         repeat(8) { if (compose.onAllNodesWithText("All shows", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) press(Key.DirectionDown) }
-        compose.onNodeWithText("Date added", useUnmergedTree = true).assertExists()
-        assertEquals("the sort was used once", 0, compose.onAllNodesWithText("Last aired", useUnmergedTree = true).fetchSemanticsNodes().size)
+        compose.onNodeWithText("Sort: Date added", useUnmergedTree = true).assertExists()
+        assertEquals("the sort was used once", 0, compose.onAllNodesWithText("Sort: Last aired", useUnmergedTree = true).fetchSemanticsNodes().size)
     }
 
     @Test
     fun `Recently released ends in See all movies by release date`() {
-        repeat(8) { press(Key.DirectionDown) } // ... Recently added movies, a list, then Recently released.
+        repeat(7) { press(Key.DirectionDown) } // ... Recently added movies, a list, then Recently released.
         compose.onNodeWithText("Row 8 of ", substring = true, useUnmergedTree = true).assertExists()
         repeat(home.recentlyReleased.size) { if (focused() != "See all movies") press(Key.DirectionRight) }
         assertEquals("See all movies, by release date", spoken())
         press(Key.DirectionCenter)
-        compose.onNodeWithText("Release date", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Sort: Release date", useUnmergedTree = true).assertExists()
         assertEquals(firstBy(FakeData.MOVIE_LIBRARY, ItemSort.Released), focused())
     }
 
@@ -120,7 +119,7 @@ class SeeAllTvTest {
         repeat(home.recentlyAired.size + 1) { if (spoken() != "See all TV shows, by last aired") press(Key.DirectionRight) }
         assertEquals("See all TV shows, by last aired", spoken())
         press(Key.DirectionCenter)
-        compose.onNodeWithText("Last aired", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Sort: Last aired", useUnmergedTree = true).assertExists()
         assertEquals(firstBy(FakeData.TV_LIBRARY, ItemSort.Aired), focused())
     }
 

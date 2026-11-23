@@ -1,7 +1,6 @@
 package media.watchmy.client.tv.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,7 +40,6 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
@@ -210,6 +208,8 @@ fun PanelRow(
     trailing: String? = null,
     enabled: Boolean = true,
     onLongClick: (() -> Unit)? = null,
+    /** A chevron at its end: it opens something rather than doing it. */
+    chevron: Boolean = false,
 ) {
     val shape = RoundedCornerShape(16.dp)
     FocusableBox(
@@ -237,6 +237,7 @@ fun PanelRow(
             }
             if (trailing != null) Text(trailing, style = TvType.Second, color = TvPalette.Muted, maxLines = 1)
             if (chosen) Icon(WmmIcons.Check, contentDescription = null, tint = WmmColors.Accent, modifier = Modifier.size(30.dp))
+            if (chevron) Icon(WmmIcons.ChevronRight, contentDescription = null, tint = TvPalette.Muted, modifier = Modifier.size(28.dp))
         }
     }
 }

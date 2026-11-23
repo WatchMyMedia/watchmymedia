@@ -2,6 +2,7 @@ package media.watchmy.client.tv.home
 
 import media.watchmy.client.tv.components.PosterHeight
 import media.watchmy.client.tv.components.PosterWidth
+import media.watchmy.client.tv.components.TvClock
 import media.watchmy.client.tv.components.WideCardHeight
 import media.watchmy.client.tv.components.WideCardWidth
 import media.watchmy.client.tv.watchlists.holdFor
@@ -81,7 +82,6 @@ import media.watchmy.client.tv.components.FocusMemory
 import media.watchmy.client.tv.components.MediaCard
 import media.watchmy.client.tv.components.Notice
 import media.watchmy.client.tv.components.PivotSpec
-import media.watchmy.client.tv.components.PlayMark
 import media.watchmy.client.tv.components.RailSection
 import media.watchmy.client.tv.components.SectionHeader
 import media.watchmy.client.tv.components.TvButton
@@ -185,6 +185,8 @@ fun HomeScreen(
                 }
             }
         }
+        // The time, so "ends 8:41 PM" has something to be read against.
+        TvClock()
         Notice(state.message, vm::messageShown)
     }
 }
@@ -193,10 +195,10 @@ private fun HomeData.isEmpty() =
     hero == null && continueWatching.isEmpty() && recentlyAddedShows.isEmpty() && recentlyAired.isEmpty() && recentlyAddedMovies.isEmpty() && recentlyReleased.isEmpty() &&
         rows.orEmpty().none { it.style != RowStyle.Live && it.hasContent }
 
-/** Arranged Home's first focus: the hero, else the first card of the first row drawn. */
+/** Arranged Home's first focus: the first card of the first row drawn, else the hero (shown only when there are no rows). */
 internal fun HomeData.arrangedFirstFocusKey(liveChannels: List<LiveChannel>): String? {
-    hero?.let { return if (it.fileId != null) "hero:play" else "hero:open" }
-    val first = rows.orEmpty().drawn(live = liveChannels.any { it.available }).firstOrNull() ?: return null
+    val first = rows.orEmpty().drawn(live = liveChannels.any { it.available }).firstOrNull()
+        ?: return hero?.let { if (it.fileId != null) "hero:play" else "hero:open" }
     if (first.style == RowStyle.Live) return liveChannels.firstOrNull { it.available }?.let { "live:${it.id}" }
     return first.cardKey()
 }
@@ -262,7 +264,6 @@ private fun HomeContent(
                                     onLongClick = { c.open(onOpenShow, onOpenMovie) },
                                     modifier = Modifier.focusMemory(memory, "cw:${c.fileId}"),
                                 ) {
-                                    PlayMark()
                                     ArtProgress(c.progress)
                                 }
                             }

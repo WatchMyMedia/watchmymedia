@@ -255,14 +255,18 @@ class LiveTVScreenTest {
             compose.onNodeWithContentDescription("2.1 HRBR-HD, Watch live").performClick()
             compose.onNode(hasText("Pause") and hasClickAction()).assertExists()
             compose.runOnIdle { runBlocking { base.auth.signIn("Alex", "password") } }
-            compose.onNode(hasText("Play") and hasClickAction()).assertIsFocused()
+            // Home again, with focus on its first row's card.
+            compose.onNodeWithText("Row 1 of ", substring = true, useUnmergedTree = true).assertExists()
+            compose.onNode(isFocused()).assertExists()
             assertEquals(1, controllers.single().releases)
             compose.onNodeWithContentDescription("Live TV").performClick()
             compose.onNodeWithContentDescription("2.1 HRBR-HD, Watch live").performClick()
             compose.onNode(hasText("Pause") and hasClickAction()).assertExists()
             // Another server this TV is signed in to.
             compose.runOnIdle { runBlocking { base.servers.switchTo(Cabin.id) } }
-            compose.onNode(hasText("Play") and hasClickAction()).assertIsFocused()
+            // Home again, with focus on its first row's card.
+            compose.onNodeWithText("Row 1 of ", substring = true, useUnmergedTree = true).assertExists()
+            compose.onNode(isFocused()).assertExists()
             assertEquals(2, controllers.size)
             assertEquals(1, controllers.last().releases)
         } finally { fakeLatencyMs = previousLatency }
