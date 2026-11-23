@@ -229,14 +229,14 @@ export function showStatus(show: Pick<ShowDetail, 'status' | 'nextAirDate'>, tod
   return { text: show.nextAirDate ? `Continuing${SEP}next episode ${dayWords(show.nextAirDate, today)}` : 'Continuing', active: true }
 }
 
-/** "Notify me", or "Notifications on" while the person follows the show. */
-export const followLabel = (following: boolean) => (following ? 'Notifications on' : 'Notify me')
+/** "Notify me", or "Following" while the person follows the show. */
+export const followLabel = (following: boolean) => (following ? 'Following' : 'Notify me')
 
 /** The bell's name for screen readers, which carries its state. */
 export const followSpoken = (following: boolean, show: string) => (following ? `Notifications on for ${show}. Turn them off` : `Notify me of new episodes of ${show}`)
 
-/** Under the buttons while the bell has focus: who notifies. */
-export const FOLLOW_TV_LINE = 'Your phone or tablet notifies you. This TV shows new episodes on Home.'
+/** Under About's buttons: what following does here, and who notifies. */
+export const FOLLOW_TV_LINE = 'New episodes of shows you follow appear on Home. Your phone or tablet notifies you.'
 
 /** The server's 409: at the limit of follows. */
 export const FOLLOW_LIMIT = 'You follow 500 shows, the most you can. Choose Stop notifying for one in Settings › Notifications first.'
@@ -245,20 +245,20 @@ export function followRefused(on: boolean, show: string): string {
   return `Couldn’t turn ${on ? 'on' : 'off'} notifications for ${show}. Check your connection and try again.`
 }
 
-/** The page's parts top to bottom, for scrolling: the episode on top, the seasons, the row, About the show, More like this. */
-export type Zone = 'top' | 'seasons' | 'episodes' | 'about' | 'related'
+/** The page's parts top to bottom, for scrolling: the episode on top, the seasons, the row, About the show, its cast, More like this. */
+export type Zone = 'top' | 'seasons' | 'episodes' | 'about' | 'cast' | 'related'
 
 /**
  * How far the page is moved up for the part with focus: the top, the tabs
- * and the row are seen with the episode on top; About the show brings the
- * tabs to [topPad] (the top scrolled away), and More like this the page's
- * end. About isn't held back by the page's end, so a page
- * without More like this still shows the tabs at the top.
+ * and the row are seen with the episode on top; About the show and its
+ * cast bring About to [topPad] (the top scrolled away), and More like this
+ * the page's end. About isn't held back by the page's end, so a page
+ * without More like this still shows About at the top.
  */
-export function zoneOffset(zone: Zone, m: { seasonsTop: number; trackHeight: number; viewHeight: number; topPad: number }): number {
+export function zoneOffset(zone: Zone, m: { aboutTop: number; trackHeight: number; viewHeight: number; topPad: number }): number {
   if (zone === 'top' || zone === 'seasons' || zone === 'episodes') return 0
-  const about = Math.max(0, m.seasonsTop - m.topPad)
-  return zone === 'about' ? about : Math.max(about, m.trackHeight - m.viewHeight)
+  const about = Math.max(0, m.aboutTop - m.topPad)
+  return zone === 'about' || zone === 'cast' ? about : Math.max(about, m.trackHeight - m.viewHeight)
 }
 
 /** Said when the episode a link named isn't in its season any more. */

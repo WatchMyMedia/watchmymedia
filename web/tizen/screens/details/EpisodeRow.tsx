@@ -2,21 +2,23 @@ import { memo, type CSSProperties } from 'react'
 import type { components } from '../../../src/api/schema'
 import { rowWindow } from '../../app/focusRules'
 import { useMediaUrls } from '../../app/hooks'
+import { Icon } from '../../ui/Icon'
 import { CARDS_IN_VIEW } from '../../ui/tones'
-import { Picture, Progress } from './DetailParts'
+import { Picture } from './DetailParts'
 import { toneStyle } from './detailWords'
-import { Glyph } from './Glyph'
-import { cardCode, cardLine, episodeProgress, missingOf, seasonName } from './showLabels'
+import { cardLine, episodeProgress, missingOf, seasonName } from './showLabels'
+import { cardTitle } from './titleWords'
 
 type Episode = components['schemas']['Episode']
 type RequestOptions = components['schemas']['RequestOptions']
 
 /**
- * The season's episodes: the one on top ringed in gold
- * with On top. Focus on a card puts its episode on top, and the row follows
- * it as the kit's rows do (the card before it stays in view, only the cards
- * near the view are drawn); OK moves focus back up to its Play and never
- * plays. Cards are `ep/<id>`.
+ * The season's episodes as the kit's wide cards: the one on top marked by
+ * a gold bar above it, never a ring, so only the focused card is ringed.
+ * Focus on a card puts its episode on top, and the row follows it as the
+ * kit's rows do (the card before it stays in view, only the cards near the
+ * view are drawn, the next one peeks); OK moves focus back up to its Play
+ * and never plays. Cards are `ep/<id>`.
  */
 export function EpisodeRow({ show, season, episodes, onTopId, options, today, onPick, onOk }: {
   show: string
@@ -50,17 +52,17 @@ const EpisodeCard = memo(function EpisodeCard({ e, show, season, onTop, options,
   const missing = missingOf(e, options)
   const line = cardLine(e, missing, today)
   const progress = e.hasFile ? episodeProgress(e) : missing?.progress
+  const watched = e.hasFile && !!e.watch?.completed
   const label = [`${seasonName(season)}, episode ${e.number}: ${e.title}`, line.text, onTop ? 'on top' : ''].filter(Boolean).join(', ')
-  return <button type="button" data-focus={`ep/${e.id}`} className={`dt-ep${onTop ? ' dt-ep--top' : ''}`} aria-label={label}
-    onFocus={() => onPick(e.id)} onClick={onOk}>
-    <span className={`dt-ep__art${e.hasFile ? '' : ' dt-ep__art--off'}`} style={e.hasFile ? toneStyle(`${show}${e.number}`) : undefined}>
-      {e.hasFile ? <Picture src={media.imageUrl(e.stillPath, 'w780')}/> : <span className="dt-ep__thumb">{missing?.thumb ?? (e.aired ? 'Missing' : 'Not aired yet')}</span>}
-      {e.hasFile && e.watch?.completed && <span className="dt-check" role="img" aria-label="Watched"><Glyph name="check"/></span>}
-      {onTop && <span className="tv-badge tv-badge--gold dt-ep__top">On top</span>}
-      <span className="tv-badge dt-ep__code">{cardCode(e)}</span>
-      {progress !== undefined && <Progress value={progress}/>}
+  return <button type="button" data-focus={`ep/${e.id}`} className={`tv-card tv-card--episode${onTop ? ' tv-card--selected' : ''}`} aria-label={label}
+    aria-current={onTop || undefined} onFocus={() => onPick(e.id)} onClick={onOk}>
+    <span className={`tv-card__art${e.hasFile ? '' : ' dt-ep__art--off'}`} style={e.hasFile ? toneStyle(`${show}${e.number}`) as CSSProperties : undefined}>
+      {e.hasFile ? <><span className="tv-card__placeholder" aria-hidden="true"/><Picture className="tv-card__img" src={media.imageUrl(e.stillPath, 'w780')}/></>
+        : <span className="dt-ep__thumb">{missing?.thumb ?? (e.aired ? 'Not in library' : line.text)}</span>}
+      {watched && <span className="tv-card__done" aria-hidden="true"><Icon name="check"/></span>}
+      {progress !== undefined && <span className="tv-card__progress" aria-hidden="true"><span style={{ width: `${Math.round(Math.min(1, progress) * 100)}%` }}/></span>}
     </span>
-    <span className={`dt-ep__title${e.hasFile ? '' : ' dt-ep__title--off'}`}>{e.title || `Episode ${e.number}`}</span>
-    <span className={`dt-ep__line${line.tone && !e.hasFile ? ` dt-tone--${line.tone}` : ''}`}>{line.dot && <i/>}{line.text}</span>
+    <span className={`tv-card__title${e.hasFile ? '' : ' dt-off'}`}>{cardTitle(e)}</span>
+    <span className={`tv-card__sub${line.tone && !e.hasFile ? ` dt-tone--${line.tone}` : ''}`}>{line.text}</span>
   </button>
 })
