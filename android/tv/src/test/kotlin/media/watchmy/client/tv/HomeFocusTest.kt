@@ -134,7 +134,8 @@ class HomeFocusTest {
         assertEquals(card, focused())
 
         press(Key.DirectionCenter)
-        compose.onNodeWithText(card, useUnmergedTree = true).assertExists()
+        // The show page names the show at its top and again in About the show, below.
+        assertTrue("the show page is open", compose.onAllNodesWithText(card, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
         assertNotEquals("The show page took focus", card, focused())
 
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }

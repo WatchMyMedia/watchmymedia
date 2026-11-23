@@ -25,6 +25,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -266,7 +269,9 @@ internal fun KeyHints(hints: List<Pair<String, String>>, modifier: Modifier = Mo
  */
 @Composable
 internal fun ScrolledHeading(scroll: ScrollState, back: String, content: @Composable RowScope.() -> Unit) {
-    AnimatedVisibility(scroll.value > ScrolledFrom, enter = fadeIn(), exit = fadeOut()) {
+    // Read as a yes or no, so the page doesn't compose again for every pixel it scrolls.
+    val scrolled by remember(scroll) { derivedStateOf { scroll.value > ScrolledFrom } }
+    AnimatedVisibility(scrolled, enter = fadeIn(), exit = fadeOut()) {
         Box(
             Modifier
                 .fillMaxWidth()
