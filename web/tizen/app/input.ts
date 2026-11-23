@@ -6,6 +6,8 @@ import { FocusEngine, type FocusHooks } from './focus'
 export const HOLD_EVENT = 'tvhold'
 /** The event a row gets when a run of ◀ stops at its first card: it gives a little. */
 export const ROW_STOP_EVENT = 'tv-row-stop'
+/** The class the focused element carries while OK is held down on it: the pressed state. */
+export const PRESSED_CLASS = 'tv-pressed'
 
 function editing(el: Element | null) {
   return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement
@@ -22,6 +24,7 @@ export class Input {
   readonly focus: FocusEngine
   private appHandler?: KeyHandler
   private hold: HoldDetector
+  private pressed?: Element
 
   constructor(private root: HTMLElement = document.body, hooks: FocusHooks = {}) {
     this.focus = new FocusEngine(root, hooks)
@@ -69,19 +72,33 @@ export class Input {
     event.preventDefault()
     if (input.action === 'left') this.focus.run.press(event.timeStamp, event.repeat)
     else this.focus.run.reset()
-    if (input.action === 'ok') { this.hold.keydown(); return }
+    if (input.action === 'ok') { this.press(); this.hold.keydown(); return }
     this.dispatch(input)
+  }
+
+  /** Shows the press on the focused element until OK is let go, so a press is answered at once. */
+  private press() {
+    const active = document.activeElement
+    if (this.pressed || !active || active === document.body || !this.root.contains(active)) return
+    active.classList.add(PRESSED_CLASS)
+    this.pressed = active
+  }
+
+  private release() {
+    this.pressed?.classList.remove(PRESSED_CLASS)
+    this.pressed = undefined
   }
 
   private onKeyUp = (event: KeyboardEvent) => {
     const input = actionFor(event)
     if (input?.action === 'left') this.focus.run.release()
     if (input?.action !== 'ok') return
+    this.release()
     // An OK that started in a field (Enter to finish typing) ends here too.
     if (!this.hold.pressing) return
     event.preventDefault()
     if (this.hold.keyup()) this.dispatch({ action: 'ok', repeat: false })
   }
 
-  private onBlur = () => this.hold.cancel()
+  private onBlur = () => { this.release(); this.hold.cancel() }
 }

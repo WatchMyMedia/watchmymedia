@@ -15,11 +15,20 @@ import { LeftRun, remember, type FocusMemory } from './focusRules'
 //   data-autofocus       where a screen's focus starts when it has no memory
 //   data-clip            a box that clips what it holds sideways (a row's
 //                        viewport): only items mostly inside it are targets
+//   data-skip            passed over by the arrows (an A–Z letter with no
+//                        titles); aria-disabled items are not: they are
+//                        dimmed and still take focus, so a press can say why
+// While a screen has nothing to focus yet (it is loading), focus parks on the
+// rail's current section without opening it (data-parked), and moves to the
+// screen as soon as it draws something focusable.
 
 const FOCUSABLE = '[data-focus]'
 
+/** How long focus parked on the rail waits for a slow screen to draw before giving up. */
+const PARK_MS = 30_000
+
 function usable(el: HTMLElement) {
-  return !el.hasAttribute('disabled') && el.getAttribute('aria-disabled') !== 'true' && !el.closest('[inert]') && el.getClientRects().length > 0
+  return !el.hasAttribute('disabled') && !el.hasAttribute('data-skip') && !el.closest('[inert]') && el.getClientRects().length > 0
 }
 
 function all(scope: ParentNode) {
@@ -160,13 +169,16 @@ export class FocusEngine {
       return this.focusFirst(scope)
     }
     if (attempt()) return
+    // Nothing to focus yet: wait on the rail, for as long as the screen takes.
+    const parked = scopeName === 'content' && this.park()
     const observer = new MutationObserver(() => { if (attempt()) stop() })
-    const timer = setTimeout(() => { attempt(); stop() }, waitMs)
+    const timer = setTimeout(() => { attempt(); stop() }, parked ? PARK_MS : waitMs)
     const grace = setTimeout(() => { if (attempt()) stop() }, graceMs)
-    const onFocus = () => stop()
+    const onFocus = () => { if (!this.parking) stop() }
     const stop = () => {
       observer.disconnect(); clearTimeout(timer); clearTimeout(grace)
       this.root.removeEventListener('focusin', onFocus, true)
+      this.unpark()
       if (this.restoring === stop) this.restoring = undefined
     }
     observer.observe(this.root, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled', 'data-focus'] })
@@ -175,11 +187,35 @@ export class FocusEngine {
     this.restoring = stop
   }
 
+  private parking = false
+
+  /** Focus waits on the rail's current section, which stays closed, while the screen loads. */
+  private park(): boolean {
+    const rail = this.scope('rail')
+    const current = rail?.querySelector<HTMLElement>('[aria-current="page"]')
+    if (!rail || !current || !usable(current)) return false
+    rail.setAttribute('data-parked', '')
+    this.parking = true
+    try { current.focus({ preventScroll: true }) } finally { this.parking = false }
+    return true
+  }
+
+  /** Focus parked on the rail: any key there opens it as usual. */
+  unpark() { this.scope('rail')?.removeAttribute('data-parked') }
+
+  /** Whether focus is parked on the rail while the screen loads. */
+  get parked(): boolean { return !!this.scope('rail')?.hasAttribute('data-parked') }
+
   /** The remote's arrow: true when it was handled (moving or staying put). */
   move(direction: Direction): boolean {
     const scope = this.activeScope()
     if (!scope) return false
     const active = document.activeElement as HTMLElement | null
+    // Parked on the rail while the screen loads: ▶ goes to the screen once it has something, any other arrow opens the rail.
+    if (this.parked && scopeName(active) === 'rail') {
+      if (direction === 'right') { if (this.focusContent()) this.unpark(); return true }
+      this.unpark()
+    }
     if (!active || !scope.contains(active) || !active.matches(FOCUSABLE)) {
       if (scope.dataset.scope === 'content' && this.memory?.last && this.focusId(this.memory.last, scope)) return true
       return this.focusFirst(scope) || true

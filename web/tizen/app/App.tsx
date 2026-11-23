@@ -5,6 +5,7 @@ import { Shell } from './Shell'
 import type { AppSession } from '../session/session'
 import type { Player } from '../player'
 import { StartFlow } from '../screens/start/StartFlow'
+import { Notes } from '../ui/Toast'
 
 /** The whole app: the start screens until a session is signed in, then that session's shell. */
 export function App({ app, input, player, exit }: { app: AppSession; input: Input; player?: Player; exit(): void }) {
@@ -13,6 +14,7 @@ export function App({ app, input, player, exit }: { app: AppSession; input: Inpu
     <AppContext.Provider value={app}>
       <PlayerContext.Provider value={player}>
         {state.screen === 'signedIn' ? <Shell key={state.session.serial} session={state.session} arrival={state.arrival} exit={exit}/> : <StartFlow state={state} exit={exit}/>}
+        <Notes/>
       </PlayerContext.Provider>
     </AppContext.Provider>
   </InputContext.Provider>

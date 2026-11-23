@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { Button, type ButtonProps } from './Button'
-import { Icon, type IconName } from './Icon'
+import type { IconName } from './Icon'
 import { CARDS_IN_VIEW } from './tones'
 import type { CardVariant } from './Card'
 
@@ -32,17 +32,18 @@ export function SkeletonRow({ variant, title = true }: { variant: CardVariant; t
 export type ProblemAction = Omit<ButtonProps, 'autoFocus' | 'children'> & { label: string }
 
 /**
- * A screen that can't go on, and why: an icon, a title, a few lines and
- * what to do. Focus starts on the first action.
+ * A screen that can't go on: a title, why, what to do, and the first
+ * action focused. Technical detail (an address, what the TV heard back)
+ * goes behind a Details action, with `foot` saying what it holds.
  */
-export function ProblemScreen({ icon, title, children, actions, extra }: { icon: IconName; title: string; children?: ReactNode; actions: ProblemAction[]; extra?: ReactNode }) {
+export function ProblemScreen({ title, children, actions, extra, foot }: { icon?: IconName; title: string; children?: ReactNode; actions: ProblemAction[]; extra?: ReactNode; foot?: ReactNode }) {
   return <section className="tv-problem" role="alert" aria-label={title}>
-    <span className="tv-problem__icon"><Icon name={icon}/></span>
     <h1 className="tv-problem__title">{title}</h1>
     {children && <div className="tv-problem__body">{children}</div>}
     {extra}
     <div className="tv-actions">
       {actions.map(({ label, ...a }, i) => <Button key={a.id} {...a} variant={a.variant ?? (i === 0 ? 'primary' : 'ghost')} autoFocus={i === 0}>{label}</Button>)}
     </div>
+    {foot && <p className="tv-problem__foot">{foot}</p>}
   </section>
 }
