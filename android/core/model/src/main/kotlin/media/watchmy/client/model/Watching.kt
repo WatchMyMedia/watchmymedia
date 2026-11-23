@@ -156,3 +156,9 @@ val HomeData.heroBadges: List<String>
         } ?: return emptyList()
         return listOfNotNull(item.quality, "HDR".takeIf { item.hdr })
     }
+
+/** What a card's menu says to take it off Continue watching, keeping its place. */
+const val REMOVE_FROM_CONTINUE = "Remove from Continue watching"
+
+/** Said once it is off the row. */
+const val REMOVED_FROM_CONTINUE = "Removed from Continue watching"
