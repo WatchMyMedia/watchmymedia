@@ -21,7 +21,7 @@ import WMMModel
         let model = model()
         await model.retry()
         #expect(model.gridHeading == "TV Shows", "no rows above it: the tab's own name")
-        #expect(model.gridCountLine == "16 shows")
+        #expect(model.gridCountLine == "16 shows · 3 added this month", "and, from API level 34, what arrived this month")
         await model.chooseGenre("Sci-Fi")
         #expect(model.gridCountLine == "3 shows in Sci-Fi", "filtered, it says what matches")
     }

@@ -76,7 +76,13 @@ extension TVFocusWords {
         var facts: [String] = []
         switch item.kind {
         case .show:
-            facts = [item.year.map(String.init), item.episodeCount.map { plural($0, "episode") }].compactMap { $0 }
+            if let left = item.unwatchedCount {
+                // "2 episodes left" leads in gold, then when the next airs.
+                lead = left > 0 ? "\(plural(left, "episode")) left" : nil
+                facts = [item.year.map(String.init), nextAirLine(item.nextAirDate, today: now).map { $0.prefix(1).uppercased() + $0.dropFirst() }].compactMap { $0 }
+            } else {
+                facts = [item.year.map(String.init), item.episodeCount.map { plural($0, "episode") }].compactMap { $0 }
+            }
         case .movie:
             facts = [item.year.map(String.init), item.runtimeMin.map { formatDuration(ms: $0 * 60_000) }].compactMap { $0 }
             if let runtime = item.runtimeMin, let progress = item.progress, progress > 0, !item.watched {
@@ -89,6 +95,7 @@ extension TVFocusWords {
         }
         self.init(
             kicker: panel.kicker, title: item.title, lead: lead, facts: facts,
+            rating: item.kind == .unmatched ? nil : item.contentRating,
             after: item.kind == .unmatched ? [] : Array(item.genres.prefix(1)),
             overview: item.overview
         )

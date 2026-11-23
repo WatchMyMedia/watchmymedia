@@ -21,8 +21,13 @@ public final class LibraryModel {
         public var genreCounts: [String: Int]?
         /// The first item held, after jumping directly to a letter.
         public var offset: Int
+        /// The library's content ratings, for the rating filter; empty from servers below API level 34.
+        public var contentRatings: [String]
+        /// Titles per rating after the other filters.
+        public var contentRatingCounts: [String: Int]?
 
-        public init(items: [BrowseItem] = [], total: Int = 0, genres: [String] = [], decades: [Int] = [], summary: LibrarySummary? = nil, letters: [LetterOffset]? = nil, genreCounts: [String: Int]? = nil, offset: Int = 0) {
+        public init(items: [BrowseItem] = [], total: Int = 0, genres: [String] = [], decades: [Int] = [], summary: LibrarySummary? = nil, letters: [LetterOffset]? = nil, genreCounts: [String: Int]? = nil, offset: Int = 0,
+                    contentRatings: [String] = [], contentRatingCounts: [String: Int]? = nil) {
             self.items = items
             self.total = total
             self.genres = genres
@@ -31,6 +36,14 @@ public final class LibraryModel {
             self.letters = letters
             self.genreCounts = genreCounts
             self.offset = offset
+            self.contentRatings = contentRatings
+            self.contentRatingCounts = contentRatingCounts
+        }
+
+        /// A grid of `page`, from its first item.
+        init(page: ItemPage) {
+            self.init(items: page.items, total: page.total, genres: page.genres, decades: page.decades, summary: page.summary, letters: page.letters,
+                      genreCounts: page.genreCounts, offset: page.offset, contentRatings: page.contentRatings, contentRatingCounts: page.contentRatingCounts)
         }
 
         public var hasMore: Bool { offset + items.count < total }
@@ -67,6 +80,8 @@ public final class LibraryModel {
     public private(set) var filter: ItemFilter = .all
     public private(set) var genre: String?
     public private(set) var decade: Int?
+    /// The content ratings the grid is narrowed to, in the library's order; empty for every rating.
+    public private(set) var contentRatings: [String] = []
     /// The search field; the grid follows it a moment after typing stops.
     public private(set) var searchText = ""
     public private(set) var selectedLetter: String?
@@ -135,7 +150,7 @@ public final class LibraryModel {
     public var genres: [String] { state.value?.genres ?? [] }
     /// Exact totals supplied by the server; older servers leave unknown counts blank.
     public var genreCounts: [String: Int] { changingQuery ? [:] : state.value?.genreCounts ?? [:] }
-    public var activeFilterCount: Int { (filter == .all ? 0 : 1) + (genre == nil ? 0 : 1) + (decade == nil ? 0 : 1) }
+    public var activeFilterCount: Int { (filter == .all ? 0 : 1) + (genre == nil ? 0 : 1) + (decade == nil ? 0 : 1) + (contentRatings.isEmpty ? 0 : 1) }
     public var letters: [LetterOffset] { sort == .title && !changingQuery ? state.value?.letters ?? [] : [] }
     public var sortLabel: String { "Sort: \(sort.label)" }
 
@@ -143,7 +158,7 @@ public final class LibraryModel {
     public var decadeChipLabel: String { decade.map(decadeLabel) ?? "Decade" }
 
     /// Anything narrowing the grid: a filter, genre, decade or title search.
-    public var isFiltered: Bool { filter != .all || genre != nil || decade != nil || queryText != nil }
+    public var isFiltered: Bool { filter != .all || genre != nil || decade != nil || !contentRatings.isEmpty || queryText != nil }
 
     /// "142 shows", the whole library, beside the title; "0 movies · 4 not
     /// matched yet" while files wait for a match.
@@ -164,6 +179,7 @@ public final class LibraryModel {
         var parts = [plural(grid.total, noun)]
         if let genre { parts.append("in \(genre)") }
         if let decade { parts.append("from the \(decadeLabel(decade))") }
+        if !contentRatings.isEmpty { parts.append("rated \(contentRatings.map(contentRatingName).joined(separator: " or "))") }
         if let text = queryText { parts.append("matching “\(text)”") }
         return parts.joined(separator: " ")
     }
@@ -377,6 +393,25 @@ public final class LibraryModel {
         await load(.change)
     }
 
+    /// The ratings the rating filter offers: the library's, from API level 34.
+    public var ratingOptions: [String] { state.value?.contentRatings ?? [] }
+
+    /// How many titles a rating has under the other filters; nil when the server doesn't say.
+    public func ratingCount(_ rating: String) -> Int? {
+        changingQuery ? nil : state.value?.contentRatingCounts?[rating]
+    }
+
+    /// A rating turned on or off in the rating filter; several may be on.
+    public func setRating(_ rating: String, on: Bool) async {
+        var chosen = contentRatings.filter { $0 != rating }
+        if on { chosen.append(rating) }
+        let order = ratingOptions
+        chosen.sort { (order.firstIndex(of: $0) ?? .max) < (order.firstIndex(of: $1) ?? .max) }
+        guard chosen != contentRatings else { return }
+        contentRatings = chosen
+        await load(.change)
+    }
+
     /// Picking the selected genre again clears it.
     public func toggleGenre(_ genre: String) async {
         self.genre = self.genre == genre ? nil : genre
@@ -393,6 +428,7 @@ public final class LibraryModel {
         filter = .all
         genre = nil
         decade = nil
+        contentRatings = []
         searchText = ""
         pendingSearch?.cancel()
         await load(.change)
@@ -431,6 +467,7 @@ public final class LibraryModel {
             current.items += page.items.filter { !known.contains($0.id) }
             current.total = page.total
             current.genreCounts = page.genreCounts
+            current.contentRatingCounts = page.contentRatingCounts ?? current.contentRatingCounts
             state = .loaded(current)
         } catch is CancellationError {
         } catch {
@@ -468,8 +505,7 @@ public final class LibraryModel {
             } else {
                 let page = try await library.items(query(id, offset: letter.offset, limit: pageSize))
                 guard loads.isCurrent(load) else { return }
-                state = .loaded(Grid(items: page.items, total: page.total, genres: page.genres, decades: page.decades,
-                                     summary: page.summary, letters: page.letters, genreCounts: page.genreCounts, offset: page.offset))
+                state = .loaded(Grid(page: page))
                 selectedLetter = letter.letter
                 scrollTargetID = page.items.first?.id
                 scrollRequestID += 1
@@ -555,7 +591,7 @@ public final class LibraryModel {
     }
 
     private func query(_ libraryID: Int, offset: Int, limit: Int) -> ItemQuery {
-        ItemQuery(libraryID: libraryID, sort: sort, filter: filter, genre: genre, decade: decade, text: queryText, offset: offset, limit: limit)
+        ItemQuery(libraryID: libraryID, sort: sort, filter: filter, genre: genre, decade: decade, text: queryText, offset: offset, limit: limit, contentRatings: contentRatings)
     }
 
     /// A load still running when another starts is cancelled.
@@ -582,7 +618,7 @@ public final class LibraryModel {
             defer { rowsTask?.cancel() }
             let page = try await self.items(id, offset: offset, count: limit)
             fetchedRows = await rowsTask?.value
-            return Grid(items: page.items, total: page.total, genres: page.genres, decades: page.decades, summary: page.summary, letters: page.letters, genreCounts: page.genreCounts, offset: page.offset)
+            return Grid(page: page)
         }
         guard let result else { return }
         changingQuery = false

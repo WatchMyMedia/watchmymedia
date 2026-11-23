@@ -159,7 +159,7 @@ private struct LibraryView: View {
                 sort.fixedSize()
                 if model.filters.contains(.unwatched) { unwatched.fixedSize() }
                 if !model.genres.isEmpty { genre.fixedSize() }
-                if !model.moreFilters.isEmpty || !model.decades(includingShows: true).isEmpty { moreFilters.fixedSize() }
+                if !model.moreFilters.isEmpty || !model.decades(includingShows: true).isEmpty || !model.ratingOptions.isEmpty { moreFilters.fixedSize() }
             }
         }
         .padding(.horizontal, TVLayout.gutter)
@@ -181,7 +181,7 @@ private struct LibraryView: View {
     }
 
     private var unwatched: some View {
-        Button(TVLibraryWords.unwatched) { Task { await model.setUnwatchedOnly(!model.unwatchedOnly) } }
+        Button(model.unwatchedChipLabel) { Task { await model.setUnwatchedOnly(!model.unwatchedOnly) } }
             .buttonStyle(TVChipStyle(selected: model.unwatchedOnly))
             .accessibilityIdentifier("library-unwatched")
     }
@@ -215,8 +215,17 @@ private struct LibraryView: View {
                     }
                 }
             }
+            // From API level 34: one switch a rating, any number on.
+            if !model.ratingOptions.isEmpty {
+                Section(TVLibraryWords.rating) {
+                    ForEach(model.ratingOptions, id: \.self) { rating in
+                        Toggle(model.ratingChoiceLabel(rating), isOn: Binding(get: { model.contentRatings.contains(rating) }, set: { on in Task { await model.setRating(rating, on: on) } }))
+                            .accessibilityLabel(model.ratingChoiceLabel(rating))
+                    }
+                }
+            }
         } label: {
-            Text(TVLibraryWords.moreFilters).font(.tv(.body, .semibold))
+            Text(model.moreFiltersLabel).font(.tv(.body, .semibold))
         }
         .buttonStyle(TVChipStyle(selected: model.moreFiltersOn))
         .accessibilityLabel(TVLibraryWords.moreFilters)
@@ -227,6 +236,7 @@ private struct LibraryView: View {
     /// What More filters has on, for VoiceOver: "Continuing, 2010s", or "None".
     private var moreFiltersValue: String {
         let on = (model.moreFilters.contains(model.filter) ? [model.filter.label] : []) + [model.decade.map(decadeLabel)].compactMap { $0 }
+            + model.contentRatings.map(contentRatingName)
         return on.isEmpty ? "None" : on.joined(separator: ", ")
     }
 
@@ -243,7 +253,7 @@ private struct LibraryView: View {
                 LazyVGrid(columns: columns, alignment: .leading, spacing: Self.rowSpacing) {
                     ForEach(grid.items) { item in
                         Button { model.open(item) } label: {
-                            GridPoster(item: item, imageURL: services.library.imageURL(item.posterPath, size: .w500))
+                            GridPoster(item: item, imageURL: services.library.imageURL(item.posterPath, size: .w500), line: item.tvGridLine())
                                 .overlay(alignment: .top) {
                                     // Where Select on the focused letter lands.
                                     if item.id == landingID {

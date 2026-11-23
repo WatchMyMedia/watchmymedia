@@ -199,6 +199,22 @@ extension BrowseItem {
     /// IDs come from different tables and can be equal.
     public var cardID: String { "\(kind.rawValue)-\(id)" }
 
+    /// A show's card on Apple TV: "2 episodes left · next on Thursday",
+    /// "All watched · next tomorrow"; nil for a movie, and from servers that
+    /// don't count what is left (below API level 34).
+    public func episodesLeftLine(today: Date = .now, calendar: Calendar = .current) -> String? {
+        guard kind == .show, let left = unwatchedCount else { return nil }
+        let count = left > 0 ? "\(plural(left, "episode")) left" : "All watched"
+        return [count, nextAirLine(nextAirDate, today: today, calendar: calendar)].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// The focused poster's line in Apple TV's grids: a show's episodes
+    /// left and when the next airs where the server counts them, else the
+    /// year and length as everywhere.
+    public func tvGridLine(today: Date = .now) -> String? {
+        episodesLeftLine(today: today) ?? gridSubtitle
+    }
+
     public var gridSubtitle: String? {
         if let subtitle { return subtitle }
         let line = [year.map(String.init), runtimeMin.map { formatDuration(ms: $0 * 60_000) }].compactMap { $0 }.joined(separator: " · ")
