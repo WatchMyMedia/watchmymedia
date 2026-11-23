@@ -2,6 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { movieQuery } from '../api/queries'
+import { Poster } from '../components/Poster'
+import { ArrowLeftIcon, PlayIcon } from '../components/icons'
+import { formatRuntime } from '../lib/format'
+import { clock } from '../lib/clock'
+import { otherTrailers } from '../lib/trailerList'
 import {
   PLAYER_ENDED,
   YOUTUBE_EMBED_ORIGIN,
@@ -21,8 +26,9 @@ const PLAYER_ID = 1
 /**
  * A movie's YouTube trailer, full screen: our bar on
  * top, YouTube's own player in a plain iframe below it, and nothing of ours
- * drawn over the video. When the owner keeps a video on YouTube, the next
- * trailer is tried, then the page says it can't play here.
+ * drawn over the video. Beside it, the movie's other trailers to choose
+ * from and the movie itself, to play. When the owner keeps a video on
+ * YouTube, the next trailer is tried, then the page says it can't play here.
  */
 export function TrailerPage({ movieId }: { movieId: number }) {
   const movie = useQuery(movieQuery(movieId))
@@ -111,43 +117,48 @@ export function TrailerPage({ movieId }: { movieId: number }) {
 
   const terms = (
     <>
-      Plays from YouTube ·{' '}
-      <a href={YOUTUBE_TERMS_URL} target="_blank" rel="noreferrer" className="whitespace-nowrap text-white/85 underline hover:text-white">
-        YouTube Terms of Service ↗<span className="sr-only"> (opens in a new tab)</span>
-      </a>
+      Trailers play in YouTube’s own player.{' '}
+      <a href={YOUTUBE_TERMS_URL} target="_blank" rel="noreferrer" className="whitespace-nowrap text-neutral-400 underline hover:text-white">
+        YouTube’s terms<span className="sr-only"> (opens in a new tab)</span>
+      </a>{' '}
+      apply.
     </>
   )
+  const list = otherTrailers(movie.data?.trailers, shown?.key)
+  const file = m?.files?.[0]
+  const facts = m ? [m.year ? String(m.year) : '', m.runtimeMin ? formatRuntime(m.runtimeMin) : '', m.contentRating ?? ''].filter(Boolean).join(' · ') : ''
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-black text-white">
-      <div className="flex flex-none items-center gap-3 border-b border-surface-2 px-4 py-3 md:gap-4 md:p-4">
-        <Link {...backLink} className="inline-flex min-h-11 shrink-0 items-center rounded-md border border-white/20 px-3 text-sm text-white hover:bg-white/10 md:min-h-9">
-          ‹ Back
+    <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-black text-white md:overflow-hidden">
+      <header className="flex h-16 flex-none items-center gap-3.5 px-3 md:h-[76px] md:px-7">
+        <Link {...backLink} aria-label={m ? `Back to ${m.title}` : 'Back'} className="grid size-12 shrink-0 place-items-center rounded-full text-neutral-100 hover:bg-white/15">
+          <ArrowLeftIcon size={22} />
         </Link>
-        <h1 className="min-w-0 flex-1 text-sm font-normal leading-snug text-white md:truncate">
-          {shown ? `${shown.name} · ${label}` : label}
-        </h1>
-        {playing && !blocked && <p className="hidden shrink-0 whitespace-nowrap text-[13px] text-white/65 md:block">{terms}</p>}
-      </div>
+        <div className="flex min-w-0 flex-col leading-tight">
+          {label && <span className="truncate text-[13.5px] text-neutral-300">{label}</span>}
+          <h1 className="truncate text-lg font-[650] md:text-xl">{shown ? shown.name : 'Trailer'}</h1>
+        </div>
+        {list.position && <span className="ml-auto hidden shrink-0 text-[13px] text-neutral-400 sm:block">{list.position}</span>}
+      </header>
 
-      {/* The player is the largest 16:9 box that fits under the bar; on phones it spans the width with the note under it. */}
-      <div className="flex min-h-0 flex-1 flex-col justify-center gap-4 md:items-center md:[container-type:size]">
-        {movie.isPending ? (
-          <p className="text-center text-sm text-white/65">Loading…</p>
-        ) : movie.isError ? (
-          <p className="px-4 text-center text-sm text-red-400">{movie.error.message}</p>
-        ) : !shown ? (
-          <p className="px-4 text-center text-sm text-white/65">This movie has no trailer to play.</p>
-        ) : blocked ? (
-          <Notice title="Reload the page to play this trailer">
-            <p className="text-sm text-neutral-400 md:text-[15px]">Trailers from YouTube were turned on after this page opened.</p>
-            <button type="button" onClick={() => window.location.reload()} className={secondary}>
-              Reload
-            </button>
-          </Notice>
-        ) : playing ? (
-          <>
-            <div className="relative aspect-video w-full md:w-[min(100cqw,calc(100cqh*16/9))]">
+      <div className="flex min-h-0 flex-1 flex-col gap-7 px-0 pb-10 md:flex-row md:px-12">
+        {/* The player is the largest 16:9 box that fits beside the list; on phones it spans the width. */}
+        <div className="flex min-h-0 min-w-0 flex-col justify-start md:flex-1 md:items-center md:[container-type:size]">
+          {movie.isPending ? (
+            <p className="px-4 text-center text-sm text-white/65">Loading…</p>
+          ) : movie.isError ? (
+            <p className="px-4 text-center text-sm text-red-400">{movie.error.message}</p>
+          ) : !shown ? (
+            <p className="px-4 text-center text-sm text-white/65">This movie has no trailer to play.</p>
+          ) : blocked ? (
+            <Notice title="Reload the page to play this trailer">
+              <p className="text-sm text-neutral-400 md:text-[15px]">Trailers from YouTube were turned on after this page opened.</p>
+              <button type="button" onClick={() => window.location.reload()} className={secondary}>
+                Reload
+              </button>
+            </Notice>
+          ) : playing ? (
+            <div className="relative aspect-video w-full overflow-hidden ring-1 ring-inset ring-white/10 md:w-[min(100cqw,calc(100cqh*16/9))] md:rounded-xl">
               <iframe
                 key={playing.key}
                 ref={frame}
@@ -160,28 +171,106 @@ export function TrailerPage({ movieId }: { movieId: number }) {
                 className="absolute inset-0 h-full w-full border-0"
               />
             </div>
-            <p className="px-4 text-[13px] leading-normal text-white/65 md:hidden">{terms}</p>
-          </>
-        ) : (
-          <Notice title="This trailer can’t play here">
-            <p className="text-sm text-neutral-400 md:text-[15px]">Its owner only lets it play on YouTube.</p>
-            <a href={watchUrl(shown.key)} target="_blank" rel="noreferrer" className={secondary}>
+          ) : (
+            <Notice title="This trailer can’t play here">
+              <p className="text-sm text-neutral-400 md:text-[15px]">Its owner only lets it play on YouTube.</p>
+              <a href={watchUrl(shown.key)} target="_blank" rel="noreferrer" className={secondary}>
+                Watch on YouTube ↗<span className="sr-only"> (opens in a new tab)</span>
+              </a>
+            </Notice>
+          )}
+        </div>
+
+        <aside aria-label="This movie’s trailers" className="flex min-w-0 flex-col gap-3.5 px-4 md:w-80 md:flex-none md:overflow-y-auto md:px-0">
+          {list.items.length > 1 && (
+            <>
+              <h2 className="text-xs font-bold uppercase tracking-[.08em] text-dim">More trailers</h2>
+              <ul className="-mx-2 flex flex-col gap-1.5">
+                {list.items.map((t) => (
+                  <li key={t.id}>
+                    {t.kind === 'youtube' ? (
+                      <button
+                        type="button"
+                        aria-pressed={t.current}
+                        onClick={() => {
+                          setRefused(false)
+                          setIndex(t.index)
+                        }}
+                        className={`flex w-full items-center gap-3 rounded-[10px] border p-2 text-left ${t.current ? 'border-accent bg-raise' : 'border-transparent hover:bg-surface-2'}`}
+                      >
+                        <TrailerTile />
+                        <span className="flex min-w-0 flex-col leading-snug">
+                          <span className="truncate text-sm font-semibold">{t.name}</span>
+                          <span className="text-[12.5px] text-neutral-400">{t.current ? 'Playing now' : 'From YouTube'}</span>
+                        </span>
+                      </button>
+                    ) : (
+                      <Link
+                        to="/play/$fileId"
+                        params={{ fileId: String(t.fileId) }}
+                        search={{ title: m ? `${m.title} · ${t.name}` : t.name, back: `/movies/${movieId}/trailer`, trailer: true }}
+                        className="flex w-full items-center gap-3 rounded-[10px] border border-transparent p-2 text-left hover:bg-surface-2"
+                      >
+                        <TrailerTile length={t.durationMs ? clock(t.durationMs) : undefined} />
+                        <span className="flex min-w-0 flex-col leading-snug">
+                          <span className="truncate text-sm font-semibold">{t.name}</span>
+                          <span className="text-[12.5px] text-neutral-400">In your library</span>
+                        </span>
+                      </Link>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {shown && (
+            <a href={watchUrl(shown.key)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 self-start text-[13.5px] text-neutral-300 hover:text-accent">
               Watch on YouTube ↗<span className="sr-only"> (opens in a new tab)</span>
             </a>
-          </Notice>
-        )}
+          )}
+          {m && (
+            <div className="mt-2 flex flex-col gap-3 md:mt-auto">
+              <div className="panel flex items-center gap-3 p-3">
+                <span className="w-[54px] shrink-0">
+                  <Poster path={m.posterPath} size="w154" alt="" className="rounded-md" />
+                </span>
+                <span className="flex min-w-0 flex-col leading-snug">
+                  <b className="truncate font-semibold">{m.title}</b>
+                  {facts && <span className="text-[12.5px] text-neutral-400">{facts}</span>}
+                  <span className="text-[12.5px] text-neutral-400">In your library</span>
+                </span>
+              </div>
+              {file && (
+                <Link to="/play/$fileId" params={{ fileId: String(file.id) }} search={{ title: m.title, back: `/movies/${movieId}` }} className="btn btn-primary btn-lg">
+                  <PlayIcon />
+                  Play the movie
+                </Link>
+              )}
+              {playing && !blocked && <p className="text-xs leading-normal text-dim">{terms}</p>}
+            </div>
+          )}
+        </aside>
       </div>
     </div>
   )
 }
 
-const secondary =
-  'mt-1.5 inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-line-2 bg-surface px-4 text-sm font-medium text-neutral-100 hover:bg-surface-2 md:mt-2 md:px-[18px]'
+/** A trailer's tile in the list: no picture of YouTube's is fetched, so a quiet tile with its length. */
+function TrailerTile({ length }: { length?: string }) {
+  return (
+    <span className="relative grid aspect-video w-28 shrink-0 place-items-center rounded-md bg-surface-2 text-neutral-400 ring-1 ring-inset ring-white/[.07]">
+      <PlayIcon size={18} />
+      {length && <span className="absolute bottom-1.5 right-1.5 rounded-[5px] bg-ground/80 px-[5px] py-px text-[11px] font-bold text-neutral-100">{length}</span>}
+    </span>
+  )
+}
+
+const secondary = 'btn mt-1.5 md:mt-2'
 
 /** What shows in the player's place when it can't play: the same 16:9 box, our words in it. */
 function Notice({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="flex aspect-video w-full flex-col items-center justify-center gap-2 bg-ground p-4 text-center md:w-[min(100cqw,calc(100cqh*16/9))] md:gap-3 md:p-8">
+    <div className="flex aspect-video w-full flex-col items-center justify-center gap-2 bg-ground p-4 text-center md:w-[min(100cqw,calc(100cqh*16/9))] md:gap-3 md:rounded-xl md:p-8">
       <h2 className="text-[17px] font-semibold md:text-[22px]">{title}</h2>
       {children}
     </div>

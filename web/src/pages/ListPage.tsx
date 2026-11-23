@@ -6,27 +6,28 @@ import { librariesQuery, mediaListEntriesQuery, mediaListQuery, useDeleteMediaLi
 import { requestOptionsQuery } from '../api/requests'
 import { Dialog } from '../components/Dialog'
 import { Icon, ListEntryCard } from '../components/ListEntryCard'
-import { Pager } from '../components/Pager'
+import { useListView } from '../components/ListHooks'
+import { ListFilters, ListMoreMenu, ListProgress } from '../components/ListParts'
 import { RequestDialog } from '../components/RequestDialog'
 import { WatchlistAction } from '../components/watchlists/WatchlistButton'
 import { relativeTime } from '../lib/format'
-import { canEditList, canRefresh, emptyListWords, inLibraryWords, isWatchlist, listCountWords, listMeta, retryWords, screenName, type MediaList, type MediaListEntry } from '../lib/mediaLists'
+import { listTally } from '../lib/listProgress'
+import { MAX_ENTRIES, canEditList, canRefresh, emptyListWords, isWatchlist, listMeta, notFoundWords, retryWords, screenName, type MediaList, type MediaListEntry } from '../lib/mediaLists'
 import type { ListSearch } from '../lib/routeSearch'
 import { screenTarget } from '../lib/screenRows'
 import { entryTitle } from '../lib/watchlists'
 import { useSettingsAccess } from './settings/shared'
 import { WatchlistPage } from './WatchlistPage'
 
-const PAGE = 100
-const b1 = 'inline-flex min-h-[40px] items-center justify-center rounded-md btn-primary px-4 text-sm font-semibold disabled:opacity-50'
-const b2 = 'inline-flex min-h-[40px] items-center justify-center gap-2 rounded-md border border-line-2 bg-surface px-4 text-sm font-medium hover:bg-surface-2 disabled:opacity-50'
 
 /**
  * A list's page, a list row's See all:
- * every title in the list's order. Those in
- * the library are the usual cards; missing ones are dimmed with TMDB's
- * poster and Request where the person may ask for them; imports TMDB
- * couldn't find are Not found.
+ * how much of it the person has and has watched, chips to narrow it, then
+ * every title in the list's order. Those in the library are the usual
+ * cards; missing ones are dimmed with TMDB's poster and Request where the
+ * person may ask for them; imports TMDB couldn't find are Not found. A list
+ * holds 250 titles at most, so the page asks for all of them at once and
+ * counts from them.
  */
 export function ListPage({ listId, search = {} }: { listId: number; search?: ListSearch }) {
   const list = useQuery(mediaListQuery(listId))
@@ -36,9 +37,9 @@ export function ListPage({ listId, search = {} }: { listId: number; search?: Lis
 
 function FetchedListPage({ listId }: { listId: number }) {
   const list = useQuery(mediaListQuery(listId))
-  const [offset, setOffset] = useState(0)
-  const entries = useQuery({ ...mediaListEntriesQuery(listId, offset, PAGE), enabled: list.isSuccess })
+  const entries = useQuery({ ...mediaListEntriesQuery(listId, 0, MAX_ENTRIES), enabled: list.isSuccess })
   const [requesting, setRequesting] = useState<MediaListEntry | null>(null)
+  const view = useListView(entries.data?.items ?? [])
 
   if (list.isPending) return <p className="text-neutral-400">Loading…</p>
   if (list.isError) {
@@ -54,26 +55,40 @@ function FetchedListPage({ listId }: { listId: number }) {
   }
   const l = list.data
   const e = entries.data
+  const tally = listTally(e?.items ?? [])
   return (
-    <div className="flex flex-col gap-6 pb-16">
-      <ListHeader list={l} inLibrary={e?.inLibrary ?? l.inLibrary} total={e?.total ?? l.entries} />
+    <div className="flex flex-col gap-[22px] pb-12">
+      <ListHeader list={l} />
       {l.error && <Failed list={l} />}
-      <CountLine list={l} total={e?.total ?? l.entries} inLibrary={e?.inLibrary ?? l.inLibrary} />
+      {e && e.items.length > 0 && <ListProgress tally={tally} />}
       {entries.isPending && <p className="text-neutral-400">Loading titles…</p>}
       {entries.isError && <p className="text-red-400">{entries.error.message}</p>}
-      {e && e.items.length === 0 && (
-        <p className="text-neutral-400">{emptyListWords(l)}</p>
-      )}
+      {e && e.items.length === 0 && <p className="text-neutral-400">{emptyListWords(l)}</p>}
       {e && e.items.length > 0 && (
-        <ol aria-label={`${l.name}, in order`} className={`grid grid-cols-3 gap-x-4 gap-y-5 md:grid-cols-5 xl:grid-cols-8 ${entries.isPlaceholderData ? 'opacity-60' : ''}`}>
-          {e.items.map((entry) => (
+        <div className="flex flex-col gap-3">
+          <ListFilters tally={tally} value={view.filter} onChange={view.setFilter}>
+            <span className="text-[13px] text-neutral-400 md:ml-auto">{view.showing} · in the list’s order</span>
+          </ListFilters>
+          <RequestNote list={l} />
+        </div>
+      )}
+      {e && view.shown.length > 0 && (
+        <ol aria-label={`${l.name}, in order`} className={`grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-x-3 gap-y-[18px] md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] md:gap-x-4 md:gap-y-[22px] ${entries.isPlaceholderData ? 'opacity-60' : ''}`}>
+          {view.shown.map((entry) => (
             <li key={entry.rank} className="flex min-w-0 flex-col">
               <ListEntryCard entry={entry} rank={entry.rank} onRequest={() => setRequesting(entry)} actions={entry.found && entryTitle(entry) ? <SaveMissing entry={entry} /> : undefined} />
             </li>
           ))}
         </ol>
       )}
-      {e && <Pager offset={offset} limit={PAGE} total={e.total} onChange={setOffset} />}
+      {e && view.of === 0 && e.items.length > 0 && <p className="text-neutral-400">Nothing here under this choice.</p>}
+      {view.more > 0 && (
+        <div className="flex justify-center pt-2.5">
+          <button type="button" onClick={view.showMore} className="btn">
+            Show {view.more.toLocaleString()} more
+          </button>
+        </div>
+      )}
       {requesting?.tmdbId && (requesting.mediaType === 'movie' || requesting.mediaType === 'tv') && (
         <RequestDialog mediaType={requesting.mediaType} tmdbId={requesting.tmdbId} onClose={() => setRequesting(null)} />
       )}
@@ -81,7 +96,7 @@ function FetchedListPage({ listId }: { listId: number }) {
   )
 }
 
-function ListHeader({ list, inLibrary, total }: { list: MediaList; inLibrary: number; total: number }) {
+function ListHeader({ list }: { list: MediaList }) {
   const refresh = useRefreshMediaList()
   const libraries = useQuery(librariesQuery)
   const [deleting, setDeleting] = useState(false)
@@ -94,56 +109,61 @@ function ListHeader({ list, inLibrary, total }: { list: MediaList; inLibrary: nu
     <div>
       <Link
         {...(target.to === '/' ? { to: '/' as const } : { to: target.to, search: { library: target.library } })}
-        className="-ml-1 inline-flex min-h-[44px] items-center gap-1 pr-2 text-sm text-neutral-300 hover:text-neutral-100"
+        className="-ml-1 inline-flex min-h-10 items-center gap-1 pr-2 text-[13.5px] text-neutral-400 hover:text-neutral-100"
       >
-        <Icon d="m15 18-6-6 6-6" />
+        <Icon d="m15 18-6-6 6-6" size={15} />
         {screenName(list.screen, libs)}
       </Link>
-      <div className="mt-1 flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
-        <div className="min-w-0 flex-[1_1_32rem]">
-          <p className="text-xs font-semibold uppercase tracking-[.06em] text-accent">List · {list.owner === 'everyone' ? 'For everyone' : 'Yours'}</p>
-          <h1 className="mt-1.5 text-[30px] font-bold leading-tight">{list.name}</h1>
-          <p className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-neutral-300">
+      <div className="mt-1 flex flex-wrap items-end gap-x-6 gap-y-4">
+        <div className="flex min-w-0 flex-[1_1_420px] flex-col gap-2">
+          <p className="eyebrow">List · {list.owner === 'everyone' ? 'For everyone' : 'Yours'}</p>
+          <h1 className="text-[28px] font-bold leading-[1.1] tracking-[-.02em] md:text-[34px]">{list.name}</h1>
+          <p className="meta">
             {meta.href ? (
-              <a href={meta.href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-neutral-100 underline underline-offset-[3px]">
-                {meta.from}
-                <Icon d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" size={13} />
-                <span className="sr-only"> (opens {new URL(meta.href).hostname.replace(/^www\./, '')})</span>
+              <a href={meta.href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-neutral-300 underline-offset-[3px] hover:text-accent hover:underline">
+                {meta.from} ↗<span className="sr-only"> (opens {new URL(meta.href).hostname.replace(/^www\./, '')})</span>
               </a>
             ) : (
               <span>{meta.from}</span>
             )}
-            <Sep />
             <span>{meta.updated}</span>
-            <Sep />
-            <span>{inLibraryWords(inLibrary, total)}</span>
-            <Sep />
             <span>{meta.type}</span>
+            {!!list.notFound && <span>{notFoundWords(list.notFound)}</span>}
           </p>
           {refreshError && (
-            <p role="alert" className="mt-2 text-sm text-warn">
+            <p role="alert" className="text-sm text-warn">
               {refreshError}
             </p>
           )}
         </div>
         {list.canEdit && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {fetched && (
-              <button type="button" disabled={!canRefresh(list) || refresh.isPending} onClick={() => refresh.mutate(list.id)} className={b2}>
+              <button type="button" disabled={!canRefresh(list) || refresh.isPending} onClick={() => refresh.mutate(list.id)} className="btn">
                 <Icon d="M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5" />
                 {list.fetching || refresh.isPending ? 'Refreshing…' : 'Refresh'}
               </button>
             )}
             {canEditList(list) && (
-              <Link to="/lists/$listId/edit" params={{ listId: String(list.id) }} className={b2}>
-                <Icon d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4" />
+              <Link to="/lists/$listId/edit" params={{ listId: String(list.id) }} className="btn">
                 Edit
               </Link>
             )}
-            <button type="button" onClick={() => setDeleting(true)} className={`${b2} text-red-300 hover:text-red-200`}>
-              <Icon d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
-              Delete
-            </button>
+            <ListMoreMenu label={`More for ${list.name}`}>
+              {(close) => (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    close()
+                    setDeleting(true)
+                  }}
+                  className="menu-item text-red-400 hover:text-red-300"
+                >
+                  Delete list…
+                </button>
+              )}
+            </ListMoreMenu>
           </div>
         )}
       </div>
@@ -184,32 +204,29 @@ function Failed({ list }: { list: MediaList }) {
   )
 }
 
-function CountLine({ list, total, inLibrary }: { list: MediaList; total: number; inLibrary: number }) {
+/** What Request does on this list, or why it isn't offered. */
+function RequestNote({ list }: { list: MediaList }) {
   const options = useQuery(requestOptionsQuery)
   const { admin } = useSettingsAccess()
-  const requests = !!(options.data?.movies || options.data?.shows)
+  if (list.source.kind === 'library' || !options.data) return null
+  const requests = !!(options.data.movies || options.data.shows)
   const imported = list.source.kind === 'import'
   return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
-      <p className="text-sm text-neutral-400">{listCountWords(total, inLibrary, list.notFound)}</p>
-      {list.source.kind !== 'library' && options.data && (
-        <p className="text-[13px] text-neutral-400">
-          {imported
-            ? 'Titles TMDB couldn’t find stay on the list as Not found.'
-            : requests
-              ? 'Request sends a missing title to the household’s requests, as Search does.'
-              : 'Requests aren’t set up on this server.'}
-          {!imported && !requests && admin && (
-            <>
-              {' '}
-              <Link to="/settings/integrations" className="text-neutral-300 underline">
-                Connect Radarr or Seerr in Settings › Integrations
-              </Link>
-            </>
-          )}
-        </p>
+    <p className="max-w-[76ch] text-[13px] text-neutral-400">
+      {imported
+        ? 'Titles TMDB couldn’t find stay on the list as Not found.'
+        : requests
+          ? 'Request sends a missing title to the household’s requests, as Search does. It joins this list’s row when it arrives; until then the row shows only what your library has.'
+          : 'Requests aren’t set up on this server.'}
+      {!imported && !requests && admin && (
+        <>
+          {' '}
+          <Link to="/settings/integrations" className="text-neutral-300 underline">
+            Connect Radarr or Seerr in Settings › Integrations
+          </Link>
+        </>
       )}
-    </div>
+    </p>
   )
 }
 
@@ -235,10 +252,10 @@ function DeleteListDialog({ list, onClose }: { list: MediaList; onClose: () => v
           </p>
         )}
         <div className="mt-6 flex flex-wrap justify-end gap-3">
-          <button type="button" onClick={onClose} className={b2}>
+          <button type="button" onClick={onClose} className="btn">
             Cancel
           </button>
-          <button type="button" disabled={del.isPending} onClick={() => del.mutate(list.id, { onSuccess: back })} className={b1}>
+          <button type="button" disabled={del.isPending} onClick={() => del.mutate(list.id, { onSuccess: back })} className="btn btn-primary">
             {del.isPending ? 'Deleting…' : 'Delete list'}
           </button>
         </div>
@@ -252,12 +269,4 @@ function SaveMissing({ entry }: { entry: MediaListEntry }) {
   const t = entryTitle(entry)
   if (!t || !entry.found) return null
   return <WatchlistAction target={{ ...t, title: entry.title, year: entry.year, posterPath: entry.posterPath }} title={entry.title} watchlisted={entry.watchlisted} />
-}
-
-function Sep() {
-  return (
-    <span aria-hidden="true" className="text-neutral-600">
-      ·
-    </span>
-  )
 }

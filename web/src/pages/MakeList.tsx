@@ -18,15 +18,25 @@ type Sources = components['schemas']['MediaListSources']
 type Library = components['schemas']['Library']
 type Preview = components['schemas']['MediaListPreview']
 
-const panel = 'rounded-xl border border-line bg-surface'
-const input = 'min-h-[44px] w-full rounded-md border border-line-2 bg-ground px-3 text-sm text-neutral-100 placeholder:text-neutral-500 disabled:opacity-50'
-const num = 'min-h-[44px] w-28 rounded-md border border-line-2 bg-ground px-3 text-sm text-neutral-100 placeholder:text-neutral-500 disabled:opacity-50'
-const b1 = 'inline-flex min-h-[44px] items-center justify-center rounded-md btn-primary px-5 text-sm font-semibold disabled:opacity-50'
-const b2 = 'inline-flex min-h-[44px] items-center justify-center gap-2 rounded-md border border-line-2 bg-surface px-4 text-sm font-medium hover:bg-surface-2'
-const hint = 'mt-1.5 text-[13px] leading-snug text-neutral-400'
+const input = 'min-h-10 w-full rounded-lg border border-line-2 bg-surface px-3 text-sm text-neutral-100 placeholder:text-neutral-500 disabled:opacity-50 max-md:min-h-11'
+const num = 'min-h-10 w-28 rounded-lg border border-line-2 bg-surface px-3 text-sm text-neutral-100 placeholder:text-neutral-500 disabled:opacity-50 max-md:min-h-11'
+const hint = 'mt-1.5 text-[12.5px] leading-snug text-neutral-400'
+const label = 'mb-1.5 block text-[13px] font-medium text-neutral-300'
+const step = 'text-[17px] font-[650] tracking-[-.01em]'
 
-const tabLines: Record<ListKind, string> = { tmdb: 'Charts and searches', mdblist: 'Lists that follow other charts', library: 'A saved filter', import: 'Paste or a file' }
+const tabLines: Record<ListKind, string> = {
+  tmdb: 'One of TMDB’s charts, a search of your own, or a TMDB list',
+  mdblist: 'Any public list on MDBList, followed as it changes',
+  library: 'A saved filter of your library, such as unwatched thrillers',
+  import: 'Paste titles or choose a file: IMDb, Letterboxd or a plain list',
+}
 const tabNames: Record<ListKind, string> = { tmdb: 'TMDB', mdblist: 'MDBList', library: 'Your library', import: 'Import' }
+const tabIcons: Record<ListKind, string> = {
+  tmdb: 'M4 19V9M10 19V5M16 19v-7M22 19H2',
+  mdblist: 'M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01',
+  library: 'M4 4h4v16H4zM10 4h4v16h-4zM16.5 4.5l3.8 1 -3.9 15-3.8-1z',
+  import: 'M12 3v12M7 10l5 5 5-5M4 21h16',
+}
 
 /** Make a list: its row goes at the top of screen. */
 export function MakeListPage({ screen, back }: { screen: string; back?: 'settings' }) {
@@ -133,26 +143,26 @@ function Builder({ screen, back, list, sources, libraries: libs }: { screen: str
   const typeAllowed = (t: MediaType) => (d.kind === 'tmdb' ? t !== 'all' : d.kind === 'library' ? t === mediaType : true)
 
   return (
-    <div className="mx-auto max-w-[84rem] pb-16">
-      <button type="button" onClick={() => leave(false)} className="-ml-1 inline-flex min-h-[44px] items-center gap-1 pr-2 text-sm text-neutral-300 hover:text-neutral-100">
+    <div className="pb-12">
+      <button type="button" onClick={() => leave(false)} className="-ml-1 inline-flex min-h-10 items-center gap-1 pr-2 text-[13.5px] text-neutral-400 hover:text-neutral-100">
         <Chevron />
         {backLabel}
       </button>
-      <h1 className="mt-1 text-[28px] font-bold">{list ? `Edit ${list.name}` : 'Make a list'}</h1>
-      <p className="mt-1.5 text-[15px] text-neutral-400">{list ? 'Change where it comes from, its name and how many titles it keeps.' : `Its row goes at the top of ${screenName}. Move it from there.`}</p>
+      <h1 className="mt-1 text-[28px] font-bold leading-[1.15] tracking-[-.02em] md:text-[32px]">{list ? `Edit ${list.name}` : 'Make a list'}</h1>
+      <p className="mt-1.5 max-w-[64ch] text-[14.5px] text-neutral-400">
+        {list ? 'Change where it comes from, its name and how many titles it keeps.' : `A list becomes a row at the top of ${screenName}, and keeps itself up to date. Move it from there.`}
+      </p>
 
-      <div className="mt-6 flex flex-wrap items-start gap-6">
-        <form className="flex min-w-0 flex-[999_1_36rem] flex-col gap-5" onSubmit={(e) => { e.preventDefault(); save() }}>
-          <section aria-labelledby="src-head" className={panel}>
-            <div className="px-5 pb-0 pt-4">
-              <h2 id="src-head" className="text-base font-semibold">Where it comes from</h2>
-              <p className="mt-1 text-sm leading-normal text-neutral-400">
-                The server fetches TMDB and MDBList lists in the background and keeps them up to date. Your library and imports never reach outside.
-              </p>
-            </div>
-            <div className="flex flex-col gap-5 px-5 pb-5 pt-4">
+      <div className="mt-[26px] flex flex-wrap items-start gap-x-10 gap-y-8">
+        <form className="flex min-w-0 flex-[999_1_560px] flex-col gap-[34px]" onSubmit={(e) => { e.preventDefault(); save() }}>
+          <section aria-labelledby="src-head">
+            <h2 id="src-head" className={step}>1 · Where it comes from</h2>
+            <p className="mt-1 max-w-[70ch] text-[13px] leading-normal text-neutral-400">
+              The server fetches TMDB and MDBList lists in the background and keeps them up to date. Your library and imports never reach outside.
+            </p>
+            <div className="mt-3.5 flex flex-col gap-[18px]">
               {!editing && (
-                <div role="radiogroup" aria-labelledby="src-head" className="grid grid-cols-2 gap-1 rounded-[10px] border border-line-2 bg-ground p-[3px] sm:grid-cols-4">
+                <div role="radiogroup" aria-labelledby="src-head" className="grid grid-cols-[repeat(auto-fit,minmax(min(200px,100%),1fr))] gap-3">
                   {known.map((s) => {
                     const kind = s.kind as ListKind
                     const on = d.kind === kind
@@ -163,10 +173,16 @@ function Builder({ screen, back, list, sources, libraries: libs }: { screen: str
                         role="radio"
                         aria-checked={on}
                         onClick={() => !on && setDraft(freshDraft(kind, screenLib?.type, libraryId, tmdbCharts))}
-                        className={`flex min-h-[56px] flex-col items-start gap-0.5 rounded-[7px] px-3 py-2 text-left text-sm font-semibold ${on ? 'bg-surface-2 text-neutral-100 ring-1 ring-inset ring-neutral-700' : 'text-neutral-400 hover:text-neutral-100'}`}
+                        className={`relative flex min-h-[122px] flex-col items-start gap-1.5 rounded-xl border p-3.5 text-left ${on ? 'border-accent bg-surface-2 ring-1 ring-inset ring-accent' : 'border-line-2 bg-surface hover:border-line-3'}`}
                       >
-                        {tabNames[kind]}
-                        <span className="text-xs font-normal text-neutral-400">{s.ready ? tabLines[kind] : 'Needs a key'}</span>
+                        <span aria-hidden="true" className={`absolute right-3.5 top-3.5 size-[18px] rounded-full border-2 ${on ? 'border-accent bg-[radial-gradient(circle,var(--color-accent)_0_42%,transparent_46%)]' : 'border-line-3'}`} />
+                        <span className={on ? 'text-accent' : 'text-neutral-400'}>
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d={tabIcons[kind]} />
+                          </svg>
+                        </span>
+                        <b className="text-[15px] font-semibold">{tabNames[kind]}</b>
+                        <small className="text-[13px] leading-[1.4] text-neutral-400">{s.ready ? tabLines[kind] : 'Needs a key'}</small>
                       </button>
                     )
                   })}
@@ -177,6 +193,12 @@ function Builder({ screen, back, list, sources, libraries: libs }: { screen: str
                   From <span className="text-neutral-200">{source?.name ?? tabNames[d.kind]}</span>. To change the source, make a new list.
                 </p>
               )}
+            </div>
+          </section>
+
+          <section aria-labelledby="what-head">
+            <h2 id="what-head" className={step}>2 · What goes in</h2>
+            <div className="mt-3.5 flex flex-col gap-[18px]">
               {blocked ? (
                 <NotReady source={source} admin={admin} />
               ) : (
@@ -195,16 +217,16 @@ function Builder({ screen, back, list, sources, libraries: libs }: { screen: str
             </div>
           </section>
 
-          <section aria-labelledby="about-head" className={panel}>
-            <h2 id="about-head" className="px-5 pt-4 text-base font-semibold">The list</h2>
-            <div className="flex flex-col gap-5 px-5 pb-5 pt-4">
-              <Field label="Name" className="max-w-md">
+          <section aria-labelledby="about-head">
+            <h2 id="about-head" className={step}>3 · The list</h2>
+            <div className="mt-3.5 flex flex-col gap-[18px]">
+              <Field label="Name" hint={named ? undefined : 'Suggested from your choices. Call it anything.'} className="max-w-[640px]">
                 {(id) => <input id={id} value={named ? name : suggested} maxLength={80} onChange={(e) => { setName(e.target.value); setNamed(true) }} className={input} />}
               </Field>
-              <div className="flex flex-wrap gap-x-6 gap-y-4">
+              <div className="flex flex-wrap items-start gap-x-7 gap-y-[18px]">
                 <div>
-                  <span id="type-lab" className="mb-2 block text-sm font-medium text-neutral-200">Shows</span>
-                  <div role="radiogroup" aria-labelledby="type-lab" className="inline-flex rounded-lg border border-line-2 bg-ground p-0.5">
+                  <span id="type-lab" className={label}>What it holds</span>
+                  <div role="radiogroup" aria-labelledby="type-lab" className="seg">
                     {typeChoices.map((t) => (
                       <button
                         key={t}
@@ -218,7 +240,7 @@ function Builder({ screen, back, list, sources, libraries: libs }: { screen: str
                           const offered = chartsFor(tmdbCharts, t)
                           edit({ mediaType: t, genres: [], chart: offered.includes(d.chart) ? d.chart : offered.includes('popular') ? 'popular' : offered[0] ?? '' })
                         }}
-                        className={`min-h-[40px] rounded-md px-3.5 text-sm disabled:cursor-default disabled:text-neutral-600 ${mediaType === t ? 'bg-surface-2 text-neutral-100 ring-1 ring-inset ring-neutral-700 disabled:text-neutral-300' : 'text-neutral-400 hover:text-neutral-100'}`}
+                        className="disabled:cursor-default disabled:opacity-45 aria-checked:disabled:opacity-100 max-md:min-h-10"
                       >
                         {t === 'all' ? 'Both' : mediaTypeLabel(t)}
                       </button>
@@ -235,7 +257,7 @@ function Builder({ screen, back, list, sources, libraries: libs }: { screen: str
                   </p>
                 </div>
                 <div>
-                  <label htmlFor="list-limit" className="mb-2 block text-sm font-medium text-neutral-200">
+                  <label htmlFor="list-limit" className={label}>
                     Keep up to
                   </label>
                   <span className="flex items-center gap-2 text-sm text-neutral-400">
@@ -260,13 +282,18 @@ function Builder({ screen, back, list, sources, libraries: libs }: { screen: str
                 </div>
               </div>
               {admin ? (
-                <fieldset>
-                  <legend className="mb-2 block text-sm font-medium text-neutral-200">Who sees it</legend>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <RadioCard name="who" checked={!shared} onChange={() => setShared(false)} title="For me" line="On your screens only" />
-                    <RadioCard name="who" checked={shared} onChange={() => setShared(true)} title="For everyone" line="On everyone’s Home until they hide it; members can add it too" />
+                <div>
+                  <span id="who-lab" className={label}>Who sees it</span>
+                  <div role="radiogroup" aria-labelledby="who-lab" className="seg">
+                    <button type="button" role="radio" aria-checked={!shared} onClick={() => setShared(false)} className="max-md:min-h-10">
+                      For me
+                    </button>
+                    <button type="button" role="radio" aria-checked={shared} onClick={() => setShared(true)} className="max-md:min-h-10">
+                      For everyone
+                    </button>
                   </div>
-                </fieldset>
+                  <p className={hint}>{shared ? 'Everyone gets it as a row they can move or hide; members can add it too.' : 'On your screens only.'}</p>
+                </div>
               ) : (
                 <p className="text-sm text-neutral-400">
                   Only you see your lists.{!editing && ` You’ve made ${sources.lists} of ${sources.maxLists}.`}
@@ -280,23 +307,23 @@ function Builder({ screen, back, list, sources, libraries: libs }: { screen: str
               {error.message}
             </p>
           )}
-          <div className="flex flex-wrap items-center gap-3">
-            <button type="submit" disabled={!canSave} className={b1}>
+          <div className="flex flex-wrap items-center gap-2.5 border-t border-line pt-[22px]">
+            <button type="submit" disabled={!canSave} className="btn btn-primary btn-lg">
               {saving ? 'Saving…' : editing ? 'Save changes' : 'Make list'}
             </button>
-            <button type="button" onClick={() => leave(false)} className={b2}>
+            <button type="button" onClick={() => leave(false)} className="btn btn-ghost btn-lg">
               Cancel
             </button>
           </div>
         </form>
 
-        <aside aria-labelledby="pv-head" className="min-w-0 max-w-[34rem] flex-[1_1_26rem] lg:sticky lg:top-20">
-          <section className={`${panel} px-5 pb-5 pt-4`}>
-            <div className="flex items-baseline justify-between gap-3">
-              <h2 id="pv-head" className="text-base font-semibold">
+        <aside aria-labelledby="pv-head" className="min-w-0 flex-[1_1_380px] lg:sticky lg:top-20">
+          <section className="panel p-[18px]">
+            <div className="rowh">
+              <h2 id="pv-head" className="!text-[17px]">
                 Preview
               </h2>
-              <span className="text-xs text-neutral-400">{preview.isFetching || (asked?.key !== key && !quiet) ? 'Looking…' : 'Updates as you change the options'}</span>
+              <span className="note">{preview.isFetching || (asked?.key !== key && !quiet) ? 'Looking…' : 'First 20, as the row will show them'}</span>
             </div>
             <PreviewBody
               d={d}
@@ -316,7 +343,7 @@ function Builder({ screen, back, list, sources, libraries: libs }: { screen: str
 function NotReady({ source, admin }: { source?: components['schemas']['MediaListSourceKind']; admin: boolean }) {
   const mdblist = source?.kind === 'mdblist'
   return (
-    <div role="status" className="flex items-start gap-3 rounded-[10px] border border-line-2 bg-ground px-4 py-3.5 text-sm leading-normal text-neutral-300">
+    <div role="status" className="panel flex items-start gap-3 px-4 py-3.5 text-sm leading-normal text-neutral-300">
       <LockIcon />
       <span className="flex-1">
         <span className="block font-semibold text-neutral-100">{source?.name ?? 'This source'} isn’t connected</span>
@@ -339,7 +366,7 @@ function Field({ label, hint: help, className = '', children }: { label: string;
   const id = useId()
   return (
     <div className={`min-w-0 ${className}`}>
-      <label htmlFor={id} className="mb-2 block text-sm font-medium text-neutral-200">
+      <label htmlFor={id} className="mb-1.5 block text-[13px] font-medium text-neutral-300">
         {label}
       </label>
       {children(id)}
@@ -350,7 +377,7 @@ function Field({ label, hint: help, className = '', children }: { label: string;
 
 function RadioCard({ name, checked, onChange, title, line }: { name: string; checked: boolean; onChange: () => void; title: string; line?: string }) {
   return (
-    <label className={`flex min-h-[44px] cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 ${checked ? 'border-accent bg-accent/5' : 'border-line-2'}`}>
+    <label className={`flex min-h-[44px] cursor-pointer items-start gap-2.5 rounded-[10px] border px-3 py-2.5 ${checked ? 'border-accent bg-surface-2' : 'border-line-2 bg-surface hover:border-line-3'}`}>
       <input type="radio" name={name} checked={checked} onChange={onChange} className="mt-px h-[18px] w-[18px] flex-none accent-accent" />
       <span className="flex flex-col gap-0.5 text-sm font-medium">
         {title}
@@ -369,7 +396,7 @@ function Chip({ on, onClick, disabled, role, children }: { on: boolean; onClick:
       aria-pressed={role ? undefined : on}
       disabled={disabled}
       onClick={onClick}
-      className={`inline-flex min-h-[36px] items-center rounded-full border px-3 text-sm disabled:opacity-45 ${on ? 'border-accent bg-accent/10 text-neutral-100' : 'border-line-2 text-neutral-400 hover:text-neutral-100'}`}
+      className="chip disabled:opacity-45 max-md:min-h-10"
     >
       {children}
     </button>
@@ -380,10 +407,10 @@ function Segmented<T extends string>({ label, options, value, onChange }: { labe
   const id = useId()
   return (
     <div>
-      <span id={id} className="mb-2 block text-sm font-medium text-neutral-200">
+      <span id={id} className="mb-1.5 block text-[13px] font-medium text-neutral-300">
         {label}
       </span>
-      <div role="radiogroup" aria-labelledby={id} className="inline-flex flex-wrap rounded-lg border border-line-2 bg-ground p-0.5">
+      <div role="radiogroup" aria-labelledby={id} className="seg flex-wrap">
         {options.map((o) => (
           <button
             key={o.value}
@@ -391,7 +418,7 @@ function Segmented<T extends string>({ label, options, value, onChange }: { labe
             role="radio"
             aria-checked={value === o.value}
             onClick={() => onChange(o.value)}
-            className={`min-h-[40px] rounded-md px-3.5 text-sm ${value === o.value ? 'bg-surface-2 text-neutral-100 ring-1 ring-inset ring-neutral-700' : 'text-neutral-400 hover:text-neutral-100'}`}
+            className="max-md:min-h-10"
           >
             {o.label}
           </button>
@@ -407,24 +434,24 @@ function TMDBOptions({ d, edit, charts, genres }: { d: SourceDraft; edit: (p: Pa
   const plainCharts = offered.filter((c) => tmdbMode(c) === 'chart')
   return (
     <>
-      <div role="radiogroup" aria-label="What on TMDB" className="flex flex-wrap gap-2">
-        <Chip role="radio" on={mode === 'chart'} onClick={() => mode !== 'chart' && edit({ chart: plainCharts.includes('popular') ? 'popular' : plainCharts[0] ?? '' })}>
-          A chart
-        </Chip>
+      <div role="radiogroup" aria-label="Start from" className="seg flex-wrap self-start">
+        <button type="button" role="radio" aria-checked={mode === 'chart'} onClick={() => mode !== 'chart' && edit({ chart: plainCharts.includes('popular') ? 'popular' : plainCharts[0] ?? '' })} className="max-md:min-h-10">
+          One of TMDB’s charts
+        </button>
         {offered.includes('discover') && (
-          <Chip role="radio" on={mode === 'discover'} onClick={() => edit({ chart: 'discover' })}>
-            Discover: your own search
-          </Chip>
+          <button type="button" role="radio" aria-checked={mode === 'discover'} onClick={() => edit({ chart: 'discover' })} className="max-md:min-h-10">
+            Build my own
+          </button>
         )}
         {(offered.includes('list') || offered.includes('collection')) && (
-          <Chip role="radio" on={mode === 'ref'} onClick={() => mode !== 'ref' && edit({ chart: offered.includes('list') ? 'list' : 'collection' })}>
+          <button type="button" role="radio" aria-checked={mode === 'ref'} onClick={() => mode !== 'ref' && edit({ chart: offered.includes('list') ? 'list' : 'collection' })} className="max-md:min-h-10">
             A TMDB list or collection
-          </Chip>
+          </button>
         )}
       </div>
       {mode === 'chart' && (
         <fieldset>
-          <legend className="mb-2 block text-sm font-medium text-neutral-200">Chart</legend>
+          <legend className="mb-1.5 block text-[13px] font-medium text-neutral-300">Chart</legend>
           <div className="grid gap-2 sm:grid-cols-2">
             {plainCharts.map((c) => (
               <RadioCard key={c} name="chart" checked={d.chart === c} onChange={() => edit({ chart: c })} title={chartLabel(c)} line={chartLine(c)} />
@@ -447,7 +474,7 @@ function TMDBOptions({ d, edit, charts, genres }: { d: SourceDraft; edit: (p: Pa
         <div className="flex flex-col gap-5">
           {genres.length > 0 && (
             <fieldset>
-              <legend className="mb-2 block text-sm font-medium text-neutral-200">Genres</legend>
+              <legend className="mb-1.5 block text-[13px] font-medium text-neutral-300">Genres</legend>
               <div className="flex flex-wrap gap-2">
                 {genres.map((g) => {
                   const on = d.genres.includes(g.id)
@@ -463,7 +490,7 @@ function TMDBOptions({ d, edit, charts, genres }: { d: SourceDraft; edit: (p: Pa
           )}
           <div className="flex flex-wrap gap-x-6 gap-y-4">
             <div>
-              <span className="mb-2 block text-sm font-medium text-neutral-200">Released</span>
+              <span className="mb-1.5 block text-[13px] font-medium text-neutral-300">Released</span>
               <span className="flex items-center gap-2 text-sm text-neutral-400">
                 <label>
                   <span className="sr-only">From year</span>
@@ -541,7 +568,7 @@ function LibraryOptions({ d, edit, libraries }: { d: SourceDraft; edit: (p: Part
         />
       )}
       <fieldset>
-        <legend className="mb-2 block text-sm font-medium text-neutral-200">Show</legend>
+        <legend className="mb-1.5 block text-[13px] font-medium text-neutral-300">Show</legend>
         <div className="flex flex-wrap gap-2">
           {filterOptions(type).map((f) => (
             <Chip key={f.value} on={d.filter === f.value} onClick={() => edit({ filter: f.value as ItemFilter })}>
@@ -603,8 +630,8 @@ function ImportOptions({ d, edit, preview }: { d: SourceDraft; edit: (p: Partial
   return (
     <div className="flex flex-col gap-3">
       <div>
-        <label htmlFor={textId} className="mb-2 block text-sm font-medium text-neutral-200">
-          Paste a list
+        <label htmlFor={textId} className="mb-1.5 block text-[13px] font-medium text-neutral-300">
+          Titles
         </label>
         <textarea
           id={textId}
@@ -612,11 +639,11 @@ function ImportOptions({ d, edit, preview }: { d: SourceDraft; edit: (p: Partial
           value={d.text}
           onChange={(e) => edit({ text: e.target.value, fileName: '' })}
           placeholder={'Blade Runner (1982)\ntt0083658\nhttps://www.themoviedb.org/movie/78'}
-          className="min-h-[156px] w-full resize-y rounded-md border border-line-2 bg-ground px-3 py-2.5 font-mono text-[13px] leading-normal text-neutral-100 placeholder:text-neutral-500"
+          className="min-h-[156px] w-full resize-y rounded-lg border border-line-2 bg-surface px-3 py-2.5 font-mono text-[13px] leading-normal text-neutral-100 placeholder:text-neutral-500"
         />
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <label className={`${b2} relative cursor-pointer overflow-hidden focus-within:ring-2 focus-within:ring-accent`}>
+        <label className="btn relative cursor-pointer overflow-hidden focus-within:ring-2 focus-within:ring-accent">
           Choose a file…
           <input
             type="file"
@@ -661,22 +688,12 @@ function PreviewBody({ d, preview: p, stale, error, empty, fromLine }: { d: Sour
       </p>
     )
   const first = p.items.slice(0, 20)
-  const pct = p.total ? Math.round((p.inLibrary / p.total) * 100) : 0
   return (
     <div className={stale ? 'opacity-60' : ''}>
-      <div className="mt-3">
-        <p aria-live="polite" className="text-xl font-bold">
-          {previewHaveWords(d.kind, p.inLibrary, p.total)}
-        </p>
-        <div aria-hidden="true" className="mt-2 h-1.5 overflow-hidden rounded-full bg-line-2">
-          <div className="h-full bg-accent" style={{ width: `${pct}%` }} />
-        </div>
-        <p className="mt-2 text-[13px] text-neutral-400">{fromLine}</p>
-      </div>
       {p.total === 0 ? (
         <p className="mt-4 text-sm text-neutral-400">The list is empty. Try other options.</p>
       ) : (
-        <ol aria-label="The first 20 titles" className="mt-4 grid grid-cols-4 gap-x-2.5 gap-y-3 sm:grid-cols-5">
+        <ol aria-label="The first 20 titles" className="mt-3.5 grid grid-cols-[repeat(auto-fill,minmax(70px,1fr))] gap-2.5">
           {first.map((e) => (
             <li key={e.rank} className="min-w-0">
               <PreviewEntry e={e} />
@@ -684,33 +701,38 @@ function PreviewBody({ d, preview: p, stale, error, empty, fromLine }: { d: Sour
           ))}
         </ol>
       )}
-      {previewRestWords(first.length, p.total, d.kind) && <p className="mt-4 text-[13px] text-neutral-400">{previewRestWords(first.length, p.total, d.kind)}</p>}
+      <p aria-live="polite" className="mt-4 flex items-center gap-2 text-sm font-medium">
+        <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center rounded-full bg-ground/80 text-accent ring-1 ring-inset ring-accent/70">
+          <CheckIcon />
+        </span>
+        {previewHaveWords(d.kind, p.inLibrary, p.total)}
+      </p>
+      <p className={hint}>{fromLine}</p>
+      {previewRestWords(first.length, p.total, d.kind) && <p className={hint}>{previewRestWords(first.length, p.total, d.kind)}</p>}
     </div>
   )
 }
 
+/** A preview title: its poster, bright with a tick when the library has it, dim when not; its words for a screen reader. */
 function PreviewEntry({ e }: { e: MediaListEntry }) {
-  const rank = <span className="absolute left-1 top-1 z-10 min-w-[18px] rounded bg-black/75 px-1 text-center text-[10px] font-bold">{e.rank}</span>
+  const words = `${e.rank}. ${e.title}${e.year ? ` (${e.year})` : ''}, ${!e.found ? 'not found on TMDB' : e.item ? 'in your library' : 'not in your library'}`
   if (!e.found)
     return (
-      <>
-        <span className="relative flex aspect-[2/3] items-center justify-center rounded-[5px] border border-dashed border-neutral-600 bg-ground p-1.5 text-center text-[11px] leading-tight text-neutral-400">
-          {rank}
-          {e.title}
-        </span>
-        <span className="mt-1 block truncate text-xs font-medium">{e.title}</span>
-        <span className="block truncate text-[11px] text-orange-300">Not found</span>
-      </>
+      <span role="img" aria-label={words} title={e.title} className="flex aspect-[2/3] items-center justify-center rounded-md border border-dashed border-line-3 p-1.5 text-center text-[10px] leading-tight text-neutral-400">
+        Not found
+      </span>
     )
   return (
-    <>
-      <span className={`relative block ${e.item ? '' : 'opacity-40 grayscale-[.6]'}`}>
-        {rank}
-        <Poster path={e.item?.posterPath ?? e.posterPath} alt="" size="w154" className="rounded-[5px] ring-1 ring-line-2" />
+    <span role="img" aria-label={words} title={e.title} className="relative block">
+      <span className={`block ${e.item ? '' : 'opacity-40'}`}>
+        <Poster path={e.item?.posterPath ?? e.posterPath} alt="" size="w154" className="rounded-md ring-1 ring-inset ring-white/[.07]" />
       </span>
-      <span className="mt-1 block truncate text-xs font-medium">{e.title}</span>
-      <span className="block truncate text-[11px] text-neutral-500">{e.item ? e.year || '' : 'Not in library'}</span>
-    </>
+      {e.item && (
+        <span aria-hidden="true" className="absolute right-[5px] top-[5px] grid size-[18px] place-items-center rounded-full bg-ground/80 text-accent ring-1 ring-inset ring-accent/70">
+          <CheckIcon size={11} />
+        </span>
+      )}
+    </span>
   )
 }
 
@@ -731,9 +753,9 @@ function LockIcon() {
   )
 }
 
-function CheckIcon() {
+function CheckIcon({ size = 13 }: { size?: number }) {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="m5 12 4 4 10-10" />
     </svg>
   )
