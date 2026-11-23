@@ -47,7 +47,7 @@ export function CastButton({ variant = 'header', notLive = false }: { variant?: 
   const device = cast.deviceName ?? 'a TV'
   const look = variant === 'player'
     ? `grid min-h-11 min-w-11 place-items-center rounded-md bg-white/10 px-3 hover:bg-white/20 ${connected ? 'text-accent' : 'text-white'} ${menu && connected ? 'ring-1 ring-inset ring-accent' : ''}`
-    : `grid h-9 w-9 place-items-center rounded-md border border-line-2 bg-surface hover:text-neutral-100 ${connected ? 'text-accent' : 'text-neutral-300'}`
+    : `ib ib-ghost ${connected ? 'text-accent' : ''}`
   return (
     <div ref={root} className="relative shrink-0">
       <button
@@ -87,14 +87,19 @@ export function CastButton({ variant = 'header', notLive = false }: { variant?: 
   )
 }
 
-/** "Casting to …" along the bottom of every page while the TV plays something. */
-export function CastBar() {
+/**
+ * "Casting to …" along the bottom of every page while the TV plays something.
+ * docked: it sits in the layout's foot, above the phone's section bar, which
+ * keeps it at the bottom; otherwise it keeps itself there.
+ */
+export function CastBar({ docked = false }: { docked?: boolean }) {
   const cast = useCast()
   const r = cast.receiver
-  if (cast.status === 'connected' && r?.live && (r.phase === 'playing' || r.phase === 'loading')) return <LiveCastBar cast={cast} receiver={r} live={r.live} />
+  const place = docked ? '' : 'sticky bottom-0 z-30'
+  if (cast.status === 'connected' && r?.live && (r.phase === 'playing' || r.phase === 'loading')) return <LiveCastBar cast={cast} receiver={r} live={r.live} place={place} />
   if (cast.status !== 'connected' || !r?.fileId || (r.phase !== 'playing' && r.phase !== 'loading')) return null
   return (
-    <div className="sticky bottom-0 z-30 border-t border-line bg-ground/95 backdrop-blur">
+    <div className={`${place} border-t border-line bg-ground/95 backdrop-blur`}>
       <div className="flex items-center gap-3 px-4 py-2 md:px-12">
         <span className="text-accent">
           <CastIcon connected />
@@ -119,7 +124,7 @@ export function CastBar() {
  * logo and episode line come from this page's channel list; the TV's state
  * carries text only.
  */
-function LiveCastBar({ cast, receiver: r, live }: { cast: CastSnapshot; receiver: StateMessage; live: LiveInfo }) {
+function LiveCastBar({ cast, receiver: r, live, place }: { cast: CastSnapshot; receiver: StateMessage; live: LiveInfo; place: string }) {
   const channels = useQuery(liveTVChannelsQuery)
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 30_000); return () => window.clearInterval(timer) }, [])
@@ -131,7 +136,7 @@ function LiveCastBar({ cast, receiver: r, live }: { cast: CastSnapshot; receiver
   const logo = channel.logoUrl && brokenLogo !== channel.logoUrl ? channel.logoUrl : undefined
   const name = [channel.number, channel.name].filter(Boolean).join(' ')
   return (
-    <div className="sticky bottom-0 z-30 border-t border-line bg-ground/95 backdrop-blur">
+    <div className={`${place} border-t border-line bg-ground/95 backdrop-blur`}>
       <div className="flex items-center gap-3 px-4 py-2 md:px-12">
         <span className="text-accent">
           <CastIcon connected />

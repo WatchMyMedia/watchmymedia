@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AXIS, GRID, MUTED } from './palette'
 import { compact } from './format'
 
@@ -39,16 +39,19 @@ export function StackedColumns({
   /** Name for screen readers. */
   label: string
 }) {
-  const box = useRef<HTMLDivElement>(null)
+  // The box is measured once it exists, and again whenever it changes size:
+  // drawn at a guess first, the chart would otherwise keep that width.
+  const [box, setBox] = useState<HTMLDivElement | null>(null)
   const [width, setWidth] = useState(640)
   const [active, setActive] = useState<number | null>(null)
   useEffect(() => {
-    const el = box.current
-    if (!el) return
-    const ro = new ResizeObserver(([e]) => setWidth(Math.max(200, Math.floor(e.contentRect.width))))
-    ro.observe(el)
+    if (!box) return
+    const measure = (w: number) => setWidth(Math.max(200, Math.floor(w)))
+    measure(box.clientWidth)
+    const ro = new ResizeObserver(([e]) => measure(e.contentRect.width))
+    ro.observe(box)
     return () => ro.disconnect()
-  }, [])
+  }, [box])
 
   const n = buckets.length
   const totals = buckets.map((_, i) => series.reduce((s, x) => s + (x.values[i] ?? 0), 0))
@@ -73,18 +76,18 @@ export function StackedColumns({
   return (
     <div className="space-y-2">
       {!single && (
-        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
           {series.map((s) => (
-            <li key={s.key} className="flex items-center gap-1.5 text-neutral-300">
-              <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} />
+            <li key={s.key} className="flex items-center gap-[7px] text-neutral-300">
+              <span className="inline-block size-3 rounded-[3px]" style={{ background: s.color }} />
               {s.label}
-              <span className="text-neutral-500">{format(s.values.reduce((a, b) => a + b, 0))}</span>
+              <span className="text-neutral-400">{format(s.values.reduce((a, b) => a + b, 0))}</span>
             </li>
           ))}
         </ul>
       )}
       <div
-        ref={box}
+        ref={setBox}
         className="relative outline-none focus-visible:ring-2 focus-visible:ring-accent"
         tabIndex={0}
         role="group"
@@ -141,7 +144,7 @@ export function StackedColumns({
               <g key={b}>
                 {segs}
                 {i === peak && (
-                  <text x={x + colW / 2} y={y(max) - 5} textAnchor="middle" fontSize={11} fill="#c3c2b7">
+                  <text x={x + colW / 2} y={y(max) - 5} textAnchor="middle" fontSize={11} fill="#f5f5f5">
                     {format(max)}
                   </text>
                 )}

@@ -15,25 +15,23 @@ function useDebounced<T>(value: T, ms: number): T {
   return settled
 }
 
-const styles = {
-  bar: {
-    form: 'relative ml-auto hidden min-w-0 flex-1 justify-end sm:flex',
-    input: 'min-h-[36px] w-full max-w-xs rounded-md border border-line-2 bg-surface px-3 text-sm placeholder:text-neutral-500',
-  },
-  page: {
-    form: 'relative sm:hidden',
-    input: 'min-h-[44px] w-full rounded-md border border-line-2 bg-surface px-3 text-base placeholder:text-neutral-500',
-  },
+const formClass = 'relative ml-auto flex min-h-10 min-w-0 flex-[0_1_420px] items-center gap-2 rounded-[10px] border border-line-2 bg-surface pl-3 pr-2.5 text-neutral-400 focus-within:border-line-3'
+const inputClass = 'min-w-0 flex-1 border-0 bg-transparent text-sm text-neutral-100 outline-none placeholder:text-neutral-400'
+
+/** Whether a key press landed in something that takes typing, where / is a character, not a shortcut. */
+function typingIn(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null
+  return !!el && (el.isContentEditable || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')
 }
 
 /**
  * Search with suggestions from the library as you type. A suggestion opens
  * its title or episode; Enter, or the last row, opens the Search page for the
  * words typed, which draws from the same request, so it is there at once.
- * `bar` is the app bar's box (from `sm` up); `page` is the Search page's own
- * box on phones, whose app bar has only a button.
+ * It is the app bar's box, at every width, which / focuses from anywhere on
+ * the page; on the Search page it starts with that page's words.
  */
-export function SearchBox({ variant, initial = '' }: { variant: 'bar' | 'page'; initial?: string }) {
+export function SearchBox({ initial = '', liveTV = false }: { initial?: string; liveTV?: boolean }) {
   const navigate = useNavigate()
   const [text, setText] = useState(initial)
   const [open, setOpen] = useState(false)
@@ -59,6 +57,17 @@ export function SearchBox({ variant, initial = '' }: { variant: 'bar' | 'page'; 
     if (active >= 0) document.getElementById(`${id}-option-${active}`)?.scrollIntoView({ block: 'nearest' })
   }, [active, id])
 
+  // / goes to the bar's box from anywhere that isn't taking typing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey || typingIn(e.target)) return
+      e.preventDefault()
+      input.current?.focus()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
+
   const close = () => {
     setOpen(false)
     setActive(-1)
@@ -72,7 +81,7 @@ export function SearchBox({ variant, initial = '' }: { variant: 'bar' | 'page'; 
   return (
     <form
       role="search"
-      className={styles[variant].form}
+      className={formClass}
       onSubmit={(e) => {
         e.preventDefault()
         if (showList && active >= 0) {
@@ -84,6 +93,10 @@ export function SearchBox({ variant, initial = '' }: { variant: 'bar' | 'page'; 
         void navigate({ to: '/search', search: { q: typed } })
       }}
     >
+      <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="shrink-0">
+        <circle cx="8.5" cy="8.5" r="5.5" />
+        <path d="m13 13 4.5 4.5" />
+      </svg>
       <input
         ref={input}
         type="search"
@@ -103,9 +116,11 @@ export function SearchBox({ variant, initial = '' }: { variant: 'bar' | 'page'; 
           } else if (e.key === 'Escape' && showList) {
             e.preventDefault()
             close()
+          } else if (e.key === 'Escape') {
+            input.current?.blur()
           }
         }}
-        placeholder="Search"
+        placeholder={liveTV ? 'Search your library and live TV' : 'Search your library'}
         aria-label="Search titles"
         role="combobox"
         aria-autocomplete="list"
@@ -113,15 +128,17 @@ export function SearchBox({ variant, initial = '' }: { variant: 'bar' | 'page'; 
         aria-controls={listId}
         aria-activedescendant={showList && active >= 0 ? optionId(active) : undefined}
         autoComplete="off"
-        autoFocus={variant === 'page' && !initial}
         enterKeyHint="search"
-        className={styles[variant].input}
+        className={inputClass}
       />
+      <kbd aria-hidden="true" className="hidden h-[22px] min-w-[22px] place-items-center rounded-[5px] border border-line-3 px-1.5 font-sans text-[11px] font-semibold text-neutral-400 md:inline-grid">
+        /
+      </kbd>
       {showList && (
         // Pressing a row mustn't take focus from the box, or it closes before the click lands.
         <div
           onMouseDown={(e) => e.preventDefault()}
-          className="absolute right-0 top-full z-40 mt-1 max-h-[calc(100vh-5rem)] w-full overflow-y-auto rounded-lg border border-line-2 bg-surface p-1 text-sm shadow-xl sm:w-[26rem]"
+          className="absolute right-0 top-full z-40 mt-1 max-h-[calc(100vh-5rem)] w-full overflow-y-auto rounded-lg border border-line-2 bg-surface p-1 text-sm shadow-xl sm:min-w-[26rem]"
         >
           {rows.length === 0 && (
             <p role="status" className="px-3 py-2.5 text-neutral-400">

@@ -7,7 +7,7 @@ import { mediaListEntriesQuery, mediaListQuery } from '../api/queries'
 import { watchlistsQuery } from '../api/watchlists'
 import { AuthContext, type AuthContextValue } from '../authContext'
 import { WatchlistButton } from '../components/watchlists/WatchlistButton'
-import type { MediaList, MediaListEntry } from '../lib/mediaLists'
+import { MAX_ENTRIES, type MediaList, type MediaListEntry } from '../lib/mediaLists'
 import type { Watchlist } from '../lib/watchlists'
 import { ListPage } from './ListPage'
 
@@ -51,7 +51,7 @@ async function draw(node: ReactNode): Promise<string> {
 
 function page(l: MediaList, items: MediaListEntry[], view: { mediaType?: 'movie' | 'tv' } = {}) {
   qc.setQueryData(mediaListQuery(l.id).queryKey, l)
-  qc.setQueryData(mediaListEntriesQuery(l.id, 0, 100, view).queryKey, { items, total: items.length, inLibrary: items.filter((e) => e.item).length, offset: 0, limit: 100 })
+  qc.setQueryData(mediaListEntriesQuery(l.id, 0, MAX_ENTRIES, view).queryKey, { items, total: items.length, inLibrary: items.filter((e) => e.item).length, offset: 0, limit: MAX_ENTRIES })
   return draw(<ListPage listId={l.id} search={{ type: view.mediaType }} />)
 }
 

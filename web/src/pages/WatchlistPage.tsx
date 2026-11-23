@@ -5,21 +5,22 @@ import { mediaListEntriesQuery } from '../api/queries'
 import { holdRemoval, isHeld, useDeleteWatchlist, useHeldRemovals, useUpdateWatchlist, watchlistsQuery } from '../api/watchlists'
 import { Dialog } from '../components/Dialog'
 import { Icon, ListEntryCard } from '../components/ListEntryCard'
+import { ListProgress } from '../components/ListParts'
 import { Pager } from '../components/Pager'
 import { RequestDialog } from '../components/RequestDialog'
 import { BookmarkIcon } from '../components/watchlists/WatchlistPicker'
 import { WatchlistNameDialog } from '../components/watchlists/WatchlistNameDialog'
 import { showWatchlistFailure } from '../components/watchlists/useWatchlistToggle'
-import type { MediaList, MediaListEntry } from '../lib/mediaLists'
+import { listTally } from '../lib/listProgress'
+import { MAX_ENTRIES, type MediaList, type MediaListEntry } from '../lib/mediaLists'
 import type { ListSearch } from '../lib/routeSearch'
 import { showToast } from '../lib/toast'
 import {
   deleteWords, emptyFilterWords, emptyWatchlist, entryTitle, failureWords, removedMessage, switchWords, watchlistCounts, watchlistFilters, watchlistSorts, withoutHeld, type WatchlistSort, type WatchlistType,
 } from '../lib/watchlists'
 
-const PAGE = 100
-const b1 = 'inline-flex min-h-11 items-center justify-center rounded-md btn-primary px-5 text-sm font-semibold disabled:opacity-50 max-sm:flex-1'
-const b2 = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-line-2 bg-surface px-4 text-sm font-medium hover:bg-surface-2 disabled:opacity-50'
+// A page holds as many titles as the server sends at once, so most watchlists are one page and their counts are exact.
+const PAGE = MAX_ENTRIES
 
 /**
  * A watchlist's page, its row's See all: every title on it, newest saved
@@ -52,34 +53,31 @@ export function WatchlistPage({ list, search }: { list: MediaList; search: ListS
     showToast({ text: removedMessage(list.name), icon: 'removed', undo: h.undo, done: () => void h.commit() })
   }
 
+  // Watched is counted from the titles on the page: only when the page holds them all.
+  const whole = !!shown && !search.type && shown.items.length >= shown.total && shown.total > 0
   return (
-    <div className="flex flex-col gap-6 pb-16">
+    <div className="flex flex-col gap-[22px] pb-12">
       <Header list={list} total={total} inLibrary={inLibrary} />
+      {whole && <ListProgress tally={listTally(shown.items)} />}
       <RemoveSwitch list={list} />
       {total === 0 && !entries.isPending ? (
         <Empty />
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
             <div role="group" aria-label="Show" className="flex flex-wrap gap-2">
               {watchlistFilters.map((f) => (
-                <button
-                  key={f.label}
-                  type="button"
-                  aria-pressed={search.type === f.value}
-                  onClick={() => choose({ type: f.value })}
-                  className={`min-h-9 rounded-full border px-3 text-sm max-sm:min-h-11 max-sm:px-3.5 ${search.type === f.value ? 'border-accent text-neutral-100' : 'border-line-2 text-neutral-400 hover:text-neutral-200'}`}
-                >
+                <button key={f.label} type="button" aria-pressed={search.type === f.value} onClick={() => choose({ type: f.value })} className="chip max-md:min-h-10">
                   {f.label}
                 </button>
               ))}
             </div>
-            <label className="ml-auto flex items-center gap-2 text-sm text-neutral-400">
+            <label className="ml-auto flex items-center gap-2 text-[13px] text-neutral-400">
               Sort
               <select
                 value={search.sort ?? 'added'}
                 onChange={(e) => choose({ sort: e.target.value === 'added' ? undefined : (e.target.value as WatchlistSort) })}
-                className="min-h-9 rounded-md border border-line-2 bg-surface px-2 text-sm text-neutral-100 max-sm:min-h-11"
+                className="min-h-[34px] rounded-lg border border-line-2 bg-surface pl-3 pr-2 text-[13px] font-semibold text-neutral-100 max-md:min-h-10"
               >
                 {watchlistSorts.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -93,7 +91,7 @@ export function WatchlistPage({ list, search }: { list: MediaList; search: ListS
           {entries.isError && <p className="text-red-400">{entries.error.message}</p>}
           {shown && shown.items.length === 0 && search.type && <p className="text-neutral-400">{emptyFilterWords(search.type as WatchlistType)}</p>}
           {shown && shown.items.length > 0 && (
-            <ul aria-label={`${list.name}, ${sortWords(search.sort)}`} className={`grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] ${entries.isPlaceholderData ? 'opacity-60' : ''}`}>
+            <ul aria-label={`${list.name}, ${sortWords(search.sort)}`} className={`grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-x-3 gap-y-[18px] md:grid-cols-[repeat(auto-fill,minmax(150px,1fr))] md:gap-x-4 md:gap-y-[22px] ${entries.isPlaceholderData ? 'opacity-60' : ''}`}>
               {shown.items.map((entry) => (
                 <li key={`${entry.mediaType}-${entry.tmdbId ?? entry.rank}`} className="group relative flex min-w-0 flex-col">
                   <ListEntryCard entry={entry} onRequest={() => setRequesting(entry)} />
@@ -102,7 +100,7 @@ export function WatchlistPage({ list, search }: { list: MediaList; search: ListS
                       type="button"
                       onClick={() => remove(entry)}
                       aria-label={`Remove ${entry.item?.title ?? entry.title} from ${list.name}`}
-                      className="absolute right-1.5 top-1.5 z-20 inline-flex min-h-7 items-center gap-1 rounded-md border border-neutral-600 bg-ground/90 pl-1.5 pr-2 text-xs font-semibold opacity-0 hover:border-accent hover:text-accent focus-visible:opacity-100 group-hover:opacity-100 max-sm:min-h-9 max-sm:opacity-100"
+                      className="absolute right-2 top-2 z-20 inline-flex min-h-7 items-center gap-1 rounded-md border border-line-3 bg-ground/90 pl-1.5 pr-2 text-xs font-semibold opacity-0 hover:border-accent hover:text-accent focus-visible:opacity-100 group-hover:opacity-100 max-md:min-h-9 max-md:opacity-100"
                     >
                       <Icon d="M6 6l12 12M18 6 6 18" size={12} />
                       Remove
@@ -133,23 +131,21 @@ function Header({ list, total, inLibrary }: { list: MediaList; total: number; in
   const [acting, setActing] = useState<'rename' | 'delete' | null>(null)
   return (
     <div>
-      <Link to="/watchlists" className="-ml-1 inline-flex min-h-[44px] items-center gap-1 pr-2 text-sm text-neutral-300 hover:text-neutral-100">
-        <Icon d="m15 18-6-6 6-6" />
-        Watchlists
+      <Link to="/watchlists" className="-ml-1 inline-flex min-h-10 items-center gap-1 pr-2 text-[13.5px] text-neutral-400 hover:text-neutral-100">
+        <Icon d="m15 18-6-6 6-6" size={15} />
+        My lists
       </Link>
-      <div className="mt-1 flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
-        <div className="min-w-0 flex-[1_1_16rem]">
-          <p className="text-xs font-semibold uppercase tracking-[.06em] text-accent">Watchlist</p>
-          <h1 className="mt-1.5 break-words text-[30px] font-bold leading-tight">{list.name}</h1>
-          {total > 0 && <p className="mt-2 text-sm text-neutral-300">{watchlistCounts({ titles: total, inLibrary })}</p>}
+      <div className="mt-1 flex flex-wrap items-end gap-x-6 gap-y-4">
+        <div className="flex min-w-0 flex-[1_1_16rem] flex-col gap-2">
+          <p className="eyebrow">Watchlist</p>
+          <h1 className="break-words text-[28px] font-bold leading-[1.1] tracking-[-.02em] md:text-[34px]">{list.name}</h1>
+          {total > 0 && <p className="text-sm text-neutral-300">{watchlistCounts({ titles: total, inLibrary })}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => setActing('rename')} className={b2}>
-            <Icon d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4" />
+          <button type="button" onClick={() => setActing('rename')} className="btn">
             Rename
           </button>
-          <button type="button" onClick={() => setActing('delete')} className={`${b2} text-red-300 hover:text-red-200`}>
-            <Icon d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+          <button type="button" onClick={() => setActing('delete')} className="btn text-red-400 hover:text-red-300">
             Delete
           </button>
         </div>
@@ -179,7 +175,7 @@ function RemoveSwitch({ list }: { list: MediaList }) {
   const update = useUpdateWatchlist()
   const on = !!list.removeWatched
   return (
-    <div className="flex max-w-[46rem] items-start gap-3.5 rounded-[10px] border border-line bg-surface px-4 py-3">
+    <div className="panel flex max-w-[46rem] items-start gap-3.5 px-4 py-3">
       <button
         type="button"
         role="switch"
@@ -222,10 +218,10 @@ function DeleteDialog({ list, inLibrary, onClose }: { list: MediaList; inLibrary
           </p>
         )}
         <div className="mt-6 flex flex-wrap justify-end gap-3">
-          <button type="button" onClick={onClose} className={`${b2} max-sm:flex-1`}>
+          <button type="button" onClick={onClose} className="btn max-sm:flex-1">
             Cancel
           </button>
-          <button type="button" disabled={del.isPending} onClick={() => del.mutate(list.id, { onSuccess: () => void navigate({ to: '/watchlists' }) })} className={b1}>
+          <button type="button" disabled={del.isPending} onClick={() => del.mutate(list.id, { onSuccess: () => void navigate({ to: '/watchlists' }) })} className="btn btn-primary max-sm:flex-1">
             {del.isPending ? 'Deleting…' : 'Delete'}
           </button>
         </div>
@@ -236,8 +232,8 @@ function DeleteDialog({ list, inLibrary, onClose }: { list: MediaList; inLibrary
 
 function Empty() {
   return (
-    <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-neutral-700 px-6 py-16 text-center">
-      <BookmarkIcon size={32} className="text-neutral-500" />
+    <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-line-3 px-6 py-16 text-center">
+      <BookmarkIcon size={32} className="text-neutral-400" />
       <h2 className="mt-2 text-xl font-semibold">{emptyWatchlist.title}</h2>
       <p className="max-w-[28rem] text-sm leading-normal text-neutral-400">{emptyWatchlist.detail}</p>
     </div>

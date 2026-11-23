@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react'
 import type { LinkProps } from '@tanstack/react-router'
+import { movieLine } from '../../lib/cardFacts'
 import { attribution, drawable, posterSubtitle, seeAllTarget, seeAllWords, titleParts, type ScreenRow, type SeeAllTarget } from '../../lib/screenRows'
 import { ContinueCard } from '../ContinueCard'
 import { EpisodeCard } from '../EpisodeCard'
@@ -11,15 +13,27 @@ type LibraryRef = { id: number; type: string }
 
 /**
  * A screen's rows in the person's order, each drawn by its style.
- * Rows with nothing in them, live (the web has no
- * Live TV row yet) and styles the web doesn't know draw nothing.
+ * Rows with nothing in them and styles the web doesn't know draw nothing.
+ * live is drawn by the screen (Home's On now) where the person put it, when
+ * the screen gives one; skip leaves out rows the screen draws elsewhere
+ * (Home's Continue watching, which leads the page).
  */
-export function ScreenRows({ rows, libraries, screenType }: { rows: readonly ScreenRow[]; libraries: readonly LibraryRef[]; screenType?: 'movie' | 'tv' }) {
+export function ScreenRows({ rows, libraries, screenType, live, skip = [], className }: { rows: readonly ScreenRow[]; libraries: readonly LibraryRef[]; screenType?: 'movie' | 'tv'; live?: (row: ScreenRow) => ReactNode; skip?: readonly string[]; className?: string }) {
   return (
     <>
-      {rows.filter(drawable).map((row) => (
-        <ScreenRowView key={row.id} row={row} libraries={libraries} screenType={screenType} />
-      ))}
+      {rows
+        .filter((row) => !skip.includes(row.id) && (drawable(row) || (row.style === 'live' && !!live)))
+        .map((row) =>
+          row.style === 'live' && live ? (
+            <div key={row.id} className={className}>
+              {live(row)}
+            </div>
+          ) : (
+            <div key={row.id} className={className}>
+              <ScreenRowView row={row} libraries={libraries} screenType={screenType} />
+            </div>
+          ),
+        )}
     </>
   )
 }
@@ -41,7 +55,7 @@ function ScreenRowView({ row, libraries, screenType }: { row: ScreenRow; librari
       {row.style === 'continue' && row.continue?.map((c) => <ContinueCard key={`${c.kind}-${c.fileId}`} item={c} />)}
       {row.style === 'episode' && row.episodes?.map((ep) => <EpisodeCard key={ep.episodeId} ep={ep} />)}
       {row.style === 'wide' && row.items?.map((it) => <ReleasedCard key={`${it.kind}-${it.id}`} item={it} />)}
-      {row.style === 'poster' && row.items?.map((it) => <PosterCard key={`${it.kind}-${it.id}`} item={it} inRow subtitle={posterSubtitle(row, it)} />)}
+      {row.style === 'poster' && row.items?.map((it) => <PosterCard key={`${it.kind}-${it.id}`} item={it} inRow subtitle={(it.kind === 'movie' && movieLine(it)) || posterSubtitle(row, it)} />)}
       {link && words && shape && <SeeAllCard key="see-all" link={link} words={words} shape={shape} list={target.kind === 'list'} />}
     </Row>
   )

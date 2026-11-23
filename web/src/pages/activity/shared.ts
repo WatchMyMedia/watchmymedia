@@ -61,14 +61,15 @@ export function when(iso: string): string {
   return `${d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' })}, ${time}`
 }
 
-export type StatsSearch = { days?: number; by?: 'time'; user?: number }
+/** Stats' choices in the address; time watched is the default measure, so by names plays only. */
+export type StatsSearch = { days?: number; by?: 'plays'; user?: number }
 
 export function validateStatsSearch(s: Record<string, unknown>): StatsSearch {
   const days = Number(s.days)
   const user = Number(s.user)
   return {
     days: [7, 30, 90, 365, 0].includes(days) && s.days !== undefined && s.days !== '' ? days : undefined,
-    by: s.by === 'time' ? 'time' : undefined,
+    by: s.by === 'plays' ? 'plays' : undefined,
     user: Number.isFinite(user) && user > 0 ? user : undefined,
   }
 }

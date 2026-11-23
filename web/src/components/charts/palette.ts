@@ -1,33 +1,38 @@
 /**
- * Chart colours for the dark surface (bg-surface, #151517). The first three
- * categorical slots of the reference palette's dark steps, in its fixed
- * order; validated all-pairs against #151517 (worst CVD ΔE 9.4, normal-vision
- * 20.9, every slot >= 3:1). Charts here never need more than three series.
- * Colour follows the entity: each key below keeps its slot whatever else is
- * on screen.
+ * Chart colours for the dark surface (bg-surface, #151517). Activity's charts
+ * are gold, the app's accent for progress: the brightest step is the most,
+ * so the series and the heatmap read by lightness, which colour-blind
+ * people see too. Colour follows the entity: each key below keeps its step
+ * whatever else is on screen.
  */
-export const SERIES = ['#3987e5', '#d95926', '#199e70'] as const
+export const GOLD = ['#ffb612', '#d99b0b', '#a87700', '#8a6200', '#6b4b00'] as const
 
 export const SERIES_COLOR: Record<string, string> = {
-  // Types
-  episode: SERIES[0],
-  movie: SERIES[1],
-  file: SERIES[2],
-  // Delivery: audio-only transcodes fold into transcode, as in peak streams.
-  direct: SERIES[0],
-  remux: SERIES[1],
-  transcode: SERIES[2],
+  // Types: episodes the brightest, movies a step darker, unmatched files darker still.
+  episode: GOLD[0],
+  movie: GOLD[3],
+  file: GOLD[4],
+  // How it played: the original the brightest, converted video the darkest.
+  original: GOLD[0],
+  direct: GOLD[0],
+  remux: GOLD[0],
+  audio: '#b07c00',
+  sound: '#b07c00',
+  transcode: GOLD[4],
+  video: GOLD[4],
 }
 
+/** Text on a series' colour: dark on the light steps, white on the darkest. */
+export const ON_SERIES: Record<string, string> = { original: '#0f0f10', sound: '#0f0f10', video: '#ffffff' }
+
 /**
- * Sequential blue for the heatmap, low to high; the low end is step 600 so
- * it still clears 2:1 on the surface (validated as an ordinal ramp, dark).
- * Zero is the neutral empty tile, not a step of the ramp.
+ * The heatmap's steps, low to high; the low end still clears 2:1 on the
+ * surface. Zero is the neutral empty tile, not a step of the ramp.
  */
-export const RAMP = ['#184f95', '#256abf', '#3987e5', '#6da7ec', '#9ec5f4', '#cde2fb'] as const
+export const RAMP = [GOLD[4], GOLD[2], GOLD[1], GOLD[0]] as const
 export const EMPTY = '#232326'
 
 /** Chart chrome on the dark surface. */
-export const GRID = '#2c2c2a'
-export const AXIS = '#383835'
-export const MUTED = '#898781'
+export const GRID = '#2a2a2e'
+export const AXIS = '#3a3a3f'
+export const MUTED = '#a3a3a3'

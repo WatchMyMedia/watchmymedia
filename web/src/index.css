@@ -6,6 +6,11 @@
   --color-surface-2: #1a1a1d;
   --color-line: #222225;
   --color-line-2: #2a2a2e;
+  --color-line-3: #3a3a3f; /* a control's rim under the pointer, a key cap */
+  /* A raised control: a hovered button, the chosen part of a segmented control. */
+  --color-raise: #232327;
+  /* The quietest text that still reads on the ground (5.6:1): counts, hints, times. */
+  --color-dim: #8c8c8c;
   /* Burgundy is the brand: buttons, avatar, icon tiles. Too dark to read on
      the ground (1.4:1), so it is always a fill, never text or a thin line. */
   --color-brand: #5a1414;
@@ -15,7 +20,7 @@
   --color-accent: #ffb612;
   /* Orange, so warnings do not read as the gold accent. */
   --color-warn: #fb923c;
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 :root {
@@ -34,6 +39,48 @@ body {
 }
 
 @layer components {
+  /* Buttons. A button is quiet (surface fill); the one main action is
+     .btn-primary; .btn-clear sits on a picture; .btn-ghost has no rim. */
+  .btn {
+    @apply inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-line-2 bg-surface-2 px-4 text-sm font-medium text-neutral-100 transition-colors;
+  }
+  .btn:hover:not(:disabled) {
+    @apply bg-raise;
+  }
+  .btn:disabled {
+    @apply cursor-default opacity-50;
+  }
+  .btn-sm {
+    @apply min-h-8 rounded-[7px] px-3 text-[13px];
+  }
+  .btn-lg {
+    @apply min-h-12 rounded-[10px] px-[22px] text-[15px];
+  }
+  .btn-clear {
+    @apply border-white/15 bg-ground/55;
+  }
+  .btn-ghost {
+    @apply border-transparent bg-transparent text-neutral-300;
+  }
+  /* A square icon button; its name is its aria-label. */
+  .ib {
+    @apply inline-grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg border border-line-2 bg-surface-2 p-0 text-neutral-300 transition-colors;
+  }
+  .ib:hover:not(:disabled) {
+    @apply bg-raise text-neutral-100;
+  }
+  .ib:disabled {
+    @apply cursor-default opacity-40;
+  }
+  .ib-ghost {
+    @apply border-transparent bg-transparent;
+  }
+  .ib-sm {
+    @apply size-8 rounded-[7px];
+  }
+  .ib-lg {
+    @apply size-12 rounded-[10px];
+  }
   /* Primary action: burgundy with white text (13.6:1). */
   .btn-primary {
     @apply border border-brand-line bg-brand text-white transition-colors;
@@ -41,6 +88,215 @@ body {
   .btn-primary:hover:not(:disabled) {
     @apply bg-brand-hover;
   }
+  .btn.btn-primary {
+    @apply font-semibold text-white;
+  }
+
+  /* Filters and choices: a chip is on when aria-pressed or aria-checked says so. */
+  .chip {
+    @apply inline-flex min-h-[34px] cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-line-2 bg-transparent px-3 text-[13px] text-neutral-300;
+  }
+  .chip:hover {
+    @apply border-line-3 text-neutral-100;
+  }
+  .chip[aria-pressed='true'],
+  .chip[aria-checked='true'],
+  .chip[aria-current='page'],
+  .chip.on {
+    @apply border-neutral-100 bg-neutral-100 font-semibold text-ground;
+  }
+  .chip .n {
+    @apply text-xs text-dim;
+  }
+  .chip[aria-pressed='true'] .n,
+  .chip[aria-checked='true'] .n,
+  .chip[aria-current='page'] .n,
+  .chip.on .n {
+    @apply text-neutral-600;
+  }
+
+  /* Tabs: an underline marks the one shown. */
+  .tabs {
+    @apply flex gap-0.5 overflow-x-auto border-b border-line;
+    scrollbar-width: none;
+  }
+  .tab {
+    @apply -mb-px inline-flex min-h-[46px] cursor-pointer items-center gap-[7px] whitespace-nowrap border-0 border-b-2 border-transparent bg-transparent px-3.5 text-[14.5px] text-neutral-400;
+  }
+  .tab:hover {
+    @apply text-neutral-100;
+  }
+  .tab[aria-selected='true'],
+  .tab[aria-current='page'],
+  .tab.on {
+    @apply border-accent font-semibold text-neutral-100;
+  }
+  .tab .n {
+    @apply text-xs font-normal text-dim;
+  }
+
+  /* A segmented control: two or three ways to see one thing. */
+  .seg {
+    @apply inline-flex rounded-[9px] border border-line-2 bg-surface p-[3px];
+  }
+  .seg > * {
+    @apply inline-flex min-h-8 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md border-0 bg-transparent px-[11px] text-[13px] text-neutral-400;
+  }
+  .seg > [aria-pressed='true'],
+  .seg > [aria-checked='true'],
+  .seg > [aria-selected='true'],
+  .seg > .on {
+    @apply bg-raise font-semibold text-neutral-100;
+  }
+
+  /* A menu or popover. */
+  .menu {
+    @apply z-40 min-w-[220px] rounded-xl border border-line-2 bg-surface-2 p-1.5 shadow-[0_18px_40px_rgba(0,0,0,.55)];
+  }
+  .menu-item {
+    @apply flex min-h-[38px] w-full cursor-pointer items-center gap-2.5 whitespace-nowrap rounded-[7px] border-0 bg-transparent px-2.5 text-left text-sm text-neutral-100;
+  }
+  .menu-item:hover,
+  .menu-item:focus-visible {
+    @apply bg-raise text-neutral-100;
+  }
+  .menu-sep {
+    @apply my-1.5 h-px border-0 bg-line-2;
+  }
+  .menu-cap {
+    @apply flex min-h-[26px] items-center px-2.5 text-[11.5px] font-semibold uppercase tracking-[.06em] text-dim;
+  }
+
+  /* Facts in one line, a dot between each. */
+  .meta {
+    @apply flex flex-wrap items-center gap-y-1 text-sm text-neutral-300;
+  }
+  .meta > * + *::before {
+    content: '·';
+    @apply mx-[9px] text-dim;
+  }
+  .eyebrow {
+    @apply text-xs font-bold uppercase tracking-[.09em] text-accent;
+  }
+
+  /* Small labels: a rating, a count, a state. */
+  .pill {
+    @apply inline-flex min-h-[22px] items-center gap-[5px] whitespace-nowrap rounded-md bg-raise px-2 text-xs font-semibold text-neutral-300;
+  }
+  .pill-gold {
+    @apply bg-accent/15 text-accent;
+  }
+  .pill-warn {
+    @apply bg-warn/15 text-warn;
+  }
+  .pill-line {
+    @apply bg-transparent ring-1 ring-inset ring-line-3;
+  }
+  /* A content rating or a quality, outlined. */
+  .tag {
+    @apply inline-flex items-center whitespace-nowrap rounded border border-line-3 px-1.5 py-px text-[11px] font-semibold tracking-[.03em] text-neutral-300;
+  }
+
+  /* A gold progress meter. */
+  .meter {
+    @apply block h-[5px] overflow-hidden rounded-[3px] bg-line-2;
+  }
+  .meter > i {
+    @apply block h-full rounded-[3px] bg-accent;
+  }
+
+  .panel {
+    @apply rounded-xl border border-line bg-surface;
+  }
+
+  /* Technical detail stays one click away: a closed disclosure until asked for. */
+  .tech {
+    @apply rounded-xl border border-line bg-surface;
+  }
+  .tech > summary {
+    @apply flex min-h-[54px] cursor-pointer list-none items-center gap-2.5 rounded-xl px-4 text-sm font-semibold;
+  }
+  .tech > summary::-webkit-details-marker {
+    display: none;
+  }
+  .tech > summary .hint {
+    @apply text-[13px] font-normal text-neutral-400;
+  }
+  .tech > summary::after {
+    content: '';
+    @apply ml-auto mr-1 size-2 flex-none rotate-45 border-b-2 border-r-2 border-neutral-400;
+    translate: -2px -2px;
+  }
+  .tech[open] > summary::after {
+    rotate: -135deg;
+    translate: -2px 2px;
+  }
+  .tech[open] > summary {
+    @apply rounded-b-none border-b border-line;
+  }
+  .tech-body {
+    @apply p-4;
+  }
+
+  /* Label and value pairs. */
+  .dl {
+    @apply grid grid-cols-[max-content_minmax(0,1fr)] gap-x-[18px] gap-y-[9px] text-[13.5px];
+  }
+  .dl dt {
+    @apply text-neutral-400;
+  }
+  .dl dd {
+    @apply m-0 text-neutral-100;
+  }
+
+  /* A row's heading line: its name, a note, and See all at the end. */
+  .rowh {
+    @apply flex flex-wrap items-baseline gap-x-3 gap-y-1;
+  }
+  .rowh h2 {
+    @apply text-[19px] font-[650] tracking-[-.01em];
+  }
+  .rowh .note {
+    @apply text-[13px] text-neutral-400;
+  }
+  .rowh .more {
+    @apply ml-auto whitespace-nowrap text-[13px] text-neutral-400 hover:text-accent;
+  }
+
+  /* A table of facts: a heading row, then rows split by a line. */
+  .tbl {
+    @apply w-full border-collapse text-[13.5px];
+  }
+  .tbl th {
+    @apply whitespace-nowrap border-b border-line-2 px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-[.04em] text-dim;
+  }
+  .tbl td {
+    @apply border-b border-line p-3 align-middle;
+  }
+
+  /* Phone width: buttons and chips grow to a finger's size; a utility on one still wins. */
+  @media (max-width: 767px) {
+    .btn:not(.btn-sm) {
+      min-height: 44px;
+    }
+    .ib:not(.ib-sm) {
+      width: 44px;
+      height: 44px;
+    }
+    .chip {
+      min-height: 40px;
+    }
+  }
+}
+
+/* A page's width: content up to 1760 px, with a gutter that grows with the window. */
+.wrap {
+  @apply mx-auto w-full max-w-[1760px] px-[clamp(16px,3.4vw,48px)];
+}
+
+/* Text hidden from sight but read aloud. */
+.vh {
+  @apply sr-only;
 }
 
 :focus-visible {

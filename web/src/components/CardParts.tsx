@@ -22,17 +22,17 @@ export function CardPicture({ to, label, children }: { to: CardTarget; label: st
 /** The first line, linked. */
 export function CardTitle({ text, to, label }: CardSegment) {
   return (
-    <div className="mt-1.5 truncate text-sm font-medium">
+    <div className="mt-2 truncate text-sm font-medium">
       {to ? <CardLink to={to} label={label} text={text} /> : text}
     </div>
   )
 }
 
 /** The second or third line: runs of text, those with a target as links. The line never wraps. */
-export function CardLine({ segments, className = 'text-neutral-500' }: { segments: CardSegment[]; className?: string }) {
+export function CardLine({ segments, className = 'text-neutral-400' }: { segments: CardSegment[]; className?: string }) {
   if (!segments.length) return null
   return (
-    <div className={`truncate text-xs ${className}`}>
+    <div className={`mt-px truncate text-[12.5px] ${className}`}>
       {segments.map((s, i) => (s.to ? <CardLink key={i} to={s.to} label={s.label} text={s.text} className="font-medium text-neutral-300" /> : <span key={i}>{s.text}</span>))}
     </div>
   )

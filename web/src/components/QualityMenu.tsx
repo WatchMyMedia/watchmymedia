@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
-import { AUTO, autoNow, type Quality } from '../lib/quality'
+import { AUTO, autoNow, stepName, type Quality } from '../lib/quality'
 
 /**
  * The player's quality menu: a button that opens the list above it, with
@@ -17,6 +17,7 @@ export function QualityMenu({
   note,
   sub,
   tall,
+  chip,
 }: {
   value: Quality
   options: Quality[]
@@ -32,6 +33,8 @@ export function QualityMenu({
   sub?: (q: Quality) => string | undefined
   /** The 44 px button of the live remote's controls. */
   tall?: boolean
+  /** The player's chip on the picture: "Auto · 1080p", read as "Quality: automatic, now 1080p". */
+  chip?: boolean
 }) {
   const [open, setOpenState] = useState(false)
   const root = useRef<HTMLDivElement>(null)
@@ -99,10 +102,21 @@ export function QualityMenu({
             setOpen(true)
           }
         }}
-        className={`inline-flex ${tall ? 'min-h-11 px-3' : 'min-h-[36px] px-2.5'} items-center gap-1.5 whitespace-nowrap rounded-md border bg-black/60 text-sm ${open ? 'border-accent' : 'border-white/20'}`}
+        aria-label={chip ? `Quality: ${value.id === AUTO ? `automatic${autoStep ? `, ${autoNow(autoStep).replace(/^Now/, 'now')}` : ''}` : value.label}` : undefined}
+        className={
+          chip
+            ? `inline-flex min-h-[34px] items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[13px] text-neutral-100 hover:border-white/60 ${open ? 'border-accent' : 'border-white/30'}`
+            : `inline-flex ${tall ? 'min-h-11 px-3' : 'min-h-[36px] px-2.5'} items-center gap-1.5 whitespace-nowrap rounded-md border bg-black/60 text-sm ${open ? 'border-accent' : 'border-white/20'}`
+        }
       >
-        <span className="sr-only">Quality: </span>
-        {value.label}
+        {!chip && <span className="sr-only">Quality: </span>}
+        {chip && value.id === AUTO && autoStep ? (
+          <>
+            Auto<span className="max-sm:hidden"> · {stepName(autoStep)}</span>
+          </>
+        ) : (
+          value.label
+        )}
         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="m6 9 6 6 6-6" />
         </svg>

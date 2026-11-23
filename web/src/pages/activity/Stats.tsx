@@ -1,20 +1,24 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { activityUsersQuery, cardsQuery, formatPlayed, heatmapQuery, itemLink, itemTitle, seriesQuery, type Series, type StatItem } from '../../api/activity'
+import { activityUsersQuery, cardsQuery, heatmapQuery, itemLink, seriesQuery, type Series, type StatItem } from '../../api/activity'
 import { ChartCard, DataTable } from '../../components/charts/ChartCard'
 import { Heatmap } from '../../components/charts/Heatmap'
 import { hourLabel, weekday } from '../../components/charts/format'
-import { SERIES_COLOR } from '../../components/charts/palette'
+import { ON_SERIES, SERIES_COLOR } from '../../components/charts/palette'
 import { StackedColumns, type ColumnSeries } from '../../components/charts/StackedColumns'
+import { Avatar } from '../../components/activity/StreamDetail'
+import { tile } from '../../components/activity/styles'
 import { Poster } from '../../components/Poster'
-import { useActivityAdmin, when, type StatsSearch } from './shared'
+import { perDayWords, playShares, watchedWords } from '../../lib/activityWords'
+import { useActivityAdmin, type StatsSearch } from './shared'
 
 const PERIODS: [number, string][] = [
   [7, '7 days'],
   [30, '30 days'],
   [90, '90 days'],
-  [365, '12 months'],
-  [0, 'All time'],
+  [365, 'Year'],
+  [0, 'All'],
 ]
 
 const HOUR = 3_600_000
@@ -30,27 +34,27 @@ function dayTitle(b: string): string {
 }
 
 /** Lines from the server as chart series, in hours when showing time. */
-function toSeries(s: Series | undefined, byTime: boolean, merge?: Record<string, string>): ColumnSeries[] {
+function toSeries(s: Series | undefined, byTime: boolean): ColumnSeries[] {
   if (!s) return []
-  const out = new Map<string, ColumnSeries>()
-  const labels: Record<string, string> = { direct: 'Direct play', remux: 'Direct stream', transcode: 'Transcode' }
-  for (const line of s.lines) {
-    const key = merge?.[line.key] ?? line.key
-    const cur = out.get(key) ?? { key, label: labels[key] ?? line.label, color: SERIES_COLOR[key] ?? '#898781', values: new Array(s.buckets.length).fill(0) }
-    line.values.forEach((v, i) => (cur.values[i] += byTime ? v / HOUR : v))
-    out.set(key, cur)
-  }
-  // Fixed order, so a colour and a place belong to the same thing every time.
-  const order = ['episode', 'movie', 'file', 'direct', 'remux', 'transcode']
-  return [...out.values()].sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key))
+  const labels: Record<string, string> = { episode: 'Episodes', movie: 'Movies', file: 'Unmatched files' }
+  const order = ['episode', 'movie', 'file']
+  return s.lines
+    .map((line) => ({ key: line.key, label: labels[line.key] ?? line.label, color: SERIES_COLOR[line.key] ?? SERIES_COLOR.file, values: line.values.map((v) => (byTime ? v / HOUR : v)) }))
+    .sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key))
 }
 
+/**
+ * Stats: the period in four figures, each day's watching, how it played,
+ * when people watch, the most watched, and who and on what. Every chart
+ * has its numbers as a table, all at once from one button.
+ */
 export function Stats({ search }: { search: StatsSearch }) {
   const admin = useActivityAdmin()
   const navigate = useNavigate({ from: '/activity/stats' })
   const set = (patch: Partial<StatsSearch>) => void navigate({ search: (s) => ({ ...s, ...patch }), replace: true })
+  const [tables, setTables] = useState(false)
   const days = search.days ?? 30
-  const byTime = search.by === 'time'
+  const byTime = search.by !== 'plays'
   const by = byTime ? 'time' : 'plays'
   const user = admin ? search.user : undefined
   const bucket = days === 0 || days > 90 ? 'month' : 'day'
@@ -58,64 +62,45 @@ export function Stats({ search }: { search: StatsSearch }) {
   const cards = useQuery(cardsQuery({ days, by, user }))
   const types = useQuery(seriesQuery({ days, by, user, split: 'type', bucket }))
   const modes = useQuery(seriesQuery({ days, by, user, split: 'mode', bucket }))
-  const months = useQuery(seriesQuery({ days: days === 0 ? 0 : Math.max(days, 365), by, user, split: 'type', bucket: 'month' }))
   const heat = useQuery(heatmapQuery({ days, by, user }))
 
-  const fmt = (v: number) => (byTime ? `${v < 10 ? v.toFixed(1) : Math.round(v)} h` : `${Math.round(v)}`)
+  const fmt = (v: number) => (byTime ? `${v < 10 ? v.toFixed(1).replace(/\.0$/, '') : Math.round(v)} h` : `${Math.round(v)}`)
   const unit = byTime ? 'Hours watched' : 'Plays'
   const typeSeries = toSeries(types.data, byTime)
-  const modeSeries = toSeries(modes.data, byTime, { audio: 'transcode' })
-  const monthSeries = toSeries(months.data, byTime)
-  const monthTotal: ColumnSeries[] = months.data
-    ? [{ key: 'all', label: unit, color: SERIES_COLOR.episode, values: months.data.buckets.map((_, i) => monthSeries.reduce((s, x) => s + x.values[i], 0)) }]
-    : []
-  const heatFmt = (v: number) => (byTime ? formatPlayed(v) : `${v} play${v === 1 ? '' : 's'}`)
+  const shares = playShares(modes.data?.lines ?? [])
+  const heatFmt = (v: number) => (byTime ? watchedWords(v) : `${v} ${v === 1 ? 'play' : 'plays'}`)
+  const period = days === 0 ? 'All time' : days === 365 ? 'The last year' : `The last ${days} days`
 
   const c = cards.data
   const heatValues = heat.data?.values.map((row) => row ?? new Array<number>(24).fill(0)) ?? []
   const heatMax = heat.data?.max ?? 0
-  let busiest = ''
-  heatValues.forEach((row, d) =>
-    row.forEach((v, h) => {
-      if (heatMax > 0 && v === heatMax && !busiest) busiest = `${weekday(d, 'long')}s, ${hourLabel(h)}`
-    }),
-  )
+  const busiest = busiestWords(heatValues, heatMax)
   const peak = c?.peak
-  const select = 'min-h-[36px] rounded-md border border-line-2 bg-ground px-2 text-sm'
+  const spanDays = days || Math.max(1, (types.data?.buckets.length ?? 1) * (bucket === 'month' ? 30 : 1))
+  const people = admin && !user ? (c?.topUsers ?? []) : []
+  const devices = c?.topDevices ?? []
+  const who = users.data?.items.find((u) => u.user.id === user)?.user.name
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex rounded-md border border-line-2 p-0.5" role="radiogroup" aria-label="Period">
+    <div>
+      <div className="mt-5 flex flex-wrap items-center gap-x-3.5 gap-y-2.5">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Period">
           {PERIODS.map(([d, l]) => (
-            <button
-              key={d}
-              type="button"
-              role="radio"
-              aria-checked={days === d}
-              onClick={() => set({ days: d === 30 ? undefined : d })}
-              className={`min-h-[32px] rounded px-2.5 text-sm ${days === d ? 'bg-neutral-100 text-black' : 'text-neutral-300 hover:text-neutral-100'}`}
-            >
+            <button key={d} type="button" aria-pressed={days === d} onClick={() => set({ days: d === 30 ? undefined : d })} className="chip">
               {l}
             </button>
           ))}
         </div>
-        <div className="flex rounded-md border border-line-2 p-0.5" role="radiogroup" aria-label="Measure">
-          {(['plays', 'time'] as const).map((b) => (
-            <button
-              key={b}
-              type="button"
-              role="radio"
-              aria-checked={by === b}
-              onClick={() => set({ by: b === 'time' ? 'time' : undefined })}
-              className={`min-h-[32px] rounded px-2.5 text-sm ${by === b ? 'bg-neutral-100 text-black' : 'text-neutral-300 hover:text-neutral-100'}`}
-            >
-              {b === 'plays' ? 'Plays' : 'Time'}
-            </button>
-          ))}
+        <div className="seg" role="group" aria-label="Measure">
+          <button type="button" aria-pressed={byTime} onClick={() => set({ by: undefined })}>
+            Time
+          </button>
+          <button type="button" aria-pressed={!byTime} onClick={() => set({ by: 'plays' })}>
+            Plays
+          </button>
         </div>
         {admin && (
-          <select aria-label="User" value={search.user ?? ''} onChange={(e) => set({ user: e.target.value ? Number(e.target.value) : undefined })} className={select}>
+          <select aria-label="Person" value={search.user ?? ''} onChange={(e) => set({ user: e.target.value ? Number(e.target.value) : undefined })} className="min-h-[34px] rounded-lg border border-line-2 bg-surface px-2.5 text-[13px] text-neutral-200">
             <option value="">Everyone</option>
             {users.data?.items.map(({ user: u }) => (
               <option key={u.id} value={u.id}>
@@ -124,41 +109,101 @@ export function Stats({ search }: { search: StatsSearch }) {
             ))}
           </select>
         )}
+        <button type="button" aria-pressed={tables} onClick={() => setTables((t) => !t)} className="btn btn-sm btn-ghost md:ml-auto">
+          {tables ? 'Show the charts' : 'Show the numbers as tables'}
+        </button>
       </div>
 
-      {cards.isError && <p className="text-red-400">{cards.error.message}</p>}
+      {cards.isError && <p className="mt-4 text-red-400">{cards.error.message}</p>}
 
-      <dl className={`grid grid-cols-2 gap-3 transition-opacity lg:grid-cols-4 ${cards.isPlaceholderData ? 'opacity-50' : ''}`}>
-        <Tile label="Plays" value={c ? c.plays.toLocaleString() : '…'} />
-        <Tile label="Watched" value={c ? formatPlayed(c.playedMs) : '…'} />
-        <Tile
-          label="Most at once"
-          value={peak ? String(peak.all.count) : '…'}
-          note={peak?.all.at ? `${new Date(peak.all.at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })} · most transcodes at once ${peak.transcode.count}` : undefined}
-        />
-        <Tile label="Busiest time" value={busiest || '—'} small />
-      </dl>
+      <section aria-label={who ? `${period}, ${who}` : period} className={`mt-[18px] grid grid-cols-[repeat(auto-fit,minmax(min(240px,100%),1fr))] gap-3.5 transition-opacity ${cards.isPlaceholderData ? 'opacity-50' : ''}`}>
+        <div className={tile}>
+          <span className="text-[13px] text-neutral-400">Watched</span>
+          <span className="text-[40px] font-semibold leading-[1.05] tracking-[-.02em] md:text-[48px]">{c ? watchedWords(c.playedMs) : '…'}</span>
+        </div>
+        <div className={tile}>
+          <span className="text-[13px] text-neutral-400">Plays</span>
+          <span className="text-[26px] font-semibold leading-tight tracking-[-.02em]">{c ? c.plays.toLocaleString() : '…'}</span>
+          {c && perDayWords(c.plays, spanDays) && <span className="text-[13px] text-neutral-300">{perDayWords(c.plays, spanDays)}</span>}
+        </div>
+        <div className={tile}>
+          <span className="text-[13px] text-neutral-400">Most at once</span>
+          <span className="text-[26px] font-semibold leading-tight tracking-[-.02em]">{peak ? `${peak.all.count} ${peak.all.count === 1 ? 'stream' : 'streams'}` : '…'}</span>
+          {peak?.all.at && (
+            <span className="text-[13px] text-neutral-300">
+              {new Date(peak.all.at).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+              {peak.transcode.count > 0 ? ` · most converted at once: ${peak.transcode.count}` : ''}
+            </span>
+          )}
+        </div>
+        <div className={tile}>
+          <span className="text-[13px] text-neutral-400">Busiest time</span>
+          <span className="text-[22px] font-semibold leading-tight tracking-[-.02em]">{busiest || '—'}</span>
+        </div>
+      </section>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <ChartCard
-          title={`${unit} per ${bucket}`}
-          subtitle="By what was played"
-          dimmed={types.isPlaceholderData}
-          chart={<StackedColumns label={`${unit} per ${bucket} by type`} buckets={types.data?.buckets ?? []} tick={dayTick} title={dayTitle} series={typeSeries} format={fmt} />}
-          table={<DataTable head={[bucket === 'day' ? 'Day' : 'Month', ...typeSeries.map((s) => s.label)]} rows={(types.data?.buckets ?? []).map((b, i) => [dayTitle(b), ...typeSeries.map((s) => fmt(s.values[i]))]).reverse()} />}
-        />
-        <ChartCard
-          title="How it streamed"
-          subtitle="Direct play costs the server nothing; transcodes cost the most"
-          dimmed={modes.isPlaceholderData}
-          chart={<StackedColumns label={`${unit} per ${bucket} by stream`} buckets={modes.data?.buckets ?? []} tick={dayTick} title={dayTitle} series={modeSeries} format={fmt} />}
-          table={<DataTable head={[bucket === 'day' ? 'Day' : 'Month', ...modeSeries.map((s) => s.label)]} rows={(modes.data?.buckets ?? []).map((b, i) => [dayTitle(b), ...modeSeries.map((s) => fmt(s.values[i]))]).reverse()} />}
-        />
+      <ChartCard
+        className="mt-3.5"
+        title={bucket === 'day' ? 'Each day' : 'Each month'}
+        subtitle={unit}
+        asTable={tables}
+        dimmed={types.isPlaceholderData}
+        chart={<StackedColumns label={`${unit} each ${bucket}, episodes and movies stacked`} buckets={types.data?.buckets ?? []} tick={dayTick} title={dayTitle} series={typeSeries} format={fmt} height={210} />}
+        table={<DataTable head={[bucket === 'day' ? 'Day' : 'Month', ...typeSeries.map((s) => s.label)]} rows={(types.data?.buckets ?? []).map((b, i) => [dayTitle(b), ...typeSeries.map((s) => fmt(s.values[i]))]).reverse()} />}
+      />
+
+      <div className="mt-3.5 grid grid-cols-[repeat(auto-fit,minmax(min(480px,100%),1fr))] gap-3.5">
+        <section className="panel px-5 py-[18px]" aria-labelledby="h-how">
+          <div className="rowh">
+            <h2 id="h-how">How it played</h2>
+            <span className="note">Share of {byTime ? 'time watched' : 'plays'}</span>
+          </div>
+          {shares.length === 0 ? (
+            <p className="mt-4 text-sm text-neutral-400">Nothing played in this period.</p>
+          ) : tables ? (
+            <div className="mt-4">
+              <DataTable head={['How', 'Share']} rows={shares.map((s) => [s.label, `${s.share}%`])} />
+            </div>
+          ) : (
+            <>
+              <div role="img" aria-label={shares.map((s) => `${s.label} ${s.share}%`).join(', ')} className={`mt-4 flex h-7 gap-0.5 ${modes.isPlaceholderData ? 'opacity-50' : ''}`}>
+                {shares.map((s) => (
+                  <span
+                    key={s.key}
+                    title={`${s.label} · ${s.share}%`}
+                    className="flex min-w-[34px] items-center overflow-hidden rounded px-2 text-[12.5px] font-semibold"
+                    style={{ flex: `${s.share} 1 0`, background: SERIES_COLOR[s.key], color: ON_SERIES[s.key] }}
+                  >
+                    {s.share}%
+                  </span>
+                ))}
+              </div>
+              <ul className="mt-3.5 flex flex-col gap-2">
+                {shares.map((s) => (
+                  <li key={s.key} className="inline-flex items-center gap-[7px] text-[13px] text-neutral-300">
+                    <i aria-hidden="true" className="block size-3 rounded-[3px]" style={{ background: SERIES_COLOR[s.key] }} />
+                    {s.label}
+                    <span className="text-neutral-400">· {s.note}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
         <ChartCard
           title="When people watch"
-          subtitle={`${byTime ? 'Time watched' : 'Plays started'} by weekday and hour`}
+          subtitle="By weekday and hour"
+          asTable={tables}
           dimmed={heat.isPlaceholderData}
-          chart={heat.data ? <Heatmap label="Plays by weekday and hour" values={heatValues} max={heatMax} format={heatFmt} /> : null}
+          chart={
+            heat.data ? (
+              <div className="overflow-x-auto">
+                <div className="min-w-[500px]">
+                  <Heatmap label={`${byTime ? 'Time watched' : 'Plays started'} by weekday and hour`} values={heatValues} max={heatMax} format={heatFmt} />
+                </div>
+              </div>
+            ) : null
+          }
           table={
             <DataTable
               head={['Hour', ...[1, 2, 3, 4, 5, 6, 0].map((d) => weekday(d))]}
@@ -166,133 +211,122 @@ export function Stats({ search }: { search: StatsSearch }) {
             />
           }
         />
-        <ChartCard
-          title={`${unit} per month`}
-          subtitle={days === 0 ? 'All time' : 'The last twelve months'}
-          dimmed={months.isPlaceholderData}
-          chart={<StackedColumns label={`${unit} per month`} buckets={months.data?.buckets ?? []} tick={dayTick} title={dayTitle} series={monthTotal} format={fmt} />}
-          table={<DataTable head={['Month', unit]} rows={(months.data?.buckets ?? []).map((b, i) => [dayTitle(b), fmt(monthTotal[0]?.values[i] ?? 0)]).reverse()} />}
-        />
       </div>
 
       {c && (
-        <div className={`space-y-6 transition-opacity ${cards.isPlaceholderData ? 'opacity-50' : ''}`}>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <PosterList title="Most watched shows" items={c.topShows} byTime={byTime} />
-            <PosterList title="Most watched movies" items={c.topMovies} byTime={byTime} />
-            {!user && <PosterList title="Most popular shows" items={c.popularShows} byTime={byTime} popular />}
-            {!user && <PosterList title="Most popular movies" items={c.popularMovies} byTime={byTime} popular />}
-          </div>
-          <div className="grid gap-4 lg:grid-cols-3">
-            {admin && !user && <RankList title="Top people" items={c.topUsers} byTime={byTime} user />}
-            <RankList title="Top devices" items={c.topDevices} byTime={byTime} />
-            <section className="min-w-0 rounded-lg border border-line bg-surface p-4">
-              <h3 className="mb-2 font-semibold">Recently watched</h3>
-              {c.recent.length === 0 ? (
-                <p className="text-sm text-neutral-500">Nothing yet.</p>
-              ) : (
-                <ul className="space-y-2 text-sm">
-                  {c.recent.map((r) => {
-                    const t = itemTitle(r.item)
-                    return (
-                      <li key={r.id} className="flex justify-between gap-3">
-                        <span className="min-w-0 truncate">
-                          {t.title}
-                          {t.subtitle && <span className="text-neutral-500"> · {t.subtitle}</span>}
-                        </span>
-                        <span className="shrink-0 text-neutral-500">{admin ? `${r.user.name}, ` : ''}{when(r.startedAt)}</span>
-                      </li>
-                    )
-                  })}
-                </ul>
+        <div className={`transition-opacity ${cards.isPlaceholderData ? 'opacity-50' : ''}`}>
+          <RankedPosters title="Most watched shows" items={c.topShows} byTime={byTime} period={period} />
+          <RankedPosters title="Most watched movies" items={c.topMovies} byTime={byTime} period={period} />
+          {(people.length > 0 || devices.length > 0) && (
+            <div className="mt-8 grid grid-cols-[repeat(auto-fit,minmax(min(480px,100%),1fr))] gap-3.5">
+              {people.length > 0 && (
+                <section className="panel px-5 py-[18px]" aria-labelledby="h-who">
+                  <div className="rowh">
+                    <h2 id="h-who">Who watched most</h2>
+                    <Link to="/activity/users" className="more">
+                      People ›
+                    </Link>
+                  </div>
+                  <Bars items={people} byTime={byTime} person />
+                </section>
               )}
-            </section>
-          </div>
+              {devices.length > 0 && (
+                <section className="panel px-5 py-[18px]" aria-labelledby="h-what">
+                  <div className="rowh">
+                    <h2 id="h-what">On what</h2>
+                  </div>
+                  <Bars items={devices} byTime={byTime} />
+                </section>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
   )
 }
 
-function Tile({ label, value, note, small }: { label: string; value: string; note?: string; small?: boolean }) {
-  return (
-    <div className="min-w-0 rounded-lg border border-line bg-surface p-4">
-      <dt className="text-sm text-neutral-400">{label}</dt>
-      <dd className={`mt-1 font-semibold ${small ? 'text-lg' : 'text-2xl'}`}>{value}</dd>
-      {note && <dd className="mt-1 text-xs text-neutral-500">{note}</dd>}
-    </div>
-  )
+/** "Saturdays, 8 PM", from the busiest cell of the weekday-by-hour grid. */
+function busiestWords(values: number[][], max: number): string {
+  if (max <= 0) return ''
+  for (const [d, row] of values.entries()) {
+    const h = row.indexOf(max)
+    if (h >= 0) return `${weekday(d, 'long')}s, ${hourLabel(h)}`
+  }
+  return ''
 }
 
-function amount(it: StatItem, byTime: boolean, popular = false): string {
-  if (popular) return `${it.users} ${it.users === 1 ? 'person' : 'people'} · ${it.plays} play${it.plays === 1 ? '' : 's'}`
-  return byTime ? `${formatPlayed(it.playedMs)} · ${it.plays} play${it.plays === 1 ? '' : 's'}` : `${it.plays} play${it.plays === 1 ? '' : 's'} · ${formatPlayed(it.playedMs)}`
+function amount(it: StatItem, byTime: boolean): string {
+  return byTime ? watchedWords(it.playedMs) : `${it.plays} ${it.plays === 1 ? 'play' : 'plays'}`
 }
 
-function PosterList({ title, items, byTime, popular }: { title: string; items: StatItem[]; byTime: boolean; popular?: boolean }) {
+function RankedPosters({ title, items, byTime, period }: { title: string; items: StatItem[]; byTime: boolean; period: string }) {
+  if (!items.length) return null
+  const id = `h-${title.toLowerCase().replace(/\W+/g, '-')}`
   return (
-    <section className="min-w-0 rounded-lg border border-line bg-surface p-4">
-      <h3 className="mb-3 font-semibold">{title}</h3>
-      {items.length === 0 ? (
-        <p className="text-sm text-neutral-500">Nothing in this period.</p>
-      ) : (
-        <ol className="grid grid-cols-5 gap-3">
-          {items.map((it, i) => {
-            const link = itemLink({ type: it.movieId ? 'movie' : 'episode', title: it.title, movieId: it.movieId, showId: it.showId })
-            const body = (
-              <>
-                <Poster path={it.posterPath} size="w185" alt={it.title} />
-                <p className="mt-1.5 line-clamp-2 text-xs font-medium leading-tight">
-                  <span className="text-neutral-500">{i + 1}. </span>
-                  {it.title}
-                </p>
-                <p className="mt-0.5 text-[11px] leading-tight text-neutral-500">{amount(it, byTime, popular)}</p>
-              </>
-            )
-            return (
-              <li key={`${it.movieId ?? ''}-${it.showId ?? ''}`} className="min-w-0">
-                {link ? (
-                  <Link {...link} className="card block">
-                    {body}
-                  </Link>
-                ) : (
-                  body
-                )}
-              </li>
-            )
-          })}
-        </ol>
-      )}
-    </section>
-  )
-}
-
-function RankList({ title, items, byTime, user }: { title: string; items: StatItem[]; byTime: boolean; user?: boolean }) {
-  return (
-    <section className="min-w-0 rounded-lg border border-line bg-surface p-4">
-      <h3 className="mb-2 font-semibold">{title}</h3>
-      {items.length === 0 ? (
-        <p className="text-sm text-neutral-500">Nothing in this period.</p>
-      ) : (
-        <ol className="space-y-2 text-sm">
-          {items.map((it, i) => (
-            <li key={`${it.userId ?? ''}-${it.deviceId ?? ''}-${i}`} className="flex justify-between gap-3">
-              <span className="min-w-0 truncate">
-                <span className="text-neutral-500">{i + 1}. </span>
-                {user && it.userId ? (
-                  <Link to="/activity/users/$userId" params={{ userId: String(it.userId) }} className="hover:underline">
-                    {it.title}
-                  </Link>
-                ) : (
-                  it.title
-                )}
-                {it.subtitle && <span className="text-neutral-500"> · {it.subtitle}</span>}
+    <section aria-labelledby={id} className="mt-8">
+      <div className="rowh">
+        <h2 id={id}>{title}</h2>
+        <span className="note">{period}</span>
+      </div>
+      <ol className="scrollbar-hide -mx-1 mt-3.5 flex gap-3 overflow-x-auto px-1 pb-1.5 pt-1 md:gap-4">
+        {items.map((it, i) => {
+          const link = itemLink({ type: it.movieId ? 'movie' : 'episode', title: it.title, movieId: it.movieId, showId: it.showId })
+          const body = (
+            <>
+              <span className="relative block">
+                <Poster path={it.posterPath} size="w185" alt="" />
+                <span className="absolute left-2 top-2 rounded-[5px] bg-ground/80 px-[7px] py-0.5 text-[11px] font-bold text-neutral-100 ring-1 ring-inset ring-white/15">{i + 1}</span>
               </span>
-              <span className="shrink-0 tabular-nums text-neutral-400">{amount(it, byTime)}</span>
+              <span className="mt-2 block truncate text-sm font-medium">{it.title}</span>
+              <span className="block truncate text-[12.5px] text-neutral-400">{amount(it, byTime)}</span>
+            </>
+          )
+          return (
+            <li key={`${it.movieId ?? ''}-${it.showId ?? ''}`} className="w-[112px] shrink-0 md:w-[132px]">
+              {link ? (
+                <Link {...link} aria-label={`${i + 1}. ${it.title}, ${amount(it, byTime)}`} className="card block rounded-lg">
+                  {body}
+                </Link>
+              ) : (
+                body
+              )}
             </li>
-          ))}
-        </ol>
-      )}
+          )
+        })}
+      </ol>
     </section>
+  )
+}
+
+/** A ranked list as gold bars: the person or device, the bar, the amount. */
+function Bars({ items, byTime, person }: { items: StatItem[]; byTime: boolean; person?: boolean }) {
+  const top = Math.max(1, ...items.map((it) => (byTime ? it.playedMs : it.plays)))
+  return (
+    <ol className="mt-2.5">
+      {items.map((it, i) => {
+        const v = byTime ? it.playedMs : it.plays
+        const name =
+          person && it.userId ? (
+            <Link to="/activity/users/$userId" params={{ userId: String(it.userId) }} className="flex min-w-0 items-center gap-2 hover:text-accent">
+              <Avatar name={it.title} />
+              <span className="truncate">{it.title}</span>
+            </Link>
+          ) : (
+            <span className="block min-w-0 truncate" title={it.subtitle || undefined}>
+              {it.title}
+            </span>
+          )
+        return (
+          <li key={`${it.userId ?? ''}-${it.deviceId ?? ''}-${i}`} className="flex min-h-[38px] items-center gap-3 text-sm">
+            <span className="min-w-0 flex-[0_0_118px] sm:flex-[0_0_150px]">{name}</span>
+            <span className="flex min-w-0 flex-1 items-center gap-3">
+              <i aria-hidden="true" className="block h-2 shrink-0 rounded-r bg-accent" style={{ width: `${Math.max(2, Math.round((v / top) * 80))}%` }} />
+              <span className="whitespace-nowrap text-[13px] text-neutral-300">{amount(it, byTime)}</span>
+            </span>
+          </li>
+        )
+      })}
+    </ol>
   )
 }

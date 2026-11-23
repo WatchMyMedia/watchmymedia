@@ -4,12 +4,13 @@ import { Link } from '@tanstack/react-router'
 import { liveTVCapabilitiesQuery, liveTVChannelsQuery, serverQuery } from '../api/queries'
 import { useAuth } from '../authContext'
 import { filterLiveChannels, guideTimes } from '../lib/liveTV'
-import { RecordingsLink } from '../components/liveTV/LiveRecordings'
+import { LiveTabs } from '../components/liveTV/LiveTabs'
 import { LiveBadge } from '../components/liveTV/LiveBadge'
 import { ListingsGuide } from '../components/liveTV/LiveGuide'
 import { showListings } from '../lib/liveGuide'
 import { serverRecords } from '../lib/liveRecordings'
 import type { GuideSearch } from '../lib/routeSearch'
+import { PlayIcon } from '../components/icons'
 
 export function LiveTV({ open }: { open?: GuideSearch } = {}) {
   const auth = useAuth()
@@ -33,27 +34,24 @@ export function LiveTV({ open }: { open?: GuideSearch } = {}) {
     <AntennaIcon />
     <h1 className="text-2xl font-semibold">{!caps.data.enabled ? (caps.data.setupComplete ? 'Live TV is off' : 'Live TV is not set up') : 'Live TV is not available to this account'}</h1>
     <p className="text-neutral-400">{admin ? (caps.data.setupComplete ? 'Enable your tuner and choose who can watch in Live TV settings.' : 'Connect your HDHomeRun antenna tuner and choose who can watch.') : 'Ask your server’s admin to enable Live TV for your account.'}</p>
-    {admin && <Link to="/settings/live-tv" className="inline-flex min-h-11 items-center rounded-md btn-primary px-5 font-semibold">{caps.data.setupComplete ? 'Open Live TV settings' : 'Set up Live TV'}</Link>}
+    {admin && <Link to="/settings/live-tv" className="btn btn-primary min-h-11">{caps.data.setupComplete ? 'Open Live TV settings' : 'Set up Live TV'}</Link>}
   </section>
   // Without listings (an older server, listings off, or none yet) the guide stays as 0.5.0 drew it.
   if (listings) return <ListingsGuide key={open?.programme ?? ''} admin={admin} playback={!!caps.data.playback} open={open} />
-  return <div className="mx-auto max-w-7xl space-y-5">
-    <header className="flex flex-wrap items-end justify-between gap-3">
-      <div><p className="mb-1 text-xs font-semibold uppercase tracking-widest text-neutral-400">Your antenna, anywhere</p><h1 className="text-3xl font-semibold tracking-tight">Live TV</h1><RecordingsLink /></div>
-      <p className="text-sm tabular-nums text-neutral-400">{channels.data?.items.length ?? 0} channels · {timeLabel(new Date(now))}</p>
-    </header>
+  return <div className="space-y-5">
+    <div><LiveTabs active="guide" right={<p className="text-[13.5px] tabular-nums text-neutral-400">{channels.data?.items.length ?? 0} channels · {timeLabel(new Date(now))}</p>} /></div>
     {channels.isError && <p role="alert" className="rounded-lg border border-warn/50 p-4 text-warn">{channels.error.message}</p>}
     {channels.isPending && <p className="py-10 text-neutral-400">Loading channels…</p>}
-    {selected && <section aria-label="Selected channel" className="flex flex-wrap items-center gap-5 rounded-xl border border-line bg-surface p-5 sm:gap-8 sm:p-6">
+    {selected && <section aria-label="Selected channel" className="panel flex flex-wrap items-center gap-5 p-5 sm:gap-8 sm:p-6">
       <div className="grid h-24 w-28 shrink-0 place-items-center rounded-lg border border-line-2 bg-ground text-4xl font-bold tabular-nums tracking-tight text-accent">{selected.number}</div>
       <div className="min-w-0 flex-1 space-y-2"><LiveBadge /><h2 className="break-words text-xl font-semibold sm:text-2xl">{selected.name}</h2><p className="text-sm text-neutral-400">{selected.available ? 'No programme listings. Watch the current broadcast.' : 'This channel is no longer in the tuner’s latest lineup.'}</p></div>
-      {selected.available && caps.data.playback ? <Link to="/live-tv/watch/$channelId" params={{ channelId: selected.id }} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md btn-primary px-6 font-semibold sm:w-auto"><span aria-hidden="true">▶</span> Watch live</Link> : <span className="text-sm text-warn">{selected.available ? 'Playback unavailable' : 'Unavailable'}</span>}
+      {selected.available && caps.data.playback ? <Link to="/live-tv/watch/$channelId" params={{ channelId: selected.id }} className="btn btn-primary min-h-11 w-full sm:w-auto"><PlayIcon size={15} />Watch live</Link> : <span className="text-sm text-warn">{selected.available ? 'Playback unavailable' : 'Unavailable'}</span>}
     </section>}
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h2 className="text-lg font-semibold">Channels <span className="ml-2 text-sm font-normal text-neutral-400">Today</span></h2>
-      <label className="w-full sm:w-72"><span className="sr-only">Go to channel by number or name</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Go to channel: 7.1 or name" className="min-h-11 w-full rounded-md border border-line-2 bg-surface px-3 text-sm placeholder:text-neutral-400" /></label>
+      <label className="w-full sm:w-72"><span className="sr-only">Go to channel by number or name</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Go to channel: 7.1 or name" className="min-h-10 w-full rounded-[10px] border border-line-2 bg-surface px-3 text-sm placeholder:text-neutral-400" /></label>
     </div>
-    {filtered.length > 0 ? <section aria-label="Channel guide" className="overflow-hidden rounded-xl border border-line bg-ground">
+    {filtered.length > 0 ? <section aria-label="Channel guide" className="panel overflow-hidden">
       <div className="flex border-b border-line-2 bg-surface">
         <div className="flex w-30 shrink-0 items-center px-3 text-xs font-semibold uppercase tracking-wide text-neutral-400 sm:w-42">Channel</div>
         <div className="grid flex-1 grid-cols-2 sm:grid-cols-4">{times.map((time, index) => <div key={time.getTime()} className={`border-l border-line px-3 py-3 text-xs font-medium tabular-nums text-neutral-300 ${index > 1 ? 'hidden sm:block' : ''}`}>{timeLabel(time)}</div>)}</div>

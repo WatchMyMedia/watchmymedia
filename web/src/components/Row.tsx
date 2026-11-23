@@ -16,19 +16,17 @@ export function Row({
   children: ReactNode
 }) {
   return (
-    <section className="space-y-3">
-      <div className="flex items-baseline justify-between gap-4">
-        <h2 className="text-lg font-semibold">
-          {title}
-          {subtitle && <span className="ml-2 text-sm font-normal text-neutral-500">{subtitle}</span>}
-        </h2>
+    <section>
+      <div className="rowh">
+        <h2>{title}</h2>
+        {subtitle && <span className="note">{subtitle}</span>}
         {seeAll && (
-          <Link {...seeAll} aria-label={seeAllLabel} className="text-sm text-neutral-400 hover:text-neutral-100">
+          <Link {...seeAll} aria-label={seeAllLabel} className="more">
             See all ›
           </Link>
         )}
       </div>
-      <div className="scrollbar-hide -mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2 pt-1">{children}</div>
+      <div className="scrollbar-hide -mx-1 mt-3.5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1.5 pt-1 md:gap-4">{children}</div>
     </section>
   )
 }

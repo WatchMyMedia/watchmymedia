@@ -69,7 +69,7 @@ export function ClashDialog({ recording, onClose }: { recording: Recording; onCl
   </Dialog>
   const choosable = holders.some((h) => !h.running)
   // A long title wraps rather than running out of the dialog at phone width.
-  const wrapping = `${primaryAction.replace('whitespace-nowrap', 'whitespace-normal')} py-2 text-center`
+  const wrapping = `${primaryAction} whitespace-normal py-2 text-center`
   const names = joinNames(holders.map((h) => h.title))
   const choose = () => pick && prefer.mutate({ id: r.id, over: pick }, {
     onSuccess: (next) => {

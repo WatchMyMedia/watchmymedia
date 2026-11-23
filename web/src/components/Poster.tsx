@@ -18,7 +18,7 @@ export function Poster({
   const [failed, setFailed] = useState(false)
   const src = failed ? undefined : img(path, size)
   return (
-    <div className={`${ratio} w-full overflow-hidden rounded-md bg-neutral-800 ${className}`}>
+    <div className={`${ratio} w-full overflow-hidden rounded-lg bg-surface-2 ${className}`}>
       {src ? (
         <img src={src} alt={alt} loading="lazy" onError={() => setFailed(true)} className="h-full w-full object-cover" />
       ) : (

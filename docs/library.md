@@ -75,21 +75,25 @@ bytes are counted where they are sent, and ffmpeg reports its own speed. Admins 
 in the top bar from anywhere they sign in; stopping a play, deleting history and revoking a
 download also work over HTTPS while remote admin is on, or from `network.admin_networks`:
 
-- **Now playing**: who is watching what, on which device and network, the position, how it
-  streams (direct play, direct stream or transcode, with the reasons), bandwidth and the
+- **Now playing**: a sentence first (how many are watching, and whether the server keeps
+  up), then who is watching what, on which device and network, the position and when it
+  ends, and how it streams in words. Under each play's Stream details: direct play, direct
+  stream or transcode with the reasons, bandwidth and the
   transcoder's lead, the speed the player measures and its stalls, and Automatic quality's
   changes (or, at a fixed quality, the step down it would have taken). Negotiated switches
   show proposed, applied, failed or canceled outcomes. An admin can stop a play
   with a message, which the viewer sees.
 
-- **History**: every play, newest first, with resumed plays of one item grouped into a row.
+- **History**: every play, newest first and grouped by day, with resumed plays of one item
+  grouped into a row that links to the title. Plays brought from Plex are a second source.
   The search box matches any part of a title, `S02E03`, people, devices and the start of
   an IP address, and answers in milliseconds even over a quarter of a million plays.
   Rows expand to each play's stream detail; admins can delete rows and export CSV.
 - **Stats**: plays or time per day or month by type and by stream, a weekday-by-hour
   heatmap, most watched and most popular shows and movies, top people and devices, and the
   most streams at once.
-- **Users**: each person's last play, watch time, devices and addresses.
+- **People**: a card for each person, opening their last play, watch time, devices and
+  addresses.
 - **Downloads**: what is downloading to phones and tablets now, and every download kept, with
   Revoke (see [Offline downloads](apps.md#offline-downloads)).
 
@@ -99,7 +103,8 @@ These ranges describe media ready on the server, not the viewer's player buffer.
 The admin Activity screen includes temporary playback bytes and free-space
 headroom alongside remote upload reservations and recent delivery.
 
-Everyone else gets "My history" in the account menu: their own plays and statistics only.
+Everyone gets "My history" in the account menu; for people who aren't admins it opens their
+own Now playing, History and Stats only.
 Movie and show pages show who watched them. Under Settings → Activity: the shortest play to
 keep (two minutes, unless it reached the credits), grouping, how long to keep history,
 and whether everyone may see what is playing now. Each user has a "Record history" switch.

@@ -1,56 +1,93 @@
-import { useEffect, useState } from 'react'
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { Link, useNavigate } from '@tanstack/react-router'
-import { liveTVGuideQuery, liveTVSearchQuery } from '../../api/queries'
-import { FETCH_HOURS, episodeLine, fetchBlock, isOn, progress, timeOfDay } from '../../lib/liveGuide'
-import { dayShort, searchTerm, searchWhen } from '../../lib/liveReminders'
-import { HitPicture } from './LiveGuide'
+import { useQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
+import { liveTVGuideQuery } from '../../api/queries'
+import type { components } from '../../api/schema'
+import { FETCH_HOURS, duration, episodeLine, fetchBlock, isOn, progress, timeOfDay } from '../../lib/liveGuide'
+import { dayShort } from '../../lib/liveReminders'
+import { PlayIcon } from '../icons'
+import { useNow } from '../useNow'
+import { RecordControls } from './LiveRecordings'
 import { RemindControls } from './LiveReminders'
-import { useGuideExtras, useReminders } from './useGuideExtras'
+import { useReminders } from './useGuideExtras'
+
+type Hit = components['schemas']['LiveTVSearchHit']
 
 /**
- * The Search page's On Live TV:
- * programmes on now and later whose titles have the words, between
- * the library's results and Not in your library. Left out when nothing
- * matches, or without listings at API level 15.
+ * The Search page's On live TV: programmes on now and later whose titles
+ * have the words, each with its channel, when it is on, and what can be done
+ * now: Watch while it's on, Record, Remind me. The title opens the guide at
+ * it. Drawn by the page once the guide has answered with something.
  */
-export function OnLiveTV({ q }: { q: string }) {
-  const extras = useGuideExtras()
-  const term = searchTerm(q)
-  const results = useQuery({ ...liveTVSearchQuery(term ?? ''), enabled: extras && !!term, placeholderData: keepPreviousData })
-  const { lead, byProgramme } = useReminders(extras && !!results.data?.items.length)
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 30_000); return () => window.clearInterval(timer) }, [])
-  const listedThrough = useQuery({ ...liveTVGuideQuery(fetchBlock(now), FETCH_HOURS), enabled: extras && !!results.data?.items.length, select: (g) => g.state.listedThrough })
-  const navigate = useNavigate()
-  const hits = results.data?.items ?? []
-  if (!extras || !term || hits.length === 0) return null
+export function OnLiveTV({ hits }: { hits: readonly Hit[] }) {
+  const now = useNow()
+  const { lead, byProgramme } = useReminders(hits.length > 0)
+  const listedThrough = useQuery({ ...liveTVGuideQuery(fetchBlock(now), FETCH_HOURS), enabled: hits.length > 0, select: (g) => g.state.listedThrough })
+  if (!hits.length) return null
   const ends = listedThrough.data ? Date.parse(listedThrough.data) : undefined
-  return <section aria-labelledby="on-live-tv" className="space-y-3">
-    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-      <h2 id="on-live-tv" className="text-lg font-semibold">On Live TV</h2>
-      <span className="text-[13px] text-neutral-400">On now and later{ends ? `, until the listings end ${dayShort(ends, now)} ${timeOfDay(ends)}` : ''}</span>
-    </div>
-    <ul className="grid grid-cols-[repeat(auto-fill,minmax(min(16rem,100%),1fr))] gap-x-4 gap-y-5">
-      {hits.map(({ channel, programme: p }) => {
-        const on = isOn(p, now)
-        return <li key={p.id} className="flex min-w-0 flex-col gap-2">
-          <button type="button" onClick={() => void navigate({ to: '/live-tv', search: { channel: channel.id, programme: p.id, at: p.start } })}
-            aria-label={`${p.title}${episodeLine(p) ? `, ${episodeLine(p)}` : ''}, ${searchWhen(p, channel.number, now)} ${channel.name}. Open in the guide`} className="group flex min-w-0 flex-col gap-1.5 text-left">
-            <span className="relative block">
-              <HitPicture p={p} channel={channel} className="w-full rounded-md ring-1 ring-line-2" />
-              {on && <span className="absolute left-2 top-2 inline-flex items-center gap-1.5 rounded bg-brand px-2 py-0.5 text-[11px] font-bold tracking-wider text-white ring-1 ring-brand-line"><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />LIVE</span>}
+  return (
+    <section aria-labelledby="h-live">
+      <div className="rowh">
+        <h2 id="h-live">On live TV</h2>
+        <span className="note">
+          {hits.length}
+          {ends ? ` · until the listings end ${dayShort(ends, now)} ${timeOfDay(ends)}` : ''}
+        </span>
+        <Link to="/live-tv" className="more">
+          Guide ›
+        </Link>
+      </div>
+      <ul className="panel mt-3.5">
+        {hits.map((hit) => (
+          <HitRow key={hit.programme.id} hit={hit} now={now} lead={lead} reminder={byProgramme.get(hit.programme.id)} />
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function HitRow({ hit: { channel, programme: p }, now, lead, reminder }: { hit: Hit; now: number; lead: number; reminder: Parameters<typeof RemindControls>[0]['reminder'] }) {
+  const on = isOn(p, now)
+  const start = Date.parse(p.start)
+  const end = Date.parse(p.end)
+  const line = [episodeLine(p) || p.categories?.slice(0, 2).join(' · ') || '', p.new ? 'New' : ''].filter(Boolean).join(' · ')
+  const when = on ? `until ${timeOfDay(end)} · ${duration(end - now)} left` : `${dayShort(start, now)} ${timeOfDay(start)} · ${duration(end - start)}`
+  const short = channel.name.split(/\s+/)[0]
+  return (
+    <li className="flex flex-wrap items-center gap-3.5 border-t border-line px-3.5 py-3 first:border-t-0">
+      <span role="img" aria-label={`Channel ${channel.number} ${channel.name}`} className="flex min-h-[54px] w-16 shrink-0 flex-col items-center justify-center rounded-[10px] border border-line-2 bg-surface-2 leading-tight">
+        <b className="text-base font-bold">{channel.number}</b>
+        <small className="max-w-full truncate px-1 text-[11px] font-semibold tracking-[.04em] text-neutral-400">{short}</small>
+      </span>
+      <div className="flex min-w-0 flex-[1_1_260px] flex-col gap-1">
+        <Link
+          to="/live-tv"
+          search={{ channel: channel.id, programme: p.id, at: p.start }}
+          aria-label={`${p.title}${line ? `, ${line}` : ''}, ${on ? 'on now' : `${dayShort(start, now)} ${timeOfDay(start)}`} on ${channel.number} ${channel.name}. Open in the guide`}
+          className="truncate text-[15px] font-medium hover:text-accent"
+        >
+          {p.title}
+        </Link>
+        {line && <p className="truncate text-[12.5px] text-neutral-400">{line}</p>}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          {on && <span className="pill bg-red-400/15 text-red-400">On now</span>}
+          <span className="text-[13px] text-neutral-300">{when}</span>
+          {on && (
+            <span className="meter min-w-20 flex-[0_1_140px]" role="img" aria-label={`${Math.round(progress(p, now))}% through`}>
+              <i style={{ width: `${progress(p, now)}%` }} />
             </span>
-            <span className={`flex min-w-0 items-center gap-1.5 text-xs font-semibold ${on ? 'text-red-300' : 'text-neutral-300'}`}>{channel.logoUrl && <img src={channel.logoUrl} alt="" className="h-4 w-7 shrink-0 object-contain object-left" />}<span className="truncate">{searchWhen(p, channel.number, now)}</span></span>
-            <span className="truncate text-sm font-semibold group-hover:text-accent">{p.title}</span>
-            <span className="truncate text-xs text-neutral-400">{episodeLine(p) || p.categories?.join(' · ')}</span>
-          </button>
-          {on ? <>
-            <span aria-hidden="true" className="block h-1 overflow-hidden rounded-full bg-line-2"><span className="block h-full bg-accent" style={{ width: `${progress(p, now)}%` }} /></span>
-            {channel.available && <Link to="/live-tv/watch/$channelId" params={{ channelId: channel.id }} className="inline-flex min-h-9 items-center gap-2 self-start rounded-md btn-primary px-3.5 text-sm font-semibold"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z" /></svg>Watch {channel.number}</Link>}
-          </> : <div className="flex flex-wrap items-center gap-1"><RemindControls programme={p} reminder={byProgramme.get(p.id)} lead={lead} now={now} primary={false} compact /></div>}
-        </li>
-      })}
-    </ul>
-  </section>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {on && channel.available && (
+          <Link to="/live-tv/watch/$channelId" params={{ channelId: channel.id }} className="btn btn-primary">
+            <PlayIcon size={15} />
+            Watch {channel.number}
+          </Link>
+        )}
+        <RecordControls programme={p} now={now} />
+        {!on && <RemindControls programme={p} reminder={reminder} lead={lead} now={now} primary={false} compact />}
+      </div>
+    </li>
+  )
 }

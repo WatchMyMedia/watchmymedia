@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, type PointerEvent } from 'react'
 import { formatDuration } from '../lib/format'
 import { SheetLoader, fetchImage, previewLeft, tileAt, tileBackground, type Trickplay } from '../lib/trickplay'
+import type { SegmentMark } from '../lib/play/words'
 
 /** Where the viewer is scrubbing to, in seconds, and whether they are dragging there or only hovering. */
 export type ScrubPreview = { seconds: number; dragging: boolean }
@@ -14,6 +15,8 @@ type Props = {
   /** The decision's seek thumbnails, when the file has them. */
   trickplay: Trickplay | null
   controlsShown: boolean
+  /** The intro, credits and the like, drawn on the bar with their names over it. */
+  marks?: SegmentMark[]
   onSeek: (seconds: number) => void
   onPreview: (preview: ScrubPreview | null) => void
 }
@@ -27,7 +30,7 @@ const clock = (seconds: number) => formatDuration(seconds * 1000) || '0:00'
  * Without thumbnails the time shows alone. The
  * picture is decorative; the slider says the time.
  */
-export function Scrubber({ time, duration, bufferedEnd, available, trickplay, controlsShown, onSeek, onPreview }: Props) {
+export function Scrubber({ time, duration, bufferedEnd, available, trickplay, controlsShown, marks = [], onSeek, onPreview }: Props) {
   const barRef = useRef<HTMLDivElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const dragging = useRef(false)
@@ -96,7 +99,7 @@ export function Scrubber({ time, duration, bufferedEnd, available, trickplay, co
         switch (e.key) { case 'ArrowDown': target = time - 10; break; case 'ArrowUp': target = time + 10; break; case 'Home': target = 0; break; case 'End': target = limit; break; default: return }
         e.preventDefault(); onSeek(Math.max(0, Math.min(target, limit)))
       }}
-      className="relative -my-2 cursor-pointer touch-none rounded py-2 focus-visible:outline-2"
+      className={`relative -my-2 cursor-pointer touch-none rounded py-2 focus-visible:outline-2 ${marks.length ? 'mt-1' : ''}`}
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => {
         if (!duration || e.button !== 0) return
@@ -126,12 +129,26 @@ export function Scrubber({ time, duration, bufferedEnd, available, trickplay, co
         if (!dragging.current) end()
       }}
     >
-      <div className={`relative h-2 w-full rounded ${available === undefined ? 'bg-white/20' : 'bg-white/5'}`}>
+      <div className={`relative h-1.5 w-full rounded ${available === undefined ? 'bg-white/22' : 'bg-white/5'}`}>
         {available !== undefined && <div className="absolute inset-y-0 left-0 rounded bg-white/20" style={{ width: `${maxFraction * 100}%` }} />}
         <div className="absolute inset-y-0 left-0 rounded bg-white/30" style={{ width: `${buffered}%` }} />
+        {marks.map((m) => (
+          <span key={m.id} role="img" aria-label={m.spoken} className="absolute inset-y-0 bg-blue-300/90 first:rounded-l" style={{ left: `${m.left}%`, width: `${m.width}%` }} />
+        ))}
         <div className="absolute inset-y-0 left-0 rounded bg-accent" style={{ width: `${played}%` }} />
+        {!point &&
+          marks.map((m) => (
+            <span
+              key={`${m.id}-label`}
+              aria-hidden="true"
+              className={`pointer-events-none absolute -top-[18px] whitespace-nowrap text-[11px] font-semibold text-neutral-300 ${m.left + m.width > 92 ? 'right-0' : ''}`}
+              style={m.left + m.width > 92 ? undefined : { left: `${m.left}%` }}
+            >
+              {m.label}
+            </span>
+          ))}
         {point && !point.dragging && <div className="absolute -inset-y-1 -ml-px w-0.5 rounded-sm bg-white" style={{ left: `${point.fraction * 100}%` }} />}
-        {point && <div className="absolute top-1/2 -ml-2 -mt-2 size-4 rounded-full bg-accent ring-2 ring-black/50" style={{ left: `${played}%` }} />}
+        <div className={`absolute top-1/2 -ml-[7px] -mt-[7px] size-[14px] rounded-full bg-accent ring-4 ring-accent/30 transition-opacity ${point || controlsShown ? 'opacity-100' : 'opacity-0'}`} style={{ left: `${played}%` }} />
         {point && (
           <div ref={previewRef} className="pointer-events-none absolute bottom-5 left-0 flex flex-col items-center gap-1.5" aria-hidden="true">
             {trickplay && tile && (

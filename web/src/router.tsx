@@ -326,9 +326,9 @@ const playRoute = createRoute({
   validateSearch: validatePlaySearch,
   component: rendering(function PlayRoute() {
     const { fileId } = playRoute.useParams()
-    const { start, title, back, trailer } = playRoute.useSearch()
+    const { start, title, back, trailer, audio, subtitle } = playRoute.useSearch()
     // Keyed by file so moving to the next episode starts with fresh player state.
-    return <Player key={fileId} fileId={Number(fileId)} start={start} title={title} back={back} trailer={trailer} />
+    return <Player key={fileId} fileId={Number(fileId)} start={start} title={title} back={back} trailer={trailer} audio={audio} subtitle={subtitle} />
   }, Player),
 })
 
