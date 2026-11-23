@@ -287,3 +287,5 @@ button { border: 0; background: none; padding: 0; text-align: inherit; cursor: p
 .tv-rail__chevron svg { width: 100%; height: 100%; }
 .tv-rail:focus-within:not([data-parked]) .tv-rail__account .tv-rail__icon { width: auto; height: auto; }
 .tv-rail:focus-within:not([data-parked]) .tv-rail__badge { position: static; margin-left: auto; }
+/* A list scrolling inside a panel: room above and below for the focused row's ring. */
+.tv-panel .tv-vscroll { margin-top: -1rem; margin-bottom: -1rem; padding-top: 1rem; padding-bottom: 1rem; }
