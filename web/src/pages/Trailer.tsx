@@ -6,7 +6,7 @@ import { Poster } from '../components/Poster'
 import { ArrowLeftIcon, PlayIcon } from '../components/icons'
 import { formatRuntime } from '../lib/format'
 import { clock } from '../lib/clock'
-import { otherTrailers } from '../lib/trailerList'
+import { otherTrailers, trailerLine } from '../lib/trailerList'
 import {
   PLAYER_ENDED,
   YOUTUBE_EMBED_ORIGIN,
@@ -201,7 +201,7 @@ export function TrailerPage({ movieId }: { movieId: number }) {
                         <TrailerTile />
                         <span className="flex min-w-0 flex-col leading-snug">
                           <span className="truncate text-sm font-semibold">{t.name}</span>
-                          <span className="text-[12.5px] text-neutral-400">{t.current ? 'Playing now' : 'From YouTube'}</span>
+                          <span className="text-[12.5px] text-neutral-400">{trailerLine(t)}</span>
                         </span>
                       </button>
                     ) : (
@@ -214,7 +214,7 @@ export function TrailerPage({ movieId }: { movieId: number }) {
                         <TrailerTile length={t.durationMs ? clock(t.durationMs) : undefined} />
                         <span className="flex min-w-0 flex-col leading-snug">
                           <span className="truncate text-sm font-semibold">{t.name}</span>
-                          <span className="text-[12.5px] text-neutral-400">In your library</span>
+                          <span className="text-[12.5px] text-neutral-400">{trailerLine(t)}</span>
                         </span>
                       </Link>
                     )}
