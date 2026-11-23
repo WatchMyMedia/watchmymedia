@@ -273,6 +273,20 @@ body {
   .tbl td {
     @apply border-b border-line p-3 align-middle;
   }
+
+  /* Phone width: buttons and chips grow to a finger's size; a utility on one still wins. */
+  @media (max-width: 767px) {
+    .btn:not(.btn-sm) {
+      min-height: 44px;
+    }
+    .ib:not(.ib-sm) {
+      width: 44px;
+      height: 44px;
+    }
+    .chip {
+      min-height: 40px;
+    }
+  }
 }
 
 /* A page's width: content up to 1760 px, with a gutter that grows with the window. */

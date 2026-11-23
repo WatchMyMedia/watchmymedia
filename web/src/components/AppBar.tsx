@@ -39,6 +39,8 @@ const LINKS: { id: Section; to: '/' | '/movies' | '/tv' | '/live-tv' | '/activit
  */
 export function AppBar({ sections, castHere, getApp, search }: { sections: Sections; castHere: boolean; getApp: boolean; search: boolean }) {
   const path = useRouterState({ select: (s) => s.location.pathname })
+  // On the Search page the box starts with that page's words, and follows them.
+  const words = useRouterState({ select: (s) => (s.location.pathname === '/search' && typeof (s.location.search as { q?: unknown }).q === 'string' ? (s.location.search as { q: string }).q : '') })
   const active = sectionOf(path)
   const [status, setStatus] = useState(false)
   return (
@@ -66,7 +68,7 @@ export function AppBar({ sections, castHere, getApp, search }: { sections: Secti
             </Link>
           ))}
         </nav>
-        {search ? <SearchBox variant="bar" liveTV={sections.live} /> : <span className="ml-auto" />}
+        {search ? <SearchBox key={words} initial={words} liveTV={sections.live} /> : <span className="ml-auto" />}
         {getApp && <GetAppMenu />}
         {castHere && <CastButton />}
         <AccountMenu onStatus={() => setStatus((s) => !s)} />
