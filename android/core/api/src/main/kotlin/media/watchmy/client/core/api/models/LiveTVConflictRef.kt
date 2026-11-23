@@ -23,6 +23,7 @@
 
 package media.watchmy.client.core.api.models
 
+import media.watchmy.client.core.api.models.LiveTVAiring
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -42,6 +43,8 @@ import kotlinx.serialization.encoding.Encoder
  * @param start
  * @param title
  * @param userName
+ * @param nextAiring
+ * @param repeat Its listing called it a repeat (API level 34).
  */
 @Serializable
 
@@ -70,7 +73,14 @@ data class LiveTVConflictRef (
     val title: kotlin.String,
 
     @SerialName(value = "userName")
-    val userName: kotlin.String
+    val userName: kotlin.String,
+
+    @SerialName(value = "nextAiring")
+    val nextAiring: LiveTVAiring? = null,
+
+    /* Its listing called it a repeat (API level 34). */
+    @SerialName(value = "repeat")
+    val repeat: kotlin.Boolean? = null
 
 ) {
 

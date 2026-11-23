@@ -24,8 +24,10 @@
 package media.watchmy.client.core.api.models
 
 import media.watchmy.client.core.api.models.Credit
+import media.watchmy.client.core.api.models.CrewMember
 import media.watchmy.client.core.api.models.NextEpisode
 import media.watchmy.client.core.api.models.Season
+import media.watchmy.client.core.api.models.ShowTracks
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -53,6 +55,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param addedAt
  * @param backdropPath
  * @param contentRating US certification from TMDB; empty when it has none.
+ * @param crew Its creators, job Creator; empty until the server has fetched the show's credits with person IDs. Absent on servers below API level 34.
  * @param firstAirDate
  * @param following The signed-in person follows the show (followShow). Absent on servers below API level 29.
  * @param lastAirDate
@@ -64,7 +67,11 @@ import kotlinx.serialization.encoding.Encoder
  * @param posterSource Set when an admin chose the poster; absent for the match's own.
  * @param quality
  * @param rating
+ * @param seasonCount Search results and findShowsByTMDB: seasons with a present episode, specials left out, as on cards.
  * @param status
+ * @param tracks
+ * @param unwatchedCount Search results and findShowsByTMDB: episodes with a present file they haven't finished, as on cards.
+ * @param watched Search results and findShowsByTMDB: the signed-in person has watched every episode with a present file.
  * @param watchlists The signed-in person's watchlists that hold the show (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33.
  * @param year
  */
@@ -123,6 +130,10 @@ data class ShowDetail (
     @SerialName(value = "contentRating")
     val contentRating: kotlin.String? = null,
 
+    /* Its creators, job Creator; empty until the server has fetched the show's credits with person IDs. Absent on servers below API level 34. */
+    @SerialName(value = "crew")
+    val crew: kotlin.collections.List<CrewMember>? = null,
+
     @SerialName(value = "firstAirDate")
     val firstAirDate: kotlin.String? = null,
 
@@ -159,8 +170,23 @@ data class ShowDetail (
     @SerialName(value = "rating")
     val rating: kotlin.Double? = null,
 
+    /* Search results and findShowsByTMDB: seasons with a present episode, specials left out, as on cards. */
+    @SerialName(value = "seasonCount")
+    val seasonCount: kotlin.Long? = null,
+
     @SerialName(value = "status")
     val status: kotlin.String? = null,
+
+    @SerialName(value = "tracks")
+    val tracks: ShowTracks? = null,
+
+    /* Search results and findShowsByTMDB: episodes with a present file they haven't finished, as on cards. */
+    @SerialName(value = "unwatchedCount")
+    val unwatchedCount: kotlin.Long? = null,
+
+    /* Search results and findShowsByTMDB: the signed-in person has watched every episode with a present file. */
+    @SerialName(value = "watched")
+    val watched: kotlin.Boolean? = null,
 
     /* The signed-in person's watchlists that hold the show (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33. */
     @SerialName(value = "watchlists")

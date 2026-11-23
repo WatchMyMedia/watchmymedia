@@ -41,14 +41,17 @@ import kotlinx.serialization.encoding.Encoder
  * @param title
  * @param updatedAt
  * @param backdropPath
+ * @param contentRating The movie's or the show's US certification from TMDB; absent when it has none.
  * @param episodeId
  * @param episodeNumber
  * @param movieId
+ * @param overview The episode's summary, or the movie's; absent when TMDB has none.
  * @param posterPath
  * @param seasonNumber
  * @param showId
  * @param stillPath
  * @param subtitle
+ * @param tmdbId The movie's TMDB id, or for an episode its show's, so an app signed in to several servers shows one card for a title on more than one.
  */
 @Serializable
 
@@ -75,6 +78,10 @@ data class ContinueItem (
     @SerialName(value = "backdropPath")
     val backdropPath: kotlin.String? = null,
 
+    /* The movie's or the show's US certification from TMDB; absent when it has none. */
+    @SerialName(value = "contentRating")
+    val contentRating: kotlin.String? = null,
+
     @SerialName(value = "episodeId")
     val episodeId: kotlin.Long? = null,
 
@@ -83,6 +90,10 @@ data class ContinueItem (
 
     @SerialName(value = "movieId")
     val movieId: kotlin.Long? = null,
+
+    /* The episode's summary, or the movie's; absent when TMDB has none. */
+    @SerialName(value = "overview")
+    val overview: kotlin.String? = null,
 
     @SerialName(value = "posterPath")
     val posterPath: kotlin.String? = null,
@@ -97,7 +108,11 @@ data class ContinueItem (
     val stillPath: kotlin.String? = null,
 
     @SerialName(value = "subtitle")
-    val subtitle: kotlin.String? = null
+    val subtitle: kotlin.String? = null,
+
+    /* The movie's TMDB id, or for an episode its show's, so an app signed in to several servers shows one card for a title on more than one. */
+    @SerialName(value = "tmdbId")
+    val tmdbId: kotlin.Long? = null
 
 ) {
 

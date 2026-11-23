@@ -37,6 +37,7 @@ import kotlinx.serialization.encoding.Encoder
 /**
  * @param fileIds The files to plan, such as a movie's versions.
  * @param profile
+ * @param tracks Also list each file's audio tracks and subtitles, those beside the file and downloaded ones included, so a person can choose them before playing. From API level 34; older servers ignore it.
  */
 @Serializable
 
@@ -47,7 +48,11 @@ data class PlanInputBody (
     val fileIds: kotlin.collections.List<kotlin.Long>?,
 
     @SerialName(value = "profile")
-    val profile: Profile
+    val profile: Profile,
+
+    /* Also list each file's audio tracks and subtitles, those beside the file and downloaded ones included, so a person can choose them before playing. From API level 34; older servers ignore it. */
+    @SerialName(value = "tracks")
+    val tracks: kotlin.Boolean? = null
 
 ) {
 

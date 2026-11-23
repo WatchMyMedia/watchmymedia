@@ -36,6 +36,7 @@ import kotlinx.serialization.encoding.Encoder
 /**
  * @param decades
  * @param genres
+ * @param contentRatings The library's content ratings, in the order the US systems rank them (movies' G to NC-17, then TV's TV-Y to TV-MA, then any other), with unrated last when some items have none. From API level 34.
  */
 @Serializable
 
@@ -45,7 +46,11 @@ data class ItemFacets (
     val decades: kotlin.collections.List<kotlin.Long>,
 
     @SerialName(value = "genres")
-    val genres: kotlin.collections.List<kotlin.String>
+    val genres: kotlin.collections.List<kotlin.String>,
+
+    /* The library's content ratings, in the order the US systems rank them (movies' G to NC-17, then TV's TV-Y to TV-MA, then any other), with unrated last when some items have none. From API level 34. */
+    @SerialName(value = "contentRatings")
+    val contentRatings: kotlin.collections.List<kotlin.String>? = null
 
 ) {
 

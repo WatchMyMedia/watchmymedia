@@ -50,6 +50,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param topShows
  * @param user
  * @param windows
+ * @param firstPlayAt When the person's first play in the history started; absent with none (API level 34).
  * @param lastPlayed
  * @param lastSeenAt
  */
@@ -92,6 +93,10 @@ data class ActivityUserDetail (
 
     @SerialName(value = "windows")
     val windows: kotlin.collections.List<ActivityWindow>,
+
+    /* When the person's first play in the history started; absent with none (API level 34). */
+    @SerialName(value = "firstPlayAt")
+    val firstPlayAt: kotlin.String? = null,
 
     @SerialName(value = "lastPlayed")
     val lastPlayed: ActivityHistoryRow? = null,

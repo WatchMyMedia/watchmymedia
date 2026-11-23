@@ -39,6 +39,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param durationMs The trailer file's length; absent for YouTube trailers.
  * @param fileId The trailer file, for source \"file\".
  * @param key The YouTube video id, for source \"youtube\".
+ * @param kind What TMDB calls it: trailer or teaser; trailer for a trailer file. Absent on older servers.
  */
 @Serializable
 
@@ -62,7 +63,11 @@ data class MovieTrailer (
 
     /* The YouTube video id, for source \"youtube\". */
     @SerialName(value = "key")
-    val key: kotlin.String? = null
+    val key: kotlin.String? = null,
+
+    /* What TMDB calls it: trailer or teaser; trailer for a trailer file. Absent on older servers. */
+    @SerialName(value = "kind")
+    val kind: kotlin.String? = null
 
 ) {
 

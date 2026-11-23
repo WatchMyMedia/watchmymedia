@@ -43,6 +43,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param limit
  * @param offset
  * @param total Items matching the filter.
+ * @param contentRatingCounts Items per content rating (as facets.contentRatings names them) after every other filter, before contentRating and pagination, with zero when none match. From API level 34.
  * @param genreCounts Items per genre after filter, decade and q, before the genre filter and pagination. Includes every library genre, with zero when none match.
  * @param letters Sorting by title: each letter present in the whole filtered list, in list order, with its first item's offset.
  * @param totals
@@ -66,6 +67,10 @@ data class ItemList (
     /* Items matching the filter. */
     @SerialName(value = "total")
     val total: kotlin.Long,
+
+    /* Items per content rating (as facets.contentRatings names them) after every other filter, before contentRating and pagination, with zero when none match. From API level 34. */
+    @SerialName(value = "contentRatingCounts")
+    val contentRatingCounts: kotlin.collections.Map<kotlin.String, kotlin.Long>? = null,
 
     /* Items per genre after filter, decade and q, before the genre filter and pagination. Includes every library genre, with zero when none match. */
     @SerialName(value = "genreCounts")

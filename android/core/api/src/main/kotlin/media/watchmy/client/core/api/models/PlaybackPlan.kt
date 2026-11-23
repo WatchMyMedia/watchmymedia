@@ -24,6 +24,8 @@
 package media.watchmy.client.core.api.models
 
 import media.watchmy.client.core.api.models.AudioPlan
+import media.watchmy.client.core.api.models.AudioTrack
+import media.watchmy.client.core.api.models.SubtitleTrack
 import media.watchmy.client.core.api.models.VideoPlan
 
 import kotlinx.serialization.Serializable
@@ -42,6 +44,8 @@ import kotlinx.serialization.encoding.Encoder
  * @param protocol
  * @param reasons Why a cheaper mode was not possible.
  * @param video
+ * @param audioTracks With tracks: the file's audio tracks, as a decision lists them. Send the chosen one's index as audioIndex.
+ * @param subtitles With tracks: every subtitle a play could show, inside the file, beside it and downloaded, as a decision lists them but without URLs. Send the chosen one's id as subtitleId.
  */
 @Serializable
 
@@ -64,7 +68,15 @@ data class PlaybackPlan (
     val reasons: kotlin.collections.List<kotlin.String>,
 
     @SerialName(value = "video")
-    val video: VideoPlan
+    val video: VideoPlan,
+
+    /* With tracks: the file's audio tracks, as a decision lists them. Send the chosen one's index as audioIndex. */
+    @SerialName(value = "audioTracks")
+    val audioTracks: kotlin.collections.List<AudioTrack>? = null,
+
+    /* With tracks: every subtitle a play could show, inside the file, beside it and downloaded, as a decision lists them but without URLs. Send the chosen one's id as subtitleId. */
+    @SerialName(value = "subtitles")
+    val subtitles: kotlin.collections.List<SubtitleTrack>? = null
 
 ) {
 
