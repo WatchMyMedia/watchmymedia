@@ -19,7 +19,7 @@ export type LiveProblem = {
   actions: { id: ProblemAction; label: string }[]
   /** Show other channels on now under it (no signal, protected). */
   others: boolean
-  /** Shown as a dialog over the paused picture rather than a page: the tuner was given back. */
+  /** Shown as a dialog over the picture rather than a page: the tuner was given back, or every tuner is busy. */
   dialog: boolean
 }
 
@@ -47,7 +47,7 @@ export function liveProblem(failure: Failure, o: { number?: string; admin: boole
   const lower = lowerQuality(o.quality)
   switch (failure.reason) {
     case 'tuners_busy': return {
-      ...base, icon: 'tuner', title: 'All tuners are in use',
+      ...base, dialog: true, icon: 'tuner', title: 'All tuners are in use',
       body: o.admin ? 'Every tuner is busy. WatchMyMedia never takes one from someone already watching.' : 'Every tuner is busy. Try again when someone stops watching.',
       adminNote: o.admin ? 'You can stop someone’s viewing from Activity in the web app.' : undefined, actions: act('retry', 'guide'),
     }

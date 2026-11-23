@@ -9,7 +9,7 @@ import { call, PlayerError, safeMessage, type ClientInfo, type Decision, type De
 import { PlaybackFailure, type Player, type PlayerFailure, type PlayerState, type PlayerUpdate } from './avplay'
 import { systemClock, type Clock } from './clock'
 import type { Cue } from './vtt'
-import { audioWords, automaticStepNote, episodeWords, onlineWords, SLOW_CONNECTION_NOTE, STOPPED_BY_ADMIN, streamPill, SUBTITLE_FAILED_NOTE, AUTOMATIC_SUBTITLE_FAILED, subtitleWords, type OptionWords } from './labels'
+import { audioWords, automaticStepNote, episodeWords, onlineWords, SLOW_CONNECTION_NOTE, STOPPED_BY_ADMIN, streamPill, SUBTITLE_FAILED_NOTE, AUTOMATIC_SUBTITLE_FAILED, subtitleWords, videoWords, type OptionWords } from './labels'
 import { fallbackProfile, samsungProfile, uhd } from './profile'
 import { Scrub, SEND_AFTER_MS, seekStepLabel } from './seek'
 import { STUCK_MESSAGE, StuckWatch } from './stuck'
@@ -70,8 +70,9 @@ export type PlaybackContext = {
 
 export type FilePhase = 'idle' | 'loading' | 'buffering' | 'playing' | 'paused' | 'ended' | 'error'
 
-export type AudioOption = OptionWords & { index: number }
-export type SubtitleOption = OptionWords & { id: string; language?: string; burnIn: boolean; source?: string }
+/** A track, with the facts the screens word for people ("Surround sound", "With sounds described"). */
+export type AudioOption = OptionWords & { index: number; channels?: number; title?: string }
+export type SubtitleOption = OptionWords & { id: string; language?: string; burnIn: boolean; source?: string; forced?: boolean; hearingImpaired?: boolean }
 export type OnlineOption = OptionWords & { id: string; trackId?: string }
 
 export type FilePlaybackState = {
@@ -88,6 +89,8 @@ export type FilePlaybackState = {
   /** The pill: "Direct play · 4K HDR · EAC3 5.1", "Auto · 720p". */
   stream?: string
   mode?: Decision['mode']
+  /** The picture as the screen gets it: "4K HDR", "1080p". */
+  video?: string
   audio: { options: readonly AudioOption[]; selected?: number }
   subtitles: {
     options: readonly SubtitleOption[]
@@ -651,8 +654,8 @@ export class FilePlayback {
     if (v.subtitles.intent.automatic) v.subtitleId = d.subtitleId
     if (d.burnIn) v.subtitleId = d.burnIn.id
     v.subtitles.setPlay(d.playId)
-    v.audioOptions = d.audioTracks.map((a) => ({ index: a.index, ...audioWords(a) }))
-    v.subtitleOptions = d.subtitles.map((s) => ({ id: s.id, language: s.language, burnIn: burnsIn(s), source: s.source, ...subtitleWords(s) }))
+    v.audioOptions = d.audioTracks.map((a) => ({ index: a.index, channels: a.channels, title: a.title, ...audioWords(a) }))
+    v.subtitleOptions = d.subtitles.map((s) => ({ id: s.id, language: s.language, burnIn: burnsIn(s), source: s.source, forced: s.forced, hearingImpaired: s.hearingImpaired, ...subtitleWords(s) }))
     const trickplay = usableTrickplay(d.trickplay)
     if (trickplay?.url !== previous?.trickplay?.url || !v.thumbnails !== !trickplay) {
       v.thumbnails = trickplay ? new Thumbnails(trickplay, (path) => this.sign(path), this.ctx.loadImage ?? fetchImage, () => this.refresh(0)) : undefined
@@ -1077,6 +1080,7 @@ export class FilePlayback {
       phase, positionMs: pos, durationMs: duration, timelineMs: Math.max(duration, planned ?? 0), bufferedMs: v.bufferedMs,
       stream: streamPill(d, v.quality.id, v.audioIndex),
       mode: d.mode,
+      video: videoWords(d.video),
       audio: { options: v.audioOptions, selected: v.audioIndex },
       subtitles: { options: v.subtitleOptions, selected: v.subtitleId, automatic: v.subtitles.intent.automatic, online: v.online, cues, size: settings.subtitleSize },
       skip,

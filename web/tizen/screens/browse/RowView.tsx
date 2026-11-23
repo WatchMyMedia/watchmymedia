@@ -43,7 +43,7 @@ export function RowCardView({ card, id, imageUrl }: { card: RowCard; id: string;
   const press = card.press && (() => run(card.press))
   return <span className="browse-card" data-hint={okWords(card.press)} data-hold={holdHint(card.hold)}>
     {card.more ? <MoreCard id={id} card={card} onPress={press}/>
-      : <Card id={id} variant={card.variant} title={card.title} subtitle={card.subtitle} image={imageUrl} progress={card.progress} badges={card.badges} live={card.live}
+      : <Card id={id} variant={card.variant} title={card.title} subtitle={card.subtitle} image={imageUrl} progress={card.progress} badges={card.badges} done={card.done} live={card.live}
         label={card.label} onPress={press} onHold={card.hold && (() => run(card.hold))}/>}
   </span>
 }
@@ -53,8 +53,10 @@ export function RowCardView({ card, id, imageUrl }: { card: RowCard; id: string;
  * it, the counter ("Row 2 of 7"), and its cards. `onFocusIndex` hears which
  * card has focus (Home's panel follows it).
  */
-export function RowView({ row, cards, counter, listings, onFocusIndex }: {
+export function RowView({ row, cards, counter, listings, onFocusIndex, dimPast }: {
   row: ScreenRow; cards: readonly RowCard[]; counter?: string; listings: boolean; onFocusIndex?: (index: number) => void
+  /** Dims the cards before the focused one (Home's row screens). */
+  dimPast?: boolean
 }) {
   const media = useMediaUrls()
   const now = useNow(row.style === 'live' && listings)
@@ -64,7 +66,7 @@ export function RowView({ row, cards, counter, listings, onFocusIndex }: {
     if (cell) onFocusIndex(Number(cell.getAttribute('data-index')))
   })
   return <div className="browse-row" data-home-row onFocus={onFocus}>
-    <Row id={rowGroup(row)} title={title} subtitle={small} counter={counter} variant={rowVariant(row)} items={cards} itemKey={(c) => c.key}
+    <Row id={rowGroup(row)} title={title} subtitle={small} counter={counter} variant={rowVariant(row)} items={cards} itemKey={(c) => c.key} dimPast={dimPast}
       renderItem={(c, id) => <RowCardView card={c} id={id} imageUrl={c.image && media.imageUrl(c.image.path, c.image.size)}/>}/>
   </div>
 }

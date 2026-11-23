@@ -188,12 +188,13 @@ describe('about the show', () => {
 })
 
 describe('scrolling the page', () => {
-  const m = { seasonsTop: 560, trackHeight: 1800, viewHeight: 1080, topPad: 72 }
+  const m = { aboutTop: 560, trackHeight: 1800, viewHeight: 1080, topPad: 72 }
 
-  it('keeps the top in view down to the row, then brings the tabs to the top, then the end', () => {
+  it('keeps the top in view down to the row, then brings About to the top, then the end', () => {
     expect(zoneOffset('top', m)).toBe(0)
     expect(zoneOffset('episodes', m)).toBe(0)
     expect(zoneOffset('about', m)).toBe(488)
+    expect(zoneOffset('cast', m)).toBe(488)
     expect(zoneOffset('related', m)).toBe(720)
     expect(zoneOffset('related', { ...m, trackHeight: 1200 })).toBe(488)
   })

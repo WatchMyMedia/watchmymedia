@@ -23,11 +23,13 @@ Built on 2026-11-19 and checked in the browser preview; the first TV session (be
   (can't reach, not set up, too old for this TV, signed out from another
   device). The last sign-in comes back on launch once the server's ID is
   checked.
-- The shell: the section rail (Search, Home, TV Shows, Movies, Live TV when
-  the server has it, Settings with the Inbox count), sections on Home and
-  pages on what opened them, each screen remembering its place, Return
-  walking back and asking before leaving at Home, Hold OK, the remote's media,
-  channel and number keys, and the offline banner.
+- The shell: the menu (Search, Home, TV Shows, Movies, Live TV when the
+  server has it, Settings with the Inbox count, and who is signed in) on the
+  top-level screens, sections on Home and pages on what opened them, each
+  screen remembering its place, Return walking back and asking before
+  leaving at Home, Hold OK as a shortcut, the remote's media, channel and
+  number keys, and a dialog with Try again now when the server stops
+  answering.
 - Several servers, from 2.0.0: the rail's account button opens Servers (the servers
   this TV has, the current one marked, Add a server, Manage servers). OK on
   another one switches at once, with "Now on …" for a moment; one that
@@ -96,7 +98,7 @@ instead of an admin; `?fakes=empty`, `scanning` and `unreadable` give Home's
 empty states; `?fakes=player` makes the player step down in Automatic, stop
 one play for the administrator, fail another and ask Still watching early;
 `?fakes=nolistings` and `?fakes=notv` give Live TV without listings and
-without access; `?fakes=savefail` refuses every change to the account's
+without access, and `?fakes=notuner` one whose channels can't play; `?fakes=savefail` refuses every change to the account's
 settings, `?fakes=nosettings` doesn't answer for them, and `?fakes=seerr`
 carries requests out through Seerr. Sam has three watchlists (Watchlist,
 Halloween and With the kids); `?fakes=nowatchlists` is a server too old to

@@ -80,6 +80,8 @@ export class ActiveSession {
   readonly connection = {
     subscribe: (listener: () => void) => { this.onlineListeners.add(listener); return () => { this.onlineListeners.delete(listener) } },
     snapshot: () => this.online,
+    /** Try again now: opens the stream again at once rather than at the next backoff. */
+    retry: () => { if (this.ended || !this.attached) return; this.events.stop(); this.events.start() },
   }
 
   private setOnline(online: boolean) {

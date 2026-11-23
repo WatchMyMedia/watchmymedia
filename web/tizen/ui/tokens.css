@@ -2,7 +2,13 @@
    Samsung TV boards. Sizes are in rem at 16px for a 1920px-wide
    screen (1rem = 100vw / 120), so the boards' pixels divide by 16 and the
    layout scales to 1280px or 3840px alike. Plain CSS for Chromium 108: no
-   color-mix, oklch, nesting or :has. */
+   color-mix, oklch, nesting or :has.
+
+   Read from the couch: text and controls stay inside the safe area (96px at
+   the sides, 54px top and bottom) while pictures run to the edges; six type
+   sizes and nothing under 22px; one focus treatment everywhere (a gold ring,
+   growth and a shadow); selected is never a ring (a gold bar, underline, dot
+   or tick). */
 :root {
   color-scheme: dark;
   font-size: calc(100vw / 120);
@@ -12,13 +18,18 @@
   --surface: #151517;
   --surface-2: #1a1a1d;
   --surface-3: #202024;
+  --panel: #151518;
+  --raised: #1e1e22;
+  --skeleton: #1c1c20;
   --line: #222225;
-  --line-2: #2a2a2e;
-  --line-3: #3a3a3f;
+  --line-2: #2e2e33;
+  --line-3: #3a3a41;
+  --line-4: #66666f;
   --field-line: #8c8c8c;
 
   /* Burgundy is only ever a fill (1.4:1 on the ground); gold marks focus,
-     progress, selection and badges; orange is for warnings. */
+     progress, selection and badges; orange is for warnings. Red stays for
+     the recording marks only. */
   --brand: #5a1414;
   --brand-line: #b04545;
   --brand-busy: #2a1414;
@@ -27,53 +38,97 @@
   --accent-soft: rgba(255, 182, 18, .14);
   --on-accent: #0f0f10;
   --warn: #fb923c;
-  --danger: #b42318;
+  --warn-ground: #24180f;
+  --bad-ground: #231314;
+  --danger: #b3261e;
   --danger-line: #e5484d;
   --error-text: #fca5a5;
 
   --text: #f5f5f5;
-  --text-2: #e5e5e5;
-  --text-3: #d4d4d4;
-  --muted: #a3a3a3;
-  --faint: #8c8c8c;
-  --dim: #6b6b6b;
+  --text-2: #e4e4e8;
+  --text-3: #d8d8dc;
+  --muted: #b8b8bd;
+  --faint: #9a9aa2;
+  --dim: #7c7c85;
+  --quiet: #26262b;
+  --quiet-glass: rgba(38, 38, 43, .72);
+  --quiet-focus: #2a2a30;
   --ghost: rgba(255, 255, 255, .10);
   --ghost-line: rgba(255, 255, 255, .14);
   --ghost-focus: rgba(255, 255, 255, .16);
-  --scrim: rgba(0, 0, 0, .6);
+  --track: rgba(255, 255, 255, .26);
+  --scroll-track: #232327;
+  --scroll-thumb: #8e8e96;
+  --scrim: rgba(0, 0, 0, .66);
 
-  /* Focus: a gold ring 4px out, and a slight scale. */
-  --focus-width: .25rem;
-  --focus-offset: .25rem;
-  --focus-scale: 1.04;
+  /* The safe area: text and anything focusable stays inside it. */
+  --safe-x: 6rem;
+  --safe-y: 3.375rem;
+
+  /* Focus, the one treatment: a 5px gold ring 5px off the item, growth and a
+     shadow. Cards grow most, buttons less, list rows least; guide cells don't. */
+  --focus-width: .3125rem;
+  --focus-offset: .3125rem;
+  --focus-shadow: 0 1.25rem 3rem rgba(0, 0, 0, .7);
+  --grow-card: 1.08;
+  --grow-button: 1.05;
+  --grow-row: 1.025;
+  --focus-scale: var(--grow-button);
   --focus-time: 120ms;
+  /* Unavailable things are translucent and still take focus. */
+  --off-opacity: .45;
 
-  --radius-s: .375rem;
-  --radius: .75rem;
-  --radius-m: .875rem;
+  --radius-s: .5rem;
+  --radius: .875rem;
+  --radius-m: 1.125rem;
   --radius-l: 1.125rem;
-  --radius-xl: 1.375rem;
+  --radius-xl: 1.75rem;
 
-  /* The screen's frame: the rail, the gutter and where content starts. */
-  --rail-w: 6rem;
-  --rail-open-w: 21.25rem;
-  --gutter: 3.625rem;
-  --content-left: 9.625rem;
-  --row-width: 110.375rem;
+  /* The screen's frame: the menu's rail inside the safe area, where content
+     starts beside it, and where a page without the menu starts (20px in from
+     the safe area, so a focused button's ring and growth stay inside it). */
+  --rail-left: var(--safe-x);
+  --rail-item: 4.75rem;
+  --drawer-w: 35rem;
+  --gutter: var(--safe-x);
+  --content-left: 13.5rem;
+  --page-left: 7.25rem;
+  --row-width: calc(120rem - var(--content-left));
 
-  /* Cards: width, height and the gap between them. */
-  --card-gap: 1.5rem;
-  --poster-w: 12.5rem;
-  --poster-h: 18.75rem;
-  --wide-w: 20rem;
-  --wide-h: 11.25rem;
+  /* Cards: four 16:9 cards or six posters across, the next one peeking. */
+  --card-gap: 2.25rem;
+  --poster-w: 14.5rem;
+  --poster-h: 21.75rem;
+  --wide-w: 23rem;
+  --wide-h: 12.9375rem;
+  --person-w: 11rem;
+  --person-pic: 9rem;
+
+  /* Buttons, fields and rows of a list. */
+  --button-h: 4.75rem;
+  --field-h: 5.25rem;
+  --option-h: 5.25rem;
+  --panel-w: 47.5rem;
+  --panel-wide-w: 60rem;
+  --dialog-w: 60rem;
 
   --font: Inter, "SamsungOne", "Samsung Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --text-kicker: 1.25rem;
-  --text-hero: 4.5rem;
-  --text-h1: 3.75rem;
-  --text-h2: 1.75rem;
-  --text-body: 1.5rem;
-  --text-small: 1.25rem;
-  --text-meta: 1.0625rem;
+  /* The six sizes: 68 the title of the thing, 46 a screen's or panel's title,
+     32 a row's heading, 28 sentences, 26 buttons, 24 and 22 labels, a card's
+     lines and key caps. */
+  --t-display: 4.25rem;
+  --t-title: 2.875rem;
+  --t-head: 2rem;
+  --t-body: 1.75rem;
+  --t-button: 1.625rem;
+  --t-label: 1.5rem;
+  --t-small: 1.375rem;
+  /* The older names, kept for the screens that read them. */
+  --text-kicker: var(--t-small);
+  --text-hero: var(--t-display);
+  --text-h1: var(--t-title);
+  --text-h2: var(--t-head);
+  --text-body: var(--t-body);
+  --text-small: var(--t-small);
+  --text-meta: var(--t-small);
 }

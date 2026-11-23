@@ -1,40 +1,31 @@
-import type { ReactNode } from 'react'
-import { useKeys } from '../../app/hooks'
+import { useState, type ReactNode } from 'react'
+import { useFocus, useKeys } from '../../app/hooks'
 import type { KeyInput } from '../../app/keys'
 import type { FilePlayback, FilePlaybackState } from '../../player'
-import { SidePanel } from '../../ui/Overlays'
+import { Button } from '../../ui/Button'
+import { Option, PanelLine, SidePanel } from '../../ui/Overlays'
 import { VScroll } from '../../ui/VScroll'
-import { qualityRows, subtitlePanel, type OnlineRow, type PickRow, type SubtitleChoices } from './labels'
+import { audioLine, qualityRows, qualitySentence, streamDetails, subtitleLine, subtitlePanel, type OnlineRow, type SubtitleChoices } from './labels'
 import { PlayerIcon } from './PlayerIcons'
 
-// Audio, Subtitles and Quality, each its own side panel (the
-// Samsung boards' change from Android TV's one sheet). A choice applies at
-// once and the panel stays open; Return closes it, and focus goes back to
-// the button that opened it. The chosen row has focus when it opens.
+// The player's two panels from the right: Audio and subtitles, in one, and
+// Quality. A choice applies at once and the panel stays open; Return
+// closes it, or from a page inside it (Find more subtitles, Stream
+// details) goes back to the row that opened that page; focus goes back to
+// the button that opened the panel. The chosen row has focus when it opens.
 
-export type Picker = 'audio' | 'subtitles' | 'quality'
+export type Picker = 'tracks' | 'quality'
 
-const TITLES: Record<Picker, string> = { audio: 'Audio', subtitles: 'Subtitles', quality: 'Quality' }
-const NOTES: Record<Picker, string> = {
-  audio: 'A choice applies at once, from where you are.',
-  subtitles: 'The file’s own tracks first, then OpenSubtitles. A burned-in subtitle restarts the stream from here.',
-  quality: 'A choice applies at once, from where you are.',
-}
-
-/** A panel's frame: the title, the rows (scrolled as focus moves), the note, and its keys. */
-export function PlayerPanel({ title, wide, onClose, onKey, note, okHint, children, aside }: {
-  title: string; wide?: boolean; onClose(): void; onKey(input: KeyInput): boolean; note?: string; okHint: string; children: ReactNode; aside?: ReactNode
+/** A panel's frame: the title, a line under it, the rows (scrolled as focus moves), and what is at its foot. */
+export function PlayerPanel({ title, sub, onClose, onKey, foot, children, wide, aside }: {
+  title: string; sub?: ReactNode; onClose(): void; onKey(input: KeyInput): boolean; foot?: ReactNode; children: ReactNode; wide?: boolean
+  /** Above the rows, outside their scroll (the Episodes panel's season tabs). */
+  aside?: ReactNode
 }) {
-  return <SidePanel title={title} onClose={onClose} className={`pl-panel${wide ? ' pl-panel--wide' : ''}`}>
+  return <SidePanel title={title} sub={sub} onClose={onClose} wide={wide} className="pl-panel" foot={foot && (typeof foot === 'string' ? <p className="pl-panel__foot">{foot}</p> : foot)}>
     <PanelKeys onKey={onKey}/>
     {aside}
     <div className="pl-panel__list"><VScroll pad={24}>{children}</VScroll></div>
-    {note && <p className="pl-panel__note">{note}</p>}
-    <div className="pl-panel__keys" aria-hidden="true">
-      <span className="tv-kbd">OK</span><span>{okHint}</span>
-      <span className="pl-panel__gap"/>
-      <span className="tv-kbd">Return</span><span>Closes this panel</span>
-    </div>
   </SidePanel>
 }
 
@@ -48,58 +39,85 @@ function PanelKeys({ onKey }: { onKey(input: KeyInput): boolean }) {
   return null
 }
 
-/** One row: the label, its detail beside it, and the gold mark when chosen. */
-function Row({ id, row, onPress, autoFocus }: { id: string; row: PickRow; onPress(): void; autoFocus?: boolean }) {
-  return <button type="button" role="menuitemradio" aria-checked={row.checked} data-focus={id} data-autofocus={autoFocus || row.checked || undefined}
-    className="tv-option pl-pick" onClick={onPress}>
-    <span className="pl-pick__label">{row.label}</span>
-    {row.detail && <span className="pl-pick__detail">{row.detail}</span>}
-    {row.checked && <span className="pl-pick__mark"><PlayerIcon name="check"/></span>}
-  </button>
-}
-
-/** An OpenSubtitles result: OK downloads it and turns it on. */
-function OnlineResult({ row, onPress }: { row: OnlineRow; onPress(): void }) {
-  return <button type="button" role="menuitem" data-focus={`online/${row.id}`} aria-disabled={row.state === 'off' || undefined}
-    aria-label={`${row.label}${row.detail ? `, ${row.detail}` : ''}${row.state === 'get' ? ', download and turn on' : row.state === 'busy' ? ', downloading' : ''}`}
-    className="tv-option pl-pick" onClick={row.state === 'get' ? onPress : undefined}>
-    <span className="pl-pick__label">{row.label}</span>
-    {row.detail && <span className="pl-pick__detail">{row.detail}</span>}
-    {row.state === 'get' && <span className="pl-pick__get"><PlayerIcon name="download"/></span>}
-    {row.state === 'busy' && <span className="pl-pick__busy">downloading…</span>}
-  </button>
-}
-
 const Heading = ({ children }: { children: string }) => <h3 className="pl-panel__heading">{children}</h3>
 
-type PickerState = Pick<FilePlaybackState, 'audio' | 'quality'> & { subtitles: SubtitleChoices }
+type PickerState = Pick<FilePlaybackState, 'audio' | 'quality' | 'mode' | 'video' | 'stream'> & { subtitles: SubtitleChoices }
 
 export function PickerPanel({ picker, state, playback, onClose, onKey }: { picker: Picker; state: PickerState; playback: FilePlayback; onClose(): void; onKey(input: KeyInput): boolean }) {
-  return <PlayerPanel title={TITLES[picker]} onClose={onClose} onKey={onKey} note={NOTES[picker]} okHint="Chooses; the panel stays open">
-    {picker === 'audio' && <div role="radiogroup" className="pl-panel__rows">
-      {state.audio.options.map((a, i) => <Row key={a.index} id={`audio/${a.index}`} autoFocus={state.audio.selected === undefined && i === 0}
-        row={{ id: String(a.index), label: a.label, detail: a.detail, checked: a.index === state.audio.selected }} onPress={() => playback.selectAudio(a.index)}/>)}
-    </div>}
-    {picker === 'subtitles' && <Subtitles subtitles={state.subtitles} playback={playback}/>}
-    {picker === 'quality' && <div role="radiogroup" className="pl-panel__rows">
-      {qualityRows(state.quality).map((q) => <Row key={q.id} id={`quality/${q.id}`} row={q} onPress={() => playback.setQuality(q.id)}/>)}
-    </div>}
+  return picker === 'tracks'
+    ? <TracksPanel state={state} playback={playback} onClose={onClose} onKey={onKey}/>
+    : <QualityPanel state={state} playback={playback} onClose={onClose} onKey={onKey}/>
+}
+
+/** Audio and subtitles in one panel, named in words: "Surround sound", "With sounds described". */
+function TracksPanel({ state, playback, onClose, onKey }: { state: PickerState; playback: FilePlayback; onClose(): void; onKey(input: KeyInput): boolean }) {
+  const focus = useFocus()
+  const [online, setOnline] = useState(false)
+  const panel = subtitlePanel(state.subtitles)
+  const back = () => { setOnline(false); queueMicrotask(() => focus.focusId('tracks/more', focus.scope('modal'))) }
+  if (online && panel.online) {
+    const o = panel.online
+    return <PlayerPanel key="online" title="Find more subtitles" sub="From OpenSubtitles, in your languages" onClose={back} onKey={onKey} foot={o.credit}>
+      <div role="radiogroup" className="pl-panel__rows">
+        {o.downloaded.map((r, i) => <Option key={r.id} id={`subtitles/${r.id}`} label={r.label} detail={r.detail} checked={r.checked} autoFocus={i === 0 && !r.checked}
+          onPress={() => playback.selectSubtitle(r.id)}/>)}
+        {o.results.map((r, i) => <OnlineResult key={r.id} row={r} autoFocus={!o.downloaded.length && i === 0} onPress={() => playback.downloadSubtitle(r.id)}/>)}
+        {o.note && <p className="pl-panel__credit">{o.note}</p>}
+      </div>
+    </PlayerPanel>
+  }
+  const audio = state.audio.options
+  const subtitles = state.subtitles.options.filter((s) => s.source !== 'opensubtitles' || s.id === state.subtitles.selected)
+  return <PlayerPanel key="tracks" title="Audio and subtitles" onClose={onClose} onKey={onKey} foot="A choice applies straight away. Return closes this.">
+    {audio.length > 0 && <>
+      <Heading>Audio</Heading>
+      <div role="radiogroup" className="pl-panel__rows">
+        {audio.map((a, i) => <Option key={a.index} id={`audio/${a.index}`} label={a.label} detail={audioLine(a)} checked={a.index === (state.audio.selected ?? audio[0].index)}
+          autoFocus={state.audio.selected === undefined && i === 0} onPress={() => playback.selectAudio(a.index)}/>)}
+      </div>
+    </>}
+    <Heading>Subtitles</Heading>
+    <div role="radiogroup" className="pl-panel__rows">
+      <Option id="subtitles/off" label="Off" checked={state.subtitles.selected === undefined} onPress={() => playback.selectSubtitle(undefined)}/>
+      {subtitles.map((s) => <Option key={s.id} id={`subtitles/${s.id}`} label={s.label} detail={subtitleLine(s)} checked={s.id === state.subtitles.selected} onPress={() => playback.selectSubtitle(s.id)}/>)}
+      {panel.online && <Option id="tracks/more" label="Find more subtitles" next onPress={() => setOnline(true)}/>}
+    </div>
   </PlayerPanel>
 }
 
-function Subtitles({ subtitles, playback }: { subtitles: PickerState['subtitles']; playback: FilePlayback }) {
-  const panel = subtitlePanel(subtitles)
-  const pick = (id: string) => playback.selectSubtitle(id)
-  return <div role="radiogroup" className="pl-panel__rows">
-    <Row id="subtitles/off" row={panel.off} onPress={() => playback.selectSubtitle(undefined)}/>
-    {panel.own.length > 0 && panel.online && <Heading>In this file</Heading>}
-    {panel.own.map((r) => <Row key={r.id} id={`subtitles/${r.id}`} row={r} onPress={() => pick(r.id)}/>)}
-    {panel.online && <>
-      <Heading>OpenSubtitles</Heading>
-      {panel.online.downloaded.map((r) => <Row key={r.id} id={`subtitles/${r.id}`} row={r} onPress={() => pick(r.id)}/>)}
-      {panel.online.results.map((r) => <OnlineResult key={r.id} row={r} onPress={() => playback.downloadSubtitle(r.id)}/>)}
-      {panel.online.note && <p className="pl-panel__credit">{panel.online.note}</p>}
-      <p className="pl-panel__credit">{panel.online.credit}</p>
-    </>}
-  </div>
+/** An OpenSubtitles result: OK downloads it and turns it on. */
+function OnlineResult({ row, onPress, autoFocus }: { row: OnlineRow; onPress(): void; autoFocus?: boolean }) {
+  return <button type="button" role="menuitem" data-focus={`online/${row.id}`} data-autofocus={autoFocus || undefined} aria-disabled={row.state === 'off' || undefined}
+    aria-label={`${row.label}${row.detail ? `, ${row.detail}` : ''}${row.state === 'get' ? ', download and turn on' : row.state === 'busy' ? ', downloading' : ''}`}
+    className="tv-option" onClick={row.state === 'get' ? onPress : undefined}>
+    <span className="tv-option__text"><span className="tv-option__label">{row.label}</span>{row.detail && <span className="tv-option__detail">{row.detail}</span>}</span>
+    {row.state === 'get' && <span className="tv-option__end"><PlayerIcon name="download"/></span>}
+    {row.state === 'busy' && <span className="tv-option__end">Downloading…</span>}
+  </button>
+}
+
+/**
+ * Quality: a sentence saying what plays now, the choices in words, and
+ * Stream details one press away for whoever looks after the server. The
+ * choice is kept for this TV; other devices keep their own.
+ */
+function QualityPanel({ state, playback, onClose, onKey }: { state: PickerState; playback: FilePlayback; onClose(): void; onKey(input: KeyInput): boolean }) {
+  const focus = useFocus()
+  const [details, setDetails] = useState(false)
+  const back = () => { setDetails(false); queueMicrotask(() => focus.focusId('quality/details', focus.scope('modal'))) }
+  if (details) {
+    return <PlayerPanel key="details" title="Stream details" sub="The numbers, for whoever looks after the server" onClose={back} onKey={onKey}
+      foot={<Button id="details/back" autoFocus onPress={back}>Back to Quality</Button>}>
+      <dl className="pl-facts">
+        {streamDetails(state).map((r) => <div key={r.label} className="pl-facts__row"><dt>{r.label}</dt><dd>{r.value}</dd></div>)}
+      </dl>
+    </PlayerPanel>
+  }
+  return <PlayerPanel key="quality" title="Quality" sub={qualitySentence(state)} onClose={onClose} onKey={onKey} foot="Your choice is kept for this TV. Other devices keep their own.">
+    <div role="radiogroup" className="pl-panel__rows">
+      {qualityRows(state.quality).map((q) => <Option key={q.id} id={`quality/${q.id}`} label={q.label} detail={q.detail} checked={q.checked} onPress={() => playback.setQuality(q.id)}/>)}
+    </div>
+    <PanelLine/>
+    <Option id="quality/details" label="Stream details" detail="The numbers, for whoever looks after the server" next onPress={() => setDetails(true)}/>
+  </PlayerPanel>
 }

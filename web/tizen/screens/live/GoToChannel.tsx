@@ -5,7 +5,7 @@ import { editChannelNumber } from '../../player'
 import { Button } from '../../ui/Button'
 import { Modal } from '../../ui/Overlays'
 import { numberKey } from './liveRemote'
-import { matchWords } from './liveWords'
+import { leftWords, matchWords, onNow } from './liveWords'
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '\b']
 
@@ -27,10 +27,10 @@ function Keypad({ digits, text, matched, onKey, onWatch, onCancel, watchLabel, n
 }
 
 /**
- * Go to channel over the guide or Live TV: the number
- * typed with the remote's digit keys (the "-" key is the dot) or the
- * keypad; OK watches the one channel that number names, and nothing else
- * changes until then. Return closes it.
+ * Go to channel over the guide: the number typed with the remote's digit
+ * keys (the "-" key is the dot) or the pad beside it; Watch (focused)
+ * tunes the one channel that number names, and nothing changes until then.
+ * Return, like Cancel, closes it without tuning.
  */
 export function GoToChannelDialog({ channels, initial, now, onWatch, onClose }: { channels: readonly LiveChannel[]; initial: string; now: number; onWatch(channel: LiveChannel): void; onClose(): void }) {
   const [digits, setDigits] = useState(initial)
@@ -43,10 +43,26 @@ export function GoToChannelDialog({ channels, initial, now, onWatch, onClose }: 
     return true
   }, true, 'modal')
   const { text, match } = matchWords(channels, digits, now)
-  return <Modal onClose={onClose} className="live-goto-host">
-    <section role="dialog" aria-modal="true" aria-label="Go to channel" className="live-goto live-goto--centre">
-      <Keypad digits={digits} text={text} matched={!!match} onKey={type} onCancel={onClose} watchLabel={match ? `Watch ${match.number}` : 'Watch'}
-        onWatch={() => { if (match) onWatch(match) }} note="The remote’s number keys open this and type the channel, here or while watching. OK watches it; Return closes."/>
+  const on = match && onNow(match, now)
+  return <Modal onClose={onClose} className="tv-dialog-host">
+    <section role="dialog" aria-modal="true" aria-label="Go to channel" className="tv-dialog live-goto2">
+      <div className="live-goto2__main">
+        <h2 className="tv-dialog__title">Go to channel</h2>
+        <div className="live-goto2__field" role="status" aria-label={`Channel ${digits || 'not typed yet'}`}>{digits || <span className="live-goto2__empty">–</span>}</div>
+        {match ? <div className="live-goto2__match">
+          <span className="live-chan">{match.number}</span>
+          <span className="live-goto2__what"><b>{match.name}</b><span>{on ? `${on.title} · ${leftWords(Date.parse(on.end), now)}` : 'No listings'}</span></span>
+        </div> : <p className="live-goto2__hint">{text}</p>}
+        <div className="tv-actions live-goto2__actions">
+          <Button id="goto/watch" variant="primary" autoFocus disabled={!match} why="Type a channel’s number first" onPress={() => { if (match) onWatch(match) }}>{match ? `Watch ${match.number}` : 'Watch'}</Button>
+          <Button id="goto/cancel" onPress={onClose}>Cancel</Button>
+        </div>
+        <p className="live-goto2__note">Type with the remote’s number keys, or use the pad. It tunes only on OK.</p>
+      </div>
+      <div className="live-goto2__pad" role="group" aria-label="Number pad">
+        {KEYS.map((k) => <button key={k} type="button" className="live-goto2__key" data-focus={`goto/${k === '\b' ? 'delete' : k === '.' ? 'dot' : k}`}
+          aria-label={k === '\b' ? 'Delete' : k === '.' ? 'Dot' : k} onClick={() => type(k)}>{k === '\b' ? 'Del' : k}</button>)}
+      </div>
     </section>
   </Modal>
 }

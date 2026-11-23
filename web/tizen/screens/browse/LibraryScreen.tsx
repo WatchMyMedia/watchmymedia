@@ -3,26 +3,28 @@ import { flushSync } from 'react-dom'
 import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query'
 import type { components } from '../../../src/api/schema'
 import { itemsQuery, librariesQuery, rowsQuery, useLibraryByType } from '../../../src/api/queries'
-import { filterOptions, sortOptions, type LibraryType } from '../../../src/lib/browseOptions'
+import { sortOptions, type LibraryType } from '../../../src/lib/browseOptions'
 import { drawable, isListRow, libraryRows, type ScreenRow } from '../../../src/lib/screenRows'
-import { useBack, useFocus, useKeys, useMediaUrls, useNav } from '../../app/hooks'
+import { useBack, useFocus, useKeys, useMediaUrls, useNav, useSession } from '../../app/hooks'
 import type { ScreenProps } from '../../app/routes'
 import { Button } from '../../ui/Button'
 import { Card } from '../../ui/Card'
 import { Grid } from '../../ui/Grid'
 import { Icon } from '../../ui/Icon'
-import { Option, SidePanel } from '../../ui/Overlays'
+import { Option, PanelLine, SidePanel } from '../../ui/Overlays'
+import { Clock } from '../../ui/Clock'
 import { ProblemScreen, SkeletonRow, SkeletonText } from '../../ui/States'
 import { VScroll } from '../../ui/VScroll'
 import { problemWords } from '../../ui/problemWords'
 import { CardActions } from './CardActions'
-import { useCardActions, useFocusHint, useFocusOnArrival, useRowCards } from './browseHooks'
+import { useCardActions, useFocusOnArrival, useRowCards } from './browseHooks'
 import { useEntryState } from './entryState'
 import { ALPHABET, letterCounts, letterLabel, nextLetter, PAGE_SIZE, pagesAround, slots, stepRows, stripEntry, toStrip, type LetterOffset } from './gridPages'
-import { HintPill, HScroll, KeyRow, type Hint } from './Hints'
 import {
-  choicesFrom, countsLine, decadeLabel, DEFAULT_CHOICES, genreChips, gridGroup, gridLine, libraryNoun, narrowed, sortLabel, type GridChoices,
+  choicesFrom, countsLine, decadeLabel, DEFAULT_CHOICES, FILTER_ROW_LABEL, filterChoices, filterRows, filterRowValue, filterSummary, genreChips, gridGroup, gridLine, libraryNoun,
+  narrowed, narrowedLine, nothingMatches, sortLabel, type FilterRow, type GridChoices,
 } from './libraryView'
+import { keepChoices, keptChoices } from './keptChoices'
 import { itemActions, seeAllRoute, type CardAction, type RowContext } from './rowCards'
 import { Glyph, RowView } from './RowView'
 import { useWatchlistsOn } from '../watchlists/useWatchlistsOn'
@@ -31,6 +33,9 @@ import './browse.css'
 type Library = components['schemas']['Library']
 type BrowseItem = components['schemas']['BrowseItem']
 type ItemList = components['schemas']['ItemList']
+
+/** Posters across the grid. */
+const COLUMNS = 6
 
 const query = (c: GridChoices) => ({ sort: c.sort, filter: c.filter, genre: c.genre || undefined, decade: c.decade || undefined })
 const pageData = (results: UseQueryResult<ItemList>[]) => results.map((r) => r.data)
@@ -41,24 +46,60 @@ function LibraryRow({ row, base }: { row: ScreenRow; base: Omit<RowContext, 'now
   return <RowView row={row} cards={cards} listings={false}/>
 }
 
-/** Sort, decade: the choices a side panel offers. */
-type Picker = 'sort' | 'decade'
+/** The panel open over the grid. */
+type Picker = 'filter' | 'sort'
 
-function ChipRow({ type, choices, facets, onChange, onPick }: {
-  type: LibraryType; choices: GridChoices; facets?: Pick<ItemList, 'facets' | 'genreCounts'>; onChange(c: GridChoices): void; onPick(p: Picker): void
+/** Filter and Sort, each a button that opens its panel, with what each is set to; Clear filters while the grid is narrowed. */
+function GridButtons({ type, choices, onPick, onClear }: { type: LibraryType; choices: GridChoices; onPick(p: Picker): void; onClear(): void }) {
+  // ▶ from the last button stops there, rather than dropping into the grid below.
+  useKeys((input) => {
+    const active = document.activeElement as HTMLElement | null
+    return input.action === 'right' && !!active?.closest('.library-buttons') && !active.nextElementSibling
+  })
+  return <div className="library-buttons">
+    <button type="button" data-focus="library/filter" className="tv-btn library-btn" onClick={() => onPick('filter')}>
+      <Icon name="filter"/>Filter<span className="library-btn__value">{filterSummary(choices)}</span>
+    </button>
+    <button type="button" data-focus="library/sort" className="tv-btn library-btn" onClick={() => onPick('sort')}>
+      <Icon name="sort"/>Sort<span className="library-btn__value">{sortLabel(type, choices.sort)}</span>
+    </button>
+    {narrowed(choices) && <Button id="library/clear" onPress={onClear}>Clear filters</Button>}
+  </div>
+}
+
+/**
+ * Filter: a row for each way to narrow the grid, with what it is set to;
+ * OK opens its choices in the same panel, and choosing one changes the grid
+ * at once and comes back to the rows. Return goes up a level, then closes.
+ */
+function FilterPanel({ type, choices, facets, line, kept, onChange, onClose }: {
+  type: LibraryType; choices: GridChoices; facets?: Pick<ItemList, 'facets' | 'genreCounts'>; line?: string; kept: boolean; onChange(c: GridChoices): void; onClose(): void
 }) {
+  const [page, setPage] = useState<FilterRow>()
+  const [from, setFrom] = useState<FilterRow>()
   const genres = genreChips(facets?.facets.genres ?? [], facets?.genreCounts, choices.genre)
   const decades = facets?.facets.decades ?? []
-  return <HScroll className="library-chips" trackClassName="library-chips__track" trackProps={{ role: 'group', 'aria-label': 'Show', 'data-row': true, 'data-group': 'library/chips' }}>
-      {filterOptions(type).map((f) => <button key={f.value || 'all'} type="button" data-focus={`chips/f-${f.value || 'all'}`} className="tv-chip" aria-pressed={choices.filter === f.value}
-        onClick={() => onChange({ ...choices, filter: f.value })}>{f.label}</button>)}
-      {(genres.length > 0 || decades.length > 0) && <span className="library-chips__divider" aria-hidden="true"/>}
-      {genres.map((g) => <button key={g} type="button" data-focus={`chips/g-${g}`} className="tv-chip" aria-pressed={choices.genre === g}
-        onClick={() => onChange({ ...choices, genre: choices.genre === g ? '' : g })}>{g}</button>)}
-      {decades.length > 0 && <button type="button" data-focus="chips/decade" className="tv-chip library-chip-more" aria-pressed={!!choices.decade} onClick={() => onPick('decade')}>
-        {choices.decade ? decadeLabel(choices.decade) : 'Decade'}<Icon name="down"/>
-      </button>}
-  </HScroll>
+  const rows = filterRows(type, { genres: genres.length > 0, decades: decades.length > 0 })
+  const back = (row: FilterRow) => { setFrom(row); setPage(undefined) }
+  if (page) {
+    const pick = (c: GridChoices) => { onChange(c); back(page) }
+    const options = page === 'genre' ? [{ value: '', label: 'Any' }, ...genres.map((g) => ({ value: g, label: g }))]
+      : page === 'decade' ? [{ value: '0', label: 'Any' }, ...decades.map((d) => ({ value: String(d), label: decadeLabel(d) }))]
+        : filterChoices(type, page)
+    const chosen = page === 'genre' ? choices.genre : page === 'decade' ? String(choices.decade) : filterRowValue(page, choices) === 'Any' ? '' : choices.filter
+    return <SidePanel key={page} title={FILTER_ROW_LABEL[page]} sub={line} onClose={() => back(page)}>
+      <VScroll>
+        {options.map((o) => <Option key={o.value || 'any'} id={`filter/${page}/${o.value || 'any'}`} label={o.label} checked={o.value === chosen}
+          onPress={() => pick(page === 'genre' ? { ...choices, genre: o.value } : page === 'decade' ? { ...choices, decade: Number(o.value) } : { ...choices, filter: o.value as GridChoices['filter'] })}/>)}
+      </VScroll>
+    </SidePanel>
+  }
+  const noun = type === 'tv' ? 'TV Shows' : 'Movies'
+  return <SidePanel key="rows" title="Filter" sub={line} onClose={onClose} foot={kept ? <p className="tv-faint">{noun} opens this way next time, on this TV.</p> : undefined}>
+    {rows.map((r) => <Option key={r} id={`filter/${r}`} label={FILTER_ROW_LABEL[r]} detail={r === 'picture' ? (type === 'tv' ? '4K' : '4K, HDR') : undefined} autoFocus={r === (from ?? rows[0])}
+      end={<span className={filterRowValue(r, choices) === 'Any' ? undefined : 'library-chosen'}>{filterRowValue(r, choices)}</span>} next onPress={() => setPage(r)}/>)}
+    {narrowed(choices) && <><PanelLine/><div className="library-panel-clear"><Button id="filter/clear" onPress={() => onChange({ ...DEFAULT_CHOICES, sort: choices.sort })}>Clear filters</Button></div></>}
+  </SidePanel>
 }
 
 /** The A–Z strip's state: the letter focused on it, and the title focus came from (Return goes back to it). */
@@ -168,21 +209,15 @@ function GridBody({ library, type, choices, first, focusFirst, onFocused, autoFo
   }
   const landing = strip ? offsetOf(strip.letter) : undefined
   const noun = libraryNoun(type)
-  const hints: Hint[] = strip
-    ? [{ keys: ['▲', '▼'], label: 'Letter, skipping empty ones' }, { keys: ['OK', '◀'], label: `First ${noun} under ${strip.letter}` }, { keys: ['Return'], label: `Back to the ${noun} you were on` }]
-    : [
-      ...(byTitle ? [{ keys: ['▶'], label: 'From the last column: A–Z' }] : []),
-      { keys: ['CH ▲', 'CH ▼'], label: 'A screen up or down' },
-      ...(menu ? [{ keys: ['Hold OK'], label: 'Its menu' }] : type === 'movie' ? [{ keys: ['Hold OK'], label: 'Mark watched' }] : []),
-      ...(byTitle || choices.sort === 'title' ? [] : [{ note: 'A–Z appears when the list is sorted by title' }]),
-    ]
+  const rowCount = Math.max(1, Math.ceil(total / COLUMNS))
+  const atRow = Math.floor(Math.max(0, view) / COLUMNS)
   return <div className="library-grid__body" onFocus={onFocus} data-autofocus={autoFocus || undefined}>
     <Grid key={group} id={group} items={items} itemKey={(_, i) => String(i)} variant="poster" reveal={reveal}
       renderItem={(item, id, i) => {
         const actions = item ? itemActions(item, menu) : {}
         return <div className={`browse-cell${item ? '' : ' browse-slot'}${landing === i ? ' browse-land' : ''}`}>
           <Card id={id} variant="poster" title={item?.title ?? ''} subtitle={item ? gridLine(item) : undefined} image={item && media.imageUrl(item.posterPath, 'w342')}
-            progress={item?.progress} badges={item?.isNew ? [{ label: 'New', tone: 'gold' }] : item?.watched ? [{ label: '✓', tone: 'gold' }] : undefined}
+            progress={item?.progress} badges={item?.isNew ? [{ label: 'New', tone: 'gold' }] : undefined} done={!!item?.watched && !item.progress}
             label={item ? [item.title, gridLine(item), item.watched && 'watched'].filter(Boolean).join(', ') : 'Loading'}
             onPress={actions.press && (() => run(actions.press))} onHold={actions.hold && (() => run(actions.hold))}/>
         </div>
@@ -191,68 +226,55 @@ function GridBody({ library, type, choices, first, focusFirst, onFocused, autoFo
       {ALPHABET.map((l) => {
         const n = counts.get(l) ?? 0
         const current = (strip?.letter ?? stripEntry(letters, view)) === l
-        return <button key={l} type="button" data-focus={`az/${l}`} className={`library-az${current ? ' library-az--current' : ''}`} aria-disabled={n === 0 || undefined}
+        return <button key={l} type="button" data-focus={`az/${l}`} className={`library-az${current ? ' library-az--current' : ''}`} aria-disabled={n === 0 || undefined} data-skip={n === 0 || undefined}
           aria-label={letterLabel(l, n, noun)} onClick={() => { const at = offsetOf(l); if (n && at !== undefined) land(at) }}>{l}</button>
       })}
     </nav>}
-    {strip && <div className="library-bubble" aria-hidden="true" style={{ top: `calc(${ALPHABET.indexOf(strip.letter)} * 1.6875rem + 1.3125rem - 3.5rem)` }}>
+    {strip && <div className="library-bubble" aria-hidden="true" style={{ top: `calc(${ALPHABET.indexOf(strip.letter)} * 1.65rem + .825rem - 3.5rem)` }}>
       <b>{strip.letter}</b><span>{`${counts.get(strip.letter) ?? 0} ${(counts.get(strip.letter) ?? 0) === 1 ? noun : `${noun}s`}`}</span>
     </div>}
-    <GridHints hints={hints}/>
+    {!byTitle && rowCount > 2 && <div className="library-pos" role="img" aria-label={`Row ${atRow + 1} of ${rowCount}`}>
+      <i style={{ height: `${Math.max(6, 200 / rowCount)}%`, top: `${(Math.min(atRow, rowCount - 2) / rowCount) * 100}%` }}/>
+    </div>}
   </div>
-}
-
-/** The grid's keys along the foot, while focus is in the grid. */
-function GridHints({ hints }: { hints: Hint[] }) {
-  return <KeyRow hints={hints} className="browse-hints library-hints"/>
 }
 
 /**
- * All movies or All shows: the count and Sort, the filter, genre and decade
- * chips, and the grid. Changing a choice leaves focus on its chip, and the
- * grid starts again at its first title.
+ * All movies or All shows: the count, Filter and Sort, and the grid.
+ * Changing a choice leaves focus on its button, and the grid starts again
+ * at its first title. Alone (no rows above), the library's name heads it.
  */
-function GridSection({ library, type, choices, onChange, alone, lists, autoFocus, focusFirst, onFocused }: {
-  library: Library; type: LibraryType; choices: GridChoices; onChange(c: GridChoices): void; alone: boolean; lists: number; autoFocus: boolean; focusFirst: boolean; onFocused(): void
+function GridSection({ library, type, choices, onChange, alone, lists, autoFocus, focusFirst, onFocused, kept }: {
+  library: Library; type: LibraryType; choices: GridChoices; onChange(c: GridChoices): void; alone: boolean; lists: number; autoFocus: boolean; focusFirst: boolean; onFocused(): void; kept: boolean
 }) {
-  // While a new choice loads, the chips keep the last reply's genres (the focused chip stays), and the grid shows its loading.
   const page = useQuery(itemsQuery(library.id, { ...query(choices), limit: PAGE_SIZE, offset: 0 }))
   const [picker, setPicker] = useState<Picker>()
-  const [inGrid, setInGrid] = useState(false)
   const title = type === 'tv' ? 'TV Shows' : 'Movies'
   const noun = type === 'tv' ? 'shows' : 'movies'
   const data = page.data
-  const counts = countsLine(type, { totals: data?.totals, total: data?.total, lists, sort: alone ? choices.sort : undefined })
-  const sort = <div className="library-sort">
-    <span className="library-sort__label">Sort</span>
-    <button type="button" data-focus="library/sort" className="tv-chip library-chip-more" onClick={() => setPicker('sort')}>{sortLabel(type, choices.sort)}<Icon name="down"/></button>
-  </div>
-  const onFocusIn = (e: FocusEvent) => setInGrid(!!(e.target as HTMLElement).closest('.library-grid__body'))
-  const onFocusOut = (e: FocusEvent) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setInGrid(false) }
-  return <section className={`library-grid${alone ? ' library-grid--alone' : ''}${choices.sort === 'title' && data?.letters?.length ? ' library-grid--az' : ''}${inGrid ? ' library-grid--in' : ''}`}
-    data-vitem aria-label={`All ${noun}`} onFocus={onFocusIn} onBlur={onFocusOut}>
+  const all = data?.totals?.items ?? data?.total
+  const line = data && narrowed(choices) && all !== undefined ? narrowedLine(type, data.total, all) : countsLine(type, { totals: data?.totals, total: data?.total, lists })
+  const clear = () => onChange({ ...DEFAULT_CHOICES, sort: choices.sort })
+  return <section className={`library-grid${alone ? ' library-grid--alone' : ''}${choices.sort === 'title' && data?.letters?.length ? ' library-grid--az' : ''}`}
+    data-vitem aria-label={`All ${noun}`}>
     {alone
-      ? <header className="library-head">
-        <div className="library-head__text"><h1 className="library-title">{title}</h1><p className="library-counts">{counts || ' '}</p></div>{sort}
-      </header>
-      : <div className="library-grid__head">
-        <h2 className="library-grid__title">All {noun}{data && !page.isPlaceholderData && <small>{data.total.toLocaleString()}</small>}</h2>{sort}
-      </div>}
-    <ChipRow type={type} choices={choices} facets={data} onChange={onChange} onPick={setPicker}/>
+      ? <header className="library-head"><h1 className="library-title">{title}</h1><p className="library-counts">{line || ' '}</p></header>
+      : <div className="library-grid__head"><h2 className="library-grid__title">All {noun}{data && !page.isPlaceholderData && <small>{line}</small>}</h2></div>}
+    <GridButtons type={type} choices={choices} onPick={setPicker} onClear={clear}/>
     {page.isPending || page.isPlaceholderData ? <div className="library-grid__body"><SkeletonRow variant="poster" title={false}/></div>
       : page.isError ? <GridProblem error={page.error} onRetry={() => void page.refetch()}/>
         : data && data.total === 0 ? <div className="library-empty">
           <h2 className="library-empty__title">{narrowed(choices) ? 'Nothing matches' : `No ${noun} yet`}</h2>
-          <p className="library-empty__body">{narrowed(choices) ? `No ${noun} match these filters.` : 'Add them to the library on the server’s web page and scan it; they appear here.'}</p>
-          {narrowed(choices) && <Button id="library/clear" variant="primary" onPress={() => onChange({ ...DEFAULT_CHOICES, sort: choices.sort })}>Clear filters</Button>}
+          <p className="library-empty__body">{narrowed(choices) ? nothingMatches(type, choices) : 'Add them to the library on the server’s web page and scan it; they appear here.'}</p>
+          {narrowed(choices) && <div className="tv-actions">
+            <Button id="library/clear-all" variant="primary" autoFocus onPress={clear}>Clear filters</Button>
+            <Button id="library/change" onPress={() => setPicker('filter')}>Change filters</Button>
+          </div>}
         </div>
           : data && <GridBody key={gridGroup(library.id, choices)} library={library} type={type} choices={choices} first={data} focusFirst={focusFirst} onFocused={onFocused} autoFocus={autoFocus}/>}
-    {picker === 'sort' && <SidePanel title="Sort by" onClose={() => setPicker(undefined)}>
+    {picker === 'filter' && <FilterPanel type={type} choices={choices} facets={data} line={line} kept={kept} onChange={onChange} onClose={() => setPicker(undefined)}/>}
+    {picker === 'sort' && <SidePanel title="Sort" sub={kept ? `${title} opens this way next time, on this TV.` : undefined} onClose={() => setPicker(undefined)}>
       {sortOptions(type).map((o) => <Option key={o.value} id={`sort/${o.value}`} label={o.label} checked={o.value === choices.sort} onPress={() => { setPicker(undefined); onChange({ ...choices, sort: o.value }) }}/>)}
-    </SidePanel>}
-    {picker === 'decade' && <SidePanel title="Decade" onClose={() => setPicker(undefined)}>
-      {[0, ...(data?.facets.decades ?? [])].map((d) => <Option key={d} id={`decade/${d}`} label={d ? decadeLabel(d) : 'Any decade'} checked={d === choices.decade}
-        onPress={() => { setPicker(undefined); onChange({ ...choices, decade: d }) }}/>)}
     </SidePanel>}
   </section>
 }
@@ -285,16 +307,19 @@ function LibrarySkeleton() {
  * in one vertical scroll. The grid's
  * choices come back with the screen; `initial` is a See all's.
  */
-function LibraryView({ library, type, initial, toGrid }: { library: Library; type: LibraryType; initial: GridChoices; toGrid: boolean }) {
+function LibraryView({ library, type, initial, toGrid }: { library: Library; type: LibraryType; initial?: GridChoices; toGrid: boolean }) {
   const nav = useNav()
+  const session = useSession()
   const rows = useQuery(rowsQuery(library.id))
   const libraries = useQuery(librariesQuery)
-  const [choices, setChoices] = useEntryState<GridChoices>('library-choices', initial)
+  // The library opens the way it was left on this TV; a See all opens the row's way and keeps nothing.
+  const kept = !initial
+  const [choices, setStoredChoices] = useEntryState<GridChoices>('library-choices', () => initial ?? keptChoices(session.server.id, library.id))
+  const setChoices = useCallback((c: GridChoices) => { setStoredChoices(c); if (kept) keepChoices(session.server.id, library.id, c) }, [setStoredChoices, kept, session.server.id, library.id])
   // The grid's first page, so first focus has somewhere to go; a new choice keeps the last page until its own is in.
   const first = useQuery(itemsQuery(library.id, { ...query(choices), limit: PAGE_SIZE, offset: 0 }))
   const [gridFocus, setGridFocus] = useState(false)
   const root = useRef<HTMLDivElement>(null)
-  const hint = useFocusHint(root)
   const refs = libraries.data?.items
   const menu = useWatchlistsOn()
   const base = useMemo<Omit<RowContext, 'now'>>(() => ({
@@ -331,11 +356,11 @@ function LibraryView({ library, type, initial, toGrid }: { library: Library; typ
             <Button id="library/edit" onPress={() => nav.push({ name: 'settings', group: 'homeRows', rowsScreen: type })}><Glyph name="sliders"/>Edit rows</Button>
           </span>
         </div>}
-        <GridSection library={library} type={type} choices={choices} onChange={setChoices} alone={alone} lists={lists} autoFocus={alone || toGrid} focusFirst={gridFocus} onFocused={onFocused}/>
+        <GridSection library={library} type={type} choices={choices} onChange={setChoices} alone={alone} lists={lists} autoFocus={alone || toGrid} focusFirst={gridFocus} onFocused={onFocused} kept={kept}/>
       </VScroll>
-      <HintPill words={hint}/>
       <FocusOnArrival/>
     </div>
+    <Clock/>
   </CardActions>
 }
 
@@ -357,7 +382,7 @@ export function LibraryScreen({ route }: ScreenProps<'library'>) {
   if (isPending) return <LibrarySkeleton/>
   if (isError) return <LibraryProblem type={route.type} error={error} onRetry={() => void refetch()}/>
   if (!library) return <NoLibrary type={route.type}/>
-  return <LibraryView key={library.id} library={library} type={route.type} initial={DEFAULT_CHOICES} toGrid={false}/>
+  return <LibraryView key={library.id} library={library} type={route.type} toGrid={false}/>
 }
 
 /**

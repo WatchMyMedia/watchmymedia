@@ -18,6 +18,8 @@ export type RowProps<T> = {
   variant: CardVariant
   /** Draws one card, with `focusId` as its id. */
   renderItem(item: T, focusId: string, index: number): ReactNode
+  /** Dims the cards before the focused one, as Home's row screens do. */
+  dimPast?: boolean
 }
 
 function indexOf(target: EventTarget) {
@@ -32,7 +34,7 @@ function indexOf(target: EventTarget) {
  * rail. The track moves with a transform and draws only the cards near the
  * view. Coming back to the screen, the row starts at the card it remembers.
  */
-export function Row<T>({ id, title, subtitle, counter, items, itemKey, variant, renderItem }: RowProps<T>) {
+export function Row<T>({ id, title, subtitle, counter, items, itemKey, variant, renderItem, dimPast }: RowProps<T>) {
   const remembered = useGroupMemory(id)
   const [focus, setFocus] = useState(() => Math.max(0, items.findIndex((item, i) => `${id}/${itemKey(item, i)}` === remembered)))
   const ref = useRef<HTMLElement>(null)
@@ -69,7 +71,7 @@ export function Row<T>({ id, title, subtitle, counter, items, itemKey, variant, 
         {items.slice(from, to).map((item, k) => {
           const i = from + k
           const key = itemKey(item, i)
-          return <div key={key} className="tv-row__cell" data-index={i}>{renderItem(item, `${id}/${key}`, i)}</div>
+          return <div key={key} className={`tv-row__cell${dimPast && i < focus ? ' tv-row__cell--past' : ''}`} data-index={i}>{renderItem(item, `${id}/${key}`, i)}</div>
         })}
       </div>
     </div>

@@ -40,6 +40,8 @@ export type KeyAction =
   /** Kept, so it neither moves focus nor clicks. */
   | { kind: 'swallow' }
   | { kind: 'show' }
+  /** From the bar, ▼ goes to Play/Pause. */
+  | { kind: 'toControls' }
   | { kind: 'seek'; direction: 1 | -1 }
   | { kind: 'toggle' }
   | { kind: 'play' }
@@ -58,7 +60,9 @@ const seek = (forward: boolean): KeyAction => ({ kind: 'seek', direction: forwar
 /**
  * A key going down (Return aside: backAction). ◀ ▶ seek unless focus is in
  * the button row, where they move along it; OK plays or pauses unless a
- * control has focus; with the controls hidden ▲ ▼ only bring them back. An
+ * control has focus; with the controls hidden ▲ ▼ only bring them back, and
+ * with them showing ▲ ▼ stop in the button row (▼ from the bar goes to
+ * Play/Pause), so nothing but the row is a stop. An
  * overlay keeps the arrows and OK for its own buttons; Play/Pause still
  * works under the card and a panel, ⏪ ⏩ under the card.
  */
@@ -74,7 +78,11 @@ export function routeKey(action: Action, c: KeyContext): KeyAction {
       if (overlay !== 'none' || (c.controls && c.area === 'buttons')) return PASS
       return seek(action === 'right')
     case 'up': case 'down':
-      return overlay === 'none' && !c.controls ? { kind: 'show' } : PASS
+      if (overlay !== 'none') return PASS
+      if (!c.controls) return { kind: 'show' }
+      if (c.area === 'buttons') return SWALLOW
+      if (c.area === 'scrubber') return action === 'down' ? { kind: 'toControls' } : SWALLOW
+      return PASS
     case 'ok':
       return overlay !== 'none' || c.area === 'skip' || c.area === 'buttons' ? PASS : { kind: 'toggle' }
     case 'hold':

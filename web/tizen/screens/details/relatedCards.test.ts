@@ -22,7 +22,7 @@ describe('related rows', () => {
 
   it('makes a card that opens the title, with New, the watched tick and progress', () => {
     expect(titleCard(item({ isNew: true }))).toMatchObject({ key: 'movie120', subtitle: '2017 · Thriller', badges: [{ label: 'New', tone: 'gold' }], route: { name: 'movie', id: 120 } })
-    expect(titleCard(item({ isNew: true, watched: true }))).toMatchObject({ badges: [{ label: '✓', tone: 'gold' }], label: 'Dead Reckoning, 2017 · Thriller, watched' })
+    expect(titleCard(item({ isNew: true, watched: true }))).toMatchObject({ badges: [], done: true, label: 'Dead Reckoning, 2017 · Thriller, watched' })
     expect(titleCard(item({ progress: 0.4 }))).toMatchObject({ progress: 0.4, label: 'Dead Reckoning, 2017 · Thriller, partly watched' })
     expect(titleCard(item({ kind: 'show', id: 205 })).route).toEqual({ name: 'show', id: 205 })
   })

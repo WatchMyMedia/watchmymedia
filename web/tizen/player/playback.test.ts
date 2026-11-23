@@ -102,6 +102,15 @@ describe('starting and stopping', () => {
     expect(h.player.calls.at(-1)).toBe('stop')
   })
 
+  it('gives the screens each track’s facts and the picture in words, to say them for people', async () => {
+    const h = harness({ decide: () => decision({ subtitles: [{ ...textTrack, hearingImpaired: true }], audioTracks: [{ index: 1, codec: 'eac3', channels: 6, default: true, language: 'en', title: 'Commentary' }] }) })
+    await started(h)
+    const s = h.c.snapshot()
+    expect(s.video).toBe('1080p')
+    expect(s.audio.options[0]).toMatchObject({ index: 1, channels: 6, title: 'Commentary', label: 'English' })
+    expect(s.subtitles.options[0]).toMatchObject({ id: 's3', hearingImpaired: true, forced: false })
+  })
+
   it('asks for an event session again where it resumes when the server started it elsewhere, and ends the first', async () => {
     const h = harness({ decide: (body) => body?.startMs === undefined
       ? hls({ playlist: 'event', sessionId: 'first', startMs: 0, resumeMs: 300_000 })

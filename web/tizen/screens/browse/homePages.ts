@@ -1,5 +1,5 @@
 import type { components } from '../../../src/api/schema'
-import { formatBytes, plural, relativeTime } from '../../../src/lib/format'
+import { plural } from '../../../src/lib/format'
 import { drawable, homeRows, titleParts, type ScreenRow } from '../../../src/lib/screenRows'
 
 // Home one row a screen (Android TV's HomePages.kt):
@@ -7,6 +7,7 @@ import { drawable, homeRows, titleParts, type ScreenRow } from '../../../src/lib
 // is on, and the words along their bottom edge.
 
 export type HomeData = components['schemas']['HomeData']
+type ContinueItem = components['schemas']['ContinueItem']
 
 /**
  * Whether Home draws a row: what the web draws, and Live TV's row when this
@@ -24,6 +25,34 @@ export function homeScreenRows(home: HomeData, live: boolean): ScreenRow[] {
 /** Nothing to show: no hero and no row with something in it, Live TV's included. */
 export function homeIsEmpty(home: HomeData, rows: readonly ScreenRow[]): boolean {
   return !home.hero && rows.length === 0
+}
+
+/**
+ * Home opens on what you were watching: Continue watching's first title is
+ * the hero, and the row keeps the rest (or goes, when that was its only
+ * title). The rows stay in the person's order. None when nothing is in
+ * progress: then the hero is the server's pick.
+ */
+export function resumeHero(rows: readonly ScreenRow[]): { item: ContinueItem; rows: ScreenRow[] } | undefined {
+  const at = rows.findIndex((r) => r.style === 'continue' && !!r.continue?.length)
+  if (at < 0) return undefined
+  const row = rows[at]
+  const [item, ...rest] = row.continue!
+  const left = rest.length ? [{ ...row, continue: rest }] : []
+  return { item, rows: [...rows.slice(0, at), ...left, ...rows.slice(at + 1)] }
+}
+
+/** The episode's own title from a continue item's line ("S03E07 The Long Dark"), when it has one. */
+export function episodeTitleOf(subtitle: string | undefined): string | undefined {
+  const m = /^S\d+\s?E\d+\s+(.+)$/.exec(subtitle ?? '')
+  const rest = m?.[1].trim()
+  return rest && !rest.includes('·') ? rest : undefined
+}
+
+/** The line under a resume hero's title: "Season 3 · Episode 7 · The Long Dark"; a movie's year. */
+export function resumeLine(item: Pick<ContinueItem, 'kind' | 'seasonNumber' | 'episodeNumber' | 'subtitle'>): string {
+  if (item.kind !== 'episode') return /^\d{4}$/.test(item.subtitle ?? '') ? item.subtitle! : ''
+  return [item.seasonNumber ? `Season ${item.seasonNumber}` : '', item.episodeNumber ? `Episode ${item.episodeNumber}` : '', episodeTitleOf(item.subtitle) ?? ''].filter(Boolean).join(' · ')
 }
 
 export type HomePage =
@@ -49,6 +78,7 @@ export function rowGroup(row: Pick<ScreenRow, 'id'>): string {
 }
 
 export const HERO_PLAY = 'home/hero/play'
+export const HERO_RESTART = 'home/hero/restart'
 export const HERO_OPEN = 'home/hero/open'
 export const END_EDIT = 'home/end/edit'
 export const END_TOP = 'home/end/top'
@@ -56,7 +86,7 @@ export const END_TOP = 'home/end/top'
 /** The page a focus id is on, by key: a row's card, the hero's buttons, or the last page's. */
 export function pageOfFocus(pages: readonly HomePage[], id: string | undefined): string | undefined {
   if (!id) return undefined
-  if (id === HERO_PLAY || id === HERO_OPEN) return pages.find((p) => p.kind === 'start')?.key
+  if (id === HERO_PLAY || id === HERO_RESTART || id === HERO_OPEN) return pages.find((p) => p.kind === 'start')?.key
   if (id === END_EDIT || id === END_TOP) return 'end'
   return pages.find((p) => p.kind !== 'end' && p.row && id.startsWith(`${rowGroup(p.row)}/`))?.key
 }
@@ -84,13 +114,19 @@ export function rowCounter(rows: readonly ScreenRow[], row: ScreenRow): string {
   return `Row ${rows.indexOf(row) + 1} of ${rows.length}`
 }
 
-/** "214 movies · 142 shows · 3,418 episodes · 18.4 TB · last scan 12 min ago". */
-export function totalsLine(home: Pick<HomeData, 'totals' | 'lastScannedAt'>): string {
+/** "214 movies, 142 shows and 3,418 episodes are in Movies and TV Shows.": what the library holds, in titles rather than terabytes. */
+export function totalsLine(home: Pick<HomeData, 'totals'>): string {
   const t = home.totals
-  return [
-    plural(t.movies, 'movie'), plural(t.shows, 'show'), `${t.episodes.toLocaleString()} ${t.episodes === 1 ? 'episode' : 'episodes'}`,
-    formatBytes(t.totalSize), home.lastScannedAt ? `last scan ${relativeTime(home.lastScannedAt)}` : '',
-  ].filter(Boolean).join(' · ')
+  const parts = [t.movies ? plural(t.movies, 'movie') : '', t.shows ? plural(t.shows, 'show') : '', t.episodes ? `${t.episodes.toLocaleString('en-US')} ${t.episodes === 1 ? 'episode' : 'episodes'}` : ''].filter(Boolean)
+  if (!parts.length) return ''
+  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+  const where = t.movies && (t.shows || t.episodes) ? 'Movies and TV Shows' : t.movies ? 'Movies' : 'TV Shows'
+  return `${list} ${parts.length === 1 && (t.movies === 1 || t.shows === 1 || t.episodes === 1) ? 'is' : 'are'} in ${where}.`
+}
+
+/** The end screen's kicker: "Row 7 of 7 was the last". */
+export function endKicker(rows: readonly ScreenRow[]): string {
+  return rows.length ? `Row ${rows.length} of ${rows.length} was the last` : ''
 }
 
 /** Which page ▲ or ▼ goes to from `index`, or none: the first page is the top, the last the bottom. */

@@ -103,6 +103,16 @@ Focus is the remote's, kept by `app/focus.ts` from markup:
   rail. `data-clip` on a row's viewport keeps cards scrolled out of view from
   being targets.
 - `data-autofocus` marks where a screen starts without a memory.
+- `aria-disabled="true"` dims an item and keeps it focusable, as Samsung
+  asks, so a press can say why (`Button`'s `why` shows a note that takes no
+  focus). `data-skip` is for the few things the arrows pass over (an A–Z
+  letter with no titles); `disabled` takes an item out entirely.
+- While a screen has nothing focusable yet (it is loading), focus parks on
+  the rail's current section with the rail closed (`data-parked`), and moves
+  to the screen once it draws something; ▶ goes to the screen, any other
+  arrow opens the rail, Return goes on as if the rail weren't there.
+- The input marks the focused element `tv-pressed` while OK is held: the
+  pressed state.
 
 Each stack entry keeps a `FocusMemory` (the last item, and each group's
 child); the shell restores it when the screen is drawn again.
@@ -204,23 +214,46 @@ together but this list, which stays on the TV.
 
 `ui/` components, all keyed by `id` (their `data-focus`):
 
-- `Rail` (the shell draws it; its account button at the foot opens Servers),
-  `Button` (`primary`, `ghost`, `danger`; `icon`, `busy`, `onHold`),
-  `KeyHints`, `Brand`, `Icon`, `PlayGlyph`.
+- `Rail` (the shell draws it on the top-level screens: icons inside the safe
+  area, the current section marked by a gold bar; with focus a drawer with
+  labels and the account row, which opens Servers), `Button` (76px pills:
+  `primary` burgundy, `ghost` grey, `glass` grey over a picture, `danger`;
+  `icon`, `busy`, `onHold`, `disabled` with `why`), `KeyHints`, `Brand` (the
+  reel), `Icon`, `PlayGlyph`, `Clock` (top right).
 - `Card` in `poster`, `wide`, `episode`, `continue` and `live`, with
-  `progress`, `badges`, `image`, `onPress`, `onHold`, and `server` for a
-  title on another server (a line under the title).
+  `progress`, `badges` (New, in words), `done` (the white watched tick),
+  `selected` (a gold bar above it), `image`, `onPress`, `onHold`, and
+  `server` for a title on another server (a line under the title). The
+  `.tv-person` styles draw a cast member's round card.
 - `Row` (title, counter, `items`, `itemKey`, `variant`, `renderItem(item,
-  focusId)`): moved with a transform, the card before the focused one in
-  view, only the cards near the view drawn. `Grid`: rows of 8 posters or 5
-  wide cards, only the rows near the focus drawn, `onLoadMore` near the end.
-  `VScroll`: a vertical list moved with a transform (`align="start"` for one
-  row a screen). `Chips`.
-- `Dialog` (centred, focus on the `safe` action, which Return also takes),
-  `SidePanel` with `Option` rows, `Banner` (takes no focus: Return dismisses,
-  Hold OK acts), `Skeleton`, `SkeletonText`, `SkeletonRow`, `ProblemScreen`,
-  `TextField`, `QrCode`.
+  focusId)`, `dimPast`): moved with a transform, the card before the focused
+  one in view, only the cards near the view drawn; four 16:9 cards or six
+  posters fit beside the rail, the next peeking. `Grid`: rows of 6 posters
+  or 4 wide cards, only the rows near the focus drawn, `onLoadMore` near the
+  end. `VScroll`: a vertical list moved with a transform (`align="start"`
+  for one row a screen). `Chips`: chosen is a gold underline.
+- `Dialog` (centred, 960px, `narrow` 820; focus on the `safe` action, which
+  Return also takes), `SidePanel` (760px from the right, `wide` 960, `side`
+  `left` for Servers; a `sub` line and a `foot`) with `Option` rows (a radio
+  for a choice, `next` for a chevron, `end` for words at the end) and
+  `PanelLine`, `Banner` (takes no focus: Return dismisses, Hold OK acts),
+  `Skeleton`, `SkeletonText`, `SkeletonRow`, `ProblemScreen` (a title, why,
+  the first action focused, a `foot` line), `TextField`, `QrCode`.
+- `showNote(text)` (`ui/notes.ts`): a short note top right that takes no
+  focus, drawn once by the app (`Notes`).
+- `leftWords`, `endsAtWords` (`ui/timeWords.ts`): "29 min left", "Ends at
+  8:41 PM", the same on Home, the title pages and the player.
 - `problemWords(error)` and `signInWords(error)` for failures.
+
+The rules every screen follows, in `ui/tokens.css`: text and controls stay
+inside the safe area (96px at the sides, 54px top and bottom; pictures run
+to the edges); six type sizes (`--t-display` 68 to `--t-small` 22) and
+nothing under 22px; one focus treatment, a 5px gold ring 5px off the item
+with growth (`--grow-card` 1.08, `--grow-button` 1.05, `--grow-row` 1.025;
+guide cells don't grow) and a shadow; selected is never a ring. Burgundy
+fills the main button and the avatar, gold is focus, progress, selection
+and badges, orange a warning; the recording marks stay red. A title's page
+and the players use the full width without the rail (`chrome: 'full'`).
 
 Sizes are rem at 16px for a 1920px-wide screen (`1rem = 100vw / 120`), so a
 board's pixels divide by 16. Keep pictures cheap: `Card` decodes

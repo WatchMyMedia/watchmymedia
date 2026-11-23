@@ -21,7 +21,9 @@ export type ServerRowState = 'current' | 'ready' | 'switching' | 'signedOut' | '
 export type ServerRow = {
   id: string
   name: string
-  /** Under the name: who is signed in and where, or why it can't be opened as it is. */
+  /** Who is signed in, for the avatar's initial; none when this TV is signed out of it. */
+  person?: string
+  /** Under the name: who is signed in and when it was last used, or why it can't be opened as it is. The address is left off: it is for whoever looks after the server. */
   detail: string
   state: ServerRowState
   /** OK does something: a switch, or its sign-in. The current server and one too old don't. */
@@ -35,26 +37,64 @@ function stateOf(server: RememberedServer, currentId: string, switching?: Switch
   return switching?.state === 'switching' && switching.id === server.id ? 'switching' : 'ready'
 }
 
-/** Who is signed in and where: "Sam · home.example.net". */
-function who(server: RememberedServer): string {
-  return [server.account?.name, displayAddress(server.baseUrl)].filter(Boolean).join(' · ')
+const DAY = 86_400_000
+
+function dayStart(at: number): number {
+  const d = new Date(at)
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
 }
+
+/**
+ * When a server was last used, by the calendar: "today", "yesterday", "on
+ * Sunday" within the week, "in October" within the year, "in October 2025"
+ * before that.
+ */
+export function lastUsedWords(at: number, now: number, locale?: string): string {
+  const days = Math.round((dayStart(now) - dayStart(at)) / DAY)
+  if (days <= 0) return 'today'
+  if (days === 1) return 'yesterday'
+  const date = new Date(at)
+  if (days < 7) return `on ${date.toLocaleDateString(locale, { weekday: 'long' })}`
+  const month = date.toLocaleDateString(locale, { month: 'long' })
+  return days < 300 && date.getFullYear() === new Date(now).getFullYear() ? `in ${month}` : `in ${month} ${date.getFullYear()}`
+}
+
+/** Who is signed in and when it was last used: "Sam · last used on Sunday"; the current one is "Sam · you are here". */
+function who(server: RememberedServer, current: boolean, now: number): string {
+  return [server.account?.name, current ? 'you are here' : `last used ${lastUsedWords(server.lastUsedAt, now)}`].filter(Boolean).join(' · ')
+}
+
+/** A server this TV is signed out of, under its name. */
+export const SIGNED_OUT_LINE = 'Needs signing in again'
 
 /**
  * The servers this TV has, as Servers lists them: the current one first,
  * then by last use. One signed out here says so, and choosing it opens its
  * sign-in; one too old for this app can't be chosen.
  */
-export function serverRows(servers: readonly RememberedServer[], currentId: string, switching?: SwitchView): ServerRow[] {
+export function serverRows(servers: readonly RememberedServer[], currentId: string, switching?: SwitchView, now = Date.now()): ServerRow[] {
   const ordered = [...servers].sort((a, b) => Number(b.id === currentId) - Number(a.id === currentId) || b.lastUsedAt - a.lastUsedAt)
   return ordered.map((s) => {
     const state = stateOf(s, currentId, switching)
     return {
-      id: s.id, name: s.name, state,
-      detail: state === 'signedOut' ? 'Signed out here · sign in again' : state === 'tooOld' ? 'Too old for this app' : who(s),
+      id: s.id, name: s.name, person: s.account?.name, state,
+      detail: state === 'signedOut' ? SIGNED_OUT_LINE : state === 'tooOld' ? 'Too old for this app' : who(s, state === 'current', now),
       canChoose: state === 'ready' || state === 'signedOut' || state === 'switching',
     }
   })
+}
+
+/** Why a server's row can't be chosen, said when it is pressed: the one you are on, or one too old. */
+export function cantChooseWords(row: Pick<ServerRow, 'name' | 'state'>): string | undefined {
+  if (row.state === 'current') return `You’re on ${row.name} now.`
+  if (row.state === 'tooOld') return `${row.name} needs an update before this app can use it.`
+  return undefined
+}
+
+/** Under the panel's title: "This TV is signed in to three." */
+export function signedInLine(count: number): string {
+  const words = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve']
+  return count === 1 ? 'This TV is signed in to one server.' : `This TV is signed in to ${words[count] ?? count}.`
 }
 
 /**
@@ -98,6 +138,9 @@ export function serversLine(current: string, count: number): string {
 export function manageLede(count: number): string {
   return count > 1 ? 'This TV is signed in to each of these. Search looks in all of them.' : 'This TV is signed in to this server. Add another and search looks in both.'
 }
+
+/** Under Manage servers in the panel. */
+export const MANAGE_LINE = 'Remove one, or sign out of it'
 
 /** Under Add a server: how (there is no discovery on this TV), or why not yet. */
 export function addLine(full: boolean): string {
@@ -154,6 +197,6 @@ export function addedWords(name: string, person: string, signedIn: number): { ti
     title: `${name} is added`,
     lead: `You’re on it now, signed in as ${person}.`,
     changed: `This TV is signed in to ${signedIn === 1 ? '1 server' : `${signedIn} servers`}. Search looks in all of them.`,
-    next: 'Choose your initial at the foot of the rail to switch. It doesn’t ask for a password again.',
+    next: 'Open the menu and choose your name at its foot to switch. It doesn’t ask for a password again.',
   }
 }

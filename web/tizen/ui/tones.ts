@@ -11,7 +11,7 @@ export function placeholderTone(title: string): [string, string] {
   return TONES[Math.abs(h) % TONES.length]
 }
 
-/** How many cards of a kind fit across a row (110.375rem), whole: for drawing only what is near the view. */
+/** How many cards of a kind fit across a row beside the rail, whole (four 16:9 cards or six posters, the next peeking): for drawing only what is near the view. */
 export const CARDS_IN_VIEW: Record<'poster' | 'wide' | 'episode' | 'continue' | 'live', number> = {
-  poster: 7, wide: 5, episode: 5, continue: 5, live: 5,
+  poster: 6, wide: 4, episode: 4, continue: 4, live: 4,
 }

@@ -6,19 +6,19 @@
 .tv-panel.wl-panel { width: 50rem; padding: 4rem 2.75rem 2.75rem; gap: 1.25rem; }
 .wl-panel__head { display: flex; flex-direction: column; gap: .5rem; padding: 0 1.125rem; }
 .wl-panel__title { font-size: 2.125rem; font-weight: 800; letter-spacing: -.015em; line-height: 1.15; }
-.wl-panel__sub { font-size: 1.3125rem; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wl-panel__note { padding: 0 1.125rem; font-size: 1.0625rem; color: var(--faint); }
-.wl-panel__limit { padding: .25rem 1.125rem 0; font-size: 1.1875rem; line-height: 1.45; color: var(--text-3); }
+.wl-panel__sub { font-size: var(--t-small); color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wl-panel__note { padding: 0 1.125rem; font-size: var(--t-small); color: var(--faint); }
+.wl-panel__limit { padding: .25rem 1.125rem 0; font-size: var(--t-small); line-height: 1.45; color: var(--text-3); }
 .wl-panel__done { padding: .375rem 1.125rem 0; }
 .wl-panel__state { display: flex; flex-direction: column; align-items: flex-start; gap: 1rem; padding: 0 1.125rem; }
 
 .wl-options { flex: none; max-height: 39.625rem; }
 .wl-options .tv-vscroll { height: auto; max-height: 39.625rem; margin: 0; padding: 0; }
 .wl-options__list { display: flex; flex-direction: column; gap: .375rem; padding: .25rem 0; }
-.wl-option { display: flex; align-items: center; gap: 1.125rem; width: 100%; height: 4.25rem; padding: 0 1.125rem; border-radius: var(--radius); font-size: 1.3125rem; font-weight: 600; text-align: left; flex: none; }
+.wl-option { display: flex; align-items: center; gap: 1.125rem; width: 100%; height: 4.25rem; padding: 0 1.125rem; border-radius: var(--radius); font-size: var(--t-small); font-weight: 600; text-align: left; flex: none; }
 .wl-option:focus { outline: var(--focus-width) solid var(--accent); outline-offset: calc(-1 * var(--focus-width)); background: var(--surface-2); }
 .wl-option__name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wl-option__count { font-size: 1.1875rem; font-weight: 500; color: var(--muted); white-space: nowrap; }
+.wl-option__count { font-size: var(--t-small); font-weight: 500; color: var(--muted); white-space: nowrap; }
 .wl-option__glyph { display: grid; place-items: center; width: 1.875rem; height: 1.875rem; flex: none; color: var(--text-3); }
 .wl-option__glyph svg { width: 1.75rem; height: 1.75rem; }
 .wl-box { display: grid; place-items: center; width: 1.875rem; height: 1.875rem; border-radius: .5rem; border: 2px solid var(--faint); flex: none; color: var(--on-accent); }
@@ -27,11 +27,11 @@
 
 /* The name step. */
 .wl-name { display: flex; flex-direction: column; gap: .625rem; padding: 0 1.125rem; }
-.wl-name__kicker { margin-bottom: .375rem; font-size: 1.0625rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
-.wl-name__label { font-size: 1.25rem; color: var(--muted); }
+.wl-name__kicker { margin-bottom: .375rem; font-size: var(--t-small); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.wl-name__label { font-size: var(--t-small); color: var(--muted); }
 .wl-name .tv-field { height: 4.5rem; font-size: 1.5rem; }
 .wl-name--bad .tv-field { border-color: var(--warn); box-shadow: 0 0 0 2px var(--warn); }
-.wl-name__problem { display: flex; align-items: center; gap: .75rem; padding: 0 1.125rem; font-size: 1.25rem; font-weight: 600; color: var(--warn); }
+.wl-name__problem { display: flex; align-items: center; gap: .75rem; padding: 0 1.125rem; font-size: var(--t-small); font-weight: 600; color: var(--warn); }
 .wl-name .wl-name__problem { padding: 0; }
 .wl-name__problem svg { width: 1.5rem; height: 1.5rem; flex: none; }
 .wl-panel .search-keys { align-items: center; }
@@ -42,8 +42,8 @@
 .wls-head { position: absolute; left: var(--content-left); right: var(--gutter); top: 3.5rem; display: flex; align-items: flex-end; justify-content: space-between; gap: 2.5rem; }
 .wls-head__text { display: flex; flex-direction: column; gap: .5rem; }
 .wls-title { font-size: 2.875rem; font-weight: 800; letter-spacing: -.02em; }
-.wls-sub { font-size: 1.25rem; color: var(--muted); }
-.wls-hint { display: flex; align-items: center; gap: .75rem; font-size: 1.1875rem; color: var(--text-3); white-space: nowrap; }
+.wls-sub { font-size: var(--t-small); color: var(--muted); }
+.wls-hint { display: flex; align-items: center; gap: .75rem; font-size: var(--t-small); color: var(--text-3); white-space: nowrap; }
 /* Room above the first row for a focused tile's ring and scale, which the scroller would clip. */
 .wls-body { position: absolute; left: var(--content-left); right: var(--gutter); top: 11.25rem; bottom: 0; }
 .wls-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.75rem; padding: 1rem 0 3rem; }
@@ -52,30 +52,30 @@
 .wls-tile--new { align-items: center; justify-content: center; gap: 1rem; background: var(--surface); border: 2px dashed var(--dim); font-size: 1.5rem; font-weight: 700; }
 .wls-tile--new svg { width: 3rem; height: 3rem; color: var(--accent); }
 .wls-tile--new[aria-disabled="true"] { opacity: .55; }
-.wls-tile__limit { font-size: 1.1875rem; font-weight: 500; color: var(--muted); text-align: center; }
+.wls-tile__limit { font-size: var(--t-small); font-weight: 500; color: var(--muted); text-align: center; }
 .wls-posters { display: flex; gap: .75rem; margin-bottom: .875rem; }
 .wls-poster { position: relative; flex: 1; aspect-ratio: 2 / 3; border-radius: .625rem; overflow: hidden; background: linear-gradient(165deg, var(--ph-a, var(--surface-2)), var(--ph-b, var(--surface-2))); }
 .wls-poster img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .wls-poster--none { background: var(--surface-3); }
 .wls-tile__name { font-size: 1.625rem; font-weight: 700; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wls-tile__count { font-size: 1.1875rem; color: var(--muted); }
-.wls-tile__keeps { margin-top: .125rem; font-size: 1.0625rem; color: var(--text-3); }
+.wls-tile__count { font-size: var(--t-small); color: var(--muted); }
+.wls-tile__keeps { margin-top: .125rem; font-size: var(--t-small); color: var(--text-3); }
 .wls-empty { display: flex; flex-direction: column; gap: .75rem; margin-top: 2rem; }
 .wls-empty h2 { font-size: 1.75rem; font-weight: 700; }
-.wls-empty p { font-size: 1.25rem; color: var(--muted); }
+.wls-empty p { font-size: var(--t-small); color: var(--muted); }
 
 /* A watchlist's page: its buttons, then the type chips and the sort, over its titles. */
 .wl-page-head { top: 3.5rem; }
-.wl-actions { position: absolute; left: var(--content-left); right: var(--gutter); top: 11.875rem; display: flex; align-items: center; gap: 1.375rem; }
-.wl-actions__note { max-width: 38.75rem; margin-left: .25rem; font-size: 1.0625rem; line-height: 1.4; color: var(--muted); }
-.wl-filters { position: absolute; left: var(--content-left); right: var(--gutter); top: 15.875rem; display: flex; align-items: center; justify-content: space-between; }
-.wl-filters__sort { display: flex; align-items: center; gap: 1rem; font-size: 1.1875rem; color: var(--muted); }
+.wl-actions { position: absolute; left: var(--content-left); right: var(--gutter); top: 13.25rem; display: flex; align-items: center; gap: 1.375rem; }
+.wl-actions__note { max-width: 38.75rem; margin-left: .25rem; font-size: var(--t-small); line-height: 1.4; color: var(--muted); }
+.wl-filters { position: absolute; left: var(--content-left); right: var(--gutter); top: 19rem; display: flex; align-items: center; justify-content: space-between; }
+.wl-filters__sort { display: flex; align-items: center; gap: 1rem; font-size: var(--t-small); color: var(--muted); }
 .wl-filters .tv-chip svg { width: 1.25rem; height: 1.25rem; }
-.list-grid.wl-grid { top: 20.375rem; }
-.wl-empty { position: absolute; left: var(--content-left); right: var(--gutter); top: 16.5rem; display: flex; flex-direction: column; gap: .75rem; }
+.list-grid.wl-grid { top: 24.5rem; }
+.wl-empty { position: absolute; left: var(--content-left); right: var(--gutter); top: 24.5rem; display: flex; flex-direction: column; gap: .75rem; }
 .wl-empty h2 { font-size: 1.75rem; font-weight: 700; }
-.wl-empty p { font-size: 1.25rem; color: var(--muted); }
-.wl-hint { position: absolute; right: var(--gutter); bottom: 2.25rem; }
+.wl-empty p { font-size: var(--t-small); color: var(--muted); }
+.wl-hint { position: absolute; right: var(--gutter); bottom: var(--safe-y); }
 
 /* The title pages' button once the title is on a watchlist: gold, bookmark and words. */
 .wl-on .tv-btn { color: var(--accent); }

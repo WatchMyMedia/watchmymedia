@@ -37,3 +37,9 @@ export function useNotice() {
   const fail = useCallback((title: string, error: unknown) => say({ title, body: problemWords(error).title, problem: true }), [say])
   return { notice, say, fail }
 }
+
+/** "IM" from "Ida Markham": a person's initials, for the picture's place while it loads or without one. */
+export function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase()
+}

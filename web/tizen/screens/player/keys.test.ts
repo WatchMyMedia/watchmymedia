@@ -31,10 +31,14 @@ describe('the remote', () => {
     expect(kind('rewind', at('panel'))).toBe('swallow')
   })
 
-  it('shows the controls with ▲ ▼ only while they are hidden, and moves focus once they show', () => {
+  it('shows the controls with ▲ ▼ while they are hidden; showing, ▲ ▼ stop in the row and ▼ from the bar goes to it', () => {
     expect(kind('up', at('none', { controls: false, area: 'root' }))).toBe('show')
     expect(kind('down', at('none', { controls: false, area: 'skip' }))).toBe('show')
-    expect(kind('down', at('none'))).toBe('pass')
+    expect(kind('down', at('none'))).toBe('toControls')
+    expect(kind('up', at('none'))).toBe('swallow')
+    expect(kind('up', at('none', { area: 'buttons' }))).toBe('swallow')
+    expect(kind('down', at('none', { area: 'buttons' }))).toBe('swallow')
+    expect(kind('down', at('none', { area: 'skip' }))).toBe('pass')
     expect(kind('up', at('next'))).toBe('pass')
   })
 

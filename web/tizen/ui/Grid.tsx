@@ -8,7 +8,7 @@ export type GridProps<T> = {
   items: readonly T[]
   itemKey(item: T, index: number): string
   variant: 'poster' | 'wide'
-  /** 8 posters across, or 5 wide cards. */
+  /** 6 posters across, or 4 wide cards. */
   columns?: number
   /** Rows in view at once, for drawing only those near it. */
   visibleRows?: number
@@ -24,16 +24,15 @@ export type GridProps<T> = {
 }
 
 /**
- * A grid card's size, the boards' 190 × 285 poster:
- * eight across with the gaps come to 105.5rem, inside the content
- * area's 106.75rem from the rail to the right gutter. A screen narrows them
- * with `--grid-poster-w` on a parent (beside the A–Z strip). Wide cards
- * keep the rows' size; five fit.
+ * A grid card's size, the boards' 232 × 348 poster: six across beside the
+ * rail, the seventh peeking at the screen's edge. A screen narrows them
+ * with `--grid-poster-w` on a parent. Wide cards keep the rows' size; four fit.
+ * A cell is the picture and the title's two lines under it.
  */
-const POSTER_W = 'var(--grid-poster-w, 11.875rem)'
+const POSTER_W = 'var(--grid-poster-w, 14.5rem)'
 const SIZES = {
-  poster: { '--poster-w': POSTER_W, '--poster-h': `calc(${POSTER_W} * 1.5)`, '--card-w': POSTER_W, '--grid-cell-h': `calc(${POSTER_W} * 1.5 + 3.75rem)` } as CSSProperties,
-  wide: { '--card-w': 'var(--wide-w)', '--grid-cell-h': '15.5rem' } as CSSProperties,
+  poster: { '--poster-w': POSTER_W, '--poster-h': `calc(${POSTER_W} * 1.5)`, '--card-w': POSTER_W, '--grid-cell-h': `calc(${POSTER_W} * 1.5 + 5.5rem)` } as CSSProperties,
+  wide: { '--card-w': 'var(--wide-w)', '--grid-cell-h': 'calc(var(--wide-h) + 5.5rem)' } as CSSProperties,
 }
 
 /**
@@ -41,7 +40,7 @@ const SIZES = {
  * one are drawn, the track moves with a transform so the focused row and
  * the one above it stay in view, and more is asked for near the end.
  */
-export function Grid<T>({ id, items, itemKey, variant, columns = variant === 'poster' ? 8 : 5, visibleRows = 2, renderItem, onLoadMore, hasMore, reveal }: GridProps<T>) {
+export function Grid<T>({ id, items, itemKey, variant, columns = variant === 'poster' ? 6 : 4, visibleRows = 2, renderItem, onLoadMore, hasMore, reveal }: GridProps<T>) {
   const remembered = useGroupMemory(id)
   const [focus, setFocus] = useState(() => Math.max(0, items.findIndex((item, i) => `${id}/${itemKey(item, i)}` === remembered)))
   // A jump asked for: draw around it now, so its card is there to take focus.
@@ -60,7 +59,7 @@ export function Grid<T>({ id, items, itemKey, variant, columns = variant === 'po
     if (i >= 0 && i !== focus) setFocus(i)
   }
   const rowH = `(var(--grid-cell-h) + var(--grid-row-gap))`
-  const style = { ...SIZES[variant], '--columns': columns, '--grid-row-gap': '1.5rem', transform: `translateY(calc(${-first} * ${rowH}))` } as CSSProperties
+  const style = { ...SIZES[variant], '--columns': columns, '--grid-row-gap': '2.5rem', transform: `translateY(calc(${-first} * ${rowH}))` } as CSSProperties
   return <div className={`tv-grid tv-grid--${variant}`} data-group={id} data-vscroll>
     <div className="tv-grid__track" style={style} onFocus={onFocus}>
       {from > 0 && <span className="tv-grid__spacer" style={{ height: `calc(${from / columns} * ${rowH} - var(--grid-row-gap))` }}/>}

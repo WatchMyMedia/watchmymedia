@@ -1,0 +1,96 @@
+/* The Live TV player, read from the couch: the banner that leads with the
+   programme, the controls, On now and Quality, the problems. Sizes are the
+   boards' pixels in rem (÷16); text and controls stay inside the safe area.
+   Pause is the burgundy fill; gold is focus and progress; red is kept for the
+   Live and recording marks only. */
+.lp { --lp-plate: rgba(21, 21, 24, .96); }
+
+.lp-shade { position: absolute; left: 0; right: 0; pointer-events: none; }
+.lp-shade--top { top: 0; height: 18.75rem; background: linear-gradient(180deg, rgba(0, 0, 0, .82), rgba(0, 0, 0, 0)); }
+.lp-shade--bottom { bottom: 0; height: 32.5rem; background: linear-gradient(0deg, rgba(0, 0, 0, .92) 10%, rgba(0, 0, 0, .6) 55%, rgba(0, 0, 0, 0)); }
+.lp-clock { position: absolute; right: var(--safe-x); top: var(--safe-y); z-index: 4; font-size: var(--t-label); font-weight: 500; color: var(--text-2); font-variant-numeric: tabular-nums; pointer-events: none; }
+
+/* The channel's number, white, as the guide draws it. */
+.lp-chan { display: inline-flex; align-items: center; justify-content: center; height: 2.75rem; min-width: 5.375rem; padding: 0 .625rem; border-radius: .5rem; background: var(--text); color: var(--ground); font-size: var(--t-small); font-weight: 700; letter-spacing: .04em; font-variant-numeric: tabular-nums; flex: none; }
+/* Live, or where the picture is when it isn't. */
+.lp-badge { display: inline-flex; align-items: center; gap: .5rem; height: 2.125rem; padding: 0 .625rem; border-radius: .4375rem; background: var(--danger); color: #fff; font-size: var(--t-small); font-weight: 700; white-space: nowrap; flex: none; }
+.lp-badge__dot { width: .625rem; height: .625rem; border-radius: 50%; background: currentColor; }
+.lp-badge--grey { background: var(--quiet); color: var(--text-2); border: 2px solid var(--line-3); }
+.lp-badge--grey .lp-badge__dot { display: none; }
+.lp-dot { width: .875rem; height: .875rem; border-radius: 50%; background: var(--danger-line); flex: none; display: inline-block; }
+.lp-hints { display: flex; align-items: center; gap: 1.625rem; font-size: var(--t-small); color: var(--muted); white-space: nowrap; }
+.lp-hints > span { display: inline-flex; align-items: center; gap: .75rem; }
+
+/* The banner on its own, at the foot */
+.lp-banner { position: absolute; left: var(--safe-x); right: var(--safe-x); bottom: var(--safe-y); z-index: 2; display: flex; align-items: flex-end; gap: 2rem; }
+.lp-banner__pic { position: relative; width: 18rem; aspect-ratio: 16 / 9; flex: none; border-radius: var(--radius); overflow: hidden; background: linear-gradient(160deg, var(--ph-a, var(--surface-3)), var(--ph-b, var(--ground-deep))); }
+.lp-banner__pic > * { width: 100%; height: 100%; }
+.lp-banner__plain { display: grid; place-items: center; padding: 0 1.25rem; text-align: center; font-size: var(--t-label); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; line-height: 1.15; color: rgba(255, 255, 255, .86); }
+.lp-banner__body { flex: 1; min-width: 0; }
+.lp-banner__chan { display: flex; align-items: center; gap: 1rem; }
+.lp-banner__name { font-size: var(--t-label); color: var(--text-2); white-space: nowrap; }
+.lp-banner__titleline { display: flex; align-items: center; gap: 1rem; margin-top: .625rem; min-width: 0; }
+.lp-banner__title { min-width: 0; font-size: var(--t-title); font-weight: 700; line-height: 1.12; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-banner__time { display: flex; align-items: center; gap: 1.375rem; margin-top: .625rem; font-size: var(--t-body); white-space: nowrap; }
+.lp-banner__time b { font-weight: 600; }
+.lp-banner__bar { width: 26.25rem; flex: none; }
+.lp-banner__next { margin-top: .625rem; font-size: var(--t-label); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-banner__hints { flex: none; }
+
+/* The controls: the channel and programme top left; the bar and buttons at the foot */
+.lp-head { position: absolute; left: var(--safe-x); top: var(--safe-y); right: 30rem; z-index: 2; display: flex; align-items: center; gap: 1.25rem; }
+.lp-head__text { min-width: 0; }
+.lp-head__title { font-size: var(--t-head); font-weight: 600; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-head__line { margin-top: .25rem; font-size: var(--t-label); color: var(--muted); }
+.lp-foot { position: absolute; left: var(--safe-x); right: var(--safe-x); bottom: var(--safe-y); z-index: 2; }
+.lp-foot__line { display: flex; justify-content: space-between; align-items: center; gap: 2rem; font-size: var(--t-body); white-space: nowrap; }
+.lp-foot__left b { font-weight: 600; }
+.lp-foot__left span { margin-left: 1.125rem; color: var(--muted); }
+.lp-bar { position: relative; height: .75rem; margin-top: 1.125rem; border-radius: .375rem; background: rgba(255, 255, 255, .28); }
+.lp-bar > i { position: absolute; top: 0; }
+.lp-bar__got { left: 0; height: 100%; border-radius: .375rem; background: var(--accent); }
+.lp-bar__knob { top: -.75rem !important; width: 2.25rem; height: 2.25rem; margin-left: -1.125rem; border-radius: 50%; background: var(--accent); border: .25rem solid var(--ground); }
+.lp-row { display: flex; align-items: center; gap: 1.5rem; margin-top: 2.125rem; }
+.lp-row__fill { flex: 1; }
+.lp-btn { display: inline-flex; align-items: center; justify-content: center; gap: .875rem; height: var(--button-h); padding: 0 2.125rem; border-radius: 2.375rem; flex: none;
+  background: var(--quiet); border: 2px solid var(--line-3); color: var(--text); font-size: var(--t-button); font-weight: 600; white-space: nowrap; transition: transform var(--focus-time) ease-out; }
+.lp-btn small { font-size: var(--t-button); font-weight: 500; color: var(--muted); }
+.lp-btn svg { width: 1.75rem; height: 1.75rem; flex: none; }
+.lp-btn--big { width: 6.5rem; height: 6.5rem; padding: 0; border-radius: 50%; background: var(--brand); border-color: var(--brand-line); }
+.lp-btn--big svg { width: 2.5rem; height: 2.5rem; }
+.lp-btn:focus { outline: var(--focus-width) solid var(--accent); outline-offset: var(--focus-offset); transform: scale(var(--grow-button)); box-shadow: var(--focus-shadow); }
+.lp-btn.tv-pressed { transform: scale(1); }
+.lp-note { margin-top: 1.125rem; font-size: var(--t-small); color: var(--muted); }
+
+/* On now, from the left; Quality, from the right */
+.tv-panel.lp-onnow { width: 50rem; }
+.lp-onnow .tv-panel__body { margin-top: 1.625rem; }
+.lp-onnow__list { height: 100%; }
+.tv-option.lp-crow { min-height: 6.75rem; gap: 1.5rem; }
+.lp-crow__text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.lp-crow__title { font-size: var(--t-body); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-crow__sub { font-size: var(--t-small); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-crow__bar { margin-top: .625rem; height: .375rem; }
+.lp-crow__watching { flex: none; font-size: var(--t-label); font-weight: 600; color: var(--accent); }
+.lp-quality .tv-option { flex: none; }
+.lp-panel-foot { font-size: var(--t-small); color: var(--muted); }
+
+/* Dialogs over the picture, a passing note, tuning */
+.lp-dialog-host { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; background: rgba(0, 0, 0, .66); }
+.tv-dialog.lp-dialog { width: 68.75rem; }
+.lp-toast { position: absolute; left: 50%; top: 10rem; z-index: 7; transform: translateX(-50%); display: flex; align-items: center; min-height: 4.5rem; padding: .75rem 1.75rem; border-radius: var(--radius-m); background: var(--raised); border: 2px solid var(--line-3); font-size: var(--t-button); white-space: nowrap; pointer-events: none; }
+.lp-tuning { position: absolute; left: 0; right: 0; top: 25rem; display: flex; flex-direction: column; align-items: center; gap: 1.5rem; font-size: var(--t-head); font-weight: 600; pointer-events: none; }
+.lp-tuning__spin { border-top-color: var(--text); }
+
+/* A recording takes this tuner soon: top left, taking no focus */
+.lp-takeover { position: absolute; left: var(--safe-x); top: var(--safe-y); z-index: 6; max-width: 77.5rem; display: flex; align-items: center; gap: 1rem; min-height: 4.5rem; padding: .75rem 1.75rem; border-radius: var(--radius-m); background: var(--raised); border: 2px solid var(--line-3); font-size: var(--t-button); pointer-events: none; }
+.lp-takeover b { font-weight: 600; }
+.lp-takeover .lp-hints { margin-left: .875rem; }
+
+/* A problem on a page of its own */
+.lp-problem { position: absolute; inset: 0; }
+.lp-problem__chan { position: absolute; left: var(--safe-x); top: var(--safe-y); display: flex; align-items: center; gap: 1rem; font-size: var(--t-label); color: var(--muted); }
+.lp-problem__body { position: absolute; left: var(--page-left); top: 50%; width: 62.5rem; transform: translateY(-55%); display: flex; flex-direction: column; gap: 1.375rem; }
+.lp-problem--others .lp-problem__body { top: 40%; }
+.lp-problem__actions { margin-top: 1.375rem; }
+.lp-problem__others { position: absolute; left: var(--page-left); right: 0; bottom: var(--safe-y); }

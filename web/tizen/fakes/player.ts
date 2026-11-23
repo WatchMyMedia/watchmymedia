@@ -336,8 +336,9 @@ export function registerPlayer(server: FakeServer, mode = '') {
   // Recordings: Harbor Evening News still recording, Inspector Vane recorded with two ad breaks.
   server.route('GET', '/api/live-tv/recordings/:id', ({ params }) => RECORDINGS[params.id]?.recording ?? problem(404, 'no such recording'))
   server.route('POST', '/api/live-tv/recordings/:id/playback', ({ params, body }) => {
-    const r = RECORDINGS[params.id]
-    if (!r) return problem(404, 'no such recording')
+    // The Live TV fakes' own recordings (one still recording when every tuner is busy, Recordings' rows)
+    // play as the one still recording here, so watching one from its start can be tried in the preview.
+    const r = RECORDINGS[params.id] ?? RECORDINGS['rec-news']
     return decide(`recording:${params.id}`, r.durationMs, body as DecisionRequest | undefined, { growing: r.growing, segments: r.segments, url: `/api/files/${r.fileId}/stream` })
   })
   server.route('PUT', '/api/live-tv/recordings/:id/progress', ({ body }) => {

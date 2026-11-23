@@ -4,6 +4,7 @@ import { formatDate, formatRuntime, plural } from '../../../src/lib/format'
 import { duration, nowAndNext, timeRange } from '../../../src/lib/liveGuide'
 import { isListRow, titleParts, type ScreenRow } from '../../../src/lib/screenRows'
 import { episodeCode, holdWords, isWatchlistRow, timeLeft, type RowCard } from './rowCards'
+import { resumeLine } from './homePages'
 
 // What the panel over a Home row screen says about its focused card
 // (Android's CardPanel): a kicker, the title, facts,
@@ -93,7 +94,7 @@ function continuePanel(c: ContinueItem): CardPanel {
   return {
     kicker: `Continue watching · ${timeLeft(c.durationMs - c.positionMs)}`,
     title: c.title,
-    facts: [c.subtitle ?? '', c.durationMs > 0 ? formatRuntime(Math.round(c.durationMs / 60_000)) : ''].filter(Boolean),
+    facts: [resumeLine(c), c.durationMs > 0 ? formatRuntime(Math.round(c.durationMs / 60_000)) : ''].filter(Boolean),
     tags: [],
     overview: '',
     target: 'resume',

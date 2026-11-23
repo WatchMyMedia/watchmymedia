@@ -16,7 +16,9 @@ export function VScroll({ children, align = 'nearest', pad = 48, className }: { 
     const item = target.closest<HTMLElement>('[data-vitem]') ?? target
     const top = item.getBoundingClientRect().top - t.getBoundingClientRect().top
     const bottom = top + item.getBoundingClientRect().height
-    const height = v.clientHeight
+    // Inside the viewport's own padding, which leaves room for a focused row's ring.
+    const style = getComputedStyle(v)
+    const height = v.clientHeight - (parseFloat(style.paddingTop) || 0) - (parseFloat(style.paddingBottom) || 0)
     let next = offset.current
     if (align === 'start') next = top - pad
     else if (top - next < pad) next = top - pad

@@ -92,3 +92,62 @@ export function gridLine(item: Pick<BrowseItem, 'kind' | 'year' | 'runtimeMin' |
       : [item.fileCount ? count(item.fileCount, 'file') : 'Not matched yet']
   return parts.filter(Boolean).join(' · ') || undefined
 }
+
+/**
+ * The Filter panel's rows. The server takes one of its filters at a time,
+ * so "Watched or not", "Still running" and "Picture" share it: choosing in
+ * one sets the others back to Any. Genre and decade are separate.
+ */
+export type FilterRow = 'watched' | 'running' | 'picture' | 'genre' | 'decade'
+
+const FILTER_ROW: Record<Exclude<ItemFilter, ''>, FilterRow> = { unwatched: 'watched', continuing: 'running', ended: 'running', '4k': 'picture', hdr: 'picture' }
+const FILTER_WORDS: Record<Exclude<ItemFilter, ''>, string> = { unwatched: 'Unwatched', continuing: 'Still running', ended: 'Ended', '4k': '4K', hdr: 'HDR' }
+
+/** The rows a library's Filter panel has, in order. */
+export function filterRows(type: LibraryType, o: { genres: boolean; decades: boolean }): FilterRow[] {
+  return ([
+    'watched',
+    ...(type === 'tv' ? ['running' as const] : []),
+    ...(o.genres ? ['genre' as const] : []),
+    ...(o.decades ? ['decade' as const] : []),
+    'picture',
+  ] as FilterRow[])
+}
+
+export const FILTER_ROW_LABEL: Record<FilterRow, string> = { watched: 'Watched or not', running: 'Still running', picture: 'Picture', genre: 'Genre', decade: 'Decade' }
+
+/** A filter row's choices: the server's filters that belong to it, Any first. */
+export function filterChoices(type: LibraryType, row: Exclude<FilterRow, 'genre' | 'decade'>): { value: ItemFilter; label: string }[] {
+  const all: Exclude<ItemFilter, ''>[] = row === 'watched' ? ['unwatched'] : row === 'running' ? ['continuing', 'ended'] : type === 'tv' ? ['4k'] : ['4k', 'hdr']
+  return [{ value: '', label: 'Any' }, ...all.map((f) => ({ value: f, label: FILTER_WORDS[f] }))]
+}
+
+/** What a filter row is set to, in words ("Unwatched", "Thriller", "1980s", "Any"). */
+export function filterRowValue(row: FilterRow, c: GridChoices): string {
+  if (row === 'genre') return c.genre || 'Any'
+  if (row === 'decade') return c.decade ? decadeLabel(c.decade) : 'Any'
+  return c.filter && FILTER_ROW[c.filter] === row ? FILTER_WORDS[c.filter] : 'Any'
+}
+
+/** The Filter button's value: "Off", or what narrows the grid ("Unwatched, Thriller, 1980s"). */
+export function filterSummary(c: GridChoices): string {
+  const parts = [c.filter ? FILTER_WORDS[c.filter] : '', c.genre, c.decade ? decadeLabel(c.decade) : ''].filter(Boolean)
+  return parts.length ? parts.join(', ') : 'Off'
+}
+
+/** The line under the library's name while it is narrowed: "23 of 214 movies". */
+export function narrowedLine(type: LibraryType, shown: number, all: number): string {
+  return `${shown.toLocaleString()} of ${count(all, libraryNoun(type))}`
+}
+
+/** Why nothing matches, in a sentence: "There are no unwatched thrillers from the 1980s in Movies." */
+export function nothingMatches(type: LibraryType, c: GridChoices): string {
+  const noun = type === 'tv' ? 'shows' : 'movies'
+  const kind = c.genre ? `${c.genre.toLowerCase()} ${type === 'tv' ? 'shows' : 'movies'}` : noun
+  const what = [
+    c.filter === 'unwatched' ? 'unwatched' : c.filter === '4k' ? '4K' : c.filter === 'hdr' ? 'HDR' : c.filter === 'continuing' ? 'still running' : c.filter === 'ended' ? 'ended' : '',
+    kind,
+  ].filter(Boolean).join(' ')
+  const when = c.decade ? ` from the ${decadeLabel(c.decade)}` : ''
+  return `There are no ${what}${when} in ${type === 'tv' ? 'TV Shows' : 'Movies'}.`
+}

@@ -47,8 +47,9 @@ export function liveKeyAction(action: Action, s: LiveKeyState): LiveAction {
     case 'playPause': return 'togglePause'
     case 'play': case 'pause': return action
     case 'info': return 'controls'
-    case 'up': return s.controls ? 'pass' : 'channelUp'
-    case 'down': return s.controls ? 'pass' : 'channelDown'
+    // With the controls showing, ▲ ▼ stop: the buttons are one row.
+    case 'up': return s.controls ? 'swallow' : 'channelUp'
+    case 'down': return s.controls ? 'swallow' : 'channelDown'
     case 'left': return s.controls ? 'pass' : 'onNow'
     case 'ok': case 'right': return s.controls ? 'pass' : 'controls'
     case 'rewind': case 'fastForward': case 'next': case 'previous': case 'minus': return 'swallow'

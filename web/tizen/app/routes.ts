@@ -63,7 +63,7 @@ type RouteDef<N extends Route['name']> = {
   screen: ComponentType<ScreenProps<N>>
   /** The rail section this route is the root of; pages have none and show the section below them. */
   section?: (route: Extract<Route, { name: N }>) => Section
-  /** 'full' draws without the rail (the player). */
+  /** 'full' draws without the rail: the players, and a title's page, which uses the full width and leaves by Return. */
   chrome?: 'rail' | 'full'
 }
 
@@ -76,8 +76,8 @@ export const ROUTES: { [N in Route['name']]: RouteDef<N> } = {
   seeAll: { screen: SeeAllScreen },
   list: { screen: ListScreen },
   watchlists: { screen: WatchlistsScreen },
-  movie: { screen: MovieScreen },
-  show: { screen: ShowScreen },
+  movie: { screen: MovieScreen, chrome: 'full' },
+  show: { screen: ShowScreen, chrome: 'full' },
   requests: { screen: RequestsScreen },
   liveGuide: { screen: LiveGuideScreen },
   recordings: { screen: RecordingsScreen },

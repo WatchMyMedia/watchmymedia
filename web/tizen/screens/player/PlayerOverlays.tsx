@@ -1,84 +1,122 @@
+import { useEffect, useState } from 'react'
 import { useMediaUrls } from '../../app/hooks'
-import type { FilePlayback, UpNext } from '../../player'
+import type { FilePlayback, FilePlaybackState, UpNext } from '../../player'
 import { Button } from '../../ui/Button'
-import { nextMeta, runtimeWords } from './labels'
+import { useNow } from '../live/clock'
+import { creditsLine, nextKicker, nextLine, nextTitle, startingWords } from './labels'
 import { PlayerIcon } from './PlayerIcons'
-import { MiniProgress, NextButton } from './Ticking'
+import { useSelect } from './select'
 
-// What comes over the video: the Next episode card, Still
-// watching, an administrator's stop or an error, the spinner and the note
-// that takes no focus. The prompts sit in the screen, so the screen's own
-// Return and keys answer them (Return keeps watching, or leaves).
+// What comes over the video: Up next, the starting view, Still watching,
+// an administrator's stop or a failure, the spinner and the note that takes
+// no focus. The prompts sit in the screen, so the screen's own Return and
+// keys answer them (Return keeps watching, or leaves).
 
-/** Next episode: the next episode's still, its title, the countdown button and Watch credits. */
-export function NextCard({ playback, episode, heading }: { playback: FilePlayback; episode: UpNext; heading: string }) {
+const countdownOf = (s: FilePlaybackState) => s.next?.seconds
+
+/**
+ * Up next, at the bottom right while the credits roll: when it starts,
+ * the episode's picture, its name, its length and when it would end, with
+ * Play now focused and Watch credits beside it. The line at the left says
+ * what is rolling.
+ */
+export function NextCard({ playback, episode, title, line }: { playback: FilePlayback; episode: UpNext; title: string; line?: string }) {
   const media = useMediaUrls()
+  const seconds = useSelect(playback, countdownOf)
+  const now = useNow(60_000)
   const still = episode.stillPath ? media.imageUrl(episode.stillPath, 'w780') : undefined
-  const runtime = runtimeWords(episode.runtimeMin)
+  const length = nextLine(episode, now)
   return <>
-    <div className="pl-shade pl-shade--card"/>
-    <MiniProgress playback={playback}/>
-    <section className="pl-next" role="dialog" aria-label="Next episode">
-      <div className="pl-next__art">
-        {still && <img className="pl-next__img" src={still} alt="" decoding="async"/>}
-        <span className="pl-next__badge">Next episode</span>
-        {runtime && <span className="pl-next__badge pl-next__badge--end">{runtime}</span>}
-      </div>
+    <div className="pl-shade pl-shade--bottom"/>
+    <p className="pl-credits">{creditsLine(title, line)}</p>
+    <aside className="pl-next" role="dialog" aria-label="Up next">
+      <p className="tv-kicker">{nextKicker({ seconds })}</p>
       <div className="pl-next__body">
-        <span className="pl-next__title">{heading}</span>
-        <span className="pl-next__meta">{nextMeta(episode)}</span>
-        <div className="pl-next__actions">
-          <NextButton playback={playback}/>
-          <button type="button" className="pl-next__btn pl-next__btn--ghost" data-focus="next/credits" onClick={() => playback.watchCredits()}>Watch credits</button>
+        <div className="pl-next__art">{still && <img className="pl-next__img" src={still} alt="" decoding="async"/>}</div>
+        <div className="pl-next__text">
+          <h2 className="pl-next__title">{nextTitle(episode)}</h2>
+          {length && <p className="pl-next__line">{length}</p>}
         </div>
       </div>
-    </section>
-  </>
-}
-
-/** A question over the dimmed video, with its buttons; focus starts on the first. */
-function Prompt({ kicker, title, children, foot, actions }: {
-  kicker?: string; title: string; children: string; foot?: string; actions: { id: string; label: string; primary?: boolean; play?: boolean; onPress(): void }[]
-}) {
-  return <div className="pl-prompt-host">
-    <section role="alertdialog" aria-label={title} className="pl-prompt">
-      {kicker && <span className="pl-prompt__kicker">{kicker}</span>}
-      <h2 className="pl-prompt__title">{title}</h2>
-      <p className="pl-prompt__body">{children}</p>
-      <div className="pl-prompt__actions">
-        {actions.map((a, i) => <Button key={a.id} id={a.id} variant={a.primary ? 'primary' : 'ghost'} icon={a.play ? 'play' : undefined} autoFocus={i === 0} onPress={a.onPress}>{a.label}</Button>)}
+      <div className="tv-actions pl-next__actions">
+        <Button id="next/play" variant="primary" icon="play" autoFocus onPress={() => playback.playNext()}>Play now</Button>
+        <Button id="next/credits" onPress={() => playback.watchCredits()}>Watch credits</Button>
       </div>
-      {foot && <p className="pl-prompt__foot">{foot}</p>}
-    </section>
-  </div>
+    </aside>
+  </>
 }
 
 export const PROMPT_FOCUS = 'prompt/first'
 
-/** Asked before the next episode starts by itself after a long while with no press (Still watching). */
-export function StillWatching({ episode, heading, onKeep, onStop }: { episode?: UpNext; heading?: string; onKeep(): void; onStop(): void }) {
-  const body = heading ? `${heading} is up next. ` : ''
-  return <Prompt kicker={episode?.showTitle} title="Still watching?" foot="Any press on the remote counts as an answer."
-    actions={[{ id: PROMPT_FOCUS, label: 'Keep watching', primary: true, play: true, onPress: onKeep }, { id: 'prompt/stop', label: 'Stop', onPress: onStop }]}>
-    {`${body}Nothing plays until you answer, so the server doesn’t keep streaming to an empty room.`}
-  </Prompt>
+type PromptAction = { id: string; label: string; primary?: boolean; onPress(): void }
+
+/** A question over the dimmed video: a title, why, what to do, its buttons with the first focused. */
+function Prompt({ title, why, what, actions }: { title: string; why: string; what?: string; actions: PromptAction[] }) {
+  return <div className="pl-prompt-host">
+    <section role="alertdialog" aria-label={title} className="tv-dialog pl-prompt">
+      <h2 className="tv-dialog__title">{title}</h2>
+      <p className="tv-lede">{why}</p>
+      {what && <p className="tv-note">{what}</p>}
+      <div className="tv-dialog__actions">
+        {actions.map((a, i) => <Button key={a.id} id={a.id} variant={a.primary ? 'primary' : 'ghost'} autoFocus={i === 0} onPress={a.onPress}>{a.label}</Button>)}
+      </div>
+    </section>
+  </div>
+}
+
+/** Asked before the next episode starts by itself after a long while with no press. Focus stays on Keep watching. */
+export function StillWatching({ title, onKeep, onStop }: { title?: string; onKeep(): void; onStop(): void }) {
+  return <Prompt title={title ? `Still watching ${title}?` : 'Still watching?'} why="It has been a while since anyone pressed the remote."
+    what="The next episode waits until you answer, so the server doesn’t stream to an empty room."
+    actions={[{ id: PROMPT_FOCUS, label: 'Keep watching', primary: true, onPress: onKeep }, { id: 'prompt/stop', label: 'Stop', onPress: onStop }]}/>
 }
 
 /** An administrator stopped the play, with their words: OK leaves. */
 export function AdminStop({ message, onOk }: { message: string; onOk(): void }) {
-  return <Prompt title="Playback stopped" actions={[{ id: PROMPT_FOCUS, label: 'OK', primary: true, onPress: onOk }]}>{message}</Prompt>
+  return <Prompt title="Playback was stopped" why={message} what="Your place is kept." actions={[{ id: PROMPT_FOCUS, label: 'OK', primary: true, onPress: onOk }]}/>
 }
 
-/** The play failed: the engine's words, Try again (from where it stopped) and Back. */
-export function PlayError({ message, backLabel, onRetry, onBack }: { message: string; backLabel: string; onRetry(): void; onBack(): void }) {
-  return <Prompt title="Can’t play this" actions={[{ id: PROMPT_FOCUS, label: 'Try again', primary: true, onPress: onRetry }, { id: 'prompt/back', label: backLabel, onPress: onBack }]}>{message}</Prompt>
+/**
+ * The play failed: why, in the engine's words, and what to do. Another
+ * version of the title comes first when there is one; then Try again (from
+ * where it stopped) and going back.
+ */
+export function PlayError({ message, other, backLabel, onOther, onRetry, onBack }: {
+  message: string; other?: string; backLabel: string; onOther(): void; onRetry(): void; onBack(): void
+}) {
+  const actions: PromptAction[] = [
+    ...(other ? [{ id: PROMPT_FOCUS, label: `Play the ${other} version`, primary: true, onPress: onOther }] : []),
+    { id: other ? 'prompt/retry' : PROMPT_FOCUS, label: 'Try again', primary: !other, onPress: onRetry },
+    { id: 'prompt/back', label: backLabel, onPress: onBack },
+  ]
+  return <Prompt title="This can’t play right now" why={message}
+    what="What went wrong is kept in Settings, under About, for whoever looks after the server." actions={actions}/>
 }
 
-/** Loading and buffering: a gold arc turning in the middle; a recording just starting says so. */
-export function Spinner({ starting }: { starting?: boolean }) {
-  return <div className="pl-wait" role="status" aria-label={starting ? 'The recording is starting' : 'Loading'}>
-    <span className="pl-spinner" aria-hidden="true"/>
-    {starting && <span className="pl-wait__line">The recording is starting…</span>}
+/** Starting: where it will start and what is left, with Cancel focused. */
+export function Starting({ startMs, durationMs, recording, onCancel }: { startMs?: number; durationMs: number; recording?: boolean; onCancel(): void }) {
+  const words = recording ? { title: 'The recording is starting', line: undefined } : startingWords(startMs, durationMs)
+  return <div className="pl-start" role="status">
+    <span className="tv-spinner tv-spinner--big pl-start__spin" aria-hidden="true"/>
+    <h2 className="tv-title">{words.title}</h2>
+    {words.line && <p className="tv-lede tv-muted">{words.line}</p>}
+    <Button id="starting/cancel" autoFocus onPress={onCancel}>Cancel</Button>
+  </div>
+}
+
+/** How long buffering goes on before it says why: a quick catch-up after a seek passes with the spinner alone. */
+const SLOW_AFTER_MS = 2500
+
+/** Buffering: a spinner in the middle, and after a moment what is happening. */
+export function Spinner({ automatic }: { automatic: boolean }) {
+  const [slow, setSlow] = useState(false)
+  useEffect(() => { const t = setTimeout(() => setSlow(true), SLOW_AFTER_MS); return () => clearTimeout(t) }, [])
+  return <div className="pl-wait" role="status" aria-label="Loading">
+    <span className="tv-spinner tv-spinner--big pl-wait__spin" aria-hidden="true"/>
+    {slow && <>
+      <p className="tv-head">Catching up…</p>
+      {automatic && <p className="tv-lede tv-muted">Quality is on Automatic, so the picture may get softer for a while.</p>}
+    </>}
   </div>
 }
 

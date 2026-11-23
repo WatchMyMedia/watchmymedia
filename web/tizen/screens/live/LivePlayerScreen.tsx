@@ -1,25 +1,30 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import type { LiveChannel } from '../../../src/api/liveTV'
-import { liveTVCapabilitiesQuery } from '../../../src/api/queries'
+import { liveTVCapabilitiesQuery, liveTVRecordingsQuery } from '../../../src/api/queries'
 import { cancelRecording } from '../../../src/api/recordings'
+import { nowAndNext } from '../../../src/lib/liveGuide'
 import { useFocus, useKeys, useNav, useSession } from '../../app/hooks'
 import { holdScreenSaver } from '../../app/platform'
 import { useVideoSurface } from '../../app/surface'
 import { recordPlaybackError } from '../../app/playbackErrors'
 import type { PlayRequest } from '../../app/routes'
 import type { LivePlayback } from '../../player'
+import { showNote } from '../../ui/notes'
 import { ProblemScreen } from '../../ui/States'
 import { placeholderTone } from '../../ui/tones'
 import { useNow } from './clock'
 import { GoToChannelPanel } from './GoToChannel'
-import { useRecordingAction } from './liveData'
+import { useLiveTV, useRecordingAction } from './liveData'
 import { liveProblem, loggedKind, lowerQuality, type ProblemAction } from './liveProblems'
 import { registerTuner, rememberChannel, useLivePlayback } from './livePlayback'
-import { ChannelBanner, Controls, OnNowPanel, ProblemDialog, ProblemPage, QualityPanel, StillWatching, TakeoverBanner, TopBar, Tuning } from './LivePlayerParts'
+import { busyWords } from './livePlayerModel'
+import { BusyDialog, ChannelBanner, Controls, OnNowPanel, ProblemDialog, ProblemPage, QualityPanel, StillWatching, TakeoverBanner, TopClock, Tuning } from './LivePlayerParts'
 import { BANNER_MS, CONTROLS_MS, liveBackAction, liveKeyAction, numberKey, type LivePanel } from './liveRemote'
-import { matchWords, qualityShort, streamLine } from './liveWords'
+import { matchWords, qualityShort } from './liveWords'
+import { RecordPanel } from './RecordPanel'
 import './live.css'
+import './livePlayer.css'
 
 /**
  * The Live TV player, which the player route
@@ -49,10 +54,12 @@ function LivePlayer({ channelId, live, preview }: { channelId: string; live: Liv
   const session = useSession()
   const state = useSyncExternalStore(live.subscribe, live.snapshot)
   const caps = useQuery(liveTVCapabilitiesQuery)
+  const tv = useLiveTV()
   const listings = !!caps.data?.guide
   const now = useNow()
   const [shownControls, setControls] = useState(false)
   const [panel, setPanel] = useState<LivePanel>()
+  const [recording, setRecording] = useState(false)
   // The channel whose banner has had its time.
   const [bannerDone, setBannerDone] = useState<string>()
   const [lastKey, setLastKey] = useState(() => Date.now())
@@ -81,6 +88,11 @@ function LivePlayer({ channelId, live, preview }: { channelId: string; live: Liv
     number: channel?.number, admin: session.isAdmin, quality: state.quality, pauseMinutes: caps.data?.pauseSeconds ? Math.max(1, Math.round(caps.data.pauseSeconds / 60)) : undefined,
   }) : undefined
   const prompt = state.askStillWatching
+  // Every tuner busy: what is recording on them, to say so and offer it from its start.
+  const busy = problem && state.failure?.reason === 'tuners_busy'
+  const recordingNow = useInfiniteQuery({ ...liveTVRecordingsQuery('now'), enabled: !!busy && tv.canRecord })
+  const holders = recordingNow.data?.pages.flatMap((p) => p.items) ?? []
+  const busyWhy = busy ? busyWords(holders, recordingNow.data?.pages[0]?.tuners) : undefined
   // Each failure goes in Settings › About's log of the last playback errors, as a code.
   // The engine words a failure afresh on each tick, so it is logged by what it is, once until it clears.
   const failed = state.failure ? `${state.failure.reason ?? ''}:${state.failure.title}` : ''
@@ -127,9 +139,11 @@ function LivePlayer({ channelId, live, preview }: { channelId: string; live: Liv
   const watch = (c: LiveChannel) => { setPanel(undefined); setControls(false); void live.open(c.id) }
   const toGuide = () => nav.replace({ name: 'liveGuide', channelId: channel?.id })
   const leave = () => nav.back()
+  const watchRecording = (id: string, title?: string) => nav.replace({ name: 'player', play: { kind: 'recording', id, startMs: 0, title } })
+  const onNowProgramme = channel ? nowAndNext(channel, now).now : undefined
 
   // A problem or Still watching takes focus on its first button.
-  const asking = problem ? `problem/${problem.actions[0]?.id}` : prompt ? 'prompt/keep' : undefined
+  const asking = busyWhy ? 'problem/watch' : problem ? `problem/${problem.actions[0]?.id}` : prompt ? 'prompt/keep' : undefined
   useLayoutEffect(() => { if (asking) focus.focusId(asking) }, [focus, asking])
   // Focus goes where the last change asked, once it is drawn.
   useLayoutEffect(() => {
@@ -140,6 +154,8 @@ function LivePlayer({ channelId, live, preview }: { channelId: string; live: Liv
   useKeys((i) => {
     setLastKey(Date.now())
     live.noteInput()
+    // The record panel is a modal of its own: it takes its keys first; what it leaves goes nowhere here.
+    if (recording) return false
     const s = { panel, controls, terminal: !!problem, prompt }
     if (i.action === 'back') {
       switch (liveBackAction(s)) {
@@ -191,7 +207,7 @@ function LivePlayer({ channelId, live, preview }: { channelId: string; live: Liv
       case 'home': return nav.openSection({ name: 'home' })
       case 'watchRecording': {
         const id = state.failure?.recordingId
-        if (id) nav.replace({ name: 'player', play: { kind: 'recording', id, startMs: 0, title: state.failure?.recordingTitle } })
+        if (id) watchRecording(id, state.failure?.recordingTitle)
         return
       }
       case 'keepWatching': return live.keepWatching()
@@ -199,6 +215,7 @@ function LivePlayer({ channelId, live, preview }: { channelId: string; live: Liv
     }
   }
 
+  const record = () => { if (onNowProgramme) setRecording(true); else showNote('This channel has no listings to record from.', 'info') }
   const tone = placeholderTone(channel?.now?.title ?? channel?.name ?? '')
   // The preview has no picture to show: the board's stand-in. On the TV the page is clear over AVPlay's plane.
   const backdrop: CSSProperties | undefined = preview || !playing ? { '--ph-a': tone[0], '--ph-b': tone[1] } as CSSProperties : undefined
@@ -209,25 +226,32 @@ function LivePlayer({ channelId, live, preview }: { channelId: string; live: Liv
   const note = state.paused && state.pauseLeftSeconds !== undefined ? `Paused. The tuner is given back in ${Math.floor(state.pauseLeftSeconds / 60)}:${String(state.pauseLeftSeconds % 60).padStart(2, '0')}.`
     : state.note ?? (state.session?.automatic && state.session.switchStatus && state.session.switchStatus !== 'ready' ? SWITCH_WORDS[state.session.switchStatus] : undefined)
 
-  if (problem && !problem.dialog) return <div className="live-player live-player--problem">
+  if (problem && !problem.dialog) return <div className="live-player live-player--problem lp">
     <ProblemPage problem={problem} channel={channel} channels={state.channels} current={channel?.id} admin={session.isAdmin} now={now} onAction={act} onWatch={watch}/>
   </div>
-  return <div className={`live-player${backdrop ? ' live-player--backdrop' : ''}${tuning ? ' live-player--tuning' : ''}`} style={backdrop}>
-    {(showBanner || controlsShown) && <div className="live-player__shade live-player__shade--top" aria-hidden="true"/>}
-    {(showBanner || controlsShown || panel === 'number') && <div className="live-player__shade live-player__shade--bottom" aria-hidden="true"/>}
+  const takeoverCancel = !!state.takeover?.canCancel
+  return <div className={`live-player lp${backdrop ? ' live-player--backdrop' : ''}${tuning ? ' live-player--tuning' : ''}`} style={backdrop}>
+    {(showBanner || controlsShown) && <div className="lp-shade lp-shade--bottom" aria-hidden="true"/>}
+    {controlsShown && <div className="lp-shade lp-shade--top" aria-hidden="true"/>}
     {tuning && <Tuning number={channel?.number}/>}
-    {(showBanner || controlsShown) && <TopBar controls={controlsShown} now={now} stream={streamLine({ tuning, quality: state.quality, autoStep: state.autoStep, mode: state.session?.mode })}/>}
-    {note && !problem && <div className="live-note live-note--player" role="status">{note}</div>}
-    {showBanner && channel && <ChannelBanner channel={channel} now={now} listings={listings} raised={controlsShown} badge={tuning ? 'tuning' : state.behind || state.paused ? 'behind' : 'live'}/>}
-    {controlsShown && <Controls state={state} quality={qualityShort(state.quality, state.autoStep)} onToggle={() => live.togglePause()} onLive={() => live.goLive()}
-      onDown={() => live.channelDown()} onUp={() => live.channelUp()} onOnNow={() => openPanel('onNow')} onQuality={() => openPanel('quality')} onGuide={toGuide}/>}
+    {(showBanner || controlsShown || panel === 'onNow' || panel === 'quality') && <TopClock now={now}/>}
+    {note && !problem && <div className="lp-toast" role="status">{note}</div>}
+    {showBanner && !controlsShown && channel && <ChannelBanner channel={channel} state={state} now={now} listings={listings} tuning={tuning}/>}
+    {controlsShown && channel && <Controls state={state} channel={channel} now={now} listings={listings} canRecord={tv.canRecord && listings && !!onNowProgramme}
+      takeoverCancel={takeoverCancel} quality={qualityShort(state.quality, state.autoStep)}
+      onToggle={() => live.togglePause()} onLive={() => live.goLive()} onRecord={record}
+      onCancelTakeover={() => { const id = state.takeover?.recordingId; live.dismissTakeover(); if (id) cancel.mutate(id) }}
+      onOnNow={() => openPanel('onNow')} onGuide={toGuide} onQuality={() => openPanel('quality')}/>}
     {panel === 'onNow' && !problem && <OnNowPanel channels={state.channels} current={channel?.id} listings={listings} now={now} onWatch={watch}/>}
     {panel === 'quality' && !problem && <QualityPanel state={state} onPick={(q) => { live.setQuality(q); closePanel() }}/>}
     {panel === 'number' && !problem && typed && number && <GoToChannelPanel digits={number.digits} text={typed.text} match={typed.match}
       onKey={(k) => live.typeDigit(k)} onCancel={closePanel} onWatch={() => { if (live.commitNumber()) { setPanel(undefined); setControls(false) } }}/>}
-    {state.takeover && !problem && <TakeoverBanner words={state.takeover.words} canCancel={state.takeover.canCancel}
-      onDismiss={() => live.dismissTakeover()} onCancel={() => { const id = state.takeover?.recordingId; live.dismissTakeover(); if (id) cancel.mutate(id) }}/>}
+    {state.takeover && !problem && !controlsShown && <TakeoverBanner at={state.session?.takeoverAt} now={now} onDismiss={() => live.dismissTakeover()}/>}
+    {recording && channel && onNowProgramme && <RecordPanel channel={channel} programme={onNowProgramme} onClose={() => setRecording(false)}
+      onNote={(text) => showNote(text, 'check')} onWatchRecording={(id, title) => { setRecording(false); watchRecording(id, title) }}/>}
     {prompt && !problem && <StillWatching channel={channel} onKeep={() => { live.keepWatching(); showControls() }} onStop={leave}/>}
-    {problem?.dialog && <ProblemDialog problem={problem} onAction={act}/>}
+    {busyWhy ? <BusyDialog why={busyWhy.why} what={busyWhy.what} watchTitle={busyWhy.watch.title} onWatch={() => watchRecording(busyWhy.watch.id, busyWhy.watch.title)}
+      onRecordings={() => nav.replace({ name: 'recordings' })} onBack={leave}/>
+      : problem?.dialog && <ProblemDialog problem={problem} onAction={act}/>}
   </div>
 }

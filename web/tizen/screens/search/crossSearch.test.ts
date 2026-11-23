@@ -190,10 +190,10 @@ describe('search across servers', () => {
   })
 
   it('words the empty states, the wait and the failure for several servers', () => {
-    expect(emptyWords(3, true)).toEqual({ title: 'Search your servers', body: 'Find a show, a movie or an episode on any of your 3 servers.' })
-    expect(emptyWords(1, false).title).toBe('Find anything in your library')
-    expect(noMatchWords('harbr', 3)).toEqual({ title: 'No matches on your 3 servers', body: 'Nothing is called “harbr” on any of them. Check the spelling, or try fewer words.' })
-    expect(noMatchWords('harbr', 1)).toEqual({ title: 'Nothing matches', body: 'No titles in your library match “harbr”.' })
+    expect(emptyWords('Lakeside', 3, true)).toEqual({ title: 'Search', body: 'Movies, shows and episodes on your 3 servers, and what is on live TV.' })
+    expect(emptyWords('Lakeside', 1, false).body).toBe('Movies, shows and episodes on Lakeside.')
+    expect(noMatchWords('harbr', 3, false).title).toBe('Nothing on your 3 servers matches “harbr”')
+    expect(noMatchWords('harbr', 1, false).title).toBe('Nothing in your library matches “harbr”')
     expect(stillAsking(['Cabin server'])).toBe('Still asking Cabin server…')
     expect(stillAsking(['Cabin server', 'Den server'])).toBe('Still asking Cabin server and Den server…')
     expect(didNotAnswer('Den server')).toBe('Den server didn’t answer, so its titles aren’t listed.')

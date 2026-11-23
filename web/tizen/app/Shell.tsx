@@ -10,7 +10,7 @@ import { chromeOf, isSection, ROUTES, sameRoute, SECTION_ROUTES, sectionOf, type
 import type { ActiveSession } from '../session/active'
 import type { Arrival } from '../session/session'
 import { Rail } from '../ui/Rail'
-import { Banner } from '../ui/Overlays'
+import { Dialog } from '../ui/Overlays'
 import { railBadge } from '../ui/railBadge'
 import { LeaveDialog } from './LeaveDialog'
 import { ReminderBanner } from '../screens/live/ReminderBanner'
@@ -22,17 +22,31 @@ import { useWatchlistsOn } from '../screens/watchlists/useWatchlistsOn'
 
 /** Shown after the stream has been down this long: brief drops pass unnoticed. */
 const OFFLINE_AFTER_MS = 5000
+/** After Try again now, how long before the dialog comes back if the server still doesn't answer. */
+const RETRY_GRACE_MS = 10_000
 
-function OfflineBanner() {
+/**
+ * Losing the server: a dialog with Try again now focused (Samsung's network
+ * popup), and Choose another server. Return is Try again now.
+ */
+function OfflineDialog({ onServers }: { onServers(): void }) {
   const session = useSession()
   const online = useSyncExternalStore(session.connection.subscribe, session.connection.snapshot)
   const [shown, setShown] = useState(false)
+  const [tried, setTried] = useState(0)
   useEffect(() => {
-    const timer = setTimeout(() => setShown(!online), online ? 0 : OFFLINE_AFTER_MS)
+    const timer = setTimeout(() => setShown(!online), online ? 0 : tried ? RETRY_GRACE_MS : OFFLINE_AFTER_MS)
     return () => clearTimeout(timer)
-  }, [online])
+  }, [online, tried])
   if (!shown || online) return null
-  return <Banner icon="offline" title={`Can’t reach ${session.server.name}`}>Trying again. What’s on screen may be out of date until it’s back.</Banner>
+  const retry = () => { setShown(false); setTried((n) => n + 1); session.connection.retry() }
+  return <Dialog title={`Can’t reach ${session.server.name}`} onCancel={retry} actions={[
+    { id: 'offline/retry', label: 'Try again now', variant: 'primary', safe: true, onPress: retry },
+    { id: 'offline/servers', label: 'Choose another server', onPress: () => { setShown(false); setTried((n) => n + 1); onServers() } },
+  ]}>
+    <p className="tv-lede">This TV is on the network, but the server isn’t answering. It may be off, restarting or updating.</p>
+    <p className="tv-note">This TV keeps trying by itself. What is on screen may be out of date until it is back.</p>
+  </Dialog>
 }
 
 /** The sessions that have said how the app came to them ("Now on …", the server just added): once each. */
@@ -61,6 +75,7 @@ function Frame({ nav, entries, arrival, exit }: { nav: NavStack<Route>; entries:
     openSection: (route) => { if (!nav.openSection(route)) input.focus.focusContent() },
     back: () => { if (!nav.back()) setLeaving(true) },
     play: (play) => nav.push({ name: 'player', play }),
+    servers: () => setServers('screen'),
   }), [nav, input])
 
   // A search result on a server that couldn't be switched to: Servers says so, with Try again.
@@ -93,8 +108,9 @@ function Frame({ nav, entries, arrival, exit }: { nav: NavStack<Route>; entries:
   }, [input, nav])
 
   // Return with the rail open closes it first, back to where focus was.
+  // Focus parked on the closed rail while a screen loads lets Return go on.
   useKeys((i) => {
-    if (i.action !== 'back' || scopeName(document.activeElement) !== 'rail') return false
+    if (i.action !== 'back' || scopeName(document.activeElement) !== 'rail' || input.focus.parked) return false
     input.focus.focusContent()
     return true
   }, true, 'overlay')
@@ -112,7 +128,8 @@ function Frame({ nav, entries, arrival, exit }: { nav: NavStack<Route>; entries:
 
   const open = (section: Section) => navApi.openSection(SECTION_ROUTES[section])
   const Screen = ROUTES[top.route.name].screen as ComponentType<ScreenProps>
-  const account = { initial: session.account.name.slice(0, 1).toUpperCase(), ...accountWords(session.account.name, session.server.name, app.store.list().length, watchlists) }
+  const words = accountWords(session.account.name, session.server.name, app.store.list().length, watchlists)
+  const account = { initial: session.account.name.slice(0, 1).toUpperCase(), name: session.account.name, server: session.server.name, label: words.label }
   return <NavContext.Provider value={navApi}>
     <div className="tv-shell">
       {chrome === 'rail' && <Rail current={current} liveTV={liveTV} badge={railBadge(options.data, session.isAdmin)} account={account}
@@ -120,11 +137,11 @@ function Frame({ nav, entries, arrival, exit }: { nav: NavStack<Route>; entries:
       <main key={top.key} className={`tv-content tv-content--${chrome}`} data-scope="content">
         <EntryContext.Provider value={top}><Screen route={top.route}/></EntryContext.Provider>
       </main>
-      {chrome === 'rail' && <OfflineBanner/>}
-      <ReminderBanner player={chrome === 'full'}/>
+      {top.route.name !== 'player' && <OfflineDialog onServers={() => setServers('screen')}/>}
+      <ReminderBanner player={top.route.name === 'player'}/>
       {arrived === 'switched' && <SwitchNote/>}
       {arrived === 'added' && <AddedDialog onDone={() => setArrived(undefined)}/>}
-      {servers && chrome === 'rail' && <ServersPanel from={servers} onClose={() => setServers(undefined)}
+      {servers && top.route.name !== 'player' && <ServersPanel from={servers} onClose={() => setServers(undefined)}
         onManage={() => { setServers(undefined); nav.openSection({ name: 'settings', group: 'account', servers: true }) }}
         onWatchlists={watchlists ? () => { setServers(undefined); nav.push({ name: 'watchlists' }) } : undefined}/>}
       {leaving && <LeaveDialog onStay={() => setLeaving(false)} onLeave={exit}/>}

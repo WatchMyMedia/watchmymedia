@@ -1,15 +1,16 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type FocusEvent } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { liveTVCapabilitiesQuery, liveTVRemindersQuery, liveTVSearchQuery, searchQuery, useLiveReminder } from '../../../src/api/queries'
+import { homeQuery, liveTVCapabilitiesQuery, liveTVRemindersQuery, liveTVSearchQuery, searchQuery, useLiveReminder } from '../../../src/api/queries'
 import { requestableSearchQuery, requestOptionsQuery, type Requestable } from '../../../src/api/requests'
 import type { components } from '../../../src/api/schema'
 import { searchTerm } from '../../../src/lib/liveReminders'
 import { isOn, progress } from '../../../src/lib/liveGuide'
 import { SUGGEST_DELAY_MS, SUGGEST_MIN_CHARS } from '../../../src/lib/searchSuggestions'
-import { useApp, useAppState, useEntry, useFocus, useHold, useKeys, useMediaUrls, useNav, useSession, useBack } from '../../app/hooks'
+import { nearest } from '../../app/geometry'
+import { useApp, useAppState, useBack, useEntry, useFocus, useHold, useKeys, useMediaUrls, useNav, useSession } from '../../app/hooks'
 import { leftOutReason, otherServers, serversLeftOut, type LeftOut, type PeerServer } from '../../session/peers'
 import type { OpenTarget } from '../../session/session'
-import { KeyHints } from '../../ui/Button'
+import { Button } from '../../ui/Button'
 import { Card } from '../../ui/Card'
 import { Icon } from '../../ui/Icon'
 import { VScroll } from '../../ui/VScroll'
@@ -20,14 +21,23 @@ import { RequestDialog, type RequestTarget } from '../requests/RequestDialog'
 import { CrossSearch, CURRENT, mergeResults, noneAnswered, resultKey, searchLines, SERVER_MS, type Tagged } from './crossSearch'
 import { keepSearch, keptSearch, searchScope } from './keptSearch'
 import { Keyboard } from './OnScreenKeyboard'
+import { readRecent, recentScope, rememberSearch } from './recentSearches'
 import { ResultsRow } from './ResultsRow'
-import { askingAgain, didNotAnswer, emptyWords, leftOutLine, episodeSub, libraryBand, liveAction, liveLine, liveWhen, movieSub, noMatchWords, notInLibrary, requestableAction, requestableSub, requestBadge, showSub, stillAsking, suggestionChips } from './searchResults'
+import {
+  askButton, askingAgain, ASK_LINE, bestMatch, continueItems, didNotAnswer, emptyWords, episodeSub, kindLine, leftOutLine, liveAction, liveLine, liveWhen, noMatchWords,
+  notInLibrary, placeIn, requestableAction, requestableSub, requestBadge, stillAsking,
+} from './searchResults'
 import './search.css'
 
 type LiveHit = components['schemas']['LiveTVSearchHit']
 type Movie = components['schemas']['Movie']
 type Show = components['schemas']['Show']
 type SearchEpisode = components['schemas']['SearchEpisode']
+/** A library title in the results, a show or a movie, with the server it is on. */
+type Title = { kind: 'show'; tagged: Tagged<Show> } | { kind: 'movie'; tagged: Tagged<Movie> }
+
+/** The keyboard's bottom row: ▼ stops there. */
+const BOTTOM_KEYS = new Set(['key/space', 'key/delete', 'key/clear', 'key/tv'])
 
 /**
  * The other servers this TV is signed in to, asked for this visit to
@@ -64,6 +74,11 @@ function useDebounced(text: string): string {
   return q
 }
 
+function tone(title: string): CSSProperties {
+  const [a, b] = placeholderTone(title)
+  return { '--ph-a': a, '--ph-b': b } as CSSProperties
+}
+
 function LiveHitCard({ hit, focusId, now, onPress, onHold }: { hit: LiveHit; focusId: string; now: number; onPress(): void; onHold(): void }) {
   const ref = useRef<HTMLButtonElement>(null)
   const media = useMediaUrls()
@@ -71,22 +86,16 @@ function LiveHitCard({ hit, focusId, now, onPress, onHold }: { hit: LiveHit; foc
   const p = hit.programme
   const on = isOn(p, now)
   const picture = media.mediaUrl(p.stillUrl ?? p.pictureUrl)
-  const logo = media.mediaUrl(hit.channel.logoUrl)
-  const tone = placeholderTone(p.title)
   return <button ref={ref} type="button" data-focus={focusId} className="search-live" onClick={onPress}
     aria-label={`${on ? `Watch ${hit.channel.number} ${hit.channel.name}, ` : ''}${p.title}, ${liveLine(hit)}, ${liveWhen(hit, now)}${on ? '' : '. Opens it in the guide'}`}>
-    <span className="search-live__art" style={{ '--ph-a': tone[0], '--ph-b': tone[1] } as CSSProperties}>
+    <span className="search-live__art" style={tone(p.title)}>
       {picture ? <img src={picture} alt="" decoding="async" loading="lazy"/> : <span className="search-live__title">{p.title}</span>}
-      <span className="search-live__top">
-        {logo && <img className="search-live__logo" src={logo} alt="" decoding="async"/>}
-        <b>{hit.channel.number}</b>
-        {on ? <span className="tv-badge tv-badge--live search-live__mark">Live</span> : p.reminder ? <span className="search-live__bell search-live__mark"><Icon name="bell"/></span> : null}
-      </span>
+      <span className="search-live__chan">{hit.channel.number}</span>
+      {on ? <span className="tv-badge tv-badge--live search-live__mark">Live</span> : p.reminder ? <span className="search-live__bell search-live__mark"><Icon name="bell"/></span> : null}
       {on && <span className="tv-card__progress"><span style={{ width: `${Math.round(progress(p, now))}%` }}/></span>}
     </span>
     <span className="tv-card__title">{p.title}</span>
-    <span className="tv-card__sub">{liveLine(hit)}</span>
-    <span className={`tv-card__sub search-live__when${on ? ' search-live__when--on' : p.reminder ? ' search-live__when--set' : ''}`}>{liveWhen(hit, now)}</span>
+    <span className={`tv-card__sub${p.reminder && !on ? ' search-live__when--set' : ''}`}>{liveWhen(hit, now)}</span>
   </button>
 }
 
@@ -94,26 +103,73 @@ function NotInLibraryCard({ item, focusId, onPress }: { item: Requestable; focus
   const media = useMediaUrls()
   const badge = requestBadge(item.state)
   const image = media.imageUrl(item.posterPath, 'w342')
-  const tone = placeholderTone(item.title)
   return <button type="button" data-focus={focusId} className="tv-card tv-card--poster" onClick={onPress} aria-label={`${item.title}, ${requestableSub(item)}, ${badge.label}`}>
-    <span className="tv-card__art" style={{ '--ph-a': tone[0], '--ph-b': tone[1] } as CSSProperties}>
+    <span className="tv-card__art" style={tone(item.title)}>
       <span className="tv-card__placeholder" aria-hidden="true"/>
       {image && <img className="tv-card__img" src={image} alt="" decoding="async" loading="lazy"/>}
-      <span className={`search-nil__badge${badge.gold ? ' search-nil__badge--gold' : ''}`}>{badge.icon ? <Icon name={badge.icon}/> : <b aria-hidden="true">+</b>}{badge.label}</span>
+      <span className={`search-nil__badge${badge.gold ? ' search-nil__badge--gold' : ''}`}>{badge.icon && <Icon name={badge.icon}/>}{badge.label}</span>
     </span>
     <span className="tv-card__title">{item.title}</span>
     <span className="tv-card__sub">{requestableSub(item)}</span>
   </button>
 }
 
+/** The library's best match: its picture with your place in it, what it is, and Resume (when you are partway) and Open. */
+function BestMatch({ title, line, place, progressOf, image, onResume, onOpen }: {
+  title: string; line: string; place?: string; progressOf?: number; image?: string; onResume?: () => void; onOpen(): void
+}) {
+  return <section className="search-best" data-vitem aria-label="Best match">
+    <h2 className="search-label">Best match</h2>
+    <div className="search-best__body">
+      <span className="search-best__pic" style={tone(title)} aria-hidden="true">
+        <span className="tv-card__placeholder"/>
+        {image && <img className="tv-card__img" src={image} alt="" decoding="async"/>}
+        {progressOf !== undefined && <span className="tv-card__progress"><span style={{ width: `${Math.round(progressOf * 100)}%` }}/></span>}
+      </span>
+      <div className="search-best__text">
+        <h3 className="tv-head tv-cut">{title}</h3>
+        <p className="search-best__line">{line}</p>
+        {place && <p className="search-best__place">{place}</p>}
+        <div className="tv-actions search-best__actions" data-edge>
+          {onResume && <Button id="search/best/resume" variant="primary" icon="play" onPress={onResume}>Resume</Button>}
+          <Button id="search/best/open" variant={onResume ? 'ghost' : 'primary'} onPress={onOpen}>Open</Button>
+        </div>
+      </div>
+    </div>
+  </section>
+}
+
+/** Not in your library's first title, when the library had nothing: its poster, what it is, why asking helps and Ask for it. */
+function AskFeature({ item, onPress }: { item: Requestable; onPress(): void }) {
+  const media = useMediaUrls()
+  const image = media.imageUrl(item.posterPath, 'w342')
+  const button = askButton(item)
+  return <div className="search-ask">
+    <span className="search-ask__pic" style={tone(item.title)} aria-hidden="true">
+      <span className="tv-card__placeholder"/>
+      {image && <img className="tv-card__img" src={image} alt="" decoding="async"/>}
+    </span>
+    <div className="search-ask__text">
+      <h3 className="tv-head">{item.title}</h3>
+      <p className="search-best__line">{requestableSub(item)}</p>
+      {item.state === 'requestable' && <p className="search-best__line search-ask__why">{ASK_LINE}</p>}
+      <div className="tv-actions search-best__actions">
+        <Button id={`search/ask/${item.mediaType}-${item.tmdbId}`} variant="primary" disabled={!!button.why} why={button.why} onPress={onPress}>{button.label}</Button>
+      </div>
+    </div>
+  </div>
+}
+
 /**
- * Search: the on-screen keyboard, with
- * Use the TV's keyboard for accents, other alphabets and the voice key, and
- * titles suggested as you type; on the right the library's shows, movies
- * and episodes (OK opens, Hold OK plays an episode), On Live TV (OK watches
- * what's on now, else opens it in the guide; Hold OK sets a reminder) and
- * Not in your library, whose Request opens the request dialog. Return from
- * the results goes back to the keyboard.
+ * Search: the box, the last three searches (Search again) and an
+ * on-screen keyboard on the left, with the TV's own keyboard (accents,
+ * other alphabets and the voice key) one key away; on the right, the best
+ * match with your place in it and Resume, then In your library, Episodes,
+ * On live TV (OK watches what is on now, else opens it in the guide; Hold
+ * OK sets a reminder, as a shortcut) and, set apart at the end, Not in your
+ * library with Ask for it. Titles on this TV's other servers come after
+ * this one's, each with its server's name. ◀ from a result's first card
+ * and Return go back to the keyboard, on the key used last.
  */
 export function SearchScreen() {
   const app = useApp()
@@ -134,12 +190,14 @@ export function SearchScreen() {
   const [again, setAgain] = useState<string[]>([])
   const [late, setLate] = useState<string>()
   const [retrying, setRetrying] = useState(false)
+  const recentKey = recentScope(session.server.id, session.account.userId)
+  const [recent, setRecent] = useState(() => readRecent(storage(), recentKey))
   // A server asked again that answers takes its line away, and focus with it: focus goes to a card.
   const answered = again.filter((id) => parts.find((p) => p.id === id)?.state !== 'asking')
   if (answered.length) setAgain(again.filter((id) => !answered.includes(id)))
   useEffect(() => {
     if (document.activeElement !== document.body) return
-    const card = resultsRef.current?.querySelector<HTMLElement>('.tv-card[data-focus]')
+    const card = resultsRef.current?.querySelector<HTMLElement>('[data-focus]')
     if (card) focus.focus(card)
   }, [again, retrying, focus])
   // A keystroke cancels every call still out; the other servers are asked a moment after typing stops, as the current one is.
@@ -149,21 +207,20 @@ export function SearchScreen() {
     const timer = setTimeout(() => cross.search(words.length >= SUGGEST_MIN_CHARS ? words : ''), SUGGEST_DELAY_MS)
     return () => clearTimeout(timer)
   }, [cross, text])
-  const [inResults, setInResults] = useState(false)
   const [asking, setAsking] = useState<RequestTarget>()
-  const [focused, setFocused] = useState<string>()
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(timer) }, [])
 
   const capabilities = useQuery(liveTVCapabilitiesQuery)
   const options = useQuery(requestOptionsQuery)
+  const home = useQuery(homeQuery)
   const liveTV = !!capabilities.data?.enabled && !!capabilities.data.allowed && !!capabilities.data.guide
   const canRequest = !!options.data && (options.data.movies || options.data.shows)
   const library = useQuery({ ...searchQuery(q), enabled: searching, placeholderData: keepPreviousData })
   const term = searchTerm(q)
   const live = useQuery({ ...liveTVSearchQuery(term ?? ''), enabled: liveTV && !!term, placeholderData: keepPreviousData })
   const requestable = useQuery({ ...requestableSearchQuery(q), enabled: canRequest && searching })
-  const hits = live.data?.items ?? []
+  const hits = searching ? live.data?.items ?? [] : []
   const reminders = useQuery({ ...liveTVRemindersQuery, enabled: hits.some((h) => h.programme.reminder) })
   const remind = useLiveReminder()
   const media = useMediaUrls()
@@ -188,12 +245,21 @@ export function SearchScreen() {
   const results = searching && !currentFailed ? library.data : undefined
   const merged = mergeResults(results, searching && (currentIn || currentFailed || library.isError), searching ? parts : [])
   const { shows, movies, episodes } = merged
+  const best = searching ? bestMatch(shows, movies, q) : undefined
+  const place = placeIn(best, continueItems(home.data))
+  // In your library: each server's shows and movies together, servers in the order they answered, so a card on screen never moves.
+  const titles: Title[] = []
+  for (const server of [undefined, ...new Set([...shows, ...movies].map((t) => t.server?.id).filter(Boolean))]) {
+    for (const t of shows) if (t.server?.id === server && !(best?.kind === 'show' && !t.server && best.item.id === t.item.id)) titles.push({ kind: 'show', tagged: t })
+    for (const t of movies) if (t.server?.id === server && !(best?.kind === 'movie' && !t.server && best.item.id === t.item.id)) titles.push({ kind: 'movie', tagged: t })
+  }
   const nil = searching ? notInLibrary(requestable.data?.items, results) : []
-  const chips = !inResults && text.trim().length >= SUGGEST_MIN_CHARS ? suggestionChips(library.data, text) : []
   // With one server it says so as it always has; with several, only once each has answered for these words.
-  const nothing = searching && (several ? merged.settled && !currentFailed : library.isSuccess) && !library.isError && !shows.length && !movies.length && !episodes.length && !hits.length && !nil.length && !requestable.isPending
+  const nothing = searching && (several ? merged.settled && !currentFailed : library.isSuccess) && !library.isError && !shows.length && !movies.length && !episodes.length && !hits.length && !requestable.isPending
   const switching = appState.screen === 'signedIn' && appState.switching?.state === 'switching' ? appState.switching : undefined
 
+  /** Using a result keeps the words for Search again. */
+  const used = () => { if (q) setRecent(rememberSearch(storage(), recentKey, q)) }
   const toKeyboard = () => {
     const last = entry?.memory.groups['search/keys']
     if (!(last && focus.focusId(last))) focus.focusId('key/1-0')
@@ -201,34 +267,48 @@ export function SearchScreen() {
   // Return from the results goes back to the keyboard, on the key left last.
   useBack(() => {
     const active = document.activeElement
-    if (!active?.closest('.search-results')) return false
+    if (!resultsRef.current?.contains(active)) return false
     toKeyboard()
     return true
   })
 
-  // A line at the end of the results is as wide as the column, where the cards around it are not, so ▲ ▼
-  // reach it (and leave it) by its place in the list rather than by where it sits.
   useKeys((i) => {
-    if (i.action !== 'up' && i.action !== 'down') return false
-    const active = document.activeElement
+    const active = document.activeElement as HTMLElement | null
+    if (!active) return false
+    // ▼ from the keyboard's bottom row stops there.
+    if (i.action === 'down' && BOTTOM_KEYS.has(active.dataset.focus ?? '')) return true
     const results = resultsRef.current
-    if (!active || !results?.contains(active)) return false
-    const items = [...results.querySelectorAll<HTMLElement>('[data-vitem]')].filter((el) => el.querySelector('[data-focus]'))
-    const at = items.findIndex((el) => el.contains(active))
-    const next = items[at + (i.action === 'down' ? 1 : -1)]
-    const line = (el: HTMLElement) => !!el.querySelector('.search-tail--again')
-    if (at < 0 || !next || !(line(next) || line(items[at]))) return false
+    // ▶ from the box goes to the results, when there are any.
+    if (i.action === 'right' && active.dataset.focus === 'search/field') return focus.focusFirst(results) || true
+    if (!results?.contains(active)) return false
+    // ◀ from a result with nothing before it goes back to the keyboard, on the key used last.
+    if (i.action === 'left') {
+      const row = active.closest<HTMLElement>('[data-row]')
+      const cards = row ? [...row.querySelectorAll<HTMLElement>('[data-focus]')] : []
+      const edge = active.closest<HTMLElement>('[data-edge]')
+      if ((row && cards[0] === active) || (edge && (edge === active || edge.querySelector('[data-focus]') === active))) { toKeyboard(); return true }
+      return false
+    }
+    if (i.action !== 'up' && i.action !== 'down') return false
+    // ▲ ▼ go group by group through the results: within a group first (Not in your library has a title and a row),
+    // then to the group above or below, on the card it had last; past the first group or the last, they stop.
+    // By the groups' order rather than by where things sit, so a line as wide as the column is reached like a row.
+    const groups = [...results.querySelectorAll<HTMLElement>('[data-vitem]')]
+      .filter((el) => !el.parentElement?.closest('[data-vitem]') && el.querySelector('[data-focus]'))
+    const at = groups.findIndex((el) => el.contains(active))
+    if (at < 0) return false
+    const here = [...groups[at].querySelectorAll<HTMLElement>('[data-focus]')].filter((el) => el !== active && el.getClientRects().length > 0)
+    const inside = nearest(active.getBoundingClientRect(), here.map((el) => el.getBoundingClientRect()), i.action)
+    if (inside >= 0) { focus.focus(here[inside]); return true }
+    const next = groups[at + (i.action === 'down' ? 1 : -1)]
+    if (!next) return true
+    const group = next.matches('[data-group]') ? next : next.querySelector<HTMLElement>('[data-group]')
+    const remembered = group?.dataset.group ? entry?.memory.groups[group.dataset.group] : undefined
+    if (remembered && focus.focusId(remembered, next)) return true
     return focus.focusFirst(next)
   })
 
   const openTvKeyboard = () => focus.find('search/field')?.click()
-  const onFocus = (e: FocusEvent) => {
-    const el = e.target as HTMLElement
-    setInResults(!!el.closest('.search-results'))
-    setFocused(el.dataset.focus)
-  }
-  const liveHint = hits.find((h) => focused === `search/live/${h.programme.id}`)
-  const nilHint = nil.find((r) => focused === `search/nil/${r.mediaType}-${r.tmdbId}`)
   const toggleReminder = (hit: LiveHit) => {
     if (Date.parse(hit.programme.start) <= now) return
     const set = reminders.data?.items.find((r) => r.programmeId === hit.programme.id)
@@ -236,6 +316,7 @@ export function SearchScreen() {
   }
   const openNil = (r: Requestable) => {
     const act = requestableAction(r)
+    used()
     if (act?.kind === 'request') setAsking({ kind: r.mediaType, tmdbId: r.tmdbId, title: r.title })
     else if (act) nav.push({ name: act.kind, id: act.id })
   }
@@ -243,26 +324,31 @@ export function SearchScreen() {
   const mediaOf = (t: Tagged<unknown>) => t.server ? peers.find((p) => p.id === t.server?.id)?.media : media
   const openOn = (server: { id: string }, target: OpenTarget) => {
     const info = peers.find((p) => p.id === server.id)?.info
+    used()
     void app.switchTo(server.id, { ...(info ? { info } : {}), open: { text: text.trim(), target } })
   }
-  const showCard = (t: Tagged<Show>, id: string) => {
-    const s = t.item
-    return <Card id={id} variant="poster" title={s.title} server={t.server?.name} subtitle={showSub(s)} image={mediaOf(t)?.imageUrl(s.posterPath, 'w342')}
-      onPress={() => t.server ? openOn(t.server, { kind: 'show', id: s.id }) : nav.push({ name: 'show', id: s.id })}/>
+  const openTitle = (t: Title) => {
+    const target: OpenTarget = t.kind === 'show' ? { kind: 'show', id: t.tagged.item.id } : { kind: 'movie', id: t.tagged.item.id }
+    if (t.tagged.server) { openOn(t.tagged.server, target); return }
+    used()
+    nav.push(t.kind === 'show' ? { name: 'show', id: t.tagged.item.id } : { name: 'movie', id: t.tagged.item.id })
   }
-  const movieCard = (t: Tagged<Movie>, id: string) => {
-    const m = t.item
-    return <Card id={id} variant="poster" title={m.title} server={t.server?.name} subtitle={movieSub(m)} image={mediaOf(t)?.imageUrl(m.posterPath, 'w342')}
-      onPress={() => t.server ? openOn(t.server, { kind: 'movie', id: m.id }) : nav.push({ name: 'movie', id: m.id })}/>
+  const titleCard = (t: Title, id: string) => {
+    const item = t.tagged.item
+    return <Card id={id} variant="poster" title={item.title} server={t.tagged.server?.name} subtitle={kindLine(t.kind, t.kind === 'show' ? { year: item.year, episodeCount: (item as Show).episodeCount } : { year: item.year })}
+      image={mediaOf(t.tagged)?.imageUrl(item.posterPath, 'w342')} onPress={() => openTitle(t)}/>
   }
   const episodeCard = (t: Tagged<SearchEpisode>, id: string) => {
     const e = t.item
-    const open = () => t.server ? openOn(t.server, { kind: 'show', id: e.showId, season: e.seasonNumber, episodeId: e.id })
-      : nav.push({ name: 'show', id: e.showId, season: e.seasonNumber, episodeId: e.id })
-    // Hold OK plays an episode on this server; on another it opens there first, as OK does.
+    const open = () => {
+      if (t.server) { openOn(t.server, { kind: 'show', id: e.showId, season: e.seasonNumber, episodeId: e.id }); return }
+      used()
+      nav.push({ name: 'show', id: e.showId, season: e.seasonNumber, episodeId: e.id })
+    }
+    // Hold OK plays an episode on this server, as a shortcut; on another it opens there first, as OK does.
     return <Card id={id} variant="episode" title={e.showTitle} server={t.server?.name} subtitle={episodeSub(e)} image={mediaOf(t)?.imageUrl(e.stillPath ?? e.showPosterPath, 'w780')}
       label={`${e.showTitle}, season ${e.seasonNumber} episode ${e.number}, ${e.title}${t.server ? `, on ${t.server.name}` : ''}`}
-      onPress={open} onHold={t.server ? open : () => nav.play({ kind: 'file', fileId: e.fileId, title: e.showTitle, subtitle: episodeSub(e) })}/>
+      onPress={open} onHold={t.server ? open : () => { used(); nav.play({ kind: 'file', fileId: e.fileId, title: e.showTitle, subtitle: episodeSub(e) }) }}/>
   }
   // Try again keeps its line, and focus on it, while the server is asked: it stays if the server fails again.
   const askAgain = (id: string) => {
@@ -278,66 +364,63 @@ export function SearchScreen() {
     ? searchLines({ current: { name: session.server.name, failed: currentFailed, again: retrying }, parts, again, leftOut })
     : []
   const waiting = merged.asking.filter((name) => !lines.some((l) => l.name === name))
-  const empty = emptyWords(1 + peers.length, liveTV)
-  const none = noMatchWords(q, merged.answered)
-  // With several servers the groups stack and keep room for a card's server line, so one that grows moves nothing.
-  const stacked = several || libraryBand(shows.length, movies.length) === 'rows'
-  const room = (card: string) => several ? `calc(${card} + 5.375rem)` : undefined
+  const empty = emptyWords(session.server.name, 1 + peers.length, liveTV)
+  const none = noMatchWords(q, merged.answered, liveTV)
+  // With several servers the rows keep room for a card's server line, so one that grows moves nothing.
+  const room = (card: string) => several ? `calc(${card} + 4.5rem)` : undefined
+  const bestItem = best?.item
+  const feature = nothing && nil.length > 0 ? nil[0] : undefined
+  const moreNil = feature ? nil.slice(1) : nil
 
-  return <div className="search" onFocus={onFocus}>
-    <section className="search-left">
-      <h1 className="search-title">Search</h1>
+  return <div className="search">
+    <section className="search-left" aria-label="Type a search">
       <div className="search-field">
         <Icon name="search"/>
-        <TextField id="search/field" label={liveTV ? 'Titles of shows, movies, episodes or Live TV programmes' : 'Titles of shows, movies or episodes'} value={text} onChange={setText}
-          placeholder={liveTV ? 'Shows, movies, episodes or Live TV' : 'Shows, movies or episodes'}/>
+        <TextField id="search/field" label={liveTV ? 'Search movies, shows and live TV' : 'Search movies and shows'} value={text} onChange={setText}
+          placeholder={liveTV ? 'Search movies, shows and live TV' : 'Search movies and shows'}/>
       </div>
-      {chips.length > 0 && <div className="search-suggest" role="group" aria-label="Suggestions">
-        <span className="search-suggest__label">Suggestions</span>
-        <div className="search-suggest__chips" data-row data-group="search/chips">
-          {chips.map((c) => <button key={c.key} type="button" data-focus={`chip/${c.key}`} className="search-chip" onClick={() => setText(c.title)}>
-            {c.parts[0]}<b>{c.parts[1]}</b>{c.parts[2]}
-          </button>)}
+      {!text.trim() && recent.length > 0 && <div className="search-again" role="group" aria-label="Search again">
+        <p className="search-label">Search again</p>
+        <div className="search-again__row" data-group="search/again">
+          {recent.map((r, i) => <button key={r} type="button" data-focus={`again/${i}`} className="tv-btn tv-btn--ghost search-again__chip" onClick={() => setText(r)}>{r}</button>)}
         </div>
       </div>}
-      <Keyboard group="search/keys" text={text} setText={setText} dim={inResults} onTvKeyboard={openTvKeyboard}
-        note="Accents, other alphabets and the remote’s voice key come with the TV’s keyboard. Return or its Done comes back here."/>
+      <Keyboard group="search/keys" layout="search" text={text} setText={setText} onTvKeyboard={openTvKeyboard}
+        note="TV keyboard opens the TV’s own, which also takes your voice."/>
     </section>
 
     <section ref={resultsRef} className="search-results" aria-label="Results">
       <VScroll pad={36}>
-        {!searching && <div className="search-hint" data-vitem><h2>{empty.title}</h2><p className="tv-note">{empty.body}</p></div>}
-        {searching && library.isPending && !currentFailed && <div className="search-hint" data-vitem><p className="tv-note"><span className="tv-spinner" aria-hidden="true"/> Searching…</p></div>}
-        {searching && (several ? allFailed : library.isError) && <div className="search-hint" data-vitem role="alert"><h2>Search didn’t work</h2>
-          <p className="tv-note">{problemWords(library.error ?? new DOMException('The server took too long', 'TimeoutError')).body}</p></div>}
-        {nothing && <div className="search-hint" data-vitem role="status"><h2>{none.title}</h2><p className="tv-note">{none.body}</p></div>}
+        {!searching && <div className="search-intro" data-vitem><h1 className="tv-title">{empty.title}</h1><p>{empty.body}</p><p>Results appear here as you type.</p></div>}
+        {searching && library.isPending && !currentFailed && <div className="search-intro" data-vitem><p className="search-status"><span className="tv-spinner" aria-hidden="true"/>Searching…</p></div>}
+        {searching && (several ? allFailed : library.isError) && <div className="search-intro" data-vitem role="alert"><h2 className="tv-head">Search didn’t work</h2>
+          <p>{problemWords(library.error ?? new DOMException('The server took too long', 'TimeoutError')).body}</p></div>}
+        {nothing && <div className="search-none" data-vitem role="status"><h2 className="tv-head">{none.title}</h2>{none.body && <p>{none.body}</p>}</div>}
 
-        {(shows.length > 0 || movies.length > 0) && (!stacked
-          ? <div className="search-band" data-row data-group="search/library" data-vitem>
-            {shows.length > 0 && <div className="search-band__group"><h2 className="tv-h2">TV Shows <small>{shows.length}</small></h2>
-              <div className="search-band__cards">{shows.map((t) => <div key={resultKey(t)}>{showCard(t, `search/library/show-${resultKey(t)}`)}</div>)}</div></div>}
-            {movies.length > 0 && <div className="search-band__group"><h2 className="tv-h2">Movies <small>{movies.length}</small></h2>
-              <div className="search-band__cards">{movies.map((t) => <div key={resultKey(t)}>{movieCard(t, `search/library/movie-${resultKey(t)}`)}</div>)}</div></div>}
-          </div>
-          : <>
-            {shows.length > 0 && <ResultsRow id="search/shows" title="TV Shows" count={shows.length} items={shows} itemKey={resultKey} cell="var(--poster-w)" visible={4} renderItem={showCard} room={room('var(--poster-h)')}/>}
-            {movies.length > 0 && <ResultsRow id="search/movies" title="Movies" count={movies.length} items={movies} itemKey={resultKey} cell="var(--poster-w)" visible={4} renderItem={movieCard} room={room('var(--poster-h)')}/>}
-          </>)}
+        {best && bestItem && <BestMatch title={bestItem.title}
+          line={kindLine(best.kind, best.kind === 'show' ? { year: bestItem.year, episodeCount: (bestItem as Show).episodeCount } : { year: bestItem.year })}
+          place={place?.line} progressOf={place && place.item.durationMs ? place.item.positionMs / place.item.durationMs : undefined}
+          image={media.imageUrl(place?.item.stillPath ?? bestItem.backdropPath, 'w780')}
+          onResume={place ? () => { used(); nav.play({ kind: 'file', fileId: place.item.fileId, startMs: place.item.positionMs, title: place.item.title, subtitle: place.item.subtitle, backdropPath: place.item.backdropPath ?? place.item.stillPath }) } : undefined}
+          onOpen={() => openTitle(best.kind === 'show' ? { kind: 'show', tagged: { item: best.item as Show } } : { kind: 'movie', tagged: { item: best.item as Movie } })}/>}
 
-        {episodes.length > 0 && <ResultsRow id="search/episodes" title="Episodes" count={episodes.length} items={episodes} itemKey={resultKey} cell="var(--search-wide-w)" visible={3}
-          renderItem={episodeCard} room={room('10.40625rem')}/>}
+        {titles.length > 0 && <ResultsRow id="search/library" title="In your library" items={titles} itemKey={(t) => `${t.kind}-${resultKey(t.tagged)}`} cell="var(--poster-w)" visible={4}
+          renderItem={titleCard} room={room('var(--poster-h)')}/>}
+
+        {episodes.length > 0 && <ResultsRow id="search/episodes" title="Episodes" items={episodes} itemKey={resultKey} cell="var(--wide-w)" visible={2}
+          renderItem={episodeCard} room={room('var(--wide-h)')}/>}
 
         {waiting.length > 0 && <p role="status" className="search-tail" data-vitem><span className="tv-spinner" aria-hidden="true"/>{stillAsking(waiting)}</p>}
         {/* The whole line takes focus, so ▼ from any card reaches it; the ring is drawn on Try again. */}
         {lines.map((f) => <div key={f.id} role="status" data-vitem>
           {f.kind === 'failed'
-            ? <button type="button" data-focus={`search/again/${f.id}`} className="search-tail search-tail--again" onClick={() => askAgain(f.id)}>
+            ? <button type="button" data-focus={`search/again/${f.id}`} data-edge className="search-tail search-tail--again" onClick={() => askAgain(f.id)}>
               <Icon name="alert"/>
               <span>{didNotAnswer(f.name)}</span>
               <span className="search-tail__again">Try again</span>
             </button>
             : f.kind === 'asking'
-              ? <button type="button" data-focus={`search/again/${f.id}`} className="search-tail search-tail--again" aria-busy="true">
+              ? <button type="button" data-focus={`search/again/${f.id}`} data-edge className="search-tail search-tail--again" aria-busy="true">
                 <span className="tv-spinner" aria-hidden="true"/>
                 <span>{askingAgain(f.name)}</span>
               </button>
@@ -345,30 +428,31 @@ export function SearchScreen() {
         </div>)}
         {switching && <p role="status" className="search-tail" data-vitem><span className="tv-spinner" aria-hidden="true"/>Switching to {switching.name}…</p>}
 
-        {liveTV && hits.length > 0 && <ResultsRow id="search/live" title="On Live TV" count={hits.length} items={hits} itemKey={(h) => h.programme.id} cell="var(--search-wide-w)" visible={3}
+        {liveTV && hits.length > 0 && <ResultsRow id="search/live" title="On live TV" items={hits} itemKey={(h) => h.programme.id} cell="var(--wide-w)" visible={2}
           renderItem={(h, id) => <LiveHitCard hit={h} focusId={id} now={now} onHold={() => toggleReminder(h)} onPress={() => {
             const act = liveAction(h, now)
+            used()
             if (act.kind === 'watch') nav.play({ kind: 'live', channelId: act.channelId })
             else nav.push({ name: 'liveGuide', channelId: act.channelId, at: act.at })
-          }}/>}
-          foot={liveHint && <KeyLine title={liveHint.programme.title} hints={liveAction(liveHint, now).kind === 'watch' ? [['OK', `Watch ${liveHint.channel.number}`]]
-            : [['OK', 'Open it in the guide'], ...(Date.parse(liveHint.programme.start) > now ? [['Hold OK', liveHint.programme.reminder ? 'Remove the reminder' : 'Remind me'] as [string, string]] : [])]}/>}/>}
+          }}/>}/>}
 
-        {nil.length > 0 && <ResultsRow id="search/nil" title="Not in your library" count={options.data?.backend === 'seerr' ? 'From Seerr' : nil.length} items={nil} itemKey={(r) => `${r.mediaType}-${r.tmdbId}`}
-          cell="var(--poster-w)" visible={4} renderItem={(r, id) => <NotInLibraryCard item={r} focusId={id} onPress={() => openNil(r)}/>}
-          foot={nilHint && requestableAction(nilHint) && <KeyLine title={nilHint.title} hints={[['OK', requestableAction(nilHint)?.kind === 'request' ? nilHint.mediaType === 'tv' ? 'Choose seasons and request' : 'Request it' : 'Open it']]}/>}/>}
+        {nil.length > 0 && <section className="search-nil" data-vitem aria-label="Not in your library">
+          {feature && <>
+            <h2 className="search-label">Not in your library</h2>
+            <div data-edge><AskFeature item={feature} onPress={() => openNil(feature)}/></div>
+          </>}
+          {moreNil.length > 0 && <ResultsRow id="search/nil" title={feature ? 'More you can ask for' : 'Not in your library'} count={options.data?.backend === 'seerr' ? 'From Seerr' : undefined}
+            items={moreNil} itemKey={(r) => `${r.mediaType}-${r.tmdbId}`} cell="var(--poster-w)" visible={4}
+            renderItem={(r, id) => <NotInLibraryCard item={r} focusId={id} onPress={() => openNil(r)}/>}/>}
+        </section>}
       </VScroll>
     </section>
 
-    {!inResults && <div className="search-foot"><KeyHints hints={[{ key: '▲', label: 'From the top row: suggestions, then the search box' }, { key: '▼', label: 'From the bottom row: the TV’s keyboard' }]}/></div>}
     {asking && <RequestDialog target={asking} onClose={() => setAsking(undefined)}/>}
   </div>
 }
 
-/** The focused result's keys, under its row: "Station 9 · OK Open it in the guide · Hold OK Remind me". */
-function KeyLine({ title, hints }: { title: string; hints: [string, string][] }) {
-  return <p className="search-keyline" aria-hidden="true">
-    <b>{title}</b><span className="search-keyline__dot">·</span>
-    {hints.map(([key, label]) => <span key={key} className="search-keyline__hint"><span className="tv-kbd">{key}</span>{label}</span>)}
-  </p>
+/** The TV's storage, where Search again is kept; none where it can't be read. */
+function storage(): Storage | undefined {
+  try { return window.localStorage } catch { return undefined }
 }

@@ -21,17 +21,17 @@ export function relatedPosterRows(reply: RelatedRows | undefined): RelatedRow[] 
     .map((r) => ({ id: r.id, title: r.title, subtitle: r.subtitle ?? (r.id === 'collection' ? RELEASE_ORDER : undefined), items: r.items ?? [] }))
 }
 
-export type TitleCard = { key: string; title: string; subtitle?: string; posterPath?: string; progress?: number; badges: CardBadge[]; label: string; route: Route }
+export type TitleCard = { key: string; title: string; subtitle?: string; posterPath?: string; progress?: number; badges: CardBadge[]; done: boolean; label: string; route: Route }
 
 /**
  * A related title's card: "2026 · Thriller" under it, New while it is new
- * and not watched, a gold tick once watched, and how far through. OK opens
- * its page on top of this one.
+ * and not watched, the white tick once watched, and how far through. OK
+ * opens its page on top of this one.
  */
 export function titleCard(item: BrowseItem): TitleCard {
   const subtitle = [item.year ? String(item.year) : '', item.genres[0] ?? ''].filter(Boolean).join(' · ') || undefined
   const progress = !item.watched && item.progress && item.progress > 0 ? item.progress : undefined
-  const badges: CardBadge[] = item.watched ? [{ label: '✓', tone: 'gold' }] : item.isNew ? [{ label: 'New', tone: 'gold' }] : []
+  const badges: CardBadge[] = !item.watched && item.isNew ? [{ label: 'New', tone: 'gold' }] : []
   const state = item.watched ? 'watched' : progress ? 'partly watched' : ''
   return {
     key: `${item.kind}${item.id}`,
@@ -40,6 +40,7 @@ export function titleCard(item: BrowseItem): TitleCard {
     posterPath: item.posterPath,
     progress,
     badges,
+    done: !!item.watched,
     label: [item.title, subtitle, state].filter(Boolean).join(', '),
     route: item.kind === 'show' ? { name: 'show', id: item.id } : { name: 'movie', id: item.id },
   }

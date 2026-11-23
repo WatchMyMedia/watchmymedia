@@ -2,30 +2,49 @@ import { describe, expect, it } from 'vitest'
 import { nearest } from '../../app/geometry'
 import { REQUIRED_API_LEVEL } from '../../session/session'
 import type { RememberedServer } from '../../session/servers'
-import { accountWords, ACCOUNT_FOCUS, ADD_FOCUS, addedWords, addLine, alreadyAdded, alreadyAddedLine, MANAGE_FOCUS, manageDetail, manageLede, nowOn, panelFocus, panelReturn, removeWords, RETRY_FOCUS, serverFocus,
-  serverRows, serversLine, signOutMove, switchFailedWords, versionLine } from './serverRows'
+import { accountWords, ACCOUNT_FOCUS, ADD_FOCUS, addedWords, addLine, alreadyAdded, alreadyAddedLine, cantChooseWords, lastUsedWords, MANAGE_FOCUS, manageDetail, manageLede, nowOn, panelFocus, panelReturn, removeWords, RETRY_FOCUS, serverFocus,
+  serverRows, serversLine, signedInLine, signOutMove, switchFailedWords, versionLine } from './serverRows'
 
 const account = { userId: 4, name: 'Sam', isAdmin: false, token: 't', sessionId: 's' }
-const living: RememberedServer = { id: 'living', name: 'Living room server', baseUrl: 'https://home.example.net', version: 'v1.8.0', account, lastUsedAt: 300 }
-const cabin: RememberedServer = { id: 'cabin', name: 'Cabin server', baseUrl: 'http://192.0.2.31:27587', version: 'v1.8.0', account, lastUsedAt: 100 }
-const den: RememberedServer = { id: 'den', name: 'Den server', baseUrl: 'http://192.0.2.52:27587', version: 'v1.8.0', account, lastUsedAt: 200 }
+// Monday 23 November 2026, mid-evening; the servers were last used that day, on the Saturday and in October.
+const NOW = new Date(2026, 10, 23, 20, 12).getTime()
+const living: RememberedServer = { id: 'living', name: 'Living room server', baseUrl: 'https://home.example.net', version: 'v1.8.0', account, lastUsedAt: new Date(2026, 10, 23, 9).getTime() }
+const cabin: RememberedServer = { id: 'cabin', name: 'Cabin server', baseUrl: 'http://192.0.2.31:27587', version: 'v1.8.0', account, lastUsedAt: new Date(2026, 9, 4).getTime() }
+const den: RememberedServer = { id: 'den', name: 'Den server', baseUrl: 'http://192.0.2.52:27587', version: 'v1.8.0', account, lastUsedAt: new Date(2026, 10, 21).getTime() }
 
 describe('Servers’ rows', () => {
-  it('lists the current server first, then by last use, with who is signed in and where', () => {
-    expect(serverRows([cabin, den, living], 'cabin')).toEqual([
-      { id: 'cabin', name: 'Cabin server', detail: 'Sam · 192.0.2.31:27587', state: 'current', canChoose: false },
-      { id: 'living', name: 'Living room server', detail: 'Sam · home.example.net', state: 'ready', canChoose: true },
-      { id: 'den', name: 'Den server', detail: 'Sam · 192.0.2.52:27587', state: 'ready', canChoose: true },
+  it('lists the current server first, then by last use, with who is signed in and when it was last used, without the address', () => {
+    expect(serverRows([cabin, den, living], 'cabin', undefined, NOW)).toEqual([
+      { id: 'cabin', name: 'Cabin server', person: 'Sam', detail: 'Sam · you are here', state: 'current', canChoose: false },
+      { id: 'living', name: 'Living room server', person: 'Sam', detail: 'Sam · last used today', state: 'ready', canChoose: true },
+      { id: 'den', name: 'Den server', person: 'Sam', detail: 'Sam · last used on Saturday', state: 'ready', canChoose: true },
     ])
+  })
+
+  it('says when a server was last used by the calendar', () => {
+    const at = (y: number, m: number, d: number) => new Date(y, m, d, 12).getTime()
+    expect(lastUsedWords(at(2026, 10, 23), NOW, 'en-US')).toBe('today')
+    expect(lastUsedWords(at(2026, 10, 22), NOW, 'en-US')).toBe('yesterday')
+    expect(lastUsedWords(at(2026, 10, 18), NOW, 'en-US')).toBe('on Wednesday')
+    expect(lastUsedWords(at(2026, 9, 4), NOW, 'en-US')).toBe('in October')
+    expect(lastUsedWords(at(2025, 10, 30), NOW, 'en-US')).toBe('in November 2025')
+  })
+
+  it('says why a row can’t be chosen, and how many servers the panel lists', () => {
+    expect(cantChooseWords({ name: 'Den server', state: 'current' })).toBe('You’re on Den server now.')
+    expect(cantChooseWords({ name: 'Den server', state: 'tooOld' })).toBe('Den server needs an update before this app can use it.')
+    expect(cantChooseWords({ name: 'Den server', state: 'ready' })).toBeUndefined()
+    expect(signedInLine(1)).toBe('This TV is signed in to one server.')
+    expect(signedInLine(3)).toBe('This TV is signed in to three.')
   })
 
   it('says when one is being switched to, is signed out here, or is too old to choose', () => {
     const signedOut = { ...den, account: undefined }
     const old = { ...cabin, apiLevel: REQUIRED_API_LEVEL - 1 }
-    const rows = serverRows([living, signedOut, old], 'living', { state: 'switching', id: 'den', name: 'Den server' })
+    const rows = serverRows([living, signedOut, old], 'living', { state: 'switching', id: 'den', name: 'Den server' }, NOW)
     expect(rows.map((r) => [r.name, r.state, r.detail, r.canChoose])).toEqual([
-      ['Living room server', 'current', 'Sam · home.example.net', false],
-      ['Den server', 'signedOut', 'Signed out here · sign in again', true],
+      ['Living room server', 'current', 'Sam · you are here', false],
+      ['Den server', 'signedOut', 'Needs signing in again', true],
       ['Cabin server', 'tooOld', 'Too old for this app', false],
     ])
     expect(serverRows([living, den], 'living', { state: 'switching', id: 'den', name: 'Den server' })[1]).toMatchObject({ state: 'switching', canChoose: true })

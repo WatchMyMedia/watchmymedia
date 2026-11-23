@@ -1,34 +1,39 @@
 import type { ReactNode } from 'react'
 import type { FilePlayback } from '../../player'
+import { showNote } from '../../ui/notes'
 import { PLAY_PAUSE_ID } from './keys'
-import { hintWords, recordingLabel, type PlayerKind } from './labels'
+import { recordingLabel, type PlayerKind } from './labels'
 import { PlayerIcon, type PlayerIconName } from './PlayerIcons'
-import { ScrubberRow, WallClock } from './Ticking'
+import { ScrubberRow, SeekHints, WallClock } from './Ticking'
 import type { Heading } from './playerSession'
 
-// The chrome over the video, for files, recordings and trailer
-// files: the title and its line, the stream pill
-// and the clock, the scrubber, the transport row and the hint line. The
-// scrubber reads the position itself; the rest redraws only on a change.
+// The controls over the video, for files, recordings and trailer files:
+// the title and its line at the top left, the clock at the top right; at
+// the foot the time, what is left and when it ends over a bar that marks
+// the intro and the credits, then Back 10, Pause and Forward 10, and the
+// panels' buttons. Nothing technical is on it: how the stream plays is in
+// Quality's Stream details. The bar reads the position itself; the rest
+// redraws only on a change.
 
-export type Opener = 'episodes' | 'audio' | 'subtitles' | 'quality'
+export type Opener = 'episodes' | 'tracks' | 'quality'
 
 export type ChromeModel = {
   kind: PlayerKind
   heading: Heading
-  stream?: string
   playing: boolean
   /** A recording still recording: the red label, written so far. */
   recordingMs?: number
   goToNow: boolean
   /** At a growing recording's edge: forward can't go further. */
   atEdge: boolean
-  episodes?: string
-  audio?: string
-  subtitles?: string
+  /** An episode with a season to choose from. */
+  episodes: boolean
+  /** Audio and subtitles' detail ("English, off"), when there is a choice. */
+  tracks?: string
   quality: string
-  next?: string
-  /** The recording's line at the end of the row (its ad breaks). */
+  /** There is a next episode. */
+  next: boolean
+  /** The recording's line under the controls (its ad breaks). */
   foot?: string
   seeking: boolean
   scrubberFocused: boolean
@@ -43,62 +48,60 @@ export type ChromeActions = {
   playNext(): void
 }
 
-/** The title and the line under it; dimmed with "paused" while a panel is open over the video. */
-export function TitleBlock({ heading, paused, dim, back }: { heading: Heading; paused?: boolean; dim?: boolean; back?: ReactNode }) {
+/** The title and the line under it, top left; a recording still recording says so beside it. */
+export function TitleBlock({ heading, paused, dim, recordingMs }: { heading: Heading; paused?: boolean; dim?: boolean; recordingMs?: number }) {
   const line = [heading.line, paused ? 'paused' : undefined].filter(Boolean).join(' · ')
-  return <div className={`pl-title${dim ? ' pl-title--dim' : ''}`}>
-    {back}
+  return <header className={`pl-title${dim ? ' pl-title--dim' : ''}`}>
     <div className="pl-title__text">
-      <span className="pl-title__name">{heading.title}</span>
-      {line && <span className="pl-title__line">{line}</span>}
+      <h1 className="pl-title__name">{heading.title}</h1>
+      {line && <p className="pl-title__line">{line}</p>}
     </div>
-  </div>
+    {recordingMs !== undefined && <span className="pl-rec" role="status"><span className="pl-dot"/>{recordingLabel(recordingMs)}</span>}
+  </header>
 }
 
-/** A transport button: an icon, or an icon with its name and the choice it holds ("Audio English"). */
-function Control({ id, icon, text, detail, label, onPress, big, disabled, autoFocus, children }: {
-  id: string; icon?: PlayerIconName; text?: string; detail?: string; label?: string; onPress(): void; big?: boolean; disabled?: boolean; autoFocus?: boolean; children?: ReactNode
+/** A transport button: round with an icon, the big Pause, or a pill with its name and the choice it holds ("Quality Automatic"). */
+function Control({ id, icon, iconAfter, text, detail, label, onPress, kind = 'pill', disabled, why, autoFocus, children }: {
+  id: string; icon?: PlayerIconName; iconAfter?: PlayerIconName; text?: string; detail?: string; label?: string; onPress(): void
+  /** Dimmed and still focusable; OK says `why`. */
+  disabled?: boolean; why?: string
+  kind?: 'pill' | 'round' | 'big'; autoFocus?: boolean; children?: ReactNode
 }) {
-  const iconOnly = !text && !children
+  const press = disabled ? () => { if (why) showNote(why, 'info') } : onPress
   return <button type="button" data-focus={id} data-autofocus={autoFocus || undefined} aria-disabled={disabled || undefined} aria-label={label}
-    className={`pl-btn${big ? ' pl-btn--big' : iconOnly ? ' pl-btn--icon' : ''}`} onClick={disabled ? undefined : onPress}>
+    className={`pl-btn pl-btn--${kind}`} onClick={press}>
     {icon && <PlayerIcon name={icon}/>}
     {children}{text}
-    {detail !== undefined && <small>{detail}</small>}
+    {detail && <small>{detail}</small>}
+    {iconAfter && <PlayerIcon name={iconAfter}/>}
   </button>
 }
 
+/** How far a recording still recording can go: Forward 10 says so when it can't. */
+const EDGE_WHY = 'That’s as far as it has recorded so far.'
+
 export function PlayerChrome({ playback, model, actions }: { playback: FilePlayback; model: ChromeModel; actions: ChromeActions }) {
-  const hints = hintWords(model.kind, model.seeking)
-  const back = model.kind === 'recording'
-    ? <button type="button" className="pl-btn pl-btn--icon" data-focus="back" aria-label="Back to Recordings" onClick={actions.back}><PlayerIcon name="chevronLeft"/></button>
-    : undefined
   return <>
     <div className="pl-shade pl-shade--top"/>
     <div className="pl-shade pl-shade--bottom"/>
-    <TitleBlock heading={model.heading} back={back}/>
-    <div className="pl-status">
-      {model.recordingMs !== undefined && <span className="pl-rec" role="status"><span className="pl-dot"/>{recordingLabel(model.recordingMs)}</span>}
-      {model.stream && <span className="pl-pill">{model.stream}</span>}
-      <WallClock className="pl-clock"/>
-    </div>
-    <ScrubberRow playback={playback} focused={model.scrubberFocused}/>
-    <div className="pl-row" data-group="transport">
-      <Control id="back10" icon="back10" label="Back 10 seconds" onPress={() => actions.step(-1)}/>
-      <Control id={PLAY_PAUSE_ID} icon={model.playing ? 'pause' : 'play'} label={model.playing ? 'Pause' : 'Play'} big autoFocus onPress={actions.togglePause}/>
-      <Control id="forward10" icon="forward10" label="Forward 10 seconds" disabled={model.atEdge} onPress={() => actions.step(1)}/>
-      {model.goToNow && <Control id="goToNow" text="Go to now" onPress={actions.goToNow}><span className="pl-dot pl-dot--live"/></Control>}
-      <span className="pl-row__gap"/>
-      {model.episodes && <Control id="episodes" icon="episodes" detail={model.episodes} text="Episodes" onPress={() => actions.open('episodes')}/>}
-      {model.audio && <Control id="audio" icon="audio" detail={model.audio} text="Audio" onPress={() => actions.open('audio')}/>}
-      {model.subtitles && <Control id="subtitles" icon="subtitles" detail={model.subtitles} text="Subtitles" onPress={() => actions.open('subtitles')}/>}
-      <Control id="quality" icon="quality" detail={model.quality} text="Quality" onPress={() => actions.open('quality')}/>
-      <span className="pl-row__fill"/>
-      {model.next && <Control id="next" icon="nextEpisode" text="Next episode" detail={model.next} onPress={actions.playNext}/>}
-      {model.foot && <span className="pl-row__foot">{model.foot}</span>}
-    </div>
-    {hints && <p className="pl-hint" aria-hidden="true">
-      <span className="pl-key">◀ ▶</span><span className="pl-key">⏪ ⏩</span>{hints.seek} · <span className="pl-key">OK</span>{hints.ok} · <span className="pl-key">Return</span>{hints.back}
-    </p>}
+    <TitleBlock heading={model.heading} recordingMs={model.recordingMs}/>
+    <WallClock className="pl-clock"/>
+    <section className="pl-foot" aria-label="Playback">
+      <ScrubberRow playback={playback} focused={model.scrubberFocused}/>
+      {model.seeking ? <SeekHints playback={playback}/> : <>
+        <div className="pl-row" data-group="transport">
+          <Control id="back10" kind="round" icon="back10" label="Back 10 seconds" onPress={() => actions.step(-1)}/>
+          <Control id={PLAY_PAUSE_ID} kind="big" icon={model.playing ? 'pause' : 'play'} label={model.playing ? 'Pause' : 'Play'} autoFocus onPress={actions.togglePause}/>
+          <Control id="forward10" kind="round" icon="forward10" label="Forward 10 seconds" disabled={model.atEdge} why={EDGE_WHY} onPress={() => actions.step(1)}/>
+          {model.goToNow && <Control id="goToNow" text="Go to now" onPress={actions.goToNow}><span className="pl-dot pl-dot--live"/></Control>}
+          <span className="pl-row__fill"/>
+          {model.tracks && <Control id="tracks" text="Audio and subtitles" detail={model.tracks} onPress={() => actions.open('tracks')}/>}
+          {model.episodes && <Control id="episodes" text="Episodes" onPress={() => actions.open('episodes')}/>}
+          <Control id="quality" text="Quality" detail={model.quality} onPress={() => actions.open('quality')}/>
+          {model.next && <Control id="next" text="Next episode" iconAfter="nextEpisode" onPress={actions.playNext}/>}
+        </div>
+        {model.foot && <p className="pl-footline">{model.foot}</p>}
+      </>}
+    </section>
   </>
 }
