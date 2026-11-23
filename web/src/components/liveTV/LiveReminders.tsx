@@ -18,8 +18,8 @@ export function BellIcon({ size = 15, filled, crossed }: { size?: number; filled
   </svg>
 }
 
-export const primaryAction = 'inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-md btn-primary px-4.5 text-sm font-semibold disabled:opacity-50'
-export const secondaryAction = 'inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-line-2 bg-surface px-4 text-sm font-medium hover:bg-surface-2 disabled:opacity-50'
+export const primaryAction = 'btn btn-primary min-h-11 disabled:opacity-50'
+export const secondaryAction = 'btn min-h-11 disabled:opacity-50'
 const textAction = 'inline-flex min-h-11 items-center whitespace-nowrap px-2 text-sm text-neutral-300 underline hover:text-accent disabled:opacity-50'
 
 /**

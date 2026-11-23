@@ -1,95 +1,349 @@
 import { useRecordingAccess, useRecordingMutation } from '../components/liveTV/useRecordings'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { liveTVChannelsQuery, liveTVRecordingsQuery } from '../api/queries'
-import { createManualRecording, deleteRecordingFile, deleteRecordingRule, type ManualRecording, type Recording, type RecordingRule } from '../api/recordings'
-import { RECORDING_HEADINGS, RECORDING_SECTIONS, canChooseClash, gapWords, localDateTime, manualRepeatWords, recordingProgress, recordingWords, validateManual, type RecordingSection } from '../lib/liveRecordings'
-import { timeRange } from '../lib/liveGuide'
+import { cancelRecording, createManualRecording, deleteRecordingFile, deleteRecordingRule, type ManualRecording, type Recording, type RecordingRule } from '../api/recordings'
+import { canChooseClash, conflictWords, gapWords, localDateTime, manualRepeatWords, reasonWords, recordingProgress, validateManual, type RecordingSection } from '../lib/liveRecordings'
+import { clashAlert, dayWords, groupRecordings, recordedWords, recordingEpisodeWords, recordingMinutes, roomWords, ruleWords, scheduleDays, type RecordingGroup } from '../lib/liveWords'
+import { timeOfDay, timeRange } from '../lib/liveGuide'
 import { formatBytes } from '../lib/format'
+import { useAuth } from '../authContext'
 import { Dialog } from '../components/Dialog'
 import { textInput } from '../components/SettingsPanel'
 import { primaryAction, secondaryAction } from '../components/liveTV/LiveReminders'
-import { ClashDialog, RecordingDot, RecordingOptions, RuleOptions } from '../components/liveTV/LiveRecordings'
+import { ClashDialog, RecordingOptions, RuleOptions } from '../components/liveTV/LiveRecordings'
+import { LiveTabs } from '../components/liveTV/LiveTabs'
+import { MoreIcon, PlayIcon, PlusIcon, WarnIcon } from '../components/icons'
 
-/** Each section is one bounded cursor query; event notifications refresh it. */
+type Tab = 'recorded' | 'scheduled' | 'series'
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'recorded', label: 'Recorded' },
+  { id: 'scheduled', label: 'Scheduled' },
+  { id: 'series', label: 'Series' },
+]
+
+/** One section's items and rules, every page loaded so far; events refresh them. */
+function useSection(section: RecordingSection) {
+  const query = useInfiniteQuery(liveTVRecordingsQuery(section))
+  const pages = query.data?.pages ?? []
+  return { query, items: pages.flatMap((p) => p.items), rules: pages.flatMap((p) => p.rules ?? []), first: pages[0] }
+}
+
+/**
+ * Recordings: what is recording now and the room left first, then any
+ * clash as an alert with its fix, then Recorded (grouped by show, ready to
+ * watch), Scheduled (by day) and Series as tabs.
+ */
 export function LiveRecordings() {
   const { allowed, pending } = useRecordingAccess()
   const [manual, setManual] = useState(false)
   // Until the server and capabilities answer, say nothing rather than "not available".
-  if (pending) return <p role="status" className="mx-auto max-w-5xl py-10 text-sm text-neutral-400">Loading recordings…</p>
+  if (pending) return <p role="status" className="py-10 text-sm text-neutral-400">Loading recordings…</p>
   if (!allowed) return <section className="mx-auto max-w-2xl space-y-4 py-10"><h1 className="text-2xl font-semibold">Recordings aren’t available</h1><p className="text-neutral-400">An admin can set up recording and choose who may record in Live TV settings.</p><Link to="/live-tv" className={secondaryAction}>Back to Live TV</Link></section>
-  return <div className="mx-auto max-w-5xl space-y-6">
-    <nav aria-label="Breadcrumb" className="text-sm text-neutral-400"><Link to="/live-tv" className="underline">Live TV</Link><span aria-hidden="true"> › </span>Recordings</nav>
-    <header className="flex flex-wrap items-center justify-between gap-4"><h1 className="text-3xl font-bold tracking-tight">Recordings</h1><button type="button" onClick={() => setManual(true)} className={primaryAction}>＋ New recording</button></header>
-    <p className="text-sm leading-relaxed text-neutral-400">Your household shares the tuners and these recordings. A recording can release a tuner someone is watching on. Finished recordings appear in the library.</p>
-    {RECORDING_SECTIONS.map((section) => <RecordingSectionList key={section} section={section} />)}
+  return <div className="flex flex-col">
+    <LiveTabs active="recordings" right={<button type="button" onClick={() => setManual(true)} className="btn"><PlusIcon size={16} />New recording</button>} />
+    <RecordingsBody />
     {manual && <ManualRecordingDialog onClose={() => setManual(false)} />}
   </div>
 }
-function RecordingSectionList({ section }: { section: RecordingSection }) {
-  const query = useInfiniteQuery(liveTVRecordingsQuery(section))
-  const pages = query.data?.pages ?? []
-  const items = pages.flatMap((p) => p.items)
-  const rules = pages.flatMap((p) => p.rules ?? [])
-  const [now, setNow] = useState(() => Date.now())
-  const ticking = section === 'now' && items.length > 0
-  useEffect(() => { if (!ticking) return; const timer = window.setInterval(() => setNow(Date.now()), 15_000); return () => window.clearInterval(timer) }, [ticking])
-  if (query.isSuccess && !items.length && !rules.length && section !== 'upcoming') return null
-  return <section aria-labelledby={`dvr-${section}`} className="space-y-3">
-    <div className="flex flex-wrap items-center justify-between gap-2"><h2 id={`dvr-${section}`} className="text-lg font-semibold">{RECORDING_HEADINGS[section]}</h2>{section === 'upcoming' && pages[0]?.freeBytes !== undefined && <p className="text-sm text-neutral-400">{formatBytes(pages[0].freeBytes)} free · {pages[0].tuners ?? 0} tuners</p>}</div>
-    {query.isPending && <p role="status" className="text-sm text-neutral-400">Loading…</p>}
-    {query.isError && <div role="alert" className="space-y-2 text-sm text-warn"><p>{query.error.message}</p><button type="button" onClick={() => void query.refetch()} className={secondaryAction}>Try again</button></div>}
-    {!!items.length && <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">{items.map((r) => <RecordingRow key={r.id} item={r} now={now} />)}</ul>}
-    {!!rules.length && <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line bg-surface">{rules.map((r) => <RuleRow key={r.id} rule={r} />)}</ul>}
-    {query.isSuccess && !items.length && !rules.length && <p className="rounded-xl border border-dashed border-line-2 px-5 py-8 text-sm text-neutral-400">Nothing is scheduled. Record a programme from the guide or choose New recording.</p>}
-    {query.hasNextPage && <button type="button" className={secondaryAction} disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>{query.isFetchingNextPage ? 'Loading…' : 'Show more'}</button>}
+
+function RecordingsBody() {
+  const auth = useAuth()
+  const [tab, setTab] = useState<Tab>('recorded')
+  const tabs = useRef<(HTMLButtonElement | null)[]>([])
+  const now = useSection('now')
+  const conflicts = useSection('conflicts')
+  const upcoming = useSection('upcoming')
+  const series = useSection('series')
+  const recorded = useSection('recorded')
+  const [clock, setClock] = useState(() => Date.now())
+  useEffect(() => { const timer = window.setInterval(() => setClock(Date.now()), 15_000); return () => window.clearInterval(timer) }, [])
+  const [left, setLeft] = useState<string[]>([])
+  const rules = [...series.rules, ...recorded.rules, ...upcoming.rules]
+  const recordingNow = now.items.filter((r) => r.state === 'recording')
+  const clashes = conflicts.items.filter((r) => !left.includes(r.id))
+  const scheduled = [...upcoming.items, ...conflicts.items.filter((c) => !upcoming.items.some((u) => u.id === c.id))]
+  const facts = upcoming.first ?? recorded.first
+  const counts: Record<Tab, ReactNode> = {
+    recorded: recorded.items.length ? <span className="n">{recorded.items.length}{recorded.query.hasNextPage ? '+' : ''}</span> : null,
+    scheduled: <>{scheduled.length ? <span className="n">{scheduled.length}</span> : null}{conflicts.items.length > 0 && <span role="img" aria-label=", one won’t record" className="text-warn"><WarnIcon size={14} /></span>}</>,
+    series: series.rules.length ? <span className="n">{series.rules.length}</span> : null,
+  }
+  function onTabKey(event: KeyboardEvent<HTMLButtonElement>, i: number) {
+    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+    if (!step) return
+    event.preventDefault()
+    const next = TABS[(i + step + TABS.length) % TABS.length]
+    setTab(next.id)
+    tabs.current[TABS.indexOf(next)]?.focus()
+  }
+  return <>
+    <div className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(min(420px,100%),1fr))] gap-4">
+      {recordingNow.map((r) => <RecordingNowPanel key={r.id} r={r} now={clock} />)}
+      <RoomPanel freeBytes={facts?.freeBytes} tuners={facts?.tuners} recordingNow={recordingNow.length} recorded={recorded.items} complete={recorded.query.isSuccess && !recorded.query.hasNextPage} keeps={rules.some((r) => r.keep > 0)} />
+    </div>
+    {clashes.map((r) => <ClashAlert key={r.id} r={r} now={clock} onLeave={() => setLeft((ids) => [...ids, r.id])} />)}
+    <div role="tablist" aria-label="Recordings" className="tabs mt-6">
+      {TABS.map((t, i) => <button key={t.id} ref={(el) => { tabs.current[i] = el }} type="button" role="tab" id={`rec-tab-${t.id}`} aria-controls={`rec-panel-${t.id}`} aria-selected={tab === t.id} tabIndex={tab === t.id ? 0 : -1} onClick={() => setTab(t.id)} onKeyDown={(e) => onTabKey(e, i)} className="tab">{t.label}{counts[t.id]}</button>)}
+    </div>
+    <div role="tabpanel" id={`rec-panel-${tab}`} aria-labelledby={`rec-tab-${tab}`}>
+      {tab === 'recorded' && <RecordedTab section={recorded} rules={rules} recordingNow={recordingNow} now={clock} />}
+      {tab === 'scheduled' && <ScheduledTab items={scheduled} loading={upcoming.query.isPending} error={upcoming.query.error} rules={rules} now={clock} you={auth.user?.name} more={upcoming.query} />}
+      {tab === 'series' && <SeriesTab rules={series.rules} loading={series.query.isPending} upcoming={scheduled} recordingNow={recordingNow} now={clock} you={auth.user?.name} />}
+    </div>
+  </>
+}
+
+/** Where a recording plays: from the library once it joined it, else from the recording itself. */
+function WatchLink({ r, className, children, label }: { r: Recording; className: string; children: ReactNode; label?: string }) {
+  const recording = r.state === 'recording'
+  return r.mediaFileId && !recording
+    ? <Link to="/play/$fileId" params={{ fileId: String(r.mediaFileId) }} search={{ title: r.title, back: '/live-tv/recordings' }} aria-label={label} className={className}>{children}</Link>
+    : <Link to="/live-tv/recordings/$recordingId/watch" params={{ recordingId: r.id }} search={{ title: r.title, back: '/live-tv/recordings' }} aria-label={label} className={className}>{children}</Link>
+}
+
+function Still({ r, className, flag }: { r: Pick<Recording, 'pictureUrl' | 'title'>; className: string; flag?: ReactNode }) {
+  const [broken, setBroken] = useState(false)
+  return <span className={`relative block aspect-video shrink-0 overflow-hidden rounded-lg bg-surface-2 ring-1 ring-inset ring-white/[.07] ${className}`}>
+    {r.pictureUrl && !broken ? <img src={r.pictureUrl} alt="" loading="lazy" onError={() => setBroken(true)} className="size-full object-cover" /> : <span aria-hidden="true" className="absolute inset-x-2 bottom-2 line-clamp-2 text-[12px] font-semibold uppercase tracking-wide text-neutral-300">{r.title}</span>}
+    {flag}
+  </span>
+}
+
+function RecordingNowPanel({ r, now }: { r: Recording; now: number }) {
+  const [stop, setStop] = useState(false)
+  const pct = recordingProgress(r.start, r.end, now)
+  const sofar = Math.max(0, Math.round((now - Date.parse(r.startedAt ?? r.start)) / 60_000))
+  const total = recordingMinutes(r)
+  const line = [r.season != null || r.episodeTitle ? recordingEpisodeWords(r) : '', `${r.number} ${r.channelName}`, timeRange(Date.parse(r.start), Date.parse(r.end))].filter(Boolean).join(' · ')
+  return <section aria-labelledby={`now-${r.id}`} className="panel flex flex-wrap items-center gap-x-[18px] gap-y-3.5 p-4">
+    <Still r={r} className="w-[176px]" flag={<span className="absolute left-2 top-2 rounded-[5px] bg-brand px-[7px] py-0.5 text-[11px] font-bold text-white ring-1 ring-inset ring-brand-line">Recording</span>} />
+    <div className="flex min-w-[220px] flex-1 flex-col gap-1.5">
+      <h2 id={`now-${r.id}`} className="text-xs font-bold uppercase tracking-[.08em] text-red-400">Recording now</h2>
+      <p className="text-lg font-[650] leading-tight">{r.title}</p>
+      <p className="text-[13px] text-neutral-400">{line}</p>
+      <div className="flex items-center gap-2.5">
+        <span className="meter flex-1" role="img" aria-label={`${sofar} of ${total} minutes recorded`}><i className="!bg-red-400" style={{ width: `${pct}%` }} /></span>
+        <span className="whitespace-nowrap text-[13px] text-neutral-300">{sofar} min so far</span>
+      </div>
+      <div className="mt-1 flex flex-wrap gap-2">
+        <WatchLink r={r} className="btn btn-primary btn-sm"><PlayIcon size={13} />Watch from the start</WatchLink>
+        {r.canCancel && <button type="button" onClick={() => setStop(true)} className="btn btn-sm">Stop</button>}
+      </div>
+    </div>
+    {stop && <RecordingOptions id={r.id} title={r.title} recording padBefore={r.padBefore} padAfter={r.padAfter} onClose={() => setStop(false)} />}
   </section>
 }
-function RecordingRow({ item: r, now }: { item: Recording; now: number }) {
-  const [edit, setEdit] = useState(false), [deleting, setDeleting] = useState(false), [dontRecord, setDontRecord] = useState(true)
+
+/** The room left as hours of recording; the gigabytes and tuners behind it stay closed until asked for. */
+function RoomPanel({ freeBytes, tuners, recordingNow, recorded, complete, keeps }: { freeBytes?: number; tuners?: number; recordingNow: number; recorded: Recording[]; complete: boolean; keeps: boolean }) {
+  const room = roomWords(freeBytes, recorded)
+  const bytes = recorded.reduce((n, r) => n + (r.bytes ?? 0), 0)
+  if (!room && tuners === undefined) return null
+  return <section aria-labelledby="h-room" className="panel flex flex-col gap-2.5 p-4">
+    <h2 id="h-room" className="text-lg font-[650] leading-tight">{room ?? 'Recordings'}</h2>
+    <p className="text-[13px] text-neutral-400">{complete ? `${recorded.length} ${recorded.length === 1 ? 'recording' : 'recordings'} kept.` : 'Recordings join your library when they finish.'}{keeps ? ' Each series clears its own old episodes.' : ''}</p>
+    <details className="tech mt-auto bg-surface-2">
+      <summary className="!min-h-11">Storage and tuners</summary>
+      <div className="tech-body">
+        <dl className="dl">
+          {freeBytes !== undefined && <><dt>Free space</dt><dd>{formatBytes(freeBytes)}</dd></>}
+          {complete && <><dt>Recordings</dt><dd>{recorded.length} · {formatBytes(bytes)}</dd></>}
+          {tuners !== undefined && <><dt>Tuners</dt><dd>{tuners}{recordingNow ? ` · ${recordingNow} recording now` : ''}</dd></>}
+        </dl>
+      </div>
+    </details>
+  </section>
+}
+
+function ClashAlert({ r, now, onLeave }: { r: Recording; now: number; onLeave: () => void }) {
+  const [open, setOpen] = useState(false)
+  const words = clashAlert(r, now)
+  return <section role="alert" className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2.5 rounded-xl border border-warn/60 bg-warn/[.07] px-4 py-3.5">
+    <span className="text-warn"><WarnIcon size={18} /></span>
+    <p className="min-w-[240px] flex-1"><b className="font-semibold">{words.heading}</b> <span className="text-neutral-300">{words.detail}</span></p>
+    {r.canCancel && canChooseClash(r) && <button type="button" aria-haspopup="dialog" onClick={() => setOpen(true)} className="btn btn-sm">Record it instead of…</button>}
+    <button type="button" onClick={onLeave} className="btn btn-ghost btn-sm">Leave it</button>
+    {open && <ClashDialog recording={r} onClose={() => setOpen(false)} />}
+  </section>
+}
+
+function RecordedTab({ section, rules, recordingNow, now }: { section: ReturnType<typeof useSection>; rules: RecordingRule[]; recordingNow: Recording[]; now: number }) {
+  const { query, items } = section
+  const { groups, oneOffs } = groupRecordings(items, rules)
+  if (query.isPending) return <p role="status" className="mt-4 text-sm text-neutral-400">Loading…</p>
+  if (query.isError) return <QueryError error={query.error} retry={() => void query.refetch()} />
+  if (!items.length) return <Empty>Nothing recorded yet. Record a programme from the guide, or choose New recording.</Empty>
+  return <>
+    {groups.map((g) => <ShowGroup key={g.key} g={g} now={now} recording={recordingNow.find((r) => r.title.trim().toLowerCase() === g.key)} />)}
+    {oneOffs.length > 0 && <section aria-labelledby="h-one" className="mt-8">
+      <div className="rowh"><h2 id="h-one">Movies and one-offs</h2><span className="note">{oneOffs.length} {oneOffs.length === 1 ? 'recording' : 'recordings'}</span></div>
+      <div className="mt-3.5 grid grid-cols-[repeat(auto-fill,minmax(min(250px,100%),1fr))] gap-x-4 gap-y-5">
+        {oneOffs.map((r) => <OneOff key={r.id} r={r} now={now} />)}
+      </div>
+    </section>}
+    {query.hasNextPage && <button type="button" className={`${secondaryAction} mt-4`} disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>{query.isFetchingNextPage ? 'Loading…' : 'Show more'}</button>}
+  </>
+}
+
+/** What went wrong with a recording, if anything: a gap, a stop, a failure. */
+function trouble(r: Recording): string | undefined {
+  if (r.gaps?.length) return gapWords(r.gaps[0], (a, b) => timeRange(a, b))
+  if (r.state === 'failed' || r.state === 'partial') return reasonWords(r.reason, true) ?? (r.state === 'failed' ? 'It didn’t record' : 'Only part of it recorded')
+  return undefined
+}
+
+function ShowGroup({ g, now, recording }: { g: RecordingGroup; now: number; recording?: Recording }) {
+  const newest = g.items.find((r) => r.state !== 'failed')
+  const latest = dayWords(g.latest, now)
+  return <section aria-label={g.title} className="panel mt-3.5 px-4 pb-1 pt-4">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-3 pb-3.5">
+      <Still r={{ title: g.title, pictureUrl: g.picture }} className="w-[150px]" />
+      <div className="min-w-[200px] flex-1">
+        <h3 className="text-[17px] font-[650]">{g.title}</h3>
+        <p className="mt-0.5 text-[13.5px] text-neutral-300">{g.items.length} {g.items.length === 1 ? 'episode' : 'episodes'}{recording ? ` · ${recordingEpisodeWords(recording)} is recording now` : ''}</p>
+        <p className="text-[13px] text-neutral-400">{[`Latest recorded ${latest === 'Today' || latest === 'Yesterday' ? latest.toLowerCase() : latest}`, g.rule?.keep ? `keeps the latest ${g.rule.keep}` : ''].filter(Boolean).join(' · ')}</p>
+      </div>
+      {newest && <WatchLink r={newest} className="btn btn-primary btn-sm"><PlayIcon size={13} />Watch {newest.season != null && newest.episode != null ? `S${newest.season} E${newest.episode}` : 'the latest'}</WatchLink>}
+    </div>
+    <ul>{g.items.map((r) => <EpisodeRow key={r.id} r={r} show={g.title} now={now} />)}</ul>
+  </section>
+}
+
+function EpisodeRow({ r, show, now }: { r: Recording; show: string; now: number }) {
+  const playable = r.state === 'done' || r.state === 'partial' || r.state === 'recording'
+  const problem = trouble(r)
+  const name = recordingEpisodeWords(r)
+  return <li className="flex flex-wrap items-center gap-x-3.5 gap-y-2.5 border-t border-line py-3">
+    {playable ? <WatchLink r={r} label={`Watch ${show}, ${name}`} className="block w-[128px] shrink-0 rounded-lg hover:ring-2 hover:ring-accent"><Still r={r} className="w-full" /></WatchLink> : <Still r={r} className="w-[128px] opacity-60" />}
+    <div className="min-w-[180px] flex-1">
+      <p className="font-semibold">{name}</p>
+      <p className="text-[13px] text-neutral-400">{recordedWords(r, now)}{r.mediaFileId ? '' : r.state === 'done' ? ' · joining your library' : ''}</p>
+      {problem && <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-warn"><WarnIcon size={13} />{problem}</p>}
+    </div>
+    {playable && <WatchLink r={r} className="btn btn-sm">Watch</WatchLink>}
+    <RecordingMenu r={r} name={`${show}, ${name}`} />
+  </li>
+}
+
+function OneOff({ r, now }: { r: Recording; now: number }) {
+  const problem = trouble(r)
+  const minutes = recordingMinutes(r)
+  const body = <>
+    <Still r={r} className="w-full" />
+    <span className="mt-2 block truncate text-sm font-medium group-hover:text-accent">{r.title}</span>
+    <span className="block truncate text-[12.5px] text-neutral-300">{[r.episodeTitle, `${r.number} ${r.channelName}`, minutes ? `${minutes} min` : ''].filter(Boolean).join(' · ')}</span>
+    <span className={`block truncate text-[12.5px] ${problem ? 'text-warn' : 'text-neutral-400'}`}>{problem ?? recordedWords(r, now).replace(/ · \d+ min$/, '')}</span>
+  </>
+  return <div className="relative">
+    {r.state === 'failed' ? <div className="opacity-70">{body}</div> : <WatchLink r={r} className="card group block rounded-lg">{body}</WatchLink>}
+    <span className="absolute right-1.5 top-1.5"><RecordingMenu r={r} name={r.title} onPicture /></span>
+  </div>
+}
+
+/** A recording's ⋯: delete it, choosing whether it records again. */
+function RecordingMenu({ r, name, onPicture = false }: { r: Recording; name: string; onPicture?: boolean }) {
+  const [open, setOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [dontRecord, setDontRecord] = useState(true)
   const remove = useRecordingMutation(deleteRecordingFile)
-  const [clash, setClash] = useState(false)
-  const recording = r.state === 'recording'
-  const playable = recording || r.state === 'done' || r.state === 'partial'
-  const time = new Date(r.start).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-  const finished = r.state === 'done' || r.state === 'partial'
-  const progress = recordingProgress(r.start, r.end, now)
-  return <li className="flex flex-wrap items-center gap-x-4 gap-y-3 p-4">
-    {r.pictureUrl && <img src={r.pictureUrl} alt="" loading="lazy" className="aspect-video w-28 shrink-0 rounded-md bg-surface-2 object-cover sm:w-36" />}
-    <div className="min-w-0 flex-1 basis-48 space-y-1">
-      <h3 className="break-words text-base font-semibold"><RecordingDot state={r.state} series={r.series} />{r.title}</h3>
-      {r.episodeTitle && <p className="text-sm text-neutral-300">{r.season != null && r.episode != null && `S${r.season} E${r.episode} · `}{r.episodeTitle}</p>}
-      <p className="text-xs tabular-nums text-neutral-400">{time} · {r.number} {r.channelName}</p>
-      <p className={`text-sm ${recording ? 'text-red-300' : r.state === 'conflict' || r.state === 'failed' || r.state === 'partial' ? 'text-warn' : 'text-neutral-300'}`}>{recordingWords(r.state, r.reason, r.conflictsWith)}</p>
-      {recording && <div role="progressbar" aria-label={`Recording ${r.title}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)} aria-valuetext={`${Math.round(progress)}% recorded`} className="h-1 max-w-sm overflow-hidden rounded-full bg-line-2"><div className="h-full bg-red-500" style={{ width: `${progress}%` }} /></div>}
-      {r.gaps?.map((g) => <p key={`${g.start}-${g.end}`} className="text-xs text-warn">{gapWords(g, (a, b) => timeRange(a, b))}</p>)}
-      {finished && <p className="text-xs text-neutral-400">{formatBytes(r.bytes)}{r.mediaFileId ? ' · In your library' : ' · Joining your library'}</p>}
-      <p className="text-xs text-neutral-400">Set by {r.userName}</p>
-    </div>
-    <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-      {playable && (r.mediaFileId && !recording ? <Link to="/play/$fileId" params={{ fileId: String(r.mediaFileId) }} search={{ title: r.title, back: '/live-tv/recordings' }} className={primaryAction}>Watch</Link> : <Link to="/live-tv/recordings/$recordingId/watch" params={{ recordingId: r.id }} search={{ title: r.title, back: '/live-tv/recordings' }} className={primaryAction}>{recording ? 'Watch from the start' : 'Watch'}</Link>)}
-      {r.canCancel && canChooseClash(r) && <button type="button" onClick={() => setClash(true)} className={primaryAction}>Record this instead</button>}
-      {r.canDelete && <button type="button" onClick={() => setDeleting(true)} className={secondaryAction}>Delete</button>}
-      {r.canCancel && !finished && r.state !== 'failed' && <button type="button" onClick={() => setEdit(true)} className={secondaryAction}>{recording ? 'Stop recording' : 'Options'}</button>}
-    </div>
-    {deleting && <Dialog title={`Delete ${r.title}?`} subtitle="This recording file is permanently deleted from the server." onClose={() => setDeleting(false)}><div className="space-y-4 p-6">
+  const root = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const away = (e: PointerEvent) => { if (!root.current?.contains(e.target as Node)) setOpen(false) }
+    const key = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('pointerdown', away); document.addEventListener('keydown', key)
+    return () => { document.removeEventListener('pointerdown', away); document.removeEventListener('keydown', key) }
+  }, [open])
+  if (!r.canDelete) return null
+  return <div ref={root} className="relative">
+    <button type="button" aria-haspopup="menu" aria-expanded={open} aria-label={`More for ${name}: delete, or don’t record it again`} onClick={() => setOpen((o) => !o)} className={`ib ib-sm ${onPicture ? 'border-white/15 bg-ground/70' : 'ib-ghost'}`}><MoreIcon size={16} /></button>
+    {open && <div role="menu" className="menu absolute right-0 top-[calc(100%+6px)] w-56">
+      <button type="button" role="menuitem" autoFocus onClick={() => { setOpen(false); setDeleting(true) }} className="menu-item">Delete…</button>
+    </div>}
+    {deleting && <Dialog title={`Delete ${name}?`} subtitle="This recording file is permanently deleted from the server." onClose={() => setDeleting(false)}><div className="space-y-4 p-6">
       <label className="flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={dontRecord} onChange={(e) => setDontRecord(e.target.checked)} className="h-4 w-4 accent-accent" />Don’t record it again</label>
       <button type="button" disabled={remove.isPending} className={primaryAction} onClick={() => remove.mutate({ id: r.id, recordAgain: !dontRecord }, { onSuccess: () => setDeleting(false) })}>{remove.isPending ? 'Deleting…' : 'Delete recording'}</button>
       {remove.isError && <p role="alert" className="text-sm text-warn">{remove.error.message}</p>}
     </div></Dialog>}
+  </div>
+}
+
+function ScheduledTab({ items, loading, error, rules, now, you, more }: { items: Recording[]; loading: boolean; error: Error | null; rules: RecordingRule[]; now: number; you?: string; more: ReturnType<typeof useSection>['query'] }) {
+  if (loading) return <p role="status" className="mt-4 text-sm text-neutral-400">Loading…</p>
+  if (error) return <QueryError error={error} retry={() => void more.refetch()} />
+  if (!items.length) return <Empty>Nothing is scheduled. Record a programme from the guide, or choose New recording.</Empty>
+  return <>
+    <p className="mt-4 text-[13.5px] text-neutral-400">This schedule is what will happen. A mark in the guide means the same thing.</p>
+    {scheduleDays(items, now).map((d) => <section key={d.key} aria-labelledby={`day-${d.key}`} className="mt-5">
+      <h2 id={`day-${d.key}`} className="text-xs font-bold uppercase tracking-[.08em] text-dim">{d.label}</h2>
+      <ul className="panel mt-2 px-4">{d.items.map((r) => <ScheduledRow key={r.id} r={r} rule={rules.find((rule) => rule.id === r.ruleId)} you={you} />)}</ul>
+    </section>)}
+    {more.hasNextPage && <button type="button" className={`${secondaryAction} mt-4`} disabled={more.isFetchingNextPage} onClick={() => void more.fetchNextPage()}>{more.isFetchingNextPage ? 'Loading…' : 'Show more'}</button>}
+  </>
+}
+
+function ScheduledRow({ r, rule, you }: { r: Recording; rule?: RecordingRule; you?: string }) {
+  const [clash, setClash] = useState(false)
+  const [options, setOptions] = useState(false)
+  const skip = useRecordingMutation(cancelRecording)
+  const conflict = r.state === 'conflict'
+  const sub = [r.season != null || r.episodeTitle ? recordingEpisodeWords(r) : '', `${r.number} ${r.channelName}`].filter(Boolean).join(' · ')
+  const who = r.userName && r.userName === you ? 'you' : r.userName
+  const how = rule ? ruleWords(rule, rule.kind === 'manual' ? manualRepeatWords(rule) : undefined, you) : `Just this one${who ? ` · set by ${who}` : ''}`
+  return <li className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line py-3.5 last:border-b-0">
+    <span className="flex-[0_0_76px] whitespace-nowrap font-semibold tabular-nums">{timeOfDay(Date.parse(r.start))}</span>
+    <div className="min-w-[200px] flex-1">
+      <p className="font-semibold">{r.title}</p>
+      <p className="text-[13px] text-neutral-400">{sub}</p>
+      {conflict && <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-warn"><WarnIcon size={13} />{conflictWords(r.reason, r.conflictsWith)}</p>}
+    </div>
+    <span className="flex-[0_1_250px] text-[13px] text-neutral-400">{how}</span>
+    {r.canCancel && <div className="flex flex-wrap gap-1.5">
+      {conflict && canChooseClash(r) && <button type="button" aria-haspopup="dialog" onClick={() => setClash(true)} className="btn btn-sm">Record this instead</button>}
+      <button type="button" disabled={skip.isPending} onClick={() => skip.mutate(r.id)} className="btn btn-ghost btn-sm">{conflict ? 'Don’t record it' : 'Skip this one'}</button>
+      {!conflict && <button type="button" onClick={() => setOptions(true)} className="btn btn-ghost btn-sm">Options</button>}
+    </div>}
+    {skip.isError && <p role="alert" className="basis-full text-sm text-warn">{skip.error.message}</p>}
     {clash && <ClashDialog recording={r} onClose={() => setClash(false)} />}
-    {edit && <RecordingOptions id={r.id} title={r.title} recording={recording} padBefore={r.padBefore} padAfter={r.padAfter} onClose={() => setEdit(false)} />}
+    {options && <RecordingOptions id={r.id} title={r.title} recording={false} padBefore={r.padBefore} padAfter={r.padAfter} onClose={() => setOptions(false)} />}
   </li>
 }
-function RuleRow({ rule: r }: { rule: RecordingRule }) {
+
+function SeriesTab({ rules, loading, upcoming, recordingNow, now, you }: { rules: RecordingRule[]; loading: boolean; upcoming: Recording[]; recordingNow: Recording[]; now: number; you?: string }) {
+  if (loading) return <p role="status" className="mt-4 text-sm text-neutral-400">Loading…</p>
+  if (!rules.length) return <Empty>No series or repeating recordings. Choose Record in the guide and then Every new episode, or make a repeating New recording.</Empty>
+  return <>
+    <ul className="panel mt-5 px-4">{rules.map((rule) => <RuleRow key={rule.id} rule={rule} you={you} now={now} recording={recordingNow.find((r) => r.ruleId === rule.id)} next={upcoming.filter((r) => r.ruleId === rule.id).sort((a, b) => Date.parse(a.start) - Date.parse(b.start))[0]} />)}</ul>
+    <p className="mt-3 text-[13px] text-neutral-400">Stopping a series keeps what it has already recorded.</p>
+  </>
+}
+
+function RuleRow({ rule: r, you, now, recording, next }: { rule: RecordingRule; you?: string; now: number; recording?: Recording; next?: Recording }) {
   const [edit, setEdit] = useState(false), [remove, setRemove] = useState(false)
   const change = useRecordingMutation(deleteRecordingRule)
-  return <li className="flex flex-wrap items-center gap-3 p-4"><div className="min-w-0 flex-1 basis-64"><h3 className="font-semibold"><RecordingDot state="scheduled" series />{r.title}</h3><p className="mt-1 text-sm text-neutral-400">{r.kind === 'series' ? `${r.newOnly ? 'New episodes' : 'Every episode'} · ${r.anyChannel ? 'Any channel' : r.number} · ${r.keep ? `Keep the latest ${r.keep}` : 'Keep all'}` : `${manualRepeatWords(r)}${r.number ? ` · ${r.number}` : ''}`} · Set by {r.userName}</p></div>{r.canCancel && <div className="flex flex-wrap gap-2">{r.kind !== 'manual' && <button type="button" className={secondaryAction} onClick={() => setEdit(true)}>Options</button>}<button type="button" className={secondaryAction} onClick={() => setRemove(true)}>Stop scheduling</button></div>}
+  const nextWords = next ? `${dayWords(Date.parse(next.start), now, undefined, true).replace(/^(Today|Tonight)$/, (d) => d.toLowerCase())} at ${timeOfDay(Date.parse(next.start))} on ${next.number} ${next.channelName}` : undefined
+  return <li className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line py-3.5 last:border-b-0">
+    <div className="min-w-[220px] flex-1">
+      <p className="text-base font-[650]">{r.title}</p>
+      <p className="text-[13px] text-neutral-400">{ruleWords(r, r.kind === 'manual' ? manualRepeatWords(r) : undefined, you)}</p>
+      {(recording || nextWords) && <p className="mt-0.5 flex items-center gap-[7px] text-[13px] text-neutral-300">{recording && <span aria-hidden="true" className="size-2 rounded-full bg-red-400" />}{[recording ? 'Recording now' : '', nextWords ? `${recording ? 'then' : 'Next:'} ${nextWords}` : ''].filter(Boolean).join(' · ')}</p>}
+    </div>
+    {r.canCancel && <div className="flex flex-wrap gap-1.5">{r.kind !== 'manual' && <button type="button" className="btn btn-sm" onClick={() => setEdit(true)}>Options</button>}<button type="button" className="btn btn-ghost btn-sm" onClick={() => setRemove(true)}>Stop</button></div>}
     {edit && <RuleOptions rule={r} onClose={() => setEdit(false)} />}
-    {remove && <Dialog title={`Stop scheduling ${r.title}?`} subtitle="Existing recordings are kept. Upcoming recordings from this rule are cancelled." onClose={() => setRemove(false)}><div className="space-y-4 p-6"><button type="button" disabled={change.isPending} className={primaryAction} onClick={() => change.mutate(r.id, { onSuccess: () => setRemove(false) })}>Stop scheduling</button>{change.isError && <p role="alert" className="text-warn">{change.error.message}</p>}</div></Dialog>}
+    {remove && <Dialog title={`Stop recording ${r.title}?`} subtitle="What it has already recorded is kept. Upcoming recordings from it are cancelled." onClose={() => setRemove(false)}><div className="space-y-4 p-6"><button type="button" disabled={change.isPending} className={primaryAction} onClick={() => change.mutate(r.id, { onSuccess: () => setRemove(false) })}>Stop</button>{change.isError && <p role="alert" className="text-warn">{change.error.message}</p>}</div></Dialog>}
   </li>
 }
+
+function Empty({ children }: { children: ReactNode }) {
+  return <p className="mt-5 rounded-xl border border-dashed border-line-2 px-5 py-8 text-sm text-neutral-400">{children}</p>
+}
+
+function QueryError({ error, retry }: { error: Error; retry: () => void }) {
+  return <div role="alert" className="mt-4 space-y-2 text-sm text-warn"><p>{error.message}</p><button type="button" onClick={retry} className={secondaryAction}>Try again</button></div>
+}
+
 function ManualRecordingDialog({ onClose }: { onClose: () => void }) {
   const channels = useQuery(liveTVChannelsQuery)
   const [channel, setChannel] = useState(''), [name, setName] = useState('')
