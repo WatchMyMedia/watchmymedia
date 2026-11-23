@@ -32,6 +32,13 @@ import WMMModel
         ("follows", 29, "following shows", { $0.follows }),
         ("related", 30, "related titles", { $0.related }),
         ("watchlists", 33, "watchlists", { $0.watchlists }),
+        ("people", 34, "people behind the cast", { $0.people }),
+        ("cardFacts", 34, "unwatchedCount", { $0.cardFacts }),
+        ("libraryTotals", 34, "ItemTotals.unwatched", { $0.libraryTotals }),
+        ("ratingFilter", 34, "contentRating", { $0.ratingFilter }),
+        ("hideFromContinueWatching", 34, "hidden", { $0.hideFromContinueWatching }),
+        ("recordingFacts", 34, "LiveTVRecording.kind", { $0.recordingFacts }),
+        ("titlesByTMDB", 34, "several servers", { $0.titlesByTMDB }),
     ]
 
     @Test(arguments: table.indices)

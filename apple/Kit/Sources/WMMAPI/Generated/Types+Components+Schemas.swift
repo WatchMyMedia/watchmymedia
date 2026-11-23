@@ -8523,6 +8523,23 @@ extension Components {
                 case total
             }
         }
+        /// - Remark: Generated from `#/components/schemas/MovieCopies`.
+        public struct MovieCopies: Codable, Hashable, Sendable {
+            /// Every library's copy with a present file, the first library's first, marked for the signed-in person as search's are (watched, progress). Empty when the library has none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MovieCopies/items`.
+            public var items: [Components.Schemas.Movie]
+            /// Creates a new `MovieCopies`.
+            ///
+            /// - Parameters:
+            ///   - items: Every library's copy with a present file, the first library's first, marked for the signed-in person as search's are (watched, progress). Empty when the library has none.
+            public init(items: [Components.Schemas.Movie]) {
+                self.items = items
+            }
+            public enum CodingKeys: String, CodingKey {
+                case items
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/MovieDetail`.
         public struct MovieDetail: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/MovieDetail/addedAt`.
@@ -10070,6 +10087,455 @@ extension Components {
                 case intervalMs
                 case linkPath
                 case secret
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/PersonDetail`.
+        public struct PersonDetail: Codable, Hashable, Sendable {
+            /// Movies with them in the billed cast and a present file, newest first, one card per title however many libraries have it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonDetail/movies`.
+            public var movies: [Components.Schemas.PersonTitle]
+            /// - Remark: Generated from `#/components/schemas/PersonDetail/name`.
+            public var name: Swift.String
+            /// TMDB person ID.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonDetail/personId`.
+            public var personId: Swift.Int64
+            /// Their picture; fetch via /api/images/{size}{profilePath}.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonDetail/profilePath`.
+            public var profilePath: Swift.String?
+            /// Shows likewise.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonDetail/shows`.
+            public var shows: [Components.Schemas.PersonTitle]
+            /// Creates a new `PersonDetail`.
+            ///
+            /// - Parameters:
+            ///   - movies: Movies with them in the billed cast and a present file, newest first, one card per title however many libraries have it.
+            ///   - name:
+            ///   - personId: TMDB person ID.
+            ///   - profilePath: Their picture; fetch via /api/images/{size}{profilePath}.
+            ///   - shows: Shows likewise.
+            public init(
+                movies: [Components.Schemas.PersonTitle],
+                name: Swift.String,
+                personId: Swift.Int64,
+                profilePath: Swift.String? = nil,
+                shows: [Components.Schemas.PersonTitle]
+            ) {
+                self.movies = movies
+                self.name = name
+                self.personId = personId
+                self.profilePath = profilePath
+                self.shows = shows
+            }
+            public enum CodingKeys: String, CodingKey {
+                case movies
+                case name
+                case personId
+                case profilePath
+                case shows
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/PersonTitle`.
+        public struct PersonTitle: Codable, Hashable, Sendable {
+            /// Recently added shows: what the card stands for, which subtitle words for older apps.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/added`.
+            public var added: Components.Schemas.AddedShow?
+            /// When the newest present file was added (see MediaFile.addedAt).
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/addedAt`.
+            public var addedAt: Foundation.Date
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/backdropPath`.
+            public var backdropPath: Swift.String?
+            /// The part, as TMDB words it; two parts in one title are joined with " / ". Absent when TMDB names none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/character`.
+            public var character: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/contentRating`.
+            public var contentRating: Swift.String?
+            /// Shows: episodes with a present file.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/episodeCount`.
+            public var episodeCount: Swift.Int64?
+            /// Recently added shows: the one episode added, when the subtitle is its code. Apps open its page rather than the show's.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/episodeId`.
+            public var episodeId: Swift.Int64?
+            /// Movies: versions on disk.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/fileCount`.
+            public var fileCount: Swift.Int64?
+            /// Unmatched: the file's path in the library, or the folder for a group of files.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/fileName`.
+            public var fileName: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/genres`.
+            public var genres: [Swift.String]
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/hdr`.
+            public var hdr: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/id`.
+            public var id: Swift.Int64
+            /// A present file arrived within the last 7 days and the signed-in user has not watched it: the film, or for a show an episode added in that time.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/isNew`.
+            public var isNew: Swift.Bool
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/kind`.
+            @frozen public enum KindPayload: RawRepresentable, Codable, Hashable, Sendable, CaseIterable {
+                case movie
+                case show
+                case unmatched
+                /// A newer server's value, preserved without assigning it a known meaning.
+                case undocumented(Swift.String)
+
+                /// Constructing a known request value still rejects unfamiliar strings.
+                public init?(rawValue: Swift.String) {
+                    switch rawValue {
+                    case "movie": self = .movie
+                    case "show": self = .show
+                    case "unmatched": self = .unmatched
+                    default: return nil
+                    }
+                }
+
+                public var rawValue: Swift.String {
+                    switch self {
+                    case .movie: return "movie"
+                    case .show: return "show"
+                    case .unmatched: return "unmatched"
+                    case .undocumented(let value): return value
+                    }
+                }
+
+                public static var allCases: [Self] {
+                    [.movie, .show, .unmatched]
+                }
+
+                public init(from decoder: any Swift.Decoder) throws {
+                    let value = try decoder.singleValueContainer().decode(Swift.String.self)
+                    self = Self(rawValue: value) ?? .undocumented(value)
+                }
+
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    var container = encoder.singleValueContainer()
+                    try container.encode(rawValue)
+                }
+            }
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/kind`.
+            public var kind: Components.Schemas.PersonTitle.KindPayload
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/lastAirDate`.
+            public var lastAirDate: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/libraryId`.
+            public var libraryId: Swift.Int64
+            /// Unmatched: the library's type, for the link to its Unmatched view.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/libraryType`.
+            @frozen public enum LibraryTypePayload: RawRepresentable, Codable, Hashable, Sendable, CaseIterable {
+                case _empty_
+                case movie
+                case tv
+                /// A newer server's value, preserved without assigning it a known meaning.
+                case undocumented(Swift.String)
+
+                /// Constructing a known request value still rejects unfamiliar strings.
+                public init?(rawValue: Swift.String) {
+                    switch rawValue {
+                    case "": self = ._empty_
+                    case "movie": self = .movie
+                    case "tv": self = .tv
+                    default: return nil
+                    }
+                }
+
+                public var rawValue: Swift.String {
+                    switch self {
+                    case ._empty_: return ""
+                    case .movie: return "movie"
+                    case .tv: return "tv"
+                    case .undocumented(let value): return value
+                    }
+                }
+
+                public static var allCases: [Self] {
+                    [._empty_, .movie, .tv]
+                }
+
+                public init(from decoder: any Swift.Decoder) throws {
+                    let value = try decoder.singleValueContainer().decode(Swift.String.self)
+                    self = Self(rawValue: value) ?? .undocumented(value)
+                }
+
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    var container = encoder.singleValueContainer()
+                    try container.encode(rawValue)
+                }
+            }
+            /// Unmatched: the library's type, for the link to its Unmatched view.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/libraryType`.
+            public var libraryType: Components.Schemas.PersonTitle.LibraryTypePayload?
+            /// Shows marked isNew: how many of the episodes added in the last 7 days the signed-in person hasn't finished ("2 new").
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/newEpisodeCount`.
+            public var newEpisodeCount: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/nextAirDate`.
+            public var nextAirDate: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/overview`.
+            public var overview: Swift.String
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/posterPath`.
+            public var posterPath: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/progress`.
+            public var progress: Swift.Double?
+            /// Best resolution across present files.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/quality`.
+            @frozen public enum QualityPayload: RawRepresentable, Codable, Hashable, Sendable, CaseIterable {
+                case _empty_
+                case _4k
+                case _1080p
+                case _720p
+                case sd
+                /// A newer server's value, preserved without assigning it a known meaning.
+                case undocumented(Swift.String)
+
+                /// Constructing a known request value still rejects unfamiliar strings.
+                public init?(rawValue: Swift.String) {
+                    switch rawValue {
+                    case "": self = ._empty_
+                    case "4K": self = ._4k
+                    case "1080p": self = ._1080p
+                    case "720p": self = ._720p
+                    case "SD": self = .sd
+                    default: return nil
+                    }
+                }
+
+                public var rawValue: Swift.String {
+                    switch self {
+                    case ._empty_: return ""
+                    case ._4k: return "4K"
+                    case ._1080p: return "1080p"
+                    case ._720p: return "720p"
+                    case .sd: return "SD"
+                    case .undocumented(let value): return value
+                    }
+                }
+
+                public static var allCases: [Self] {
+                    [._empty_, ._4k, ._1080p, ._720p, .sd]
+                }
+
+                public init(from decoder: any Swift.Decoder) throws {
+                    let value = try decoder.singleValueContainer().decode(Swift.String.self)
+                    self = Self(rawValue: value) ?? .undocumented(value)
+                }
+
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    var container = encoder.singleValueContainer()
+                    try container.encode(rawValue)
+                }
+            }
+            /// Best resolution across present files.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/quality`.
+            public var quality: Components.Schemas.PersonTitle.QualityPayload?
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/rating`.
+            public var rating: Swift.Double?
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/releaseDate`.
+            public var releaseDate: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/runtimeMin`.
+            public var runtimeMin: Swift.Int64?
+            /// Shows: seasons with an episode that has a present file, specials left out.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/seasonCount`.
+            public var seasonCount: Swift.Int64?
+            /// Recently added shows: that episode's season.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/seasonNumber`.
+            public var seasonNumber: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/status`.
+            public var status: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/subtitle`.
+            public var subtitle: Swift.String?
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/title`.
+            public var title: Swift.String
+            /// The movie's or show's TMDB id, which saving it to a watchlist takes. Absent for a title TMDB hasn't matched, which can't be saved.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/tmdbId`.
+            public var tmdbId: Swift.Int64?
+            /// Bytes across present files.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/totalSize`.
+            public var totalSize: Swift.Int64
+            /// Shows: episodes with a present file the signed-in person hasn't finished ("4 episodes left"); equal to episodeCount when they haven't started. Absent for movies and on servers below API level 34.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/unwatchedCount`.
+            public var unwatchedCount: Swift.Int64?
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/watched`.
+            public var watched: Swift.Bool
+            /// It is on one of the signed-in person's watchlists: a card's menu offers Remove from Watchlist rather than Add.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/watchlisted`.
+            public var watchlisted: Swift.Bool?
+            /// - Remark: Generated from `#/components/schemas/PersonTitle/year`.
+            public var year: Swift.Int64?
+            /// Creates a new `PersonTitle`.
+            ///
+            /// - Parameters:
+            ///   - added: Recently added shows: what the card stands for, which subtitle words for older apps.
+            ///   - addedAt: When the newest present file was added (see MediaFile.addedAt).
+            ///   - backdropPath:
+            ///   - character: The part, as TMDB words it; two parts in one title are joined with " / ". Absent when TMDB names none.
+            ///   - contentRating:
+            ///   - episodeCount: Shows: episodes with a present file.
+            ///   - episodeId: Recently added shows: the one episode added, when the subtitle is its code. Apps open its page rather than the show's.
+            ///   - fileCount: Movies: versions on disk.
+            ///   - fileName: Unmatched: the file's path in the library, or the folder for a group of files.
+            ///   - genres:
+            ///   - hdr:
+            ///   - id:
+            ///   - isNew: A present file arrived within the last 7 days and the signed-in user has not watched it: the film, or for a show an episode added in that time.
+            ///   - kind:
+            ///   - lastAirDate:
+            ///   - libraryId:
+            ///   - libraryType: Unmatched: the library's type, for the link to its Unmatched view.
+            ///   - newEpisodeCount: Shows marked isNew: how many of the episodes added in the last 7 days the signed-in person hasn't finished ("2 new").
+            ///   - nextAirDate:
+            ///   - overview:
+            ///   - posterPath:
+            ///   - progress:
+            ///   - quality: Best resolution across present files.
+            ///   - rating:
+            ///   - releaseDate:
+            ///   - runtimeMin:
+            ///   - seasonCount: Shows: seasons with an episode that has a present file, specials left out.
+            ///   - seasonNumber: Recently added shows: that episode's season.
+            ///   - status:
+            ///   - subtitle:
+            ///   - title:
+            ///   - tmdbId: The movie's or show's TMDB id, which saving it to a watchlist takes. Absent for a title TMDB hasn't matched, which can't be saved.
+            ///   - totalSize: Bytes across present files.
+            ///   - unwatchedCount: Shows: episodes with a present file the signed-in person hasn't finished ("4 episodes left"); equal to episodeCount when they haven't started. Absent for movies and on servers below API level 34.
+            ///   - watched:
+            ///   - watchlisted: It is on one of the signed-in person's watchlists: a card's menu offers Remove from Watchlist rather than Add.
+            ///   - year:
+            public init(
+                added: Components.Schemas.AddedShow? = nil,
+                addedAt: Foundation.Date,
+                backdropPath: Swift.String? = nil,
+                character: Swift.String? = nil,
+                contentRating: Swift.String? = nil,
+                episodeCount: Swift.Int64? = nil,
+                episodeId: Swift.Int64? = nil,
+                fileCount: Swift.Int64? = nil,
+                fileName: Swift.String? = nil,
+                genres: [Swift.String],
+                hdr: Swift.Bool,
+                id: Swift.Int64,
+                isNew: Swift.Bool,
+                kind: Components.Schemas.PersonTitle.KindPayload,
+                lastAirDate: Swift.String? = nil,
+                libraryId: Swift.Int64,
+                libraryType: Components.Schemas.PersonTitle.LibraryTypePayload? = nil,
+                newEpisodeCount: Swift.Int64? = nil,
+                nextAirDate: Swift.String? = nil,
+                overview: Swift.String,
+                posterPath: Swift.String? = nil,
+                progress: Swift.Double? = nil,
+                quality: Components.Schemas.PersonTitle.QualityPayload? = nil,
+                rating: Swift.Double? = nil,
+                releaseDate: Swift.String? = nil,
+                runtimeMin: Swift.Int64? = nil,
+                seasonCount: Swift.Int64? = nil,
+                seasonNumber: Swift.Int64? = nil,
+                status: Swift.String? = nil,
+                subtitle: Swift.String? = nil,
+                title: Swift.String,
+                tmdbId: Swift.Int64? = nil,
+                totalSize: Swift.Int64,
+                unwatchedCount: Swift.Int64? = nil,
+                watched: Swift.Bool,
+                watchlisted: Swift.Bool? = nil,
+                year: Swift.Int64? = nil
+            ) {
+                self.added = added
+                self.addedAt = addedAt
+                self.backdropPath = backdropPath
+                self.character = character
+                self.contentRating = contentRating
+                self.episodeCount = episodeCount
+                self.episodeId = episodeId
+                self.fileCount = fileCount
+                self.fileName = fileName
+                self.genres = genres
+                self.hdr = hdr
+                self.id = id
+                self.isNew = isNew
+                self.kind = kind
+                self.lastAirDate = lastAirDate
+                self.libraryId = libraryId
+                self.libraryType = libraryType
+                self.newEpisodeCount = newEpisodeCount
+                self.nextAirDate = nextAirDate
+                self.overview = overview
+                self.posterPath = posterPath
+                self.progress = progress
+                self.quality = quality
+                self.rating = rating
+                self.releaseDate = releaseDate
+                self.runtimeMin = runtimeMin
+                self.seasonCount = seasonCount
+                self.seasonNumber = seasonNumber
+                self.status = status
+                self.subtitle = subtitle
+                self.title = title
+                self.tmdbId = tmdbId
+                self.totalSize = totalSize
+                self.unwatchedCount = unwatchedCount
+                self.watched = watched
+                self.watchlisted = watchlisted
+                self.year = year
+            }
+            public enum CodingKeys: String, CodingKey {
+                case added
+                case addedAt
+                case backdropPath
+                case character
+                case contentRating
+                case episodeCount
+                case episodeId
+                case fileCount
+                case fileName
+                case genres
+                case hdr
+                case id
+                case isNew
+                case kind
+                case lastAirDate
+                case libraryId
+                case libraryType
+                case newEpisodeCount
+                case nextAirDate
+                case overview
+                case posterPath
+                case progress
+                case quality
+                case rating
+                case releaseDate
+                case runtimeMin
+                case seasonCount
+                case seasonNumber
+                case status
+                case subtitle
+                case title
+                case tmdbId
+                case totalSize
+                case unwatchedCount
+                case watched
+                case watchlisted
+                case year
             }
         }
         /// - Remark: Generated from `#/components/schemas/Ping`.
@@ -13304,6 +13770,23 @@ extension Components {
                 case unwatchedCount
                 case watched
                 case year
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ShowCopies`.
+        public struct ShowCopies: Codable, Hashable, Sendable {
+            /// Every library's copy with a present episode file, the first library's first, marked for the signed-in person as search's are (watched, unwatchedCount, seasonCount). Empty when the library has none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ShowCopies/items`.
+            public var items: [Components.Schemas.Show]
+            /// Creates a new `ShowCopies`.
+            ///
+            /// - Parameters:
+            ///   - items: Every library's copy with a present episode file, the first library's first, marked for the signed-in person as search's are (watched, unwatchedCount, seasonCount). Empty when the library has none.
+            public init(items: [Components.Schemas.Show]) {
+                self.items = items
+            }
+            public enum CodingKeys: String, CodingKey {
+                case items
             }
         }
         /// - Remark: Generated from `#/components/schemas/ShowDetail`.
