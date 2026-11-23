@@ -101,6 +101,10 @@
       "ActivityCards": {
         "additionalProperties": false,
         "properties": {
+          "conversions": {
+            "$ref": "#/components/schemas/ActivityConversions",
+            "description": "Why the period's plays were converted rather than played directly (API level 34)."
+          },
           "peak": {
             "$ref": "#/components/schemas/ActivityPeaks"
           },
@@ -169,6 +173,46 @@
         ],
         "type": "object"
       },
+      "ActivityConversionReason": {
+        "additionalProperties": false,
+        "properties": {
+          "plays": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "reason": {
+            "description": "video-format (a codec, profile, bit depth or HDR the device can't play), resolution, bitrate, smaller (a quality below the original, chosen or Automatic's, such as away from home), audio-format, audio-channels, audio-track (the chosen track needed a remux), container, subtitles (burned in) or other. Apps show kinds they don't know as other.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "plays"
+        ],
+        "type": "object"
+      },
+      "ActivityConversions": {
+        "additionalProperties": false,
+        "properties": {
+          "plays": {
+            "description": "Plays not played directly, counted as plays are.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "reasons": {
+            "description": "How many of them had each reason, most first; a play counts once under each of its reasons, so these can add up to more than plays.",
+            "items": {
+              "$ref": "#/components/schemas/ActivityConversionReason"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "plays",
+          "reasons"
+        ],
+        "type": "object"
+      },
       "ActivityDevice": {
         "additionalProperties": false,
         "properties": {
@@ -209,6 +253,10 @@
           },
           "lastSeenAt": {
             "format": "date-time",
+            "type": "string"
+          },
+          "network": {
+            "description": "The network lastIp is on: local (at home), tailnet or remote. Absent without an address (API level 34).",
             "type": "string"
           },
           "plays": {
@@ -755,6 +803,11 @@
             "format": "date-time",
             "type": "string"
           },
+          "converted": {
+            "description": "The overall peak only: how many of its streams were not played directly (API level 34).",
+            "format": "int64",
+            "type": "integer"
+          },
           "count": {
             "format": "int64",
             "type": "integer"
@@ -1258,6 +1311,11 @@
             "format": "int64",
             "type": "integer"
           },
+          "firstPlayAt": {
+            "description": "When the person's first play in the history started; absent with none (API level 34).",
+            "format": "date-time",
+            "type": "string"
+          },
           "isAdmin": {
             "type": "boolean"
           },
@@ -1506,6 +1564,35 @@
         },
         "required": [
           "renditions"
+        ],
+        "type": "object"
+      },
+      "AddedShow": {
+        "additionalProperties": false,
+        "properties": {
+          "episodes": {
+            "description": "Episodes added in the row's window.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "newShow": {
+            "description": "The show had no episodes in the library before them.",
+            "type": "boolean"
+          },
+          "seasonComplete": {
+            "description": "That season now has every episode TMDB lists.",
+            "type": "boolean"
+          },
+          "seasonNumber": {
+            "description": "The season they were all added to, when it was one.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "episodes",
+          "seasonComplete",
+          "newShow"
         ],
         "type": "object"
       },
@@ -1786,6 +1873,10 @@
       "BrowseItem": {
         "additionalProperties": false,
         "properties": {
+          "added": {
+            "$ref": "#/components/schemas/AddedShow",
+            "description": "Recently added shows: what the card stands for, which subtitle words for older apps."
+          },
           "addedAt": {
             "description": "When the newest present file was added (see MediaFile.addedAt).",
             "format": "date-time",
@@ -1857,6 +1948,11 @@
             ],
             "type": "string"
           },
+          "newEpisodeCount": {
+            "description": "Shows marked isNew: how many of the episodes added in the last 7 days the signed-in person hasn't finished (\"2 new\").",
+            "format": "int64",
+            "type": "integer"
+          },
           "nextAirDate": {
             "type": "string"
           },
@@ -1892,6 +1988,11 @@
             "format": "int64",
             "type": "integer"
           },
+          "seasonCount": {
+            "description": "Shows: seasons with an episode that has a present file, specials left out.",
+            "format": "int64",
+            "type": "integer"
+          },
           "seasonNumber": {
             "description": "Recently added shows: that episode's season.",
             "format": "int64",
@@ -1913,6 +2014,11 @@
           },
           "totalSize": {
             "description": "Bytes across present files.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "unwatchedCount": {
+            "description": "Shows: episodes with a present file the signed-in person hasn't finished (\"4 episodes left\"); equal to episodeCount when they haven't started. Absent for movies and on servers below API level 34.",
             "format": "int64",
             "type": "integer"
           },
@@ -2298,6 +2404,13 @@
           "backdropPath": {
             "type": "string"
           },
+          "contentRating": {
+            "description": "The movie's or the show's US certification from TMDB; absent when it has none.",
+            "examples": [
+              "TV-14"
+            ],
+            "type": "string"
+          },
           "durationMs": {
             "format": "int64",
             "type": "integer"
@@ -2324,6 +2437,10 @@
           "movieId": {
             "format": "int64",
             "type": "integer"
+          },
+          "overview": {
+            "description": "The episode's summary, or the movie's; absent when TMDB has none.",
+            "type": "string"
           },
           "positionMs": {
             "format": "int64",
@@ -2605,12 +2722,43 @@
           "name": {
             "type": "string"
           },
+          "personId": {
+            "description": "TMDB's person ID: getPerson lists the person's titles in the library. Absent for a credit stored before person IDs were kept, until the server fetches the title's credits again, and on servers below API level 34; such a card opens nothing.",
+            "format": "int64",
+            "type": "integer"
+          },
           "profilePath": {
             "type": "string"
           }
         },
         "required": [
           "name"
+        ],
+        "type": "object"
+      },
+      "CrewMember": {
+        "additionalProperties": false,
+        "properties": {
+          "job": {
+            "description": "As TMDB words it: Director, Screenplay, Writer, Story, Original Music Composer, Producer, or Creator for a show.",
+            "examples": [
+              "Director"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "personId": {
+            "description": "TMDB's person ID.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "personId",
+          "name",
+          "job"
         ],
         "type": "object"
       },
@@ -3272,6 +3420,11 @@
           "overview": {
             "type": "string"
           },
+          "runtimeMin": {
+            "description": "The episode's length in minutes, as TMDB lists it.",
+            "format": "int64",
+            "type": "integer"
+          },
           "seasonNumber": {
             "format": "int64",
             "type": "integer"
@@ -3893,6 +4046,10 @@
       "HomeHero": {
         "additionalProperties": false,
         "properties": {
+          "airDate": {
+            "description": "Episodes: when it aired, YYYY-MM-DD.",
+            "type": "string"
+          },
           "backdropPath": {
             "type": "string"
           },
@@ -3900,6 +4057,11 @@
             "type": "string"
           },
           "episodeId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "episodeNumber": {
+            "description": "Episodes: its number in seasonNumber.",
             "format": "int64",
             "type": "integer"
           },
@@ -3951,6 +4113,11 @@
             ],
             "type": "string"
           },
+          "runtimeMin": {
+            "description": "The episode's or movie's length in minutes.",
+            "format": "int64",
+            "type": "integer"
+          },
           "seasonNumber": {
             "format": "int64",
             "type": "integer"
@@ -3958,6 +4125,10 @@
           "showId": {
             "format": "int64",
             "type": "integer"
+          },
+          "showTitle": {
+            "description": "Episodes and shows: the show's title.",
+            "type": "string"
           },
           "title": {
             "type": "string"
@@ -4405,6 +4576,13 @@
       "ItemFacets": {
         "additionalProperties": false,
         "properties": {
+          "contentRatings": {
+            "description": "The library's content ratings, in the order the US systems rank them (movies' G to NC-17, then TV's TV-Y to TV-MA, then any other), with unrated last when some items have none. From API level 34.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "decades": {
             "items": {
               "format": "int64",
@@ -4428,6 +4606,14 @@
       "ItemList": {
         "additionalProperties": false,
         "properties": {
+          "contentRatingCounts": {
+            "additionalProperties": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "description": "Items per content rating (as facets.contentRatings names them) after every other filter, before contentRating and pagination, with zero when none match. From API level 34.",
+            "type": "object"
+          },
           "facets": {
             "$ref": "#/components/schemas/ItemFacets"
           },
@@ -4481,6 +4667,11 @@
       "ItemTotals": {
         "additionalProperties": false,
         "properties": {
+          "addedThisMonth": {
+            "description": "Items whose newest present file arrived this calendar month, in the server's time zone.",
+            "format": "int64",
+            "type": "integer"
+          },
           "continuing": {
             "description": "TV: shows that have not ended or been canceled.",
             "format": "int64",
@@ -4491,8 +4682,23 @@
             "format": "int64",
             "type": "integer"
           },
+          "following": {
+            "description": "TV: shows the signed-in person follows, as filter following lists them.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "inProgress": {
+            "description": "Movies part watched, or shows started and not finished, as filter inProgress lists them.",
+            "format": "int64",
+            "type": "integer"
+          },
           "items": {
             "description": "Matched movies or shows with a present file.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "newEpisodes": {
+            "description": "TV: shows with a new episode the signed-in person hasn't finished (isNew).",
             "format": "int64",
             "type": "integer"
           },
@@ -4503,6 +4709,11 @@
           },
           "unmatched": {
             "description": "Items for files not matched yet: one per file, or per show folder.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "unwatched": {
+            "description": "Movies the signed-in person hasn't finished, or shows with an episode they haven't seen (\"58 you haven't watched\").",
             "format": "int64",
             "type": "integer"
           }
@@ -4636,6 +4847,128 @@
         },
         "required": [
           "libraryId"
+        ],
+        "type": "object"
+      },
+      "LibraryCollection": {
+        "additionalProperties": false,
+        "properties": {
+          "backdropPath": {
+            "type": "string"
+          },
+          "count": {
+            "description": "Its movies in this library with a present file.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "firstYear": {
+            "description": "The year of its earliest film in the library.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "description": "TMDB collection ID; listLibraryItems takes it as collection.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "lastYear": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "posterPath": {
+            "description": "The collection's own picture, else its first film's.",
+            "type": "string"
+          },
+          "total": {
+            "description": "The films TMDB lists in it; absent until the server has fetched the collection.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "count"
+        ],
+        "type": "object"
+      },
+      "LibraryCollectionDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "backdropPath": {
+            "type": "string"
+          },
+          "count": {
+            "description": "Its movies in this library with a present file.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "firstYear": {
+            "description": "The year of its earliest film in the library.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "description": "TMDB collection ID; listLibraryItems takes it as collection.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "lastYear": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "missing": {
+            "description": "The films TMDB lists in it that this library lacks, in release order, each with where it stands as request search says it (available when another library has it). Request opens createRequest as from search. Empty until the server has fetched the collection.",
+            "items": {
+              "$ref": "#/components/schemas/Requestable"
+            },
+            "type": "array"
+          },
+          "movies": {
+            "description": "The library's films of it with a present file, in release order, marked for the signed-in person as cards are.",
+            "items": {
+              "$ref": "#/components/schemas/BrowseItem"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "posterPath": {
+            "description": "The collection's own picture, else its first film's.",
+            "type": "string"
+          },
+          "total": {
+            "description": "The films TMDB lists in it; absent until the server has fetched the collection.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "movies",
+          "missing",
+          "id",
+          "name",
+          "count"
+        ],
+        "type": "object"
+      },
+      "LibraryCollections": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "description": "By name.",
+            "items": {
+              "$ref": "#/components/schemas/LibraryCollection"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
         ],
         "type": "object"
       },
@@ -4899,6 +5232,35 @@
         ],
         "type": "object"
       },
+      "LiveTVAiring": {
+        "additionalProperties": false,
+        "properties": {
+          "channelId": {
+            "type": "string"
+          },
+          "channelName": {
+            "type": "string"
+          },
+          "number": {
+            "type": "string"
+          },
+          "programmeId": {
+            "type": "string"
+          },
+          "start": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "channelId",
+          "number",
+          "channelName",
+          "programmeId",
+          "start"
+        ],
+        "type": "object"
+      },
       "LiveTVCapabilities": {
         "additionalProperties": false,
         "properties": {
@@ -5050,8 +5412,16 @@
           "id": {
             "type": "string"
           },
+          "nextAiring": {
+            "$ref": "#/components/schemas/LiveTVAiring",
+            "description": "For a repeat: when the same episode airs again in the listings, so it could give way and be recorded then (API level 34)."
+          },
           "number": {
             "type": "string"
+          },
+          "repeat": {
+            "description": "Its listing called it a repeat (API level 34).",
+            "type": "boolean"
           },
           "running": {
             "description": "Already recording, so it can't give way.",
@@ -5776,6 +6146,13 @@
             "description": "The current delete policy permits removing this finished recording's owned file.",
             "type": "boolean"
           },
+          "categories": {
+            "description": "The listing's categories, such as Documentary or Sports (API level 34).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "channelId": {
             "type": "string"
           },
@@ -5813,9 +6190,21 @@
           "id": {
             "type": "string"
           },
+          "kind": {
+            "description": "What was recorded, from its listing: episode, show (a programme without episodes, such as news) or movie; absent for a recording made by time. Other values may follow (API level 34).",
+            "type": "string"
+          },
           "mediaFileId": {
             "format": "int64",
             "type": "integer"
+          },
+          "new": {
+            "description": "The listing called it new. From API level 34; absent for a recording scheduled before, whose listing was gone.",
+            "type": "boolean"
+          },
+          "nextAiring": {
+            "$ref": "#/components/schemas/LiveTVAiring",
+            "description": "For a repeat that won't record (state conflict): when the same episode airs again in the listings (API level 34)."
           },
           "number": {
             "type": "string"
@@ -5834,8 +6223,16 @@
           "programmeId": {
             "type": "string"
           },
+          "progress": {
+            "$ref": "#/components/schemas/LiveTVViewerProgress",
+            "description": "Where the signed-in person is in it: its own position while it isn't in the library, then the watch state of the movie or episode it became. Absent when they haven't started it (API level 34)."
+          },
           "reason": {
             "type": "string"
+          },
+          "repeat": {
+            "description": "The listing called it a repeat (API level 34).",
+            "type": "boolean"
           },
           "ruleId": {
             "type": "string"
@@ -5870,6 +6267,15 @@
           },
           "userName": {
             "type": "string"
+          },
+          "watched": {
+            "description": "The signed-in person finished the movie or episode it became (API level 34).",
+            "type": "boolean"
+          },
+          "year": {
+            "description": "A movie's year, or the year an episode first aired, from the listing (API level 34).",
+            "format": "int64",
+            "type": "integer"
           }
         },
         "required": [
@@ -6240,6 +6646,10 @@
       "LiveTVRecordings": {
         "additionalProperties": false,
         "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/LiveTVSectionCounts",
+            "description": "The recordings in each section and their bytes, and the rules, for the tabs. On the first page only (API level 34)."
+          },
           "freeBytes": {
             "format": "int64",
             "type": "integer"
@@ -6253,11 +6663,21 @@
           "nextCursor": {
             "type": "string"
           },
+          "reserveBytes": {
+            "description": "Space the recorder keeps free on the disk: freeBytes less this is the room recordings can use. On the first page, with freeBytes (API level 34).",
+            "format": "int64",
+            "type": "integer"
+          },
           "rules": {
             "items": {
               "$ref": "#/components/schemas/LiveTVRecordingRule"
             },
             "type": "array"
+          },
+          "totalBytes": {
+            "description": "The size of the disk recordings go to. On the first page, with freeBytes (API level 34).",
+            "format": "int64",
+            "type": "integer"
           },
           "tuners": {
             "format": "int64",
@@ -6393,6 +6813,53 @@
         },
         "required": [
           "items"
+        ],
+        "type": "object"
+      },
+      "LiveTVSectionCount": {
+        "additionalProperties": false,
+        "properties": {
+          "bytes": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "items": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "bytes"
+        ],
+        "type": "object"
+      },
+      "LiveTVSectionCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "conflicts": {
+            "$ref": "#/components/schemas/LiveTVSectionCount"
+          },
+          "now": {
+            "$ref": "#/components/schemas/LiveTVSectionCount"
+          },
+          "recorded": {
+            "$ref": "#/components/schemas/LiveTVSectionCount"
+          },
+          "series": {
+            "$ref": "#/components/schemas/LiveTVSectionCount",
+            "description": "The recording rules; bytes is 0."
+          },
+          "upcoming": {
+            "$ref": "#/components/schemas/LiveTVSectionCount"
+          }
+        },
+        "required": [
+          "now",
+          "conflicts",
+          "upcoming",
+          "recorded",
+          "series"
         ],
         "type": "object"
       },
@@ -6713,6 +7180,24 @@
         ],
         "type": "object"
       },
+      "LiveTVViewerProgress": {
+        "additionalProperties": false,
+        "properties": {
+          "durationMs": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "positionMs": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "positionMs",
+          "durationMs"
+        ],
+        "type": "object"
+      },
       "ManualSegment": {
         "additionalProperties": false,
         "properties": {
@@ -6923,6 +7408,10 @@
             "format": "int64",
             "type": "integer"
           },
+          "episode": {
+            "$ref": "#/components/schemas/MediaFileEpisode",
+            "description": "The files list only: the first episode an episode file holds (API level 34)."
+          },
           "firstSeenAt": {
             "format": "date-time",
             "type": "string"
@@ -7014,6 +7503,10 @@
             ],
             "type": "string"
           },
+          "title": {
+            "description": "The files list only: the movie's or show's title the file was matched to (API level 34).",
+            "type": "string"
+          },
           "videoCodec": {
             "examples": [
               "h264"
@@ -7021,6 +7514,11 @@
             "type": "string"
           },
           "width": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "year": {
+            "description": "The files list only: the matched movie's year (API level 34).",
             "format": "int64",
             "type": "integer"
           }
@@ -7083,6 +7581,10 @@
             ],
             "format": "int64",
             "type": "integer"
+          },
+          "episode": {
+            "$ref": "#/components/schemas/MediaFileEpisode",
+            "description": "The files list only: the first episode an episode file holds (API level 34)."
           },
           "episodeId": {
             "format": "int64",
@@ -7194,6 +7696,10 @@
             ],
             "type": "string"
           },
+          "title": {
+            "description": "The files list only: the movie's or show's title the file was matched to (API level 34).",
+            "type": "string"
+          },
           "videoCodec": {
             "examples": [
               "h264"
@@ -7201,6 +7707,11 @@
             "type": "string"
           },
           "width": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "year": {
+            "description": "The files list only: the matched movie's year (API level 34).",
             "format": "int64",
             "type": "integer"
           }
@@ -7223,6 +7734,27 @@
         ],
         "type": "object"
       },
+      "MediaFileEpisode": {
+        "additionalProperties": false,
+        "properties": {
+          "episodeNumber": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "seasonNumber": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "seasonNumber",
+          "episodeNumber"
+        ],
+        "type": "object"
+      },
       "MediaFileList": {
         "additionalProperties": false,
         "properties": {
@@ -7242,6 +7774,11 @@
           },
           "total": {
             "description": "Total files matching the filter.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "unreadable": {
+            "description": "Present files in the library ffprobe could not read, whatever the filter (API level 34).",
             "format": "int64",
             "type": "integer"
           }
@@ -8009,6 +8546,11 @@
             ],
             "type": "string"
           },
+          "progress": {
+            "description": "Search results: the fraction watched (0-1) when partway through.",
+            "format": "double",
+            "type": "number"
+          },
           "rating": {
             "description": "TMDB vote average, 0-10.",
             "format": "double",
@@ -8031,6 +8573,10 @@
             "format": "int64",
             "type": "integer"
           },
+          "watched": {
+            "description": "Search results: the signed-in person finished it. Absent elsewhere; a movie's page has watch.",
+            "type": "boolean"
+          },
           "year": {
             "format": "int64",
             "type": "integer"
@@ -8048,6 +8594,40 @@
         ],
         "type": "object"
       },
+      "MovieCollection": {
+        "additionalProperties": false,
+        "properties": {
+          "have": {
+            "description": "The collection's films in this movie's library with a present file, it included.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "description": "TMDB collection ID.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "part": {
+            "description": "Its place among the collection's films by release, from 1; absent until the server has fetched the collection.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "total": {
+            "description": "The films TMDB lists in it; absent until fetched.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "have"
+        ],
+        "type": "object"
+      },
       "MovieDetail": {
         "additionalProperties": false,
         "properties": {
@@ -8057,6 +8637,10 @@
           },
           "backdropPath": {
             "type": "string"
+          },
+          "collection": {
+            "$ref": "#/components/schemas/MovieCollection",
+            "description": "Its TMDB collection, where it falls in it and how many of it this library has (\"Part 2 of 3 · you have all three\"). Absent when it belongs to none."
           },
           "contentRating": {
             "description": "US certification from TMDB; empty when it has none.",
@@ -8068,6 +8652,13 @@
           "credits": {
             "items": {
               "$ref": "#/components/schemas/Credit"
+            },
+            "type": "array"
+          },
+          "crew": {
+            "description": "Its directors, writers, composers and producers, in that order; empty until the server has fetched the movie's credits with person IDs. Absent on servers below API level 34.",
+            "items": {
+              "$ref": "#/components/schemas/CrewMember"
             },
             "type": "array"
           },
@@ -8128,6 +8719,11 @@
             ],
             "type": "string"
           },
+          "progress": {
+            "description": "Search results: the fraction watched (0-1) when partway through.",
+            "format": "double",
+            "type": "number"
+          },
           "quality": {
             "enum": [
               "",
@@ -8174,6 +8770,10 @@
           "watch": {
             "$ref": "#/components/schemas/WatchState",
             "description": "The signed-in user's progress."
+          },
+          "watched": {
+            "description": "Search results: the signed-in person finished it. Absent elsewhere; a movie's page has watch.",
+            "type": "boolean"
           },
           "watchlists": {
             "description": "The signed-in person's watchlists that hold the movie (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33.",
@@ -8248,6 +8848,13 @@
           },
           "key": {
             "description": "The YouTube video id, for source \"youtube\".",
+            "type": "string"
+          },
+          "kind": {
+            "description": "What TMDB calls it: trailer or teaser; trailer for a trailer file. Absent on older servers.",
+            "examples": [
+              "teaser"
+            ],
             "type": "string"
           },
           "name": {
@@ -8947,6 +9554,10 @@
             "format": "int64",
             "type": "integer"
           },
+          "ip": {
+            "description": "The address fetching it, for admins only (API level 34).",
+            "type": "string"
+          },
           "item": {
             "$ref": "#/components/schemas/OfflineItem"
           },
@@ -9267,6 +9878,227 @@
         ],
         "type": "object"
       },
+      "PersonDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "movies": {
+            "description": "Movies with them in the billed cast and a present file, newest first, one card per title however many libraries have it.",
+            "items": {
+              "$ref": "#/components/schemas/PersonTitle"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "personId": {
+            "description": "TMDB person ID.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "profilePath": {
+            "description": "Their picture; fetch via /api/images/{size}{profilePath}.",
+            "type": "string"
+          },
+          "shows": {
+            "description": "Shows likewise.",
+            "items": {
+              "$ref": "#/components/schemas/PersonTitle"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "personId",
+          "name",
+          "movies",
+          "shows"
+        ],
+        "type": "object"
+      },
+      "PersonTitle": {
+        "additionalProperties": false,
+        "properties": {
+          "added": {
+            "$ref": "#/components/schemas/AddedShow",
+            "description": "Recently added shows: what the card stands for, which subtitle words for older apps."
+          },
+          "addedAt": {
+            "description": "When the newest present file was added (see MediaFile.addedAt).",
+            "format": "date-time",
+            "type": "string"
+          },
+          "backdropPath": {
+            "type": "string"
+          },
+          "character": {
+            "description": "The part, as TMDB words it; two parts in one title are joined with \" / \". Absent when TMDB names none.",
+            "type": "string"
+          },
+          "contentRating": {
+            "type": "string"
+          },
+          "episodeCount": {
+            "description": "Shows: episodes with a present file.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "episodeId": {
+            "description": "Recently added shows: the one episode added, when the subtitle is its code. Apps open its page rather than the show's.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "fileCount": {
+            "description": "Movies: versions on disk.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "fileName": {
+            "description": "Unmatched: the file's path in the library, or the folder for a group of files.",
+            "type": "string"
+          },
+          "genres": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "hdr": {
+            "type": "boolean"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "isNew": {
+            "description": "A present file arrived within the last 7 days and the signed-in user has not watched it: the film, or for a show an episode added in that time.",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "movie",
+              "show",
+              "unmatched"
+            ],
+            "type": "string"
+          },
+          "lastAirDate": {
+            "type": "string"
+          },
+          "libraryId": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "libraryType": {
+            "description": "Unmatched: the library's type, for the link to its Unmatched view.",
+            "enum": [
+              "",
+              "movie",
+              "tv"
+            ],
+            "type": "string"
+          },
+          "newEpisodeCount": {
+            "description": "Shows marked isNew: how many of the episodes added in the last 7 days the signed-in person hasn't finished (\"2 new\").",
+            "format": "int64",
+            "type": "integer"
+          },
+          "nextAirDate": {
+            "type": "string"
+          },
+          "overview": {
+            "type": "string"
+          },
+          "posterPath": {
+            "type": "string"
+          },
+          "progress": {
+            "format": "double",
+            "type": "number"
+          },
+          "quality": {
+            "description": "Best resolution across present files.",
+            "enum": [
+              "",
+              "4K",
+              "1080p",
+              "720p",
+              "SD"
+            ],
+            "type": "string"
+          },
+          "rating": {
+            "format": "double",
+            "type": "number"
+          },
+          "releaseDate": {
+            "type": "string"
+          },
+          "runtimeMin": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "seasonCount": {
+            "description": "Shows: seasons with an episode that has a present file, specials left out.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "seasonNumber": {
+            "description": "Recently added shows: that episode's season.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "subtitle": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "tmdbId": {
+            "description": "The movie's or show's TMDB id, which saving it to a watchlist takes. Absent for a title TMDB hasn't matched, which can't be saved.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "totalSize": {
+            "description": "Bytes across present files.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "unwatchedCount": {
+            "description": "Shows: episodes with a present file the signed-in person hasn't finished (\"4 episodes left\"); equal to episodeCount when they haven't started. Absent for movies and on servers below API level 34.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "watched": {
+            "type": "boolean"
+          },
+          "watchlisted": {
+            "description": "It is on one of the signed-in person's watchlists: a card's menu offers Remove from Watchlist rather than Add.",
+            "type": "boolean"
+          },
+          "year": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "libraryId",
+          "title",
+          "overview",
+          "genres",
+          "hdr",
+          "addedAt",
+          "isNew",
+          "totalSize",
+          "watched"
+        ],
+        "type": "object"
+      },
       "Ping": {
         "additionalProperties": false,
         "properties": {
@@ -9297,6 +10129,10 @@
           },
           "profile": {
             "$ref": "#/components/schemas/Profile"
+          },
+          "tracks": {
+            "description": "Also list each file's audio tracks and subtitles, those beside the file and downloaded ones included, so a person can choose them before playing. From API level 34; older servers ignore it.",
+            "type": "boolean"
           }
         },
         "required": [
@@ -9379,6 +10215,13 @@
           "audio": {
             "$ref": "#/components/schemas/AudioPlan"
           },
+          "audioTracks": {
+            "description": "With tracks: the file's audio tracks, as a decision lists them. Send the chosen one's index as audioIndex.",
+            "items": {
+              "$ref": "#/components/schemas/AudioTrack"
+            },
+            "type": "array"
+          },
           "fileId": {
             "format": "int64",
             "type": "integer"
@@ -9403,6 +10246,13 @@
             "description": "Why a cheaper mode was not possible.",
             "items": {
               "type": "string"
+            },
+            "type": "array"
+          },
+          "subtitles": {
+            "description": "With tracks: every subtitle a play could show, inside the file, beside it and downloaded, as a decision lists them but without URLs. Send the chosen one's id as subtitleId.",
+            "items": {
+              "$ref": "#/components/schemas/SubtitleTrack"
             },
             "type": "array"
           },
@@ -10639,6 +11489,10 @@
             "description": "Play the next episode by itself after the credits.",
             "type": "boolean"
           },
+          "hideSpoilers": {
+            "description": "The person asked not to see what happens in episodes they haven't watched. The server hides nothing; each app hides what it draws for those episodes. Off by default (API level 34).",
+            "type": "boolean"
+          },
           "liveTVReminderMinutes": {
             "description": "Minutes before a programme starts that a Live TV reminder comes: 0, 1, 5, 10 or 15 (API level 15).",
             "format": "int64",
@@ -11494,6 +12348,7 @@
             "type": "integer"
           },
           "subtitleId": {
+            "description": "A subtitles[].id from a decision or a plan with tracks: s\u003cindex\u003e for a stream inside the file (its ffprobe index), x\u003cn\u003e for a subtitle file beside the video (n counts them from 0 in the order the server lists them), d\u003cid\u003e for a downloaded one.",
             "type": "string"
           },
           "subtitleMode": {
@@ -12224,6 +13079,16 @@
             "type": "integer"
           },
           "number": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "progress": {
+            "description": "The fraction the signed-in person has watched (0-1) when partway through.",
+            "format": "double",
+            "type": "number"
+          },
+          "runtimeMin": {
+            "description": "Its length in minutes, as TMDB lists it.",
             "format": "int64",
             "type": "integer"
           },
@@ -13224,6 +14089,11 @@
             "format": "double",
             "type": "number"
           },
+          "seasonCount": {
+            "description": "Search results: seasons with a present episode, specials left out, as on cards.",
+            "format": "int64",
+            "type": "integer"
+          },
           "status": {
             "examples": [
               "Ended"
@@ -13236,6 +14106,15 @@
           "tmdbId": {
             "format": "int64",
             "type": "integer"
+          },
+          "unwatchedCount": {
+            "description": "Search results: episodes with a present file they haven't finished, as on cards.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "watched": {
+            "description": "Search results: the signed-in person has watched every episode with a present file.",
+            "type": "boolean"
           },
           "year": {
             "format": "int64",
@@ -13274,6 +14153,13 @@
           "credits": {
             "items": {
               "$ref": "#/components/schemas/Credit"
+            },
+            "type": "array"
+          },
+          "crew": {
+            "description": "Its creators, job Creator; empty until the server has fetched the show's credits with person IDs. Absent on servers below API level 34.",
+            "items": {
+              "$ref": "#/components/schemas/CrewMember"
             },
             "type": "array"
           },
@@ -13355,6 +14241,11 @@
             "format": "double",
             "type": "number"
           },
+          "seasonCount": {
+            "description": "Search results: seasons with a present episode, specials left out, as on cards.",
+            "format": "int64",
+            "type": "integer"
+          },
           "seasons": {
             "items": {
               "$ref": "#/components/schemas/Season"
@@ -13382,6 +14273,19 @@
           "totalSize": {
             "format": "int64",
             "type": "integer"
+          },
+          "tracks": {
+            "$ref": "#/components/schemas/ShowTracks",
+            "description": "The sound and subtitles the signed-in person picked for the show (setShowTracks), which its episodes start with. Absent when they have none, and on older servers."
+          },
+          "unwatchedCount": {
+            "description": "Search results: episodes with a present file they haven't finished, as on cards.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "watched": {
+            "description": "Search results: the signed-in person has watched every episode with a present file.",
+            "type": "boolean"
           },
           "watchlists": {
             "description": "The signed-in person's watchlists that hold the show (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33.",
@@ -13497,6 +14401,51 @@
           "title",
           "seasons"
         ],
+        "type": "object"
+      },
+      "ShowTracks": {
+        "additionalProperties": false,
+        "properties": {
+          "audioLanguage": {
+            "description": "BCP 47. A play that names no audioIndex starts on this language when the file has it, before the person's audio languages. Absent: their audio languages alone.",
+            "examples": [
+              "ja"
+            ],
+            "type": "string"
+          },
+          "subtitleLanguage": {
+            "description": "BCP 47. A play with subtitleMode auto starts subtitles in this language, before the person's subtitle languages. Absent: their subtitle settings, unless subtitlesOff.",
+            "examples": [
+              "en"
+            ],
+            "type": "string"
+          },
+          "subtitlesOff": {
+            "description": "A play with subtitleMode auto starts without subtitles.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "subtitlesOff"
+        ],
+        "type": "object"
+      },
+      "ShowTracksInputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "audioLanguage": {
+            "description": "BCP 47; an empty string forgets it. Omitted: kept.",
+            "type": "string"
+          },
+          "subtitleLanguage": {
+            "description": "BCP 47, which also turns subtitlesOff off; an empty string forgets it. Omitted: kept.",
+            "type": "string"
+          },
+          "subtitlesOff": {
+            "description": "true forgets subtitleLanguage. Omitted: kept.",
+            "type": "boolean"
+          }
+        },
         "type": "object"
       },
       "SignIn": {
@@ -14590,6 +15539,10 @@
             "description": "Audio fields to change; omitted fields keep their values. From API level 21; older servers reject it."
           },
           "autoplayNext": {
+            "type": "boolean"
+          },
+          "hideSpoilers": {
+            "description": "From API level 34; older servers reject it.",
             "type": "boolean"
           },
           "liveTVReminderMinutes": {
@@ -19998,6 +20951,107 @@
         ]
       }
     },
+    "/api/libraries/{id}/collections": {
+      "get": {
+        "description": "The collections the library has two films of or more. Empty for a TV library. From API level 34.",
+        "operationId": "listLibraryCollections",
+        "parameters": [
+          {
+            "description": "Library ID.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Library ID.",
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryCollections"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "A movie library's TMDB collections",
+        "tags": [
+          "browse"
+        ]
+      }
+    },
+    "/api/libraries/{id}/collections/{collectionId}": {
+      "get": {
+        "description": "404 when the library has fewer than two of its films. The reply never waits on TMDB. From API level 34.",
+        "operationId": "getLibraryCollection",
+        "parameters": [
+          {
+            "description": "Library ID.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Library ID.",
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "TMDB collection ID.",
+            "in": "path",
+            "name": "collectionId",
+            "required": true,
+            "schema": {
+              "description": "TMDB collection ID.",
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LibraryCollectionDetail"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "A collection's films: the library's, and the ones it lacks to request",
+        "tags": [
+          "browse"
+        ]
+      }
+    },
     "/api/libraries/{id}/files": {
       "get": {
         "operationId": "listLibraryFiles",
@@ -20040,6 +21094,30 @@
                 "unmatched",
                 "failed"
               ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "failed: only the files ffprobe could not read (API level 34).",
+            "explode": false,
+            "in": "query",
+            "name": "probe",
+            "schema": {
+              "description": "failed: only the files ffprobe could not read (API level 34).",
+              "enum": [
+                "failed"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Words in the file's path, in order, any case (API level 34).",
+            "explode": false,
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "description": "Words in the file's path, in order, any case (API level 34).",
+              "maxLength": 200,
               "type": "string"
             }
           },
@@ -20177,19 +21255,90 @@
             }
           },
           {
+            "description": "Ascending or descending; absent for the sort's own direction: A to Z for title, the most or newest first for the rest. \"Shortest first\" is sort=runtime\u0026order=asc. From API level 34.",
+            "explode": false,
+            "in": "query",
+            "name": "order",
+            "schema": {
+              "description": "Ascending or descending; absent for the sort's own direction: A to Z for title, the most or newest first for the rest. \"Shortest first\" is sort=runtime\u0026order=asc. From API level 34.",
+              "enum": [
+                "",
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "inProgress (movies part watched, shows started and not finished) and following (TV: shows the person follows) are from API level 34.",
             "explode": false,
             "in": "query",
             "name": "filter",
             "schema": {
+              "description": "inProgress (movies part watched, shows started and not finished) and following (TV: shows the person follows) are from API level 34.",
               "enum": [
                 "",
                 "continuing",
                 "ended",
                 "4k",
                 "hdr",
-                "unwatched"
+                "unwatched",
+                "inProgress",
+                "following"
               ],
               "type": "string"
+            }
+          },
+          {
+            "description": "More filters, comma separated, all of which an item must meet, with filter as one more. From API level 34.",
+            "explode": false,
+            "in": "query",
+            "name": "filters",
+            "schema": {
+              "description": "More filters, comma separated, all of which an item must meet, with filter as one more. From API level 34.",
+              "items": {
+                "enum": [
+                  "continuing",
+                  "ended",
+                  "4k",
+                  "hdr",
+                  "unwatched",
+                  "inProgress",
+                  "following"
+                ],
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Ratings to keep, comma separated, as facets.contentRatings lists them: TMDB's US certification, or unrated. From API level 34.",
+            "explode": false,
+            "in": "query",
+            "name": "contentRating",
+            "schema": {
+              "description": "Ratings to keep, comma separated, as facets.contentRatings lists them: TMDB's US certification, or unrated. From API level 34.",
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Movies: only those of this TMDB collection, as listLibraryCollections lists them. From API level 34.",
+            "explode": false,
+            "in": "query",
+            "name": "collection",
+            "schema": {
+              "description": "Movies: only those of this TMDB collection, as listLibraryCollections lists them. From API level 34.",
+              "format": "int64",
+              "type": "integer"
             }
           },
           {
@@ -23990,6 +25139,52 @@
         ]
       }
     },
+    "/api/people/{personId}": {
+      "get": {
+        "description": "The titles in every library with the person in their billed cast, matched by TMDB person ID, never by name, with the part played. Titles matched before the server kept person IDs count once their credits are fetched again in the background. 404 when no title in the library has the person. From API level 34.",
+        "operationId": "getPerson",
+        "parameters": [
+          {
+            "description": "TMDB person ID, from a credit's personId.",
+            "in": "path",
+            "name": "personId",
+            "required": true,
+            "schema": {
+              "description": "TMDB person ID, from a credit's personId.",
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonDetail"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "A cast member's movies and shows in the library",
+        "tags": [
+          "browse"
+        ]
+      }
+    },
     "/api/playback/capabilities": {
       "get": {
         "operationId": "getPlaybackCapabilities",
@@ -27071,6 +28266,97 @@
         ]
       }
     },
+    "/api/shows/{id}/tracks": {
+      "delete": {
+        "description": "Its episodes start on the person's own languages again. From API level 34.",
+        "operationId": "forgetShowTracks",
+        "parameters": [
+          {
+            "description": "Show ID.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Show ID.",
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Forget the sound and subtitles remembered for a show",
+        "tags": [
+          "playback"
+        ]
+      },
+      "put": {
+        "description": "Apps send it when the person picks a track in the player during one of the show's episodes, so the next episodes start the same way. Kept by the show's TMDB id, for every library's copy. Fields left out keep their values. From API level 34.",
+        "operationId": "setShowTracks",
+        "parameters": [
+          {
+            "description": "Show ID.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "description": "Show ID.",
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShowTracksInputBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShowTracks"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Remember the sound and subtitles the signed-in person picked for a show",
+        "tags": [
+          "playback"
+        ]
+      }
+    },
     "/api/shows/{id}/watched": {
       "delete": {
         "operationId": "markShowUnwatched",
@@ -27677,6 +28963,100 @@
           }
         },
         "summary": "Items the user is partway through, newest first",
+        "tags": [
+          "watch"
+        ]
+      }
+    },
+    "/api/watch/{type}/{id}/hidden": {
+      "delete": {
+        "description": "Undoes hideFromContinueWatching. From API level 34.",
+        "operationId": "showInContinueWatching",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "type",
+            "required": true,
+            "schema": {
+              "enum": [
+                "movie",
+                "episode"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Put a movie or episode taken off Continue watching back on it",
+        "tags": [
+          "watch"
+        ]
+      },
+      "put": {
+        "description": "The position and watched mark stay. Playing the item again brings it back. Nothing happens when the signed-in person has no progress on it. From API level 34.",
+        "operationId": "hideFromContinueWatching",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "type",
+            "required": true,
+            "schema": {
+              "enum": [
+                "movie",
+                "episode"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Take a movie or episode off Continue watching, keeping its place",
         "tags": [
           "watch"
         ]

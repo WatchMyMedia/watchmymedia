@@ -615,6 +615,49 @@ extension Components {
                 case renditions
             }
         }
+        /// - Remark: Generated from `#/components/schemas/AddedShow`.
+        public struct AddedShow: Codable, Hashable, Sendable {
+            /// Episodes added in the row's window.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AddedShow/episodes`.
+            public var episodes: Swift.Int64
+            /// The show had no episodes in the library before them.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AddedShow/newShow`.
+            public var newShow: Swift.Bool
+            /// That season now has every episode TMDB lists.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AddedShow/seasonComplete`.
+            public var seasonComplete: Swift.Bool
+            /// The season they were all added to, when it was one.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AddedShow/seasonNumber`.
+            public var seasonNumber: Swift.Int64?
+            /// Creates a new `AddedShow`.
+            ///
+            /// - Parameters:
+            ///   - episodes: Episodes added in the row's window.
+            ///   - newShow: The show had no episodes in the library before them.
+            ///   - seasonComplete: That season now has every episode TMDB lists.
+            ///   - seasonNumber: The season they were all added to, when it was one.
+            public init(
+                episodes: Swift.Int64,
+                newShow: Swift.Bool,
+                seasonComplete: Swift.Bool,
+                seasonNumber: Swift.Int64? = nil
+            ) {
+                self.episodes = episodes
+                self.newShow = newShow
+                self.seasonComplete = seasonComplete
+                self.seasonNumber = seasonNumber
+            }
+            public enum CodingKeys: String, CodingKey {
+                case episodes
+                case newShow
+                case seasonComplete
+                case seasonNumber
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/AudioPlan`.
         public struct AudioPlan: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/AudioPlan/channels`.
@@ -1023,6 +1066,10 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/BrowseItem`.
         public struct BrowseItem: Codable, Hashable, Sendable {
+            /// Recently added shows: what the card stands for, which subtitle words for older apps.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BrowseItem/added`.
+            public var added: Components.Schemas.AddedShow?
             /// When the newest present file was added (see MediaFile.addedAt).
             ///
             /// - Remark: Generated from `#/components/schemas/BrowseItem/addedAt`.
@@ -1151,6 +1198,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/BrowseItem/libraryType`.
             public var libraryType: Components.Schemas.BrowseItem.LibraryTypePayload?
+            /// Shows marked isNew: how many of the episodes added in the last 7 days the signed-in person hasn't finished ("2 new").
+            ///
+            /// - Remark: Generated from `#/components/schemas/BrowseItem/newEpisodeCount`.
+            public var newEpisodeCount: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/BrowseItem/nextAirDate`.
             public var nextAirDate: Swift.String?
             /// - Remark: Generated from `#/components/schemas/BrowseItem/overview`.
@@ -1218,6 +1269,10 @@ extension Components {
             public var releaseDate: Swift.String?
             /// - Remark: Generated from `#/components/schemas/BrowseItem/runtimeMin`.
             public var runtimeMin: Swift.Int64?
+            /// Shows: seasons with an episode that has a present file, specials left out.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BrowseItem/seasonCount`.
+            public var seasonCount: Swift.Int64?
             /// Recently added shows: that episode's season.
             ///
             /// - Remark: Generated from `#/components/schemas/BrowseItem/seasonNumber`.
@@ -1236,6 +1291,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/BrowseItem/totalSize`.
             public var totalSize: Swift.Int64
+            /// Shows: episodes with a present file the signed-in person hasn't finished ("4 episodes left"); equal to episodeCount when they haven't started. Absent for movies and on servers below API level 34.
+            ///
+            /// - Remark: Generated from `#/components/schemas/BrowseItem/unwatchedCount`.
+            public var unwatchedCount: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/BrowseItem/watched`.
             public var watched: Swift.Bool
             /// It is on one of the signed-in person's watchlists: a card's menu offers Remove from Watchlist rather than Add.
@@ -1247,6 +1306,7 @@ extension Components {
             /// Creates a new `BrowseItem`.
             ///
             /// - Parameters:
+            ///   - added: Recently added shows: what the card stands for, which subtitle words for older apps.
             ///   - addedAt: When the newest present file was added (see MediaFile.addedAt).
             ///   - backdropPath:
             ///   - contentRating:
@@ -1262,6 +1322,7 @@ extension Components {
             ///   - lastAirDate:
             ///   - libraryId:
             ///   - libraryType: Unmatched: the library's type, for the link to its Unmatched view.
+            ///   - newEpisodeCount: Shows marked isNew: how many of the episodes added in the last 7 days the signed-in person hasn't finished ("2 new").
             ///   - nextAirDate:
             ///   - overview:
             ///   - posterPath:
@@ -1270,16 +1331,19 @@ extension Components {
             ///   - rating:
             ///   - releaseDate:
             ///   - runtimeMin:
+            ///   - seasonCount: Shows: seasons with an episode that has a present file, specials left out.
             ///   - seasonNumber: Recently added shows: that episode's season.
             ///   - status:
             ///   - subtitle:
             ///   - title:
             ///   - tmdbId: The movie's or show's TMDB id, which saving it to a watchlist takes. Absent for a title TMDB hasn't matched, which can't be saved.
             ///   - totalSize: Bytes across present files.
+            ///   - unwatchedCount: Shows: episodes with a present file the signed-in person hasn't finished ("4 episodes left"); equal to episodeCount when they haven't started. Absent for movies and on servers below API level 34.
             ///   - watched:
             ///   - watchlisted: It is on one of the signed-in person's watchlists: a card's menu offers Remove from Watchlist rather than Add.
             ///   - year:
             public init(
+                added: Components.Schemas.AddedShow? = nil,
                 addedAt: Foundation.Date,
                 backdropPath: Swift.String? = nil,
                 contentRating: Swift.String? = nil,
@@ -1295,6 +1359,7 @@ extension Components {
                 lastAirDate: Swift.String? = nil,
                 libraryId: Swift.Int64,
                 libraryType: Components.Schemas.BrowseItem.LibraryTypePayload? = nil,
+                newEpisodeCount: Swift.Int64? = nil,
                 nextAirDate: Swift.String? = nil,
                 overview: Swift.String,
                 posterPath: Swift.String? = nil,
@@ -1303,16 +1368,19 @@ extension Components {
                 rating: Swift.Double? = nil,
                 releaseDate: Swift.String? = nil,
                 runtimeMin: Swift.Int64? = nil,
+                seasonCount: Swift.Int64? = nil,
                 seasonNumber: Swift.Int64? = nil,
                 status: Swift.String? = nil,
                 subtitle: Swift.String? = nil,
                 title: Swift.String,
                 tmdbId: Swift.Int64? = nil,
                 totalSize: Swift.Int64,
+                unwatchedCount: Swift.Int64? = nil,
                 watched: Swift.Bool,
                 watchlisted: Swift.Bool? = nil,
                 year: Swift.Int64? = nil
             ) {
+                self.added = added
                 self.addedAt = addedAt
                 self.backdropPath = backdropPath
                 self.contentRating = contentRating
@@ -1328,6 +1396,7 @@ extension Components {
                 self.lastAirDate = lastAirDate
                 self.libraryId = libraryId
                 self.libraryType = libraryType
+                self.newEpisodeCount = newEpisodeCount
                 self.nextAirDate = nextAirDate
                 self.overview = overview
                 self.posterPath = posterPath
@@ -1336,17 +1405,20 @@ extension Components {
                 self.rating = rating
                 self.releaseDate = releaseDate
                 self.runtimeMin = runtimeMin
+                self.seasonCount = seasonCount
                 self.seasonNumber = seasonNumber
                 self.status = status
                 self.subtitle = subtitle
                 self.title = title
                 self.tmdbId = tmdbId
                 self.totalSize = totalSize
+                self.unwatchedCount = unwatchedCount
                 self.watched = watched
                 self.watchlisted = watchlisted
                 self.year = year
             }
             public enum CodingKeys: String, CodingKey {
+                case added
                 case addedAt
                 case backdropPath
                 case contentRating
@@ -1362,6 +1434,7 @@ extension Components {
                 case lastAirDate
                 case libraryId
                 case libraryType
+                case newEpisodeCount
                 case nextAirDate
                 case overview
                 case posterPath
@@ -1370,12 +1443,14 @@ extension Components {
                 case rating
                 case releaseDate
                 case runtimeMin
+                case seasonCount
                 case seasonNumber
                 case status
                 case subtitle
                 case title
                 case tmdbId
                 case totalSize
+                case unwatchedCount
                 case watched
                 case watchlisted
                 case year
@@ -1572,6 +1647,10 @@ extension Components {
         public struct ContinueItem: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/ContinueItem/backdropPath`.
             public var backdropPath: Swift.String?
+            /// The movie's or the show's US certification from TMDB; absent when it has none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ContinueItem/contentRating`.
+            public var contentRating: Swift.String?
             /// - Remark: Generated from `#/components/schemas/ContinueItem/durationMs`.
             public var durationMs: Swift.Int64
             /// - Remark: Generated from `#/components/schemas/ContinueItem/episodeId`.
@@ -1622,6 +1701,10 @@ extension Components {
             public var kind: Components.Schemas.ContinueItem.KindPayload
             /// - Remark: Generated from `#/components/schemas/ContinueItem/movieId`.
             public var movieId: Swift.Int64?
+            /// The episode's summary, or the movie's; absent when TMDB has none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ContinueItem/overview`.
+            public var overview: Swift.String?
             /// - Remark: Generated from `#/components/schemas/ContinueItem/positionMs`.
             public var positionMs: Swift.Int64
             /// - Remark: Generated from `#/components/schemas/ContinueItem/posterPath`.
@@ -1642,12 +1725,14 @@ extension Components {
             ///
             /// - Parameters:
             ///   - backdropPath:
+            ///   - contentRating: The movie's or the show's US certification from TMDB; absent when it has none.
             ///   - durationMs:
             ///   - episodeId:
             ///   - episodeNumber:
             ///   - fileId:
             ///   - kind:
             ///   - movieId:
+            ///   - overview: The episode's summary, or the movie's; absent when TMDB has none.
             ///   - positionMs:
             ///   - posterPath:
             ///   - seasonNumber:
@@ -1658,12 +1743,14 @@ extension Components {
             ///   - updatedAt:
             public init(
                 backdropPath: Swift.String? = nil,
+                contentRating: Swift.String? = nil,
                 durationMs: Swift.Int64,
                 episodeId: Swift.Int64? = nil,
                 episodeNumber: Swift.Int64? = nil,
                 fileId: Swift.Int64,
                 kind: Components.Schemas.ContinueItem.KindPayload,
                 movieId: Swift.Int64? = nil,
+                overview: Swift.String? = nil,
                 positionMs: Swift.Int64,
                 posterPath: Swift.String? = nil,
                 seasonNumber: Swift.Int64? = nil,
@@ -1674,12 +1761,14 @@ extension Components {
                 updatedAt: Foundation.Date
             ) {
                 self.backdropPath = backdropPath
+                self.contentRating = contentRating
                 self.durationMs = durationMs
                 self.episodeId = episodeId
                 self.episodeNumber = episodeNumber
                 self.fileId = fileId
                 self.kind = kind
                 self.movieId = movieId
+                self.overview = overview
                 self.positionMs = positionMs
                 self.posterPath = posterPath
                 self.seasonNumber = seasonNumber
@@ -1691,12 +1780,14 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case backdropPath
+                case contentRating
                 case durationMs
                 case episodeId
                 case episodeNumber
                 case fileId
                 case kind
                 case movieId
+                case overview
                 case positionMs
                 case posterPath
                 case seasonNumber
@@ -1892,6 +1983,10 @@ extension Components {
             public var character: Swift.String?
             /// - Remark: Generated from `#/components/schemas/Credit/name`.
             public var name: Swift.String
+            /// TMDB's person ID: getPerson lists the person's titles in the library. Absent for a credit stored before person IDs were kept, until the server fetches the title's credits again, and on servers below API level 34; such a card opens nothing.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Credit/personId`.
+            public var personId: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/Credit/profilePath`.
             public var profilePath: Swift.String?
             /// Creates a new `Credit`.
@@ -1899,20 +1994,57 @@ extension Components {
             /// - Parameters:
             ///   - character:
             ///   - name:
+            ///   - personId: TMDB's person ID: getPerson lists the person's titles in the library. Absent for a credit stored before person IDs were kept, until the server fetches the title's credits again, and on servers below API level 34; such a card opens nothing.
             ///   - profilePath:
             public init(
                 character: Swift.String? = nil,
                 name: Swift.String,
+                personId: Swift.Int64? = nil,
                 profilePath: Swift.String? = nil
             ) {
                 self.character = character
                 self.name = name
+                self.personId = personId
                 self.profilePath = profilePath
             }
             public enum CodingKeys: String, CodingKey {
                 case character
                 case name
+                case personId
                 case profilePath
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/CrewMember`.
+        public struct CrewMember: Codable, Hashable, Sendable {
+            /// As TMDB words it: Director, Screenplay, Writer, Story, Original Music Composer, Producer, or Creator for a show.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CrewMember/job`.
+            public var job: Swift.String
+            /// - Remark: Generated from `#/components/schemas/CrewMember/name`.
+            public var name: Swift.String
+            /// TMDB's person ID.
+            ///
+            /// - Remark: Generated from `#/components/schemas/CrewMember/personId`.
+            public var personId: Swift.Int64
+            /// Creates a new `CrewMember`.
+            ///
+            /// - Parameters:
+            ///   - job: As TMDB words it: Director, Screenplay, Writer, Story, Original Music Composer, Producer, or Creator for a show.
+            ///   - name:
+            ///   - personId: TMDB's person ID.
+            public init(
+                job: Swift.String,
+                name: Swift.String,
+                personId: Swift.Int64
+            ) {
+                self.job = job
+                self.name = name
+                self.personId = personId
+            }
+            public enum CodingKeys: String, CodingKey {
+                case job
+                case name
+                case personId
             }
         }
         /// - Remark: Generated from `#/components/schemas/DecideRequestInputBody`.
@@ -2846,6 +2978,10 @@ extension Components {
             public var isNew: Swift.Bool
             /// - Remark: Generated from `#/components/schemas/EpisodeCard/overview`.
             public var overview: Swift.String
+            /// The episode's length in minutes, as TMDB lists it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EpisodeCard/runtimeMin`.
+            public var runtimeMin: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/EpisodeCard/seasonNumber`.
             public var seasonNumber: Swift.Int64
             /// - Remark: Generated from `#/components/schemas/EpisodeCard/showBackdropPath`.
@@ -2875,6 +3011,7 @@ extension Components {
             ///   - hasFile:
             ///   - isNew: A present file arrived within the last 7 days and the signed-in user has not watched the episode.
             ///   - overview:
+            ///   - runtimeMin: The episode's length in minutes, as TMDB lists it.
             ///   - seasonNumber:
             ///   - showBackdropPath:
             ///   - showId:
@@ -2892,6 +3029,7 @@ extension Components {
                 hasFile: Swift.Bool,
                 isNew: Swift.Bool,
                 overview: Swift.String,
+                runtimeMin: Swift.Int64? = nil,
                 seasonNumber: Swift.Int64,
                 showBackdropPath: Swift.String? = nil,
                 showId: Swift.Int64,
@@ -2909,6 +3047,7 @@ extension Components {
                 self.hasFile = hasFile
                 self.isNew = isNew
                 self.overview = overview
+                self.runtimeMin = runtimeMin
                 self.seasonNumber = seasonNumber
                 self.showBackdropPath = showBackdropPath
                 self.showId = showId
@@ -2927,6 +3066,7 @@ extension Components {
                 case hasFile
                 case isNew
                 case overview
+                case runtimeMin
                 case seasonNumber
                 case showBackdropPath
                 case showId
@@ -3440,12 +3580,20 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/HomeHero`.
         public struct HomeHero: Codable, Hashable, Sendable {
+            /// Episodes: when it aired, YYYY-MM-DD.
+            ///
+            /// - Remark: Generated from `#/components/schemas/HomeHero/airDate`.
+            public var airDate: Swift.String?
             /// - Remark: Generated from `#/components/schemas/HomeHero/backdropPath`.
             public var backdropPath: Swift.String?
             /// - Remark: Generated from `#/components/schemas/HomeHero/contentRating`.
             public var contentRating: Swift.String?
             /// - Remark: Generated from `#/components/schemas/HomeHero/episodeId`.
             public var episodeId: Swift.Int64?
+            /// Episodes: its number in seasonNumber.
+            ///
+            /// - Remark: Generated from `#/components/schemas/HomeHero/episodeNumber`.
+            public var episodeNumber: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/HomeHero/facts`.
             public var facts: Swift.String
             /// - Remark: Generated from `#/components/schemas/HomeHero/fileId`.
@@ -3556,18 +3704,28 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/HomeHero/quality`.
             public var quality: Components.Schemas.HomeHero.QualityPayload?
+            /// The episode's or movie's length in minutes.
+            ///
+            /// - Remark: Generated from `#/components/schemas/HomeHero/runtimeMin`.
+            public var runtimeMin: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/HomeHero/seasonNumber`.
             public var seasonNumber: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/HomeHero/showId`.
             public var showId: Swift.Int64?
+            /// Episodes and shows: the show's title.
+            ///
+            /// - Remark: Generated from `#/components/schemas/HomeHero/showTitle`.
+            public var showTitle: Swift.String?
             /// - Remark: Generated from `#/components/schemas/HomeHero/title`.
             public var title: Swift.String
             /// Creates a new `HomeHero`.
             ///
             /// - Parameters:
+            ///   - airDate: Episodes: when it aired, YYYY-MM-DD.
             ///   - backdropPath:
             ///   - contentRating:
             ///   - episodeId:
+            ///   - episodeNumber: Episodes: its number in seasonNumber.
             ///   - facts:
             ///   - fileId:
             ///   - hdr:
@@ -3577,13 +3735,17 @@ extension Components {
             ///   - overview:
             ///   - posterPath:
             ///   - quality: The episode's best file, or the movie's or show's best.
+            ///   - runtimeMin: The episode's or movie's length in minutes.
             ///   - seasonNumber:
             ///   - showId:
+            ///   - showTitle: Episodes and shows: the show's title.
             ///   - title:
             public init(
+                airDate: Swift.String? = nil,
                 backdropPath: Swift.String? = nil,
                 contentRating: Swift.String? = nil,
                 episodeId: Swift.Int64? = nil,
+                episodeNumber: Swift.Int64? = nil,
                 facts: Swift.String,
                 fileId: Swift.Int64? = nil,
                 hdr: Swift.Bool? = nil,
@@ -3593,13 +3755,17 @@ extension Components {
                 overview: Swift.String,
                 posterPath: Swift.String? = nil,
                 quality: Components.Schemas.HomeHero.QualityPayload? = nil,
+                runtimeMin: Swift.Int64? = nil,
                 seasonNumber: Swift.Int64? = nil,
                 showId: Swift.Int64? = nil,
+                showTitle: Swift.String? = nil,
                 title: Swift.String
             ) {
+                self.airDate = airDate
                 self.backdropPath = backdropPath
                 self.contentRating = contentRating
                 self.episodeId = episodeId
+                self.episodeNumber = episodeNumber
                 self.facts = facts
                 self.fileId = fileId
                 self.hdr = hdr
@@ -3609,14 +3775,18 @@ extension Components {
                 self.overview = overview
                 self.posterPath = posterPath
                 self.quality = quality
+                self.runtimeMin = runtimeMin
                 self.seasonNumber = seasonNumber
                 self.showId = showId
+                self.showTitle = showTitle
                 self.title = title
             }
             public enum CodingKeys: String, CodingKey {
+                case airDate
                 case backdropPath
                 case contentRating
                 case episodeId
+                case episodeNumber
                 case facts
                 case fileId
                 case hdr
@@ -3626,8 +3796,10 @@ extension Components {
                 case overview
                 case posterPath
                 case quality
+                case runtimeMin
                 case seasonNumber
                 case showId
+                case showTitle
                 case title
             }
         }
@@ -3707,6 +3879,10 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/ItemFacets`.
         public struct ItemFacets: Codable, Hashable, Sendable {
+            /// The library's content ratings, in the order the US systems rank them (movies' G to NC-17, then TV's TV-Y to TV-MA, then any other), with unrated last when some items have none. From API level 34.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemFacets/contentRatings`.
+            public var contentRatings: [Swift.String]?
             /// - Remark: Generated from `#/components/schemas/ItemFacets/decades`.
             public var decades: [Swift.Int64]
             /// - Remark: Generated from `#/components/schemas/ItemFacets/genres`.
@@ -3714,22 +3890,50 @@ extension Components {
             /// Creates a new `ItemFacets`.
             ///
             /// - Parameters:
+            ///   - contentRatings: The library's content ratings, in the order the US systems rank them (movies' G to NC-17, then TV's TV-Y to TV-MA, then any other), with unrated last when some items have none. From API level 34.
             ///   - decades:
             ///   - genres:
             public init(
+                contentRatings: [Swift.String]? = nil,
                 decades: [Swift.Int64],
                 genres: [Swift.String]
             ) {
+                self.contentRatings = contentRatings
                 self.decades = decades
                 self.genres = genres
             }
             public enum CodingKeys: String, CodingKey {
+                case contentRatings
                 case decades
                 case genres
             }
         }
         /// - Remark: Generated from `#/components/schemas/ItemList`.
         public struct ItemList: Codable, Hashable, Sendable {
+            /// Items per content rating (as facets.contentRatings names them) after every other filter, before contentRating and pagination, with zero when none match. From API level 34.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemList/contentRatingCounts`.
+            public struct ContentRatingCountsPayload: Codable, Hashable, Sendable {
+                /// A container of undocumented properties.
+                public var additionalProperties: [String: Swift.Int64]
+                /// Creates a new `ContentRatingCountsPayload`.
+                ///
+                /// - Parameters:
+                ///   - additionalProperties: A container of undocumented properties.
+                public init(additionalProperties: [String: Swift.Int64] = .init()) {
+                    self.additionalProperties = additionalProperties
+                }
+                public init(from decoder: any Swift.Decoder) throws {
+                    additionalProperties = try decoder.decodeAdditionalProperties(knownKeys: [])
+                }
+                public func encode(to encoder: any Swift.Encoder) throws {
+                    try encoder.encodeAdditionalProperties(additionalProperties)
+                }
+            }
+            /// Items per content rating (as facets.contentRatings names them) after every other filter, before contentRating and pagination, with zero when none match. From API level 34.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemList/contentRatingCounts`.
+            public var contentRatingCounts: Components.Schemas.ItemList.ContentRatingCountsPayload?
             /// - Remark: Generated from `#/components/schemas/ItemList/facets`.
             public var facets: Components.Schemas.ItemFacets
             /// Items per genre after filter, decade and q, before the genre filter and pagination. Includes every library genre, with zero when none match.
@@ -3775,6 +3979,7 @@ extension Components {
             /// Creates a new `ItemList`.
             ///
             /// - Parameters:
+            ///   - contentRatingCounts: Items per content rating (as facets.contentRatings names them) after every other filter, before contentRating and pagination, with zero when none match. From API level 34.
             ///   - facets:
             ///   - genreCounts: Items per genre after filter, decade and q, before the genre filter and pagination. Includes every library genre, with zero when none match.
             ///   - items:
@@ -3784,6 +3989,7 @@ extension Components {
             ///   - total: Items matching the filter.
             ///   - totals:
             public init(
+                contentRatingCounts: Components.Schemas.ItemList.ContentRatingCountsPayload? = nil,
                 facets: Components.Schemas.ItemFacets,
                 genreCounts: Components.Schemas.ItemList.GenreCountsPayload? = nil,
                 items: [Components.Schemas.BrowseItem],
@@ -3793,6 +3999,7 @@ extension Components {
                 total: Swift.Int64,
                 totals: Components.Schemas.ItemTotals? = nil
             ) {
+                self.contentRatingCounts = contentRatingCounts
                 self.facets = facets
                 self.genreCounts = genreCounts
                 self.items = items
@@ -3803,6 +4010,7 @@ extension Components {
                 self.totals = totals
             }
             public enum CodingKeys: String, CodingKey {
+                case contentRatingCounts
                 case facets
                 case genreCounts
                 case items
@@ -3815,6 +4023,10 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/ItemTotals`.
         public struct ItemTotals: Codable, Hashable, Sendable {
+            /// Items whose newest present file arrived this calendar month, in the server's time zone.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemTotals/addedThisMonth`.
+            public var addedThisMonth: Swift.Int64?
             /// TV: shows that have not ended or been canceled.
             ///
             /// - Remark: Generated from `#/components/schemas/ItemTotals/continuing`.
@@ -3823,10 +4035,22 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ItemTotals/episodes`.
             public var episodes: Swift.Int64
+            /// TV: shows the signed-in person follows, as filter following lists them.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemTotals/following`.
+            public var following: Swift.Int64?
+            /// Movies part watched, or shows started and not finished, as filter inProgress lists them.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemTotals/inProgress`.
+            public var inProgress: Swift.Int64?
             /// Matched movies or shows with a present file.
             ///
             /// - Remark: Generated from `#/components/schemas/ItemTotals/items`.
             public var items: Swift.Int64
+            /// TV: shows with a new episode the signed-in person hasn't finished (isNew).
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemTotals/newEpisodes`.
+            public var newEpisodes: Swift.Int64?
             /// Bytes across every item's present files.
             ///
             /// - Remark: Generated from `#/components/schemas/ItemTotals/totalSize`.
@@ -3835,33 +4059,57 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ItemTotals/unmatched`.
             public var unmatched: Swift.Int64
+            /// Movies the signed-in person hasn't finished, or shows with an episode they haven't seen ("58 you haven't watched").
+            ///
+            /// - Remark: Generated from `#/components/schemas/ItemTotals/unwatched`.
+            public var unwatched: Swift.Int64?
             /// Creates a new `ItemTotals`.
             ///
             /// - Parameters:
+            ///   - addedThisMonth: Items whose newest present file arrived this calendar month, in the server's time zone.
             ///   - continuing: TV: shows that have not ended or been canceled.
             ///   - episodes: TV: episodes with a present file.
+            ///   - following: TV: shows the signed-in person follows, as filter following lists them.
+            ///   - inProgress: Movies part watched, or shows started and not finished, as filter inProgress lists them.
             ///   - items: Matched movies or shows with a present file.
+            ///   - newEpisodes: TV: shows with a new episode the signed-in person hasn't finished (isNew).
             ///   - totalSize: Bytes across every item's present files.
             ///   - unmatched: Items for files not matched yet: one per file, or per show folder.
+            ///   - unwatched: Movies the signed-in person hasn't finished, or shows with an episode they haven't seen ("58 you haven't watched").
             public init(
+                addedThisMonth: Swift.Int64? = nil,
                 continuing: Swift.Int64,
                 episodes: Swift.Int64,
+                following: Swift.Int64? = nil,
+                inProgress: Swift.Int64? = nil,
                 items: Swift.Int64,
+                newEpisodes: Swift.Int64? = nil,
                 totalSize: Swift.Int64,
-                unmatched: Swift.Int64
+                unmatched: Swift.Int64,
+                unwatched: Swift.Int64? = nil
             ) {
+                self.addedThisMonth = addedThisMonth
                 self.continuing = continuing
                 self.episodes = episodes
+                self.following = following
+                self.inProgress = inProgress
                 self.items = items
+                self.newEpisodes = newEpisodes
                 self.totalSize = totalSize
                 self.unmatched = unmatched
+                self.unwatched = unwatched
             }
             public enum CodingKeys: String, CodingKey {
+                case addedThisMonth
                 case continuing
                 case episodes
+                case following
+                case inProgress
                 case items
+                case newEpisodes
                 case totalSize
                 case unmatched
+                case unwatched
             }
         }
         /// - Remark: Generated from `#/components/schemas/LetterOffset`.
@@ -4142,6 +4390,47 @@ extension Components {
                 case listId
             }
         }
+        /// - Remark: Generated from `#/components/schemas/LiveTVAiring`.
+        public struct LiveTVAiring: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/LiveTVAiring/channelId`.
+            public var channelId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/LiveTVAiring/channelName`.
+            public var channelName: Swift.String
+            /// - Remark: Generated from `#/components/schemas/LiveTVAiring/number`.
+            public var number: Swift.String
+            /// - Remark: Generated from `#/components/schemas/LiveTVAiring/programmeId`.
+            public var programmeId: Swift.String
+            /// - Remark: Generated from `#/components/schemas/LiveTVAiring/start`.
+            public var start: Foundation.Date
+            /// Creates a new `LiveTVAiring`.
+            ///
+            /// - Parameters:
+            ///   - channelId:
+            ///   - channelName:
+            ///   - number:
+            ///   - programmeId:
+            ///   - start:
+            public init(
+                channelId: Swift.String,
+                channelName: Swift.String,
+                number: Swift.String,
+                programmeId: Swift.String,
+                start: Foundation.Date
+            ) {
+                self.channelId = channelId
+                self.channelName = channelName
+                self.number = number
+                self.programmeId = programmeId
+                self.start = start
+            }
+            public enum CodingKeys: String, CodingKey {
+                case channelId
+                case channelName
+                case number
+                case programmeId
+                case start
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/LiveTVCapabilities`.
         public struct LiveTVCapabilities: Codable, Hashable, Sendable {
             /// This account may watch live television.
@@ -4347,8 +4636,16 @@ extension Components {
             public var end: Foundation.Date
             /// - Remark: Generated from `#/components/schemas/LiveTVConflictRef/id`.
             public var id: Swift.String
+            /// For a repeat: when the same episode airs again in the listings, so it could give way and be recorded then (API level 34).
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTVConflictRef/nextAiring`.
+            public var nextAiring: Components.Schemas.LiveTVAiring?
             /// - Remark: Generated from `#/components/schemas/LiveTVConflictRef/number`.
             public var number: Swift.String
+            /// Its listing called it a repeat (API level 34).
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTVConflictRef/repeat`.
+            public var _repeat: Swift.Bool?
             /// Already recording, so it can't give way.
             ///
             /// - Remark: Generated from `#/components/schemas/LiveTVConflictRef/running`.
@@ -4365,7 +4662,9 @@ extension Components {
             ///   - channelName:
             ///   - end:
             ///   - id:
+            ///   - nextAiring: For a repeat: when the same episode airs again in the listings, so it could give way and be recorded then (API level 34).
             ///   - number:
+            ///   - _repeat: Its listing called it a repeat (API level 34).
             ///   - running: Already recording, so it can't give way.
             ///   - start:
             ///   - title:
@@ -4374,7 +4673,9 @@ extension Components {
                 channelName: Swift.String,
                 end: Foundation.Date,
                 id: Swift.String,
+                nextAiring: Components.Schemas.LiveTVAiring? = nil,
                 number: Swift.String,
+                _repeat: Swift.Bool? = nil,
                 running: Swift.Bool,
                 start: Foundation.Date,
                 title: Swift.String,
@@ -4383,7 +4684,9 @@ extension Components {
                 self.channelName = channelName
                 self.end = end
                 self.id = id
+                self.nextAiring = nextAiring
                 self.number = number
+                self._repeat = _repeat
                 self.running = running
                 self.start = start
                 self.title = title
@@ -4393,7 +4696,9 @@ extension Components {
                 case channelName
                 case end
                 case id
+                case nextAiring
                 case number
+                case _repeat = "repeat"
                 case running
                 case start
                 case title
@@ -5085,6 +5390,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/LiveTVRecording/canDelete`.
             public var canDelete: Swift.Bool?
+            /// The listing's categories, such as Documentary or Sports (API level 34).
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTVRecording/categories`.
+            public var categories: [Swift.String]?
             /// - Remark: Generated from `#/components/schemas/LiveTVRecording/channelId`.
             public var channelId: Swift.String
             /// - Remark: Generated from `#/components/schemas/LiveTVRecording/channelName`.
@@ -5105,8 +5414,20 @@ extension Components {
             public var gaps: [Components.Schemas.LiveTVGap]
             /// - Remark: Generated from `#/components/schemas/LiveTVRecording/id`.
             public var id: Swift.String
+            /// What was recorded, from its listing: episode, show (a programme without episodes, such as news) or movie; absent for a recording made by time. Other values may follow (API level 34).
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTVRecording/kind`.
+            public var kind: Swift.String?
             /// - Remark: Generated from `#/components/schemas/LiveTVRecording/mediaFileId`.
             public var mediaFileId: Swift.Int64?
+            /// The listing called it new. From API level 34; absent for a recording scheduled before, whose listing was gone.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTVRecording/new`.
+            public var new: Swift.Bool?
+            /// For a repeat that won't record (state conflict): when the same episode airs again in the listings (API level 34).
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTVRecording/nextAiring`.
+            public var nextAiring: Components.Schemas.LiveTVAiring?
             /// - Remark: Generated from `#/components/schemas/LiveTVRecording/number`.
             public var number: Swift.String
             /// - Remark: Generated from `#/components/schemas/LiveTVRecording/padAfter`.
@@ -5117,8 +5438,16 @@ extension Components {
             public var pictureUrl: Swift.String?
             /// - Remark: Generated from `#/components/schemas/LiveTVRecording/programmeId`.
             public var programmeId: Swift.String?
+            /// Where the signed-in person is in it: its own position while it isn't in the library, then the watch state of the movie or episode it became. Absent when they haven't started it (API level 34).
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTVRecording/progress`.
+            public var progress: Components.Schemas.LiveTVViewerProgress?
             /// - Remark: Generated from `#/components/schemas/LiveTVRecording/reason`.
             public var reason: Swift.String?
+            /// The listing called it a repeat (API level 34).
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTVRecording/repeat`.
+            public var _repeat: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/LiveTVRecording/ruleId`.
             public var ruleId: Swift.String?
             /// - Remark: Generated from `#/components/schemas/LiveTVRecording/season`.
@@ -5139,12 +5468,21 @@ extension Components {
             public var userId: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/LiveTVRecording/userName`.
             public var userName: Swift.String
+            /// The signed-in person finished the movie or episode it became (API level 34).
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTVRecording/watched`.
+            public var watched: Swift.Bool?
+            /// A movie's year, or the year an episode first aired, from the listing (API level 34).
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTVRecording/year`.
+            public var year: Swift.Int64?
             /// Creates a new `LiveTVRecording`.
             ///
             /// - Parameters:
             ///   - bytes:
             ///   - canCancel:
             ///   - canDelete: The current delete policy permits removing this finished recording's owned file.
+            ///   - categories: The listing's categories, such as Documentary or Sports (API level 34).
             ///   - channelId:
             ///   - channelName:
             ///   - conflictsWith: For a recording that won't record (state conflict): the recordings holding the tuners while it would run. Choosing one with PATCH {prefer, over} makes that one give way.
@@ -5154,13 +5492,18 @@ extension Components {
             ///   - episodeTitle:
             ///   - gaps:
             ///   - id:
+            ///   - kind: What was recorded, from its listing: episode, show (a programme without episodes, such as news) or movie; absent for a recording made by time. Other values may follow (API level 34).
             ///   - mediaFileId:
+            ///   - new: The listing called it new. From API level 34; absent for a recording scheduled before, whose listing was gone.
+            ///   - nextAiring: For a repeat that won't record (state conflict): when the same episode airs again in the listings (API level 34).
             ///   - number:
             ///   - padAfter:
             ///   - padBefore:
             ///   - pictureUrl:
             ///   - programmeId:
+            ///   - progress: Where the signed-in person is in it: its own position while it isn't in the library, then the watch state of the movie or episode it became. Absent when they haven't started it (API level 34).
             ///   - reason:
+            ///   - _repeat: The listing called it a repeat (API level 34).
             ///   - ruleId:
             ///   - season:
             ///   - series:
@@ -5171,10 +5514,13 @@ extension Components {
             ///   - title:
             ///   - userId:
             ///   - userName:
+            ///   - watched: The signed-in person finished the movie or episode it became (API level 34).
+            ///   - year: A movie's year, or the year an episode first aired, from the listing (API level 34).
             public init(
                 bytes: Swift.Int64,
                 canCancel: Swift.Bool,
                 canDelete: Swift.Bool? = nil,
+                categories: [Swift.String]? = nil,
                 channelId: Swift.String,
                 channelName: Swift.String,
                 conflictsWith: [Components.Schemas.LiveTVConflictRef]? = nil,
@@ -5184,13 +5530,18 @@ extension Components {
                 episodeTitle: Swift.String? = nil,
                 gaps: [Components.Schemas.LiveTVGap],
                 id: Swift.String,
+                kind: Swift.String? = nil,
                 mediaFileId: Swift.Int64? = nil,
+                new: Swift.Bool? = nil,
+                nextAiring: Components.Schemas.LiveTVAiring? = nil,
                 number: Swift.String,
                 padAfter: Swift.Int64,
                 padBefore: Swift.Int64,
                 pictureUrl: Swift.String? = nil,
                 programmeId: Swift.String? = nil,
+                progress: Components.Schemas.LiveTVViewerProgress? = nil,
                 reason: Swift.String? = nil,
+                _repeat: Swift.Bool? = nil,
                 ruleId: Swift.String? = nil,
                 season: Swift.Int64? = nil,
                 series: Swift.Bool,
@@ -5200,11 +5551,14 @@ extension Components {
                 state: Swift.String,
                 title: Swift.String,
                 userId: Swift.Int64? = nil,
-                userName: Swift.String
+                userName: Swift.String,
+                watched: Swift.Bool? = nil,
+                year: Swift.Int64? = nil
             ) {
                 self.bytes = bytes
                 self.canCancel = canCancel
                 self.canDelete = canDelete
+                self.categories = categories
                 self.channelId = channelId
                 self.channelName = channelName
                 self.conflictsWith = conflictsWith
@@ -5214,13 +5568,18 @@ extension Components {
                 self.episodeTitle = episodeTitle
                 self.gaps = gaps
                 self.id = id
+                self.kind = kind
                 self.mediaFileId = mediaFileId
+                self.new = new
+                self.nextAiring = nextAiring
                 self.number = number
                 self.padAfter = padAfter
                 self.padBefore = padBefore
                 self.pictureUrl = pictureUrl
                 self.programmeId = programmeId
+                self.progress = progress
                 self.reason = reason
+                self._repeat = _repeat
                 self.ruleId = ruleId
                 self.season = season
                 self.series = series
@@ -5231,11 +5590,14 @@ extension Components {
                 self.title = title
                 self.userId = userId
                 self.userName = userName
+                self.watched = watched
+                self.year = year
             }
             public enum CodingKeys: String, CodingKey {
                 case bytes
                 case canCancel
                 case canDelete
+                case categories
                 case channelId
                 case channelName
                 case conflictsWith
@@ -5245,13 +5607,18 @@ extension Components {
                 case episodeTitle
                 case gaps
                 case id
+                case kind
                 case mediaFileId
+                case new
+                case nextAiring
                 case number
                 case padAfter
                 case padBefore
                 case pictureUrl
                 case programmeId
+                case progress
                 case reason
+                case _repeat = "repeat"
                 case ruleId
                 case season
                 case series
@@ -5262,6 +5629,8 @@ extension Components {
                 case title
                 case userId
                 case userName
+                case watched
+                case year
             }
         }
         /// - Remark: Generated from `#/components/schemas/LiveTVRecordingCreate`.
@@ -5636,42 +6005,66 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/LiveTVRecordings`.
         public struct LiveTVRecordings: Codable, Hashable, Sendable {
+            /// The recordings in each section and their bytes, and the rules, for the tabs. On the first page only (API level 34).
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTVRecordings/counts`.
+            public var counts: Components.Schemas.LiveTVSectionCounts?
             /// - Remark: Generated from `#/components/schemas/LiveTVRecordings/freeBytes`.
             public var freeBytes: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/LiveTVRecordings/items`.
             public var items: [Components.Schemas.LiveTVRecording]
             /// - Remark: Generated from `#/components/schemas/LiveTVRecordings/nextCursor`.
             public var nextCursor: Swift.String?
+            /// Space the recorder keeps free on the disk: freeBytes less this is the room recordings can use. On the first page, with freeBytes (API level 34).
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTVRecordings/reserveBytes`.
+            public var reserveBytes: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/LiveTVRecordings/rules`.
             public var rules: [Components.Schemas.LiveTVRecordingRule]?
+            /// The size of the disk recordings go to. On the first page, with freeBytes (API level 34).
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTVRecordings/totalBytes`.
+            public var totalBytes: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/LiveTVRecordings/tuners`.
             public var tuners: Swift.Int64?
             /// Creates a new `LiveTVRecordings`.
             ///
             /// - Parameters:
+            ///   - counts: The recordings in each section and their bytes, and the rules, for the tabs. On the first page only (API level 34).
             ///   - freeBytes:
             ///   - items:
             ///   - nextCursor:
+            ///   - reserveBytes: Space the recorder keeps free on the disk: freeBytes less this is the room recordings can use. On the first page, with freeBytes (API level 34).
             ///   - rules:
+            ///   - totalBytes: The size of the disk recordings go to. On the first page, with freeBytes (API level 34).
             ///   - tuners:
             public init(
+                counts: Components.Schemas.LiveTVSectionCounts? = nil,
                 freeBytes: Swift.Int64? = nil,
                 items: [Components.Schemas.LiveTVRecording],
                 nextCursor: Swift.String? = nil,
+                reserveBytes: Swift.Int64? = nil,
                 rules: [Components.Schemas.LiveTVRecordingRule]? = nil,
+                totalBytes: Swift.Int64? = nil,
                 tuners: Swift.Int64? = nil
             ) {
+                self.counts = counts
                 self.freeBytes = freeBytes
                 self.items = items
                 self.nextCursor = nextCursor
+                self.reserveBytes = reserveBytes
                 self.rules = rules
+                self.totalBytes = totalBytes
                 self.tuners = tuners
             }
             public enum CodingKeys: String, CodingKey {
+                case counts
                 case freeBytes
                 case items
                 case nextCursor
+                case reserveBytes
                 case rules
+                case totalBytes
                 case tuners
             }
         }
@@ -5846,6 +6239,72 @@ extension Components {
             }
             public enum CodingKeys: String, CodingKey {
                 case items
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/LiveTVSectionCount`.
+        public struct LiveTVSectionCount: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/LiveTVSectionCount/bytes`.
+            public var bytes: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/LiveTVSectionCount/items`.
+            public var items: Swift.Int64
+            /// Creates a new `LiveTVSectionCount`.
+            ///
+            /// - Parameters:
+            ///   - bytes:
+            ///   - items:
+            public init(
+                bytes: Swift.Int64,
+                items: Swift.Int64
+            ) {
+                self.bytes = bytes
+                self.items = items
+            }
+            public enum CodingKeys: String, CodingKey {
+                case bytes
+                case items
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/LiveTVSectionCounts`.
+        public struct LiveTVSectionCounts: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/LiveTVSectionCounts/conflicts`.
+            public var conflicts: Components.Schemas.LiveTVSectionCount
+            /// - Remark: Generated from `#/components/schemas/LiveTVSectionCounts/now`.
+            public var now: Components.Schemas.LiveTVSectionCount
+            /// - Remark: Generated from `#/components/schemas/LiveTVSectionCounts/recorded`.
+            public var recorded: Components.Schemas.LiveTVSectionCount
+            /// The recording rules; bytes is 0.
+            ///
+            /// - Remark: Generated from `#/components/schemas/LiveTVSectionCounts/series`.
+            public var series: Components.Schemas.LiveTVSectionCount
+            /// - Remark: Generated from `#/components/schemas/LiveTVSectionCounts/upcoming`.
+            public var upcoming: Components.Schemas.LiveTVSectionCount
+            /// Creates a new `LiveTVSectionCounts`.
+            ///
+            /// - Parameters:
+            ///   - conflicts:
+            ///   - now:
+            ///   - recorded:
+            ///   - series: The recording rules; bytes is 0.
+            ///   - upcoming:
+            public init(
+                conflicts: Components.Schemas.LiveTVSectionCount,
+                now: Components.Schemas.LiveTVSectionCount,
+                recorded: Components.Schemas.LiveTVSectionCount,
+                series: Components.Schemas.LiveTVSectionCount,
+                upcoming: Components.Schemas.LiveTVSectionCount
+            ) {
+                self.conflicts = conflicts
+                self.now = now
+                self.recorded = recorded
+                self.series = series
+                self.upcoming = upcoming
+            }
+            public enum CodingKeys: String, CodingKey {
+                case conflicts
+                case now
+                case recorded
+                case series
+                case upcoming
             }
         }
         /// - Remark: Generated from `#/components/schemas/LiveTVSessionView`.
@@ -6138,6 +6597,29 @@ extension Components {
                 case requestId
             }
         }
+        /// - Remark: Generated from `#/components/schemas/LiveTVViewerProgress`.
+        public struct LiveTVViewerProgress: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/LiveTVViewerProgress/durationMs`.
+            public var durationMs: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/LiveTVViewerProgress/positionMs`.
+            public var positionMs: Swift.Int64
+            /// Creates a new `LiveTVViewerProgress`.
+            ///
+            /// - Parameters:
+            ///   - durationMs:
+            ///   - positionMs:
+            public init(
+                durationMs: Swift.Int64,
+                positionMs: Swift.Int64
+            ) {
+                self.durationMs = durationMs
+                self.positionMs = positionMs
+            }
+            public enum CodingKeys: String, CodingKey {
+                case durationMs
+                case positionMs
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/MatchFinished`.
         public struct MatchFinished: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/MatchFinished/durationMs`.
@@ -6255,6 +6737,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/MediaFile/dvProfile`.
             public var dvProfile: Swift.Int64?
+            /// The files list only: the first episode an episode file holds (API level 34).
+            ///
+            /// - Remark: Generated from `#/components/schemas/MediaFile/episode`.
+            public var episode: Components.Schemas.MediaFileEpisode?
             /// - Remark: Generated from `#/components/schemas/MediaFile/firstSeenAt`.
             public var firstSeenAt: Foundation.Date
             /// HDR kind of the main video stream.
@@ -6441,10 +6927,18 @@ extension Components {
             }
             /// - Remark: Generated from `#/components/schemas/MediaFile/status`.
             public var status: Components.Schemas.MediaFile.StatusPayload
+            /// The files list only: the movie's or show's title the file was matched to (API level 34).
+            ///
+            /// - Remark: Generated from `#/components/schemas/MediaFile/title`.
+            public var title: Swift.String?
             /// - Remark: Generated from `#/components/schemas/MediaFile/videoCodec`.
             public var videoCodec: Swift.String?
             /// - Remark: Generated from `#/components/schemas/MediaFile/width`.
             public var width: Swift.Int64?
+            /// The files list only: the matched movie's year (API level 34).
+            ///
+            /// - Remark: Generated from `#/components/schemas/MediaFile/year`.
+            public var year: Swift.Int64?
             /// Creates a new `MediaFile`.
             ///
             /// - Parameters:
@@ -6454,6 +6948,7 @@ extension Components {
             ///   - container:
             ///   - durationMs:
             ///   - dvProfile: Dolby Vision profile (5, 7, 8…); omitted for other files, and for Dolby Vision files the scanner has not probed again since profiles were kept.
+            ///   - episode: The files list only: the first episode an episode file holds (API level 34).
             ///   - firstSeenAt:
             ///   - hdr: HDR kind of the main video stream.
             ///   - height:
@@ -6473,8 +6968,10 @@ extension Components {
             ///   - relativePath: Path relative to the library root, forward slashes.
             ///   - size: Bytes.
             ///   - status:
+            ///   - title: The files list only: the movie's or show's title the file was matched to (API level 34).
             ///   - videoCodec:
             ///   - width:
+            ///   - year: The files list only: the matched movie's year (API level 34).
             public init(
                 addedAt: Foundation.Date,
                 audioCodec: Swift.String? = nil,
@@ -6482,6 +6979,7 @@ extension Components {
                 container: Swift.String? = nil,
                 durationMs: Swift.Int64? = nil,
                 dvProfile: Swift.Int64? = nil,
+                episode: Components.Schemas.MediaFileEpisode? = nil,
                 firstSeenAt: Foundation.Date,
                 hdr: Components.Schemas.MediaFile.HdrPayload? = nil,
                 height: Swift.Int64? = nil,
@@ -6501,8 +6999,10 @@ extension Components {
                 relativePath: Swift.String,
                 size: Swift.Int64,
                 status: Components.Schemas.MediaFile.StatusPayload,
+                title: Swift.String? = nil,
                 videoCodec: Swift.String? = nil,
-                width: Swift.Int64? = nil
+                width: Swift.Int64? = nil,
+                year: Swift.Int64? = nil
             ) {
                 self.addedAt = addedAt
                 self.audioCodec = audioCodec
@@ -6510,6 +7010,7 @@ extension Components {
                 self.container = container
                 self.durationMs = durationMs
                 self.dvProfile = dvProfile
+                self.episode = episode
                 self.firstSeenAt = firstSeenAt
                 self.hdr = hdr
                 self.height = height
@@ -6529,8 +7030,10 @@ extension Components {
                 self.relativePath = relativePath
                 self.size = size
                 self.status = status
+                self.title = title
                 self.videoCodec = videoCodec
                 self.width = width
+                self.year = year
             }
             public enum CodingKeys: String, CodingKey {
                 case addedAt
@@ -6539,6 +7042,7 @@ extension Components {
                 case container
                 case durationMs
                 case dvProfile
+                case episode
                 case firstSeenAt
                 case hdr
                 case height
@@ -6558,8 +7062,10 @@ extension Components {
                 case relativePath
                 case size
                 case status
+                case title
                 case videoCodec
                 case width
+                case year
             }
         }
         /// - Remark: Generated from `#/components/schemas/MediaFileDetail`.
@@ -6580,6 +7086,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/MediaFileDetail/dvProfile`.
             public var dvProfile: Swift.Int64?
+            /// The files list only: the first episode an episode file holds (API level 34).
+            ///
+            /// - Remark: Generated from `#/components/schemas/MediaFileDetail/episode`.
+            public var episode: Components.Schemas.MediaFileEpisode?
             /// - Remark: Generated from `#/components/schemas/MediaFileDetail/episodeId`.
             public var episodeId: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/MediaFileDetail/episodeNumber`.
@@ -6776,10 +7286,18 @@ extension Components {
             }
             /// - Remark: Generated from `#/components/schemas/MediaFileDetail/status`.
             public var status: Components.Schemas.MediaFileDetail.StatusPayload
+            /// The files list only: the movie's or show's title the file was matched to (API level 34).
+            ///
+            /// - Remark: Generated from `#/components/schemas/MediaFileDetail/title`.
+            public var title: Swift.String?
             /// - Remark: Generated from `#/components/schemas/MediaFileDetail/videoCodec`.
             public var videoCodec: Swift.String?
             /// - Remark: Generated from `#/components/schemas/MediaFileDetail/width`.
             public var width: Swift.Int64?
+            /// The files list only: the matched movie's year (API level 34).
+            ///
+            /// - Remark: Generated from `#/components/schemas/MediaFileDetail/year`.
+            public var year: Swift.Int64?
             /// Creates a new `MediaFileDetail`.
             ///
             /// - Parameters:
@@ -6789,6 +7307,7 @@ extension Components {
             ///   - container:
             ///   - durationMs:
             ///   - dvProfile: Dolby Vision profile (5, 7, 8…); omitted for other files, and for Dolby Vision files the scanner has not probed again since profiles were kept.
+            ///   - episode: The files list only: the first episode an episode file holds (API level 34).
             ///   - episodeId:
             ///   - episodeNumber:
             ///   - firstSeenAt:
@@ -6813,8 +7332,10 @@ extension Components {
             ///   - showId:
             ///   - size: Bytes.
             ///   - status:
+            ///   - title: The files list only: the movie's or show's title the file was matched to (API level 34).
             ///   - videoCodec:
             ///   - width:
+            ///   - year: The files list only: the matched movie's year (API level 34).
             public init(
                 addedAt: Foundation.Date,
                 audioCodec: Swift.String? = nil,
@@ -6822,6 +7343,7 @@ extension Components {
                 container: Swift.String? = nil,
                 durationMs: Swift.Int64? = nil,
                 dvProfile: Swift.Int64? = nil,
+                episode: Components.Schemas.MediaFileEpisode? = nil,
                 episodeId: Swift.Int64? = nil,
                 episodeNumber: Swift.Int64? = nil,
                 firstSeenAt: Foundation.Date,
@@ -6846,8 +7368,10 @@ extension Components {
                 showId: Swift.Int64? = nil,
                 size: Swift.Int64,
                 status: Components.Schemas.MediaFileDetail.StatusPayload,
+                title: Swift.String? = nil,
                 videoCodec: Swift.String? = nil,
-                width: Swift.Int64? = nil
+                width: Swift.Int64? = nil,
+                year: Swift.Int64? = nil
             ) {
                 self.addedAt = addedAt
                 self.audioCodec = audioCodec
@@ -6855,6 +7379,7 @@ extension Components {
                 self.container = container
                 self.durationMs = durationMs
                 self.dvProfile = dvProfile
+                self.episode = episode
                 self.episodeId = episodeId
                 self.episodeNumber = episodeNumber
                 self.firstSeenAt = firstSeenAt
@@ -6879,8 +7404,10 @@ extension Components {
                 self.showId = showId
                 self.size = size
                 self.status = status
+                self.title = title
                 self.videoCodec = videoCodec
                 self.width = width
+                self.year = year
             }
             public enum CodingKeys: String, CodingKey {
                 case addedAt
@@ -6889,6 +7416,7 @@ extension Components {
                 case container
                 case durationMs
                 case dvProfile
+                case episode
                 case episodeId
                 case episodeNumber
                 case firstSeenAt
@@ -6913,8 +7441,39 @@ extension Components {
                 case showId
                 case size
                 case status
+                case title
                 case videoCodec
                 case width
+                case year
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/MediaFileEpisode`.
+        public struct MediaFileEpisode: Codable, Hashable, Sendable {
+            /// - Remark: Generated from `#/components/schemas/MediaFileEpisode/episodeNumber`.
+            public var episodeNumber: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/MediaFileEpisode/seasonNumber`.
+            public var seasonNumber: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/MediaFileEpisode/title`.
+            public var title: Swift.String?
+            /// Creates a new `MediaFileEpisode`.
+            ///
+            /// - Parameters:
+            ///   - episodeNumber:
+            ///   - seasonNumber:
+            ///   - title:
+            public init(
+                episodeNumber: Swift.Int64,
+                seasonNumber: Swift.Int64,
+                title: Swift.String? = nil
+            ) {
+                self.episodeNumber = episodeNumber
+                self.seasonNumber = seasonNumber
+                self.title = title
+            }
+            public enum CodingKeys: String, CodingKey {
+                case episodeNumber
+                case seasonNumber
+                case title
             }
         }
         /// - Remark: Generated from `#/components/schemas/MediaInfo`.
@@ -7782,6 +8341,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Movie/posterSource`.
             public var posterSource: Components.Schemas.Movie.PosterSourcePayload?
+            /// Search results: the fraction watched (0-1) when partway through.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Movie/progress`.
+            public var progress: Swift.Double?
             /// TMDB vote average, 0-10.
             ///
             /// - Remark: Generated from `#/components/schemas/Movie/rating`.
@@ -7796,6 +8359,10 @@ extension Components {
             public var title: Swift.String
             /// - Remark: Generated from `#/components/schemas/Movie/tmdbId`.
             public var tmdbId: Swift.Int64
+            /// Search results: the signed-in person finished it. Absent elsewhere; a movie's page has watch.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Movie/watched`.
+            public var watched: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/Movie/year`.
             public var year: Swift.Int64?
             /// Creates a new `Movie`.
@@ -7813,12 +8380,14 @@ extension Components {
             ///   - overview:
             ///   - posterPath: Image path; fetch via /api/images/{size}{posterPath}. TMDB's, or a picture an admin chose.
             ///   - posterSource: Set when an admin chose the poster: another of TMDB's, an upload or a link. Absent for the match's own poster.
+            ///   - progress: Search results: the fraction watched (0-1) when partway through.
             ///   - rating: TMDB vote average, 0-10.
             ///   - releaseDate:
             ///   - runtimeMin:
             ///   - tagline:
             ///   - title:
             ///   - tmdbId:
+            ///   - watched: Search results: the signed-in person finished it. Absent elsewhere; a movie's page has watch.
             ///   - year:
             public init(
                 backdropPath: Swift.String? = nil,
@@ -7833,12 +8402,14 @@ extension Components {
                 overview: Swift.String,
                 posterPath: Swift.String? = nil,
                 posterSource: Components.Schemas.Movie.PosterSourcePayload? = nil,
+                progress: Swift.Double? = nil,
                 rating: Swift.Double? = nil,
                 releaseDate: Swift.String? = nil,
                 runtimeMin: Swift.Int64? = nil,
                 tagline: Swift.String? = nil,
                 title: Swift.String,
                 tmdbId: Swift.Int64,
+                watched: Swift.Bool? = nil,
                 year: Swift.Int64? = nil
             ) {
                 self.backdropPath = backdropPath
@@ -7853,12 +8424,14 @@ extension Components {
                 self.overview = overview
                 self.posterPath = posterPath
                 self.posterSource = posterSource
+                self.progress = progress
                 self.rating = rating
                 self.releaseDate = releaseDate
                 self.runtimeMin = runtimeMin
                 self.tagline = tagline
                 self.title = title
                 self.tmdbId = tmdbId
+                self.watched = watched
                 self.year = year
             }
             public enum CodingKeys: String, CodingKey {
@@ -7874,13 +8447,64 @@ extension Components {
                 case overview
                 case posterPath
                 case posterSource
+                case progress
                 case rating
                 case releaseDate
                 case runtimeMin
                 case tagline
                 case title
                 case tmdbId
+                case watched
                 case year
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/MovieCollection`.
+        public struct MovieCollection: Codable, Hashable, Sendable {
+            /// The collection's films in this movie's library with a present file, it included.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MovieCollection/have`.
+            public var have: Swift.Int64
+            /// TMDB collection ID.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MovieCollection/id`.
+            public var id: Swift.Int64
+            /// - Remark: Generated from `#/components/schemas/MovieCollection/name`.
+            public var name: Swift.String
+            /// Its place among the collection's films by release, from 1; absent until the server has fetched the collection.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MovieCollection/part`.
+            public var part: Swift.Int64?
+            /// The films TMDB lists in it; absent until fetched.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MovieCollection/total`.
+            public var total: Swift.Int64?
+            /// Creates a new `MovieCollection`.
+            ///
+            /// - Parameters:
+            ///   - have: The collection's films in this movie's library with a present file, it included.
+            ///   - id: TMDB collection ID.
+            ///   - name:
+            ///   - part: Its place among the collection's films by release, from 1; absent until the server has fetched the collection.
+            ///   - total: The films TMDB lists in it; absent until fetched.
+            public init(
+                have: Swift.Int64,
+                id: Swift.Int64,
+                name: Swift.String,
+                part: Swift.Int64? = nil,
+                total: Swift.Int64? = nil
+            ) {
+                self.have = have
+                self.id = id
+                self.name = name
+                self.part = part
+                self.total = total
+            }
+            public enum CodingKeys: String, CodingKey {
+                case have
+                case id
+                case name
+                case part
+                case total
             }
         }
         /// - Remark: Generated from `#/components/schemas/MovieDetail`.
@@ -7889,12 +8513,20 @@ extension Components {
             public var addedAt: Foundation.Date?
             /// - Remark: Generated from `#/components/schemas/MovieDetail/backdropPath`.
             public var backdropPath: Swift.String?
+            /// Its TMDB collection, where it falls in it and how many of it this library has ("Part 2 of 3 · you have all three"). Absent when it belongs to none.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MovieDetail/collection`.
+            public var collection: Components.Schemas.MovieCollection?
             /// US certification from TMDB; empty when it has none.
             ///
             /// - Remark: Generated from `#/components/schemas/MovieDetail/contentRating`.
             public var contentRating: Swift.String?
             /// - Remark: Generated from `#/components/schemas/MovieDetail/credits`.
             public var credits: [Components.Schemas.Credit]
+            /// Its directors, writers, composers and producers, in that order; empty until the server has fetched the movie's credits with person IDs. Absent on servers below API level 34.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MovieDetail/crew`.
+            public var crew: [Components.Schemas.CrewMember]?
             /// A download of it in Radarr's queue, such as an upgrade.
             ///
             /// - Remark: Generated from `#/components/schemas/MovieDetail/download`.
@@ -7972,6 +8604,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/MovieDetail/posterSource`.
             public var posterSource: Components.Schemas.MovieDetail.PosterSourcePayload?
+            /// Search results: the fraction watched (0-1) when partway through.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MovieDetail/progress`.
+            public var progress: Swift.Double?
             /// - Remark: Generated from `#/components/schemas/MovieDetail/quality`.
             @frozen public enum QualityPayload: RawRepresentable, Codable, Hashable, Sendable, CaseIterable {
                 case _empty_
@@ -8045,6 +8681,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/MovieDetail/watch`.
             public var watch: Components.Schemas.WatchState?
+            /// Search results: the signed-in person finished it. Absent elsewhere; a movie's page has watch.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MovieDetail/watched`.
+            public var watched: Swift.Bool?
             /// The signed-in person's watchlists that hold the movie (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33.
             ///
             /// - Remark: Generated from `#/components/schemas/MovieDetail/watchlists`.
@@ -8056,8 +8696,10 @@ extension Components {
             /// - Parameters:
             ///   - addedAt:
             ///   - backdropPath:
+            ///   - collection: Its TMDB collection, where it falls in it and how many of it this library has ("Part 2 of 3 · you have all three"). Absent when it belongs to none.
             ///   - contentRating: US certification from TMDB; empty when it has none.
             ///   - credits:
+            ///   - crew: Its directors, writers, composers and producers, in that order; empty until the server has fetched the movie's credits with person IDs. Absent on servers below API level 34.
             ///   - download: A download of it in Radarr's queue, such as an upgrade.
             ///   - fileCount:
             ///   - files:
@@ -8071,6 +8713,7 @@ extension Components {
             ///   - overview:
             ///   - posterPath: Image path; fetch via /api/images/{size}{posterPath}. TMDB's, or a picture an admin chose.
             ///   - posterSource: Set when an admin chose the poster: another of TMDB's, an upload or a link. Absent for the match's own poster.
+            ///   - progress: Search results: the fraction watched (0-1) when partway through.
             ///   - quality:
             ///   - rating: TMDB vote average, 0-10.
             ///   - releaseDate:
@@ -8081,13 +8724,16 @@ extension Components {
             ///   - totalSize:
             ///   - trailers: The movie's trailers, best first: trailer files in the library, then YouTube trailers while they are on. Apps play the first one whose source they know. Absent when it has none, and on older servers.
             ///   - watch: The signed-in user's progress.
+            ///   - watched: Search results: the signed-in person finished it. Absent elsewhere; a movie's page has watch.
             ///   - watchlists: The signed-in person's watchlists that hold the movie (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33.
             ///   - year:
             public init(
                 addedAt: Foundation.Date? = nil,
                 backdropPath: Swift.String? = nil,
+                collection: Components.Schemas.MovieCollection? = nil,
                 contentRating: Swift.String? = nil,
                 credits: [Components.Schemas.Credit],
+                crew: [Components.Schemas.CrewMember]? = nil,
                 download: Components.Schemas.QueueDownload? = nil,
                 fileCount: Swift.Int64,
                 files: [Components.Schemas.MediaFileDetail],
@@ -8101,6 +8747,7 @@ extension Components {
                 overview: Swift.String,
                 posterPath: Swift.String? = nil,
                 posterSource: Components.Schemas.MovieDetail.PosterSourcePayload? = nil,
+                progress: Swift.Double? = nil,
                 quality: Components.Schemas.MovieDetail.QualityPayload? = nil,
                 rating: Swift.Double? = nil,
                 releaseDate: Swift.String? = nil,
@@ -8111,13 +8758,16 @@ extension Components {
                 totalSize: Swift.Int64,
                 trailers: [Components.Schemas.MovieTrailer]? = nil,
                 watch: Components.Schemas.WatchState? = nil,
+                watched: Swift.Bool? = nil,
                 watchlists: [Swift.Int64]? = nil,
                 year: Swift.Int64? = nil
             ) {
                 self.addedAt = addedAt
                 self.backdropPath = backdropPath
+                self.collection = collection
                 self.contentRating = contentRating
                 self.credits = credits
+                self.crew = crew
                 self.download = download
                 self.fileCount = fileCount
                 self.files = files
@@ -8131,6 +8781,7 @@ extension Components {
                 self.overview = overview
                 self.posterPath = posterPath
                 self.posterSource = posterSource
+                self.progress = progress
                 self.quality = quality
                 self.rating = rating
                 self.releaseDate = releaseDate
@@ -8141,14 +8792,17 @@ extension Components {
                 self.totalSize = totalSize
                 self.trailers = trailers
                 self.watch = watch
+                self.watched = watched
                 self.watchlists = watchlists
                 self.year = year
             }
             public enum CodingKeys: String, CodingKey {
                 case addedAt
                 case backdropPath
+                case collection
                 case contentRating
                 case credits
+                case crew
                 case download
                 case fileCount
                 case files
@@ -8162,6 +8816,7 @@ extension Components {
                 case overview
                 case posterPath
                 case posterSource
+                case progress
                 case quality
                 case rating
                 case releaseDate
@@ -8172,6 +8827,7 @@ extension Components {
                 case totalSize
                 case trailers
                 case watch
+                case watched
                 case watchlists
                 case year
             }
@@ -8190,6 +8846,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/MovieTrailer/key`.
             public var key: Swift.String?
+            /// What TMDB calls it: trailer or teaser; trailer for a trailer file. Absent on older servers.
+            ///
+            /// - Remark: Generated from `#/components/schemas/MovieTrailer/kind`.
+            public var kind: Swift.String?
             /// TMDB's name for it ("Official Trailer"), or the file's.
             ///
             /// - Remark: Generated from `#/components/schemas/MovieTrailer/name`.
@@ -8204,18 +8864,21 @@ extension Components {
             ///   - durationMs: The trailer file's length; absent for YouTube trailers.
             ///   - fileId: The trailer file, for source "file".
             ///   - key: The YouTube video id, for source "youtube".
+            ///   - kind: What TMDB calls it: trailer or teaser; trailer for a trailer file. Absent on older servers.
             ///   - name: TMDB's name for it ("Official Trailer"), or the file's.
             ///   - source: "youtube": Key is a YouTube video id, played by YouTube's own player or app. "file": play FileID like any other file. Apps skip sources they don't know.
             public init(
                 durationMs: Swift.Int64? = nil,
                 fileId: Swift.Int64? = nil,
                 key: Swift.String? = nil,
+                kind: Swift.String? = nil,
                 name: Swift.String,
                 source: Swift.String
             ) {
                 self.durationMs = durationMs
                 self.fileId = fileId
                 self.key = key
+                self.kind = kind
                 self.name = name
                 self.source = source
             }
@@ -8223,6 +8886,7 @@ extension Components {
                 case durationMs
                 case fileId
                 case key
+                case kind
                 case name
                 case source
             }
@@ -9415,21 +10079,29 @@ extension Components {
             public var fileIds: [Swift.Int64]?
             /// - Remark: Generated from `#/components/schemas/PlanInputBody/profile`.
             public var profile: Components.Schemas.Profile
+            /// Also list each file's audio tracks and subtitles, those beside the file and downloaded ones included, so a person can choose them before playing. From API level 34; older servers ignore it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlanInputBody/tracks`.
+            public var tracks: Swift.Bool?
             /// Creates a new `PlanInputBody`.
             ///
             /// - Parameters:
             ///   - fileIds: The files to plan, such as a movie's versions.
             ///   - profile:
+            ///   - tracks: Also list each file's audio tracks and subtitles, those beside the file and downloaded ones included, so a person can choose them before playing. From API level 34; older servers ignore it.
             public init(
                 fileIds: [Swift.Int64]? = nil,
-                profile: Components.Schemas.Profile
+                profile: Components.Schemas.Profile,
+                tracks: Swift.Bool? = nil
             ) {
                 self.fileIds = fileIds
                 self.profile = profile
+                self.tracks = tracks
             }
             public enum CodingKeys: String, CodingKey {
                 case fileIds
                 case profile
+                case tracks
             }
         }
         /// - Remark: Generated from `#/components/schemas/PlanList`.
@@ -9453,6 +10125,10 @@ extension Components {
         public struct PlaybackPlan: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/PlaybackPlan/audio`.
             public var audio: Components.Schemas.AudioPlan
+            /// With tracks: the file's audio tracks, as a decision lists them. Send the chosen one's index as audioIndex.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaybackPlan/audioTracks`.
+            public var audioTracks: [Components.Schemas.AudioTrack]?
             /// - Remark: Generated from `#/components/schemas/PlaybackPlan/fileId`.
             public var fileId: Swift.Int64
             /// - Remark: Generated from `#/components/schemas/PlaybackPlan/mode`.
@@ -9545,38 +10221,50 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/PlaybackPlan/reasons`.
             public var reasons: [Swift.String]
+            /// With tracks: every subtitle a play could show, inside the file, beside it and downloaded, as a decision lists them but without URLs. Send the chosen one's id as subtitleId.
+            ///
+            /// - Remark: Generated from `#/components/schemas/PlaybackPlan/subtitles`.
+            public var subtitles: [Components.Schemas.SubtitleTrack]?
             /// - Remark: Generated from `#/components/schemas/PlaybackPlan/video`.
             public var video: Components.Schemas.VideoPlan
             /// Creates a new `PlaybackPlan`.
             ///
             /// - Parameters:
             ///   - audio:
+            ///   - audioTracks: With tracks: the file's audio tracks, as a decision lists them. Send the chosen one's index as audioIndex.
             ///   - fileId:
             ///   - mode:
             ///   - _protocol:
             ///   - reasons: Why a cheaper mode was not possible.
+            ///   - subtitles: With tracks: every subtitle a play could show, inside the file, beside it and downloaded, as a decision lists them but without URLs. Send the chosen one's id as subtitleId.
             ///   - video:
             public init(
                 audio: Components.Schemas.AudioPlan,
+                audioTracks: [Components.Schemas.AudioTrack]? = nil,
                 fileId: Swift.Int64,
                 mode: Components.Schemas.PlaybackPlan.ModePayload,
                 _protocol: Components.Schemas.PlaybackPlan._ProtocolPayload,
                 reasons: [Swift.String],
+                subtitles: [Components.Schemas.SubtitleTrack]? = nil,
                 video: Components.Schemas.VideoPlan
             ) {
                 self.audio = audio
+                self.audioTracks = audioTracks
                 self.fileId = fileId
                 self.mode = mode
                 self._protocol = _protocol
                 self.reasons = reasons
+                self.subtitles = subtitles
                 self.video = video
             }
             public enum CodingKeys: String, CodingKey {
                 case audio
+                case audioTracks
                 case fileId
                 case mode
                 case _protocol = "protocol"
                 case reasons
+                case subtitles
                 case video
             }
         }
@@ -9632,6 +10320,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Preferences/autoplayNext`.
             public var autoplayNext: Swift.Bool
+            /// The person asked not to see what happens in episodes they haven't watched. The server hides nothing; each app hides what it draws for those episodes. Off by default (API level 34).
+            ///
+            /// - Remark: Generated from `#/components/schemas/Preferences/hideSpoilers`.
+            public var hideSpoilers: Swift.Bool?
             /// Minutes before a programme starts that a Live TV reminder comes: 0, 1, 5, 10 or 15 (API level 15).
             ///
             /// - Remark: Generated from `#/components/schemas/Preferences/liveTVReminderMinutes`.
@@ -9669,18 +10361,21 @@ extension Components {
             /// - Parameters:
             ///   - audio: The person's audio languages: a play that names no audioIndex starts on the best track in the first of them the file has (API level 21).
             ///   - autoplayNext: Play the next episode by itself after the credits.
+            ///   - hideSpoilers: The person asked not to see what happens in episodes they haven't watched. The server hides nothing; each app hides what it draws for those episodes. Off by default (API level 34).
             ///   - liveTVReminderMinutes: Minutes before a programme starts that a Live TV reminder comes: 0, 1, 5, 10 or 15 (API level 15).
             ///   - skip: Per segment kind: none (no button), ask (a Skip button), auto (skip at once) or auto-delay (skip after 3 s).
             ///   - subtitles: The person's subtitle languages, starting mode and opt-in automatic download (API level 18).
             public init(
                 audio: Components.Schemas.AudioPreferences? = nil,
                 autoplayNext: Swift.Bool,
+                hideSpoilers: Swift.Bool? = nil,
                 liveTVReminderMinutes: Swift.Int64? = nil,
                 skip: Components.Schemas.Preferences.SkipPayload,
                 subtitles: Components.Schemas.SubtitlePreferences? = nil
             ) {
                 self.audio = audio
                 self.autoplayNext = autoplayNext
+                self.hideSpoilers = hideSpoilers
                 self.liveTVReminderMinutes = liveTVReminderMinutes
                 self.skip = skip
                 self.subtitles = subtitles
@@ -9688,6 +10383,7 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case audio
                 case autoplayNext
+                case hideSpoilers
                 case liveTVReminderMinutes
                 case skip
                 case subtitles
@@ -10407,6 +11103,8 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Request/startMs`.
             public var startMs: Swift.Int64?
+            /// A subtitles[].id from a decision or a plan with tracks: s<index> for a stream inside the file (its ffprobe index), x<n> for a subtitle file beside the video (n counts them from 0 in the order the server lists them), d<id> for a downloaded one.
+            ///
             /// - Remark: Generated from `#/components/schemas/Request/subtitleId`.
             public var subtitleId: Swift.String?
             /// From API level 18: auto uses the person's subtitle preferences; off explicitly disables them. A subtitleId takes precedence. Omitted, older players keep their existing behavior.
@@ -10437,7 +11135,7 @@ extension Components {
             ///   - profile:
             ///   - quality: The quality the viewer picked: original, 2160, 1080, 720, 480 or 360, shown in activity, with its caps already in the profile; or auto, with the device's own profile, for the server to pick the step and lower it when the connection cannot keep up (API level 3).
             ///   - startMs: Position to start from; only used by HLS sessions. Omitted, a play of something partway through starts preparing where it resumes (resumeMs); 0 starts at the beginning.
-            ///   - subtitleId:
+            ///   - subtitleId: A subtitles[].id from a decision or a plan with tracks: s<index> for a stream inside the file (its ffprobe index), x<n> for a subtitle file beside the video (n counts them from 0 in the order the server lists them), d<id> for a downloaded one.
             ///   - subtitleMode: From API level 18: auto uses the person's subtitle preferences; off explicitly disables them. A subtitleId takes precedence. Omitted, older players keep their existing behavior.
             ///   - switchGeneration: Generation of a quality directive this request accepts. Omit for a new play or an unrelated seek/track change.
             public init(
@@ -11503,6 +12201,14 @@ extension Components {
             public var id: Swift.Int64
             /// - Remark: Generated from `#/components/schemas/SearchEpisode/number`.
             public var number: Swift.Int64
+            /// The fraction the signed-in person has watched (0-1) when partway through.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SearchEpisode/progress`.
+            public var progress: Swift.Double?
+            /// Its length in minutes, as TMDB lists it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SearchEpisode/runtimeMin`.
+            public var runtimeMin: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/SearchEpisode/seasonNumber`.
             public var seasonNumber: Swift.Int64
             /// - Remark: Generated from `#/components/schemas/SearchEpisode/showId`.
@@ -11526,6 +12232,8 @@ extension Components {
             ///   - fileId:
             ///   - id:
             ///   - number:
+            ///   - progress: The fraction the signed-in person has watched (0-1) when partway through.
+            ///   - runtimeMin: Its length in minutes, as TMDB lists it.
             ///   - seasonNumber:
             ///   - showId:
             ///   - showPosterPath:
@@ -11538,6 +12246,8 @@ extension Components {
                 fileId: Swift.Int64,
                 id: Swift.Int64,
                 number: Swift.Int64,
+                progress: Swift.Double? = nil,
+                runtimeMin: Swift.Int64? = nil,
                 seasonNumber: Swift.Int64,
                 showId: Swift.Int64,
                 showPosterPath: Swift.String? = nil,
@@ -11550,6 +12260,8 @@ extension Components {
                 self.fileId = fileId
                 self.id = id
                 self.number = number
+                self.progress = progress
+                self.runtimeMin = runtimeMin
                 self.seasonNumber = seasonNumber
                 self.showId = showId
                 self.showPosterPath = showPosterPath
@@ -11563,6 +12275,8 @@ extension Components {
                 case fileId
                 case id
                 case number
+                case progress
+                case runtimeMin
                 case seasonNumber
                 case showId
                 case showPosterPath
@@ -12451,12 +13165,24 @@ extension Components {
             public var posterSource: Components.Schemas.Show.PosterSourcePayload?
             /// - Remark: Generated from `#/components/schemas/Show/rating`.
             public var rating: Swift.Double?
+            /// Search results: seasons with a present episode, specials left out, as on cards.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Show/seasonCount`.
+            public var seasonCount: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/Show/status`.
             public var status: Swift.String?
             /// - Remark: Generated from `#/components/schemas/Show/title`.
             public var title: Swift.String
             /// - Remark: Generated from `#/components/schemas/Show/tmdbId`.
             public var tmdbId: Swift.Int64
+            /// Search results: episodes with a present file they haven't finished, as on cards.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Show/unwatchedCount`.
+            public var unwatchedCount: Swift.Int64?
+            /// Search results: the signed-in person has watched every episode with a present file.
+            ///
+            /// - Remark: Generated from `#/components/schemas/Show/watched`.
+            public var watched: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/Show/year`.
             public var year: Swift.Int64?
             /// Creates a new `Show`.
@@ -12477,9 +13203,12 @@ extension Components {
             ///   - posterPath:
             ///   - posterSource: Set when an admin chose the poster; absent for the match's own.
             ///   - rating:
+            ///   - seasonCount: Search results: seasons with a present episode, specials left out, as on cards.
             ///   - status:
             ///   - title:
             ///   - tmdbId:
+            ///   - unwatchedCount: Search results: episodes with a present file they haven't finished, as on cards.
+            ///   - watched: Search results: the signed-in person has watched every episode with a present file.
             ///   - year:
             public init(
                 backdropPath: Swift.String? = nil,
@@ -12497,9 +13226,12 @@ extension Components {
                 posterPath: Swift.String? = nil,
                 posterSource: Components.Schemas.Show.PosterSourcePayload? = nil,
                 rating: Swift.Double? = nil,
+                seasonCount: Swift.Int64? = nil,
                 status: Swift.String? = nil,
                 title: Swift.String,
                 tmdbId: Swift.Int64,
+                unwatchedCount: Swift.Int64? = nil,
+                watched: Swift.Bool? = nil,
                 year: Swift.Int64? = nil
             ) {
                 self.backdropPath = backdropPath
@@ -12517,9 +13249,12 @@ extension Components {
                 self.posterPath = posterPath
                 self.posterSource = posterSource
                 self.rating = rating
+                self.seasonCount = seasonCount
                 self.status = status
                 self.title = title
                 self.tmdbId = tmdbId
+                self.unwatchedCount = unwatchedCount
+                self.watched = watched
                 self.year = year
             }
             public enum CodingKeys: String, CodingKey {
@@ -12538,9 +13273,12 @@ extension Components {
                 case posterPath
                 case posterSource
                 case rating
+                case seasonCount
                 case status
                 case title
                 case tmdbId
+                case unwatchedCount
+                case watched
                 case year
             }
         }
@@ -12556,6 +13294,10 @@ extension Components {
             public var contentRating: Swift.String?
             /// - Remark: Generated from `#/components/schemas/ShowDetail/credits`.
             public var credits: [Components.Schemas.Credit]
+            /// Its creators, job Creator; empty until the server has fetched the show's credits with person IDs. Absent on servers below API level 34.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ShowDetail/crew`.
+            public var crew: [Components.Schemas.CrewMember]?
             /// Episodes with a present file.
             ///
             /// - Remark: Generated from `#/components/schemas/ShowDetail/episodeCount`.
@@ -12690,6 +13432,10 @@ extension Components {
             public var quality: Components.Schemas.ShowDetail.QualityPayload?
             /// - Remark: Generated from `#/components/schemas/ShowDetail/rating`.
             public var rating: Swift.Double?
+            /// Search results: seasons with a present episode, specials left out, as on cards.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ShowDetail/seasonCount`.
+            public var seasonCount: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/ShowDetail/seasons`.
             public var seasons: [Components.Schemas.Season]
             /// - Remark: Generated from `#/components/schemas/ShowDetail/status`.
@@ -12704,6 +13450,18 @@ extension Components {
             public var totalEpisodes: Swift.Int64
             /// - Remark: Generated from `#/components/schemas/ShowDetail/totalSize`.
             public var totalSize: Swift.Int64
+            /// The sound and subtitles the signed-in person picked for the show (setShowTracks), which its episodes start with. Absent when they have none, and on older servers.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ShowDetail/tracks`.
+            public var tracks: Components.Schemas.ShowTracks?
+            /// Search results: episodes with a present file they haven't finished, as on cards.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ShowDetail/unwatchedCount`.
+            public var unwatchedCount: Swift.Int64?
+            /// Search results: the signed-in person has watched every episode with a present file.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ShowDetail/watched`.
+            public var watched: Swift.Bool?
             /// The signed-in person's watchlists that hold the show (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33.
             ///
             /// - Remark: Generated from `#/components/schemas/ShowDetail/watchlists`.
@@ -12717,6 +13475,7 @@ extension Components {
             ///   - backdropPath:
             ///   - contentRating: US certification from TMDB; empty when it has none.
             ///   - credits:
+            ///   - crew: Its creators, job Creator; empty until the server has fetched the show's credits with person IDs. Absent on servers below API level 34.
             ///   - episodeCount: Episodes with a present file.
             ///   - fileCount:
             ///   - firstAirDate:
@@ -12735,12 +13494,16 @@ extension Components {
             ///   - posterSource: Set when an admin chose the poster; absent for the match's own.
             ///   - quality:
             ///   - rating:
+            ///   - seasonCount: Search results: seasons with a present episode, specials left out, as on cards.
             ///   - seasons:
             ///   - status:
             ///   - title:
             ///   - tmdbId:
             ///   - totalEpisodes: Episodes across all seasons, as the seasons' episodeCount counts them.
             ///   - totalSize:
+            ///   - tracks: The sound and subtitles the signed-in person picked for the show (setShowTracks), which its episodes start with. Absent when they have none, and on older servers.
+            ///   - unwatchedCount: Search results: episodes with a present file they haven't finished, as on cards.
+            ///   - watched: Search results: the signed-in person has watched every episode with a present file.
             ///   - watchlists: The signed-in person's watchlists that hold the show (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33.
             ///   - year:
             public init(
@@ -12748,6 +13511,7 @@ extension Components {
                 backdropPath: Swift.String? = nil,
                 contentRating: Swift.String? = nil,
                 credits: [Components.Schemas.Credit],
+                crew: [Components.Schemas.CrewMember]? = nil,
                 episodeCount: Swift.Int64,
                 fileCount: Swift.Int64,
                 firstAirDate: Swift.String? = nil,
@@ -12766,12 +13530,16 @@ extension Components {
                 posterSource: Components.Schemas.ShowDetail.PosterSourcePayload? = nil,
                 quality: Components.Schemas.ShowDetail.QualityPayload? = nil,
                 rating: Swift.Double? = nil,
+                seasonCount: Swift.Int64? = nil,
                 seasons: [Components.Schemas.Season],
                 status: Swift.String? = nil,
                 title: Swift.String,
                 tmdbId: Swift.Int64,
                 totalEpisodes: Swift.Int64,
                 totalSize: Swift.Int64,
+                tracks: Components.Schemas.ShowTracks? = nil,
+                unwatchedCount: Swift.Int64? = nil,
+                watched: Swift.Bool? = nil,
                 watchlists: [Swift.Int64]? = nil,
                 year: Swift.Int64? = nil
             ) {
@@ -12779,6 +13547,7 @@ extension Components {
                 self.backdropPath = backdropPath
                 self.contentRating = contentRating
                 self.credits = credits
+                self.crew = crew
                 self.episodeCount = episodeCount
                 self.fileCount = fileCount
                 self.firstAirDate = firstAirDate
@@ -12797,12 +13566,16 @@ extension Components {
                 self.posterSource = posterSource
                 self.quality = quality
                 self.rating = rating
+                self.seasonCount = seasonCount
                 self.seasons = seasons
                 self.status = status
                 self.title = title
                 self.tmdbId = tmdbId
                 self.totalEpisodes = totalEpisodes
                 self.totalSize = totalSize
+                self.tracks = tracks
+                self.unwatchedCount = unwatchedCount
+                self.watched = watched
                 self.watchlists = watchlists
                 self.year = year
             }
@@ -12811,6 +13584,7 @@ extension Components {
                 case backdropPath
                 case contentRating
                 case credits
+                case crew
                 case episodeCount
                 case fileCount
                 case firstAirDate
@@ -12829,12 +13603,16 @@ extension Components {
                 case posterSource
                 case quality
                 case rating
+                case seasonCount
                 case seasons
                 case status
                 case title
                 case tmdbId
                 case totalEpisodes
                 case totalSize
+                case tracks
+                case unwatchedCount
+                case watched
                 case watchlists
                 case year
             }
@@ -12862,6 +13640,41 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case episodes
                 case season
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/ShowTracks`.
+        public struct ShowTracks: Codable, Hashable, Sendable {
+            /// BCP 47. A play that names no audioIndex starts on this language when the file has it, before the person's audio languages. Absent: their audio languages alone.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ShowTracks/audioLanguage`.
+            public var audioLanguage: Swift.String?
+            /// BCP 47. A play with subtitleMode auto starts subtitles in this language, before the person's subtitle languages. Absent: their subtitle settings, unless subtitlesOff.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ShowTracks/subtitleLanguage`.
+            public var subtitleLanguage: Swift.String?
+            /// A play with subtitleMode auto starts without subtitles.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ShowTracks/subtitlesOff`.
+            public var subtitlesOff: Swift.Bool
+            /// Creates a new `ShowTracks`.
+            ///
+            /// - Parameters:
+            ///   - audioLanguage: BCP 47. A play that names no audioIndex starts on this language when the file has it, before the person's audio languages. Absent: their audio languages alone.
+            ///   - subtitleLanguage: BCP 47. A play with subtitleMode auto starts subtitles in this language, before the person's subtitle languages. Absent: their subtitle settings, unless subtitlesOff.
+            ///   - subtitlesOff: A play with subtitleMode auto starts without subtitles.
+            public init(
+                audioLanguage: Swift.String? = nil,
+                subtitleLanguage: Swift.String? = nil,
+                subtitlesOff: Swift.Bool
+            ) {
+                self.audioLanguage = audioLanguage
+                self.subtitleLanguage = subtitleLanguage
+                self.subtitlesOff = subtitlesOff
+            }
+            public enum CodingKeys: String, CodingKey {
+                case audioLanguage
+                case subtitleLanguage
+                case subtitlesOff
             }
         }
         /// - Remark: Generated from `#/components/schemas/SignIn`.
@@ -13522,6 +14335,10 @@ extension Components {
             public var audio: Components.Schemas.UpdateAudioPreferences?
             /// - Remark: Generated from `#/components/schemas/UpdatePreferencesInputBody/autoplayNext`.
             public var autoplayNext: Swift.Bool?
+            /// From API level 34; older servers reject it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdatePreferencesInputBody/hideSpoilers`.
+            public var hideSpoilers: Swift.Bool?
             /// 0, 1, 5, 10 or 15.
             ///
             /// - Remark: Generated from `#/components/schemas/UpdatePreferencesInputBody/liveTVReminderMinutes`.
@@ -13559,18 +14376,21 @@ extension Components {
             /// - Parameters:
             ///   - audio: Audio fields to change; omitted fields keep their values. From API level 21; older servers reject it.
             ///   - autoplayNext:
+            ///   - hideSpoilers: From API level 34; older servers reject it.
             ///   - liveTVReminderMinutes: 0, 1, 5, 10 or 15.
             ///   - skip: Kinds to change; others keep their setting.
             ///   - subtitles: Subtitle fields to change; omitted fields keep their values (API level 18).
             public init(
                 audio: Components.Schemas.UpdateAudioPreferences? = nil,
                 autoplayNext: Swift.Bool? = nil,
+                hideSpoilers: Swift.Bool? = nil,
                 liveTVReminderMinutes: Swift.Int64? = nil,
                 skip: Components.Schemas.UpdatePreferencesInputBody.SkipPayload? = nil,
                 subtitles: Components.Schemas.UpdateSubtitlePreferences? = nil
             ) {
                 self.audio = audio
                 self.autoplayNext = autoplayNext
+                self.hideSpoilers = hideSpoilers
                 self.liveTVReminderMinutes = liveTVReminderMinutes
                 self.skip = skip
                 self.subtitles = subtitles
@@ -13578,6 +14398,7 @@ extension Components {
             public enum CodingKeys: String, CodingKey {
                 case audio
                 case autoplayNext
+                case hideSpoilers
                 case liveTVReminderMinutes
                 case skip
                 case subtitles

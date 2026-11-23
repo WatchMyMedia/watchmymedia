@@ -4916,6 +4916,20 @@ public enum Operations {
                 }
                 /// - Remark: Generated from `#/paths/api/libraries/{id}/items/GET/query/sort`.
                 public var sort: Operations.ListLibraryItems.Input.Query.SortPayload?
+                /// Ascending or descending; absent for the sort's own direction: A to Z for title, the most or newest first for the rest. "Shortest first" is sort=runtime&order=asc. From API level 34.
+                ///
+                /// - Remark: Generated from `#/paths/api/libraries/{id}/items/GET/query/order`.
+                @frozen public enum OrderPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case _empty_ = ""
+                    case asc = "asc"
+                    case desc = "desc"
+                }
+                /// Ascending or descending; absent for the sort's own direction: A to Z for title, the most or newest first for the rest. "Shortest first" is sort=runtime&order=asc. From API level 34.
+                ///
+                /// - Remark: Generated from `#/paths/api/libraries/{id}/items/GET/query/order`.
+                public var order: Operations.ListLibraryItems.Input.Query.OrderPayload?
+                /// inProgress (movies part watched, shows started and not finished) and following (TV: shows the person follows) are from API level 34.
+                ///
                 /// - Remark: Generated from `#/paths/api/libraries/{id}/items/GET/query/filter`.
                 @frozen public enum FilterPayload: String, Codable, Hashable, Sendable, CaseIterable {
                     case _empty_ = ""
@@ -4924,9 +4938,39 @@ public enum Operations {
                     case _4k = "4k"
                     case hdr = "hdr"
                     case unwatched = "unwatched"
+                    case inProgress = "inProgress"
+                    case following = "following"
                 }
+                /// inProgress (movies part watched, shows started and not finished) and following (TV: shows the person follows) are from API level 34.
+                ///
                 /// - Remark: Generated from `#/paths/api/libraries/{id}/items/GET/query/filter`.
                 public var filter: Operations.ListLibraryItems.Input.Query.FilterPayload?
+                /// - Remark: Generated from `#/paths/api/libraries/{id}/items/GET/query/FiltersPayload`.
+                @frozen public enum FiltersPayloadPayload: String, Codable, Hashable, Sendable, CaseIterable {
+                    case continuing = "continuing"
+                    case ended = "ended"
+                    case _4k = "4k"
+                    case hdr = "hdr"
+                    case unwatched = "unwatched"
+                    case inProgress = "inProgress"
+                    case following = "following"
+                }
+                /// More filters, comma separated, all of which an item must meet, with filter as one more. From API level 34.
+                ///
+                /// - Remark: Generated from `#/paths/api/libraries/{id}/items/GET/query/filters`.
+                public typealias FiltersPayload = [Operations.ListLibraryItems.Input.Query.FiltersPayloadPayload]
+                /// More filters, comma separated, all of which an item must meet, with filter as one more. From API level 34.
+                ///
+                /// - Remark: Generated from `#/paths/api/libraries/{id}/items/GET/query/filters`.
+                public var filters: Operations.ListLibraryItems.Input.Query.FiltersPayload?
+                /// Ratings to keep, comma separated, as facets.contentRatings lists them: TMDB's US certification, or unrated. From API level 34.
+                ///
+                /// - Remark: Generated from `#/paths/api/libraries/{id}/items/GET/query/contentRating`.
+                public var contentRating: [Swift.String]?
+                /// Movies: only those of this TMDB collection, as listLibraryCollections lists them. From API level 34.
+                ///
+                /// - Remark: Generated from `#/paths/api/libraries/{id}/items/GET/query/collection`.
+                public var collection: Swift.Int64?
                 /// - Remark: Generated from `#/paths/api/libraries/{id}/items/GET/query/genre`.
                 public var genre: Swift.String?
                 /// e.g. 1990
@@ -4945,7 +4989,11 @@ public enum Operations {
                 ///
                 /// - Parameters:
                 ///   - sort:
-                ///   - filter:
+                ///   - order: Ascending or descending; absent for the sort's own direction: A to Z for title, the most or newest first for the rest. "Shortest first" is sort=runtime&order=asc. From API level 34.
+                ///   - filter: inProgress (movies part watched, shows started and not finished) and following (TV: shows the person follows) are from API level 34.
+                ///   - filters: More filters, comma separated, all of which an item must meet, with filter as one more. From API level 34.
+                ///   - contentRating: Ratings to keep, comma separated, as facets.contentRatings lists them: TMDB's US certification, or unrated. From API level 34.
+                ///   - collection: Movies: only those of this TMDB collection, as listLibraryCollections lists them. From API level 34.
                 ///   - genre:
                 ///   - decade: e.g. 1990
                 ///   - q: Title contains.
@@ -4953,7 +5001,11 @@ public enum Operations {
                 ///   - offset:
                 public init(
                     sort: Operations.ListLibraryItems.Input.Query.SortPayload? = nil,
+                    order: Operations.ListLibraryItems.Input.Query.OrderPayload? = nil,
                     filter: Operations.ListLibraryItems.Input.Query.FilterPayload? = nil,
+                    filters: Operations.ListLibraryItems.Input.Query.FiltersPayload? = nil,
+                    contentRating: [Swift.String]? = nil,
+                    collection: Swift.Int64? = nil,
                     genre: Swift.String? = nil,
                     decade: Swift.Int64? = nil,
                     q: Swift.String? = nil,
@@ -4961,7 +5013,11 @@ public enum Operations {
                     offset: Swift.Int64? = nil
                 ) {
                     self.sort = sort
+                    self.order = order
                     self.filter = filter
+                    self.filters = filters
+                    self.contentRating = contentRating
+                    self.collection = collection
                     self.genre = genre
                     self.decade = decade
                     self.q = q
