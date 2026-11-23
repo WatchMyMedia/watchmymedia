@@ -58,9 +58,12 @@ public struct TopShelfPlan: Hashable, Sendable {
             )
         }
 
-        // Movies and shows in turn, movies first, as the board draws them. An
-        // unmatched file has no page to open, so it isn't on the shelf.
-        let addedMovies = movies.filter { $0.kind == .movie }, addedShows = shows.filter { $0.kind == .show }
+        // Movies and shows in turn, movies first. Only what this person
+        // hasn't watched or started: the shelf never offers what was already
+        // seen, and what was started is in Continue watching. An unmatched
+        // file has no page to open, so it isn't on the shelf.
+        func unwatched(_ item: BrowseItem) -> Bool { !item.watched && (item.progress ?? 0) == 0 }
+        let addedMovies = movies.filter { $0.kind == .movie && unwatched($0) }, addedShows = shows.filter { $0.kind == .show && unwatched($0) }
         var added: [BrowseItem] = []
         for i in 0..<max(addedMovies.count, addedShows.count) {
             if i < addedMovies.count { added.append(addedMovies[i]) }

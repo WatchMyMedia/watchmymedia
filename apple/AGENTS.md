@@ -248,8 +248,8 @@ server, and on iPad in both a regular and a compact width.
   SwiftUI draws a `RadialGradient` on the main thread, a pixel at a time,
   across the whole of its view (`PaintShapeLayer.draw`, then
   `CGContextDrawRadialGradient`, in a `sample` of the app). The two under
-  each of Apple TV Home's backdrops (1400 × 660 pt) were 200 ms of its first
-  page turn on a tvOS 27.2 simulator. Draw a soft one small and scale it up
+  each of Apple TV Home's backdrops (then 1400 × 660 pt) were 200 ms of its
+  first page turn on a tvOS 27.2 simulator. Draw a soft one small and scale it up
   (`BackdropGlow` in `TV/Screens/Home/HomeScreen.swift`), or only in the box
   its light reaches (`ArtworkPlaceholder`). The show and movie pages'
   `DetailBackdrop`, the request dialog and the sign-in screens still draw
@@ -267,8 +267,15 @@ server, and on iPad in both a regular and a compact width.
   focus enters (`old == nil` in `onChange(of: focused)`); a container's
   `.focused($held)` says when focus is inside it and, set, moves focus into
   it (Back to the top, Menu), and each screen has such a state of its own
-  (`ScreenFocus`). The screen on view and the screen asked to take focus are
-  in `HomePaging`, an `@Observable` that `HomeView`'s body does not read.
+  (`ScreenFocus`). Apple TV's Home opens on its first card that way: when
+  it first has rows at launch, `HomeView` asks the first screen for focus
+  (`openOnFirstCard`), and the row moves it to its first card; reached later
+  (the tab bar, Menu from another tab) focus stays the system's. Menu from a
+  later screen goes back to the first and from the first is the system's
+  (the tab bar), judged by the screen focus is in (`HomePaging.focusedPage`),
+  not the scroll, which passes every screen on the way up. The screen on
+  view and the screen asked to take focus are in `HomePaging`, an
+  `@Observable` that `HomeView`'s body does not read.
   That body builds every screen, and its first run after Home loads updates
   them all at once (135 ms on a tvOS 27.2 simulator, where any other move
   takes 30), so keep out of it any state a focus move or a page turn

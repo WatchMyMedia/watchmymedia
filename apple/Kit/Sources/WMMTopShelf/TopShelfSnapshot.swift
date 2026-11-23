@@ -56,12 +56,13 @@ public struct TopShelfSection: Codable, Hashable, Sendable {
     public enum Kind: String, Codable, Hashable, Sendable {
         /// 16:9 cards with the system's progress bar.
         case continueWatching
-        /// Posters.
+        /// Posters: what was added lately that this person hasn't watched,
+        /// headed New for you. Its stored name is the one the shelf had first.
         case recentlyAdded
     }
 
     public var kind: Kind
-    /// "Continue watching", "Recently added".
+    /// "Continue watching", "New for you".
     public var title: String
     public var items: [TopShelfItem]
 
@@ -77,7 +78,7 @@ extension TopShelfSection.Kind {
     public var title: String {
         switch self {
         case .continueWatching: "Continue watching"
-        case .recentlyAdded: "Recently added"
+        case .recentlyAdded: "New for you"
         }
     }
 }

@@ -71,6 +71,8 @@ enum ServicesFactory {
             several: arguments.contains("-fakesServers")
         )
         (services.library as? FakeLibraryRepository)?.firstRun = FakeFirstRunState.from(arguments)
+        // The server in use doesn't answer at all: Home's Can't reach.
+        if arguments.contains("-fakesUnreachable") { (services.library as? FakeLibraryRepository)?.offline = true }
         if arguments.contains("-fakesSlowServer") { (services.library as? FakeLibraryRepository)?.otherServerDelay = .milliseconds(2500) }
         if arguments.contains("-fakesOneWatchlist") { (services.watchlists as? FakeWatchlistsRepository)?.keepOnlyFirst() }
         if let i = arguments.firstIndex(of: "-fakesAudioLanguages"), arguments.indices.contains(i + 1), !arguments[i + 1].hasPrefix("-") {

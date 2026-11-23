@@ -378,7 +378,11 @@ are made on the web.
 `-fakes -fakesRows` puts the fakes' server at level 22: Home has two list rows
 and Trending this week waits in Add a row; Movies has Best of 2026, whose last
 MDBList fetch failed. On iPad and Apple TV an arranged Home is drawn one row a
-screen (`-fakesRows` is needed to see it). `-editRows` opens Home rows at launch and `-addRow` its
+screen (`-fakesRows` is needed to see it). On Apple TV every screen is a row
+with the focused card's words above it (`TVFocusWords`: what it is, time
+left and "Ends at", never the file's format), the first screen is the first
+row, Home opens on its first card, and a server below level 22 has its
+fixed rows drawn the same way. `-editRows` opens Home rows at launch and `-addRow` its
 Add a row; `-open watchmymedia://lists/9001` opens Top rated science fiction
 (with titles to request) and `lists/9002` Rainy Sunday films (an import with a
 title not found). On Apple TV, `-tab settings -homeRowsSettings` opens Home
@@ -779,7 +783,9 @@ read a library, or finished a scan without finding media. Admins get **Open the
 web page** on iPhone/iPad and its address on Apple TV; members get instructions
 to ask the server owner. Scan transitions refresh it, and Check again remains
 available. `-fakes -fakesFirstRun noLibraries` (or `scanning`, `failed`, `empty`)
-previews the states; add `-fakesMember` for the member wording.
+previews the states; add `-fakesMember` for the member wording. On Apple TV
+Home also says when the server doesn't answer, naming it, with Try again and
+Switch server (`-fakes -fakesUnreachable`, Apple TV only).
 
 Settings › Audio & subtitles is one page
 on iPhone, iPad (two columns where the page is wide) and Apple TV (a sheet in
@@ -1219,8 +1225,8 @@ their own:
 
 With the app in the top row of the Apple TV's Home Screen, the Top Shelf
 shows Continue watching (16:9 cards with the system's progress bar) and
-Recently added (posters, movies and shows in turn) as two sections the
-system draws. Select
+New for you (posters, movies and shows in turn, added lately and neither
+watched nor started) as two sections the system draws. Select
 opens the page; Play/Pause plays, as on the card in the app: a Continue
 watching item resumes, a movie plays its first version, and a show, which has
 no single episode to play, opens. Signed out, or with nothing to show, the
@@ -1236,7 +1242,7 @@ system shows the static Top Shelf image from `TV/Resources`.
   (`.publishesTopShelf` in `TV/Screens/Home/HomeScreen.swift`, then
   `TopShelfPublisher` in WMMFeatures): the rows the person shows on Home (a
   row hidden from Home isn't on the shelf), ten Continue watching and twelve
-  Recently added, each picture fetched with the app's sign-in and saved as a
+  New for you, each picture fetched with the app's sign-in and saved as a
   file in the group, then `TVTopShelfContentProvider.topShelfContentDidChange()`.
   Signing out, or another person or server signing in, clears it
   (`.clearsTopShelfOnAccountChange` in `TV/Shell/WatchMyMediaTVApp.swift`);
