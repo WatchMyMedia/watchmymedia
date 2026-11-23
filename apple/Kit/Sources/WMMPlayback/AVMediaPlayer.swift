@@ -33,6 +33,9 @@ public final class AVMediaPlayer: MediaPlayer {
     private var audioGroup: AVMediaSelectionGroup?
     /// Player time to seek to once the item is ready, before playing.
     private var pendingStartMs: Int?
+    /// Counts start seeks, so one that a newer start seek of ours replaced is
+    /// told apart from one a seek made elsewhere cut short (tests read it).
+    private(set) var startSeeks = 0
     /// The source's audio option isn't selected yet: nothing plays until it is.
     private var awaitingAudio = false
     private var ended = false
@@ -265,15 +268,24 @@ public final class AVMediaPlayer: MediaPlayer {
     }
 
     /// Seeks to the start the load asked for, then plays if the viewer wants to.
+    ///
+    /// A seek made elsewhere cuts this one short (`finished` false): the
+    /// Apple TV's transport bar seeks the AVPlayer itself when the viewer
+    /// skips or scrubs. That seek goes where the viewer chose, so the start
+    /// is over all the same. Waiting on the start instead left the player
+    /// buffering for good, its position fixed at the start and Play doing
+    /// nothing, until the viewer left.
     private func startAtPending() {
         guard let start = pendingStartMs else { return }
         let load = loads
-        player.seek(to: Self.time(start), toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
+        startSeeks += 1
+        let seek = startSeeks
+        player.seek(to: Self.time(start), toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
             onMain {
-                // An interrupted seek was replaced by a newer one, which finishes the start.
-                guard let self, finished, self.loads == load, self.pendingStartMs != nil else { return }
+                // A newer start seek of ours replaced this one, and finishes the start itself.
+                guard let self, self.loads == load, self.startSeeks == seek, self.pendingStartMs != nil else { return }
                 self.pendingStartMs = nil
-                if self.playWhenReady && !self.awaitingAudio { self.player.play() }
+                if self.playWhenReady && !self.awaitingAudio && !self.ended { self.player.play() }
                 self.listener?.changed()
             }
         }

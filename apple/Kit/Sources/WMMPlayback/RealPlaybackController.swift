@@ -171,8 +171,14 @@ public final class RealPlaybackController: PlaybackController {
 
     public func noteSeek(playerMs: Int) {
         stillWatching.noteInput()
-        guard let v = active(), let d = v.decision, !v.loading else { return }
-        noteSeek(v, d, to: min(max(v.streamClock.filePosition(playerMs), 0), duration(v, d)))
+        guard let v = active(), let d = v.decision else { return }
+        // While a new stream is fetched the transport bar still seeks the one
+        // showing, on its clock: the new one starts where the viewer went.
+        // Unless the old one plays on, it would start at the place asked for
+        // first; one that plays on carries its position over by itself.
+        let target = min(max(v.streamClock.filePosition(playerMs), 0), duration(v, d))
+        noteSeek(v, d, to: target)
+        if v.loading && v.pendingPositionMs != nil { v.pendingPositionMs = target }
         refresh(0)
     }
 
