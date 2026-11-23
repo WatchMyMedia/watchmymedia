@@ -118,19 +118,25 @@ class RelatedRowsTest {
         assertEquals("up from the cast goes back to the button focus was on", "Play", focused())
     }
 
-    @Test fun `down from About the show reaches More like this, and up goes back to About`() {
+    @Test fun `down from About the show reaches its cast, then More like this, and up goes back`() {
         show()
-        val about = listOf("Notifications on", "Mark show watched", "Show missing episodes", "Cast & details")
+        val about = listOf("Notify me", "Notifications on", "Watchlist", "Mark show watched", "More")
         var presses = 0
         while (focused() !in about && presses++ < 6) press(Key.DirectionDown)
         assertTrue("${focused()} is in About the show", focused() in about)
+        val button = focused()
+        val cast = FakeData.show(100).cast.map { it.name }
+        press(Key.DirectionDown)
+        assertTrue("${focused()} is in the cast", focused() in cast)
         press(Key.DirectionDown)
         assertEquals(FakeData.showRelated(100).single().items.first().title, focused())
         compose.onNode(isFocused()).assertIsDisplayed()
         press(Key.DirectionCenter)
         assertEquals(listOf(FakeData.showRelated(100).single().items.first().id), opened)
         press(Key.DirectionUp)
-        assertTrue("${focused()} is in About the show", focused() in about)
+        assertTrue("${focused()} is in the cast", focused() in cast)
+        press(Key.DirectionUp)
+        assertEquals("up from the cast goes back to the button focus was on", button, focused())
     }
 
     @Test fun `Back from the title a card opened puts focus back on that card`() {
