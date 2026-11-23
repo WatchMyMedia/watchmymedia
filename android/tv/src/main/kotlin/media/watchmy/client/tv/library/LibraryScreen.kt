@@ -146,7 +146,7 @@ fun LibraryScreen(
 
     TvScaffold(if (type == LibraryType.Tv) RailSection.Shows else RailSection.Movies, onNavigate) {
         if (rowsVm.arranges && state.libraryId != null) {
-            val actions = TvRowActions(onPlay, onOpenShow, onOpenMovie, { show, season, episode -> onNavigate(TvRoutes.Episode(show, season, episode)) }, notMatched, { vm.setWatched(it, !it.watched) }) { id -> onNavigate(TvRoutes.MediaList(id, type = if (type == LibraryType.Movie) "movie" else "tv")) }
+            val actions = TvRowActions(onPlay, onOpenShow, onOpenMovie, { show, season, episode -> onNavigate(TvRoutes.Episode(show, season, episode)) }, notMatched, { vm.setWatched(it, !it.watched) }, { id -> onNavigate(TvRoutes.MediaList(id, type = if (type == LibraryType.Movie) "movie" else "tv")) })
             ArrangedLibrary(
                 type, title, state, rows, actions, memory, gridState, jumps, byTitle,
                 controls = { m -> LibraryControls(state.choices, memory, vm::clearFilters, { vm.setFilter(ItemFilter.Unwatched) }, { openPanel(null) }, { openPanel(FilterList.Sort) }, m) },
@@ -263,6 +263,7 @@ fun LibraryScreen(
             onSort = vm::setSort,
             onClear = vm::clearFilters,
             onDismiss = { panelOpen = false },
+            onRating = vm::setRating,
         )
     }
 }
@@ -457,6 +458,9 @@ private fun GridCard(item: BrowseItem, imageUrl: String?, onClick: () -> Unit, o
         subtitleLine = false,
     ) {
         if (item.isNew) ArtBadge("New", Modifier.align(Alignment.TopStart).padding(10.dp), BadgeStyle.Gold)
+        // A show partway through says how many episodes are left ("4 left"), where the server counts them.
+        val left = item.unwatchedCount?.takeIf { item.kind == media.watchmy.client.model.ItemKind.Show && it > 0 && !item.watched }
+        if (left != null) ArtBadge("$left left", Modifier.align(Alignment.TopEnd).padding(10.dp))
         ArtWatched(item.watched)
         ArtProgress(item.progress)
     }

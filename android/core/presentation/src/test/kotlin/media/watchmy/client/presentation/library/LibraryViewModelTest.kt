@@ -113,6 +113,28 @@ class LibraryViewModelTest {
         assertEquals("2026 · 1 h 52 min", vm.state.value.items.first().gridSubtitle())
     }
 
+    @Test fun `the rating filter offers the library's certifications and narrows the grid to one`() = runTest(main.dispatcher) {
+        val vm = vm(LibraryType.Movie)
+        assertEquals(listOf("PG", "PG-13", "R"), vm.state.value.ratings)
+        assertEquals(2, vm.state.value.ratingCounts["R"])
+        vm.setRating("R")
+        assertEquals(setOf("R"), library.queries.last().contentRatings)
+        assertTrue(vm.state.value.items.all { it.contentRating == "R" })
+        assertEquals(1, vm.state.value.choices.filterCount)
+        vm.setRating("R")
+        assertNull("picking the rating again clears it", vm.state.value.choices.rating)
+        vm.setRating("PG")
+        vm.clearFilters()
+        assertNull(vm.state.value.choices.rating)
+        assertEquals(emptySet<String>(), library.queries.last().contentRatings)
+    }
+
+    @Test fun `an older server offers no rating filter`() = runTest(main.dispatcher) {
+        val older = object : LibraryRepository by FakeLibraryRepository(level = { media.watchmy.client.model.REDESIGN_API_LEVEL - 1 }) {}
+        val vm = vm(LibraryType.Movie, from = older)
+        assertNull(vm.state.value.ratings)
+    }
+
     @Test fun `filters, genre and decade go into the query and narrow the grid`() = runTest(main.dispatcher) {
         val vm = vm()
         vm.setFilter(ItemFilter.FourK)

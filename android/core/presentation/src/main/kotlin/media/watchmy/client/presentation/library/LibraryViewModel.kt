@@ -70,14 +70,16 @@ class LibraryViewModel(
         val decade: Int? = null,
         /** Title contains (the phone's and tablet's filter field). */
         val text: String = "",
+        /** A certification to keep ("PG-13", [media.watchmy.client.model.UNRATED]); null keeps every one. */
+        val rating: String? = null,
     ) {
-        /** A filter, genre or decade is on. */
-        val narrowed: Boolean get() = filter != ItemFilter.All || genre != null || decade != null
+        /** A filter, genre, decade or rating is on. */
+        val narrowed: Boolean get() = filter != ItemFilter.All || genre != null || decade != null || rating != null
 
         /** Anything narrows the grid, the title filter included. */
         val filtered: Boolean get() = narrowed || text.isNotBlank()
 
-        val filterCount: Int get() = listOf(filter != ItemFilter.All, genre != null, decade != null).count { it }
+        val filterCount: Int get() = listOf(filter != ItemFilter.All, genre != null, decade != null, rating != null).count { it }
     }
 
     /** The newest A–Z jump: the grid moves to [index] of the items (the first title under [letter]). */
@@ -100,6 +102,10 @@ class LibraryViewModel(
         val jump: Jump? = null,
         val genreCounts: Map<String, Int> = emptyMap(),
         val genreCountsFromServer: Boolean = false,
+        /** The certifications the rating filter offers, in the US order; null where the server has no rating filter. */
+        val ratings: List<String>? = null,
+        /** Titles of each certification with the other filters on. */
+        val ratingCounts: Map<String, Int> = emptyMap(),
         /** The whole library's counts; null from servers that do not send them. */
         val summary: LibrarySummary? = null,
         /** The TV's "142 shows · 3,418 episodes · 12 continuing", once known. */
@@ -135,6 +141,7 @@ class LibraryViewModel(
                 genre = saved[GENRE],
                 decade = saved[DECADE],
                 text = saved[TEXT] ?: "",
+                rating = saved[RATING],
             ),
         ),
     )
@@ -180,7 +187,10 @@ class LibraryViewModel(
 
     fun setDecade(decade: Int?) = change { it.copy(decade = decade) }
 
-    fun clearFilters() = change { it.copy(filter = ItemFilter.All, genre = null, decade = null, text = "") }
+    /** Null keeps every certification; picking the chosen one again does too. */
+    fun setRating(rating: String?) = change { it.copy(rating = if (rating == it.rating) null else rating) }
+
+    fun clearFilters() = change { it.copy(filter = ItemFilter.All, genre = null, decade = null, text = "", rating = null) }
 
     /**
      * A row's See all: the link's sort when this
@@ -355,6 +365,7 @@ class LibraryViewModel(
         saved[GENRE] = choices.genre
         saved[DECADE] = choices.decade
         saved[TEXT] = choices.text
+        saved[RATING] = choices.rating
     }
 
     /** The choices a See all asks for, from these: a sort this library doesn't offer leaves the sort as it is. */
@@ -421,6 +432,7 @@ class LibraryViewModel(
                         end = page.offset + page.items.size, letters = page.letters, genres = page.genres, decades = page.decades, summary = page.summary,
                         anchorLetter = anchor?.takeIf { letter -> page.letters?.any { entry -> entry.letter == letter } == true },
                         genreCounts = page.genreCounts.orEmpty(), genreCountsFromServer = page.genreCounts != null,
+                        ratings = page.contentRatings?.takeIf { r -> r.isNotEmpty() }, ratingCounts = page.contentRatingCounts.orEmpty(),
                         loading = false, refreshing = false, error = null, noLibrary = false,
                     ).withKnownGenreCounts()
                 }
@@ -445,7 +457,9 @@ class LibraryViewModel(
             // Best effort: on failure the title stands alone.
             attempt {
                 val line = if (type == LibraryType.Tv) {
-                    if (counts != null) {
+                    if (counts?.newEpisodes != null) {
+                        listOfNotNull(plural(counts.items, "show"), counts.newEpisodes?.takeIf { it > 0 }?.let { "$it with new episodes" }).joinToString(" · ")
+                    } else if (counts != null) {
                         showsLine(counts.items, counts.episodes, counts.continuing)
                     } else {
                         val totals = library.home().totals
@@ -453,7 +467,7 @@ class LibraryViewModel(
                     }
                 } else {
                     val movies = counts?.items ?: library.home().totals.movies
-                    val unwatched = library.items(ItemQuery(id, filter = ItemFilter.Unwatched, limit = 1)).total
+                    val unwatched = counts?.unwatched ?: library.items(ItemQuery(id, filter = ItemFilter.Unwatched, limit = 1)).total
                     "${plural(movies, "movie")} · $unwatched unwatched"
                 }
                 _state.update { it.copy(countsLine = line) }
@@ -470,7 +484,7 @@ class LibraryViewModel(
     }
 
     private fun State.query(libraryId: Long, offset: Int) = choices.let { c ->
-        ItemQuery(libraryId = libraryId, sort = c.sort, filter = c.filter, genre = c.genre, decade = c.decade, text = c.text, offset = offset, limit = pageSize)
+        ItemQuery(libraryId = libraryId, sort = c.sort, filter = c.filter, genre = c.genre, decade = c.decade, text = c.text, offset = offset, limit = pageSize, contentRatings = setOfNotNull(c.rating))
     }
 
     companion object {
@@ -484,6 +498,7 @@ class LibraryViewModel(
         private const val FILTER = "filter"
         private const val GENRE = "genre"
         private const val DECADE = "decade"
+        private const val RATING = "rating"
         private const val TEXT = "text"
     }
 }

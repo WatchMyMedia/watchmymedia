@@ -43,6 +43,8 @@ import media.watchmy.client.model.heading
 import media.watchmy.client.model.nextAt
 import media.watchmy.client.model.onAt
 import media.watchmy.client.model.plural
+import media.watchmy.client.model.episodesLeftLine
+import media.watchmy.client.model.nextEpisodeLine
 import media.watchmy.client.model.seeAllWords
 import media.watchmy.client.tv.components.Kicker
 import media.watchmy.client.tv.components.TvPalette
@@ -114,9 +116,14 @@ private fun continueFocus(c: ContinueItem, now: Long, format: LiveClockFormat): 
         kicker = "Continue watching",
         title = c.title,
         episode = if (code != null) listOfNotNull(code, c.subtitle?.takeIf { it.isNotBlank() && !it.startsWith(code) }).joinToString(" · ") else null,
-        facts = listOf(HomeFact(timeLeft(c.remainingMs), HomeFact.Kind.Strong), HomeFact(endsAt(c.remainingMs, now, format))),
+        facts = listOfNotNull(
+            HomeFact(timeLeft(c.remainingMs), HomeFact.Kind.Strong),
+            HomeFact(endsAt(c.remainingMs, now, format)),
+            c.contentRating?.let { HomeFact(it, HomeFact.Kind.Tag) },
+        ),
         progress = c.progress.takeIf { c.durationMs > 0 },
         progressLabel = if (totalMin > 0) "$watchedMin of $totalMin minutes watched" else null,
+        overview = c.overview.orEmpty(),
         picturePath = c.stillPath ?: c.backdropPath,
     )
 }
@@ -139,6 +146,7 @@ private fun ScreenRow.itemFocus(item: BrowseItem, index: Int, headingTitle: Stri
     when (item.kind) {
         ItemKind.Movie -> {
             item.year?.let { facts += HomeFact(it.toString()) }
+            item.contentRating?.let { facts += HomeFact(it, HomeFact.Kind.Tag) }
             if (partway != null && runtimeMs != null) {
                 val left = (runtimeMs * (1f - partway)).toLong()
                 facts += HomeFact(timeLeft(left), HomeFact.Kind.Strong)
@@ -150,9 +158,15 @@ private fun ScreenRow.itemFocus(item: BrowseItem, index: Int, headingTitle: Stri
             genre?.let { facts += HomeFact(it) }
         }
         ItemKind.Show -> {
-            item.year?.let { facts += HomeFact(it.toString()) }
-            item.episodeCount?.let { facts += HomeFact(plural(it, "episode"), HomeFact.Kind.Strong) }
+            item.seasonCount?.let { facts += HomeFact(plural(it, "season")) } ?: item.year?.let { facts += HomeFact(it.toString()) }
+            item.contentRating?.let { facts += HomeFact(it, HomeFact.Kind.Tag) }
+            val left = item.episodesLeftLine()
+            when {
+                left != null -> facts += HomeFact(left, HomeFact.Kind.Strong)
+                else -> item.episodeCount?.let { facts += HomeFact(plural(it, "episode"), HomeFact.Kind.Strong) }
+            }
             genre?.let { facts += HomeFact(it) }
+            note = nextEpisodeLine(item.nextAirDate)
         }
         ItemKind.Unmatched -> {
             item.fileName?.let { facts += HomeFact(it) }

@@ -27,6 +27,9 @@ import androidx.tv.material3.Text
 import media.watchmy.client.model.BrowseItem
 import media.watchmy.client.model.ItemFilter
 import media.watchmy.client.model.ItemKind
+import media.watchmy.client.model.UNRATED
+import media.watchmy.client.model.episodesLeftLine
+import media.watchmy.client.model.nextEpisodeLine
 import media.watchmy.client.model.ItemSort
 import media.watchmy.client.model.LibraryType
 import media.watchmy.client.model.formatDuration
@@ -107,17 +110,34 @@ internal fun FocusedFacts(item: BrowseItem?, modifier: Modifier = Modifier) {
     }
 }
 
-/** What a grid card's facts line says, in a viewer's order: when, how long, what kind, then where they are with it. */
+/** A certification as the rating filter words it: "PG-13", or "Not rated". */
+internal fun ratingWords(rating: String): String = if (rating == UNRATED) "Not rated" else rating
+
+/**
+ * What a grid card's facts line says, in a viewer's order: when, how long,
+ * what kind, its rating, then where they are with it. A show says its
+ * seasons and when the next episode airs, and how many episodes are left,
+ * where the server says so.
+ */
 internal fun BrowseItem.gridFacts(): List<HomeFact> = buildList {
-    year?.let { add(HomeFact(it.toString())) }
     when (kind) {
-        ItemKind.Movie -> runtimeMin?.let { add(HomeFact(formatDuration(it * 60_000L))) }
-        ItemKind.Show -> episodeCount?.let { add(HomeFact(plural(it, "episode"))) }
+        ItemKind.Movie -> {
+            year?.let { add(HomeFact(it.toString())) }
+            runtimeMin?.let { add(HomeFact(formatDuration(it * 60_000L))) }
+        }
+        ItemKind.Show -> {
+            val seasons = seasonCount
+            if (seasons != null) add(HomeFact(plural(seasons, "season"))) else year?.let { add(HomeFact(it.toString())) }
+            nextEpisodeLine(nextAirDate)?.let { add(HomeFact(it)) } ?: if (seasons == null) episodeCount?.let { add(HomeFact(plural(it, "episode"))) } else Unit
+        }
         ItemKind.Unmatched -> fileName?.let { add(HomeFact(it)) }
     }
-    genres.firstOrNull()?.let { add(HomeFact(it)) }
+    if (kind == ItemKind.Movie) genres.firstOrNull()?.let { add(HomeFact(it)) }
+    contentRating?.let { add(HomeFact(it, HomeFact.Kind.Tag)) }
     val partway = progress?.takeIf { it > 0f && it < 1f }
+    val left = episodesLeftLine()
     when {
+        left != null -> add(HomeFact(left, HomeFact.Kind.Strong))
         watched -> add(HomeFact("Watched", HomeFact.Kind.Strong))
         partway != null && runtimeMin != null -> add(HomeFact(timeLeft((runtimeMin!! * 60_000L * (1f - partway)).toLong()), HomeFact.Kind.Strong))
         kind == ItemKind.Movie -> add(HomeFact("Not watched yet", HomeFact.Kind.Strong))
@@ -135,7 +155,7 @@ private val ItemSort.order: String
     }
 
 /** Which list the Sort and filter panel shows: its rows, or one row's choices. */
-internal enum class FilterList { Show, Genre, Status, Decade, Picture, Sort }
+internal enum class FilterList { Show, Genre, Status, Decade, Rating, Picture, Sort }
 
 /**
  * Sort and filter, a panel from the right: a row for each way to narrow
@@ -157,6 +177,7 @@ internal fun SortFilterPanel(
     onSort: (ItemSort) -> Unit,
     onClear: () -> Unit,
     onDismiss: () -> Unit,
+    onRating: (String?) -> Unit = {},
 ) {
     var open by rememberSaveable { mutableStateOf(start) }
     // The row a list was opened from takes focus again when Back returns to the rows.
@@ -199,7 +220,7 @@ internal fun SortFilterPanel(
                     if (back == null || runCatching { back.requestFocus() }.getOrDefault(false).not()) focus.requestFocus()
                 }
             }
-            else -> ChoiceList(list, state, filters, sorts, onFilter, onGenre, onDecade, onSort)
+            else -> ChoiceList(list, state, filters, sorts, onFilter, onGenre, onDecade, onSort, onRating)
         }
     }
 }
@@ -217,6 +238,7 @@ private fun filterRows(state: LibraryViewModel.State, filters: List<ItemFilter>)
             add(FilterRow(FilterList.Status, "Status", when (f) { ItemFilter.Continuing -> "Still running"; ItemFilter.Ended -> "Ended"; else -> "Any" }))
         }
         if (state.decades.isNotEmpty()) add(FilterRow(FilterList.Decade, "Decade", c.decade?.let { "The ${it}s" } ?: "Any"))
+        if (state.ratings != null) add(FilterRow(FilterList.Rating, "Rating", c.rating?.let(::ratingWords) ?: "Any"))
         if (ItemFilter.FourK in filters || ItemFilter.Hdr in filters) {
             add(FilterRow(FilterList.Picture, "Picture", when (f) { ItemFilter.FourK -> "4K"; ItemFilter.Hdr -> "HDR"; else -> "Any" }))
         }
@@ -235,6 +257,7 @@ private fun ChoiceList(
     onGenre: (String?) -> Unit,
     onDecade: (Int?) -> Unit,
     onSort: (ItemSort) -> Unit,
+    onRating: (String?) -> Unit,
 ) {
     val c = state.choices
     val f = c.filter
@@ -251,6 +274,9 @@ private fun ChoiceList(
             Choice("Ended", "No more episodes are coming", f == ItemFilter.Ended) { onFilter(ItemFilter.Ended) },
         )
         FilterList.Decade -> "Decade" to (listOf(Choice("Any", null, c.decade == null) { onDecade(null) }) + state.decades.map { d -> Choice("The ${d}s", null, c.decade == d) { onDecade(d) } })
+        FilterList.Rating -> "Rating" to (listOf(Choice("Any", null, c.rating == null) { c.rating?.let(onRating) }) + state.ratings.orEmpty().map { r ->
+            Choice(ratingWords(r), state.ratingCounts[r]?.let { n -> plural(n, "title") }, c.rating == r) { if (c.rating != r) onRating(r) }
+        })
         FilterList.Picture -> "Picture" to listOfNotNull(
             Choice("Any", null, f != ItemFilter.FourK && f != ItemFilter.Hdr) { if (f == ItemFilter.FourK || f == ItemFilter.Hdr) onFilter(ItemFilter.All) },
             Choice("4K", "Ultra HD versions", f == ItemFilter.FourK) { onFilter(ItemFilter.FourK) }.takeIf { ItemFilter.FourK in filters },
