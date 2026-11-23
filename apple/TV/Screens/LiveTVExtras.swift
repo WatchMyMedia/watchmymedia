@@ -31,23 +31,23 @@ struct TVLiveReminderBanner: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
             VStack(alignment: .leading, spacing: 5) {
                 Text("\(Image(systemName: "bell.fill")) \(liveStartingIn(leadMinutes: extras.leadMinutes).uppercased())")
-                    .font(.system(size: 16, weight: .bold)).tracking(1.6).foregroundStyle(Palette.gold)
-                Text(reminder.title).font(.system(size: 30, weight: .bold)).lineLimit(1)
+                    .font(.tv(.caption2, .bold)).tracking(1.6).foregroundStyle(Palette.gold)
+                Text(reminder.title).font(.tv(.callout, .bold)).lineLimit(1)
                 HStack(spacing: 10) {
                     if let logo = channel?.logoURL { LiveLogo(url: logo) { Color.clear }.frame(width: 40, height: 30) }
-                    Text(reminder.number).font(.system(size: 19, weight: .bold)).monospacedDigit()
+                    Text(reminder.number).font(.tv(.caption1, .bold)).monospacedDigit()
                     Text("\(reminder.channelName ?? "") · \(LiveClock.device.time(reminder.start))")
-                        .font(.system(size: 19)).foregroundStyle(Palette.textSecondary).lineLimit(1)
+                        .font(.tv(.caption1)).foregroundStyle(Palette.textSecondary).lineLimit(1)
                 }
-                Text("\(Image(systemName: inPlayer ? "chevron.down" : "tv")) \(liveBannerHint(inPlayer: inPlayer))")
-                    .font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.textSecondary)
+                Text(liveBannerHint(inPlayer: inPlayer))
+                    .font(.tv(.caption2, .semibold)).foregroundStyle(Palette.textSecondary)
                     .padding(.top, 4)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .foregroundStyle(Palette.text)
         .padding(.leading, 18).padding(.trailing, 26).padding(.vertical, 18)
-        .frame(width: 640)
+        .frame(width: 720)
         .background(Color(hex: 0x1C1C1E).opacity(0.95), in: RoundedRectangle(cornerRadius: 26))
         .shadow(color: .black.opacity(0.7), radius: 40, y: 30)
         .padding(.trailing, TVLayout.gutter)
@@ -72,9 +72,9 @@ struct TVLiveReminderStat: View {
     var body: some View {
         let gone = reminder.state == .gone
         Text("\(Image(systemName: gone ? "bell.slash" : "bell.fill")) \(text)")
-            .font(.system(size: 19, weight: .semibold))
+            .font(.tv(.caption2, .semibold))
             .foregroundStyle(gone ? Color(hex: 0xE5E5E5) : Palette.gold)
-            .padding(.horizontal, 14).frame(height: 40)
+            .padding(.horizontal, 16).frame(height: 48)
             .background(gone ? .white.opacity(0.10) : Palette.gold.opacity(0.14), in: RoundedRectangle(cornerRadius: 12))
             .accessibilityIdentifier("live-hero-reminder")
     }
@@ -88,15 +88,15 @@ struct TVLiveReminderStat: View {
     }
 }
 
-/// A hint in the hero: "▶ Watch 4.1", "Hold · Remind me".
+/// A hint beside Search's Live TV results: "Show it in the guide".
 struct TVLiveHint: View {
     let systemImage: String
     let text: String
 
     var body: some View {
         Text("\(Image(systemName: systemImage)) \(text)")
-            .font(.system(size: 19, weight: .semibold))
-            .padding(.horizontal, 14).frame(height: 40)
+            .font(.tv(.caption2, .semibold))
+            .padding(.horizontal, 16).frame(height: 48)
             .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
     }
 }
@@ -115,8 +115,8 @@ struct TVLiveRemindersScreen: View {
         ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: 30) {
                 HStack(alignment: .lastTextBaseline, spacing: 24) {
-                    Text(liveRemindersTitle).font(.system(size: 48, weight: .heavy)).accessibilityAddTraits(.isHeader)
-                    Text(liveRemindersTVNote(leadMinutes: extras.leadMinutes)).font(.system(size: 19)).foregroundStyle(Palette.muted)
+                    Text(liveRemindersTitle).font(.tv(.title3)).accessibilityAddTraits(.isHeader)
+                    Text(liveRemindersTVNote(leadMinutes: extras.leadMinutes)).font(.tv(.caption1)).foregroundStyle(Palette.muted)
                         .lineLimit(2)
                 }
                 TimelineView(.periodic(from: .now, by: 60)) { context in
@@ -125,14 +125,14 @@ struct TVLiveRemindersScreen: View {
                         if extras.loading && !extras.loaded {
                             ProgressView().frame(maxWidth: .infinity, minHeight: 300)
                         } else {
-                            TVEmptyState(systemImage: "bell", title: liveNoReminders, message: "Hold Select on a programme in the guide and choose Remind me.")
+                            TVEmptyState(systemImage: "bell", title: liveNoReminders, message: "Choose a programme in the guide, then Remind me.")
                                 .frame(minHeight: 300)
                         }
                     } else {
                         LazyVGrid(columns: [GridItem(.flexible(), spacing: 80, alignment: .top), GridItem(.flexible(), alignment: .top)], alignment: .leading, spacing: 40) {
                             ForEach(groups) { group in
                                 VStack(alignment: .leading, spacing: 16) {
-                                    Text(group.title.uppercased()).font(.system(size: 16, weight: .bold)).tracking(1.6).foregroundStyle(Palette.muted)
+                                    TVGroupLabel(group.title)
                                     ForEach(group.reminders) { row($0, now: context.date) }
                                 }
                                 .focusSection()
@@ -143,7 +143,7 @@ struct TVLiveRemindersScreen: View {
             }
             .foregroundStyle(Palette.text)
             .padding(.horizontal, TVLayout.gutter)
-            .padding(.top, 40).padding(.bottom, 80)
+            .padding(.top, TVLayout.safeTop).padding(.bottom, TVLayout.safeBottom)
         }
         .scrollClipDisabled()
         .ignoresSafeArea(edges: .horizontal)
@@ -191,23 +191,23 @@ private struct TVLiveReminderRow: View {
     var body: some View {
         HStack(spacing: 20) {
             picture
-                .frame(width: 144, height: 81)
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .frame(width: 176, height: 99)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
             VStack(alignment: .leading, spacing: 3) {
-                Text(reminder.title).font(.system(size: 23, weight: .semibold)).lineLimit(1)
+                Text(reminder.title).font(.tv(.body, .semibold)).lineLimit(1)
                 if let line = liveReminderLine(reminder, previousStart: previousStart, now: now) {
-                    Text(line).font(.system(size: 17)).foregroundStyle(focused ? Color(hex: 0x404040) : Palette.muted).lineLimit(1)
+                    Text(line).font(.tv(.caption2)).foregroundStyle(focused ? Color.tvOnWhiteMuted : Palette.muted).lineLimit(1)
                 }
                 Text("\(Image(systemName: reminder.state == .gone ? "bell.slash" : "bell.fill")) \(liveReminderWhen(reminder, now: now))")
-                    .font(.system(size: 18, weight: reminder.state == .gone ? .medium : .semibold))
+                    .font(.tv(.caption2, reminder.state == .gone ? .medium : .semibold))
                     .foregroundStyle(whenColour).lineLimit(1)
             }
             Spacer(minLength: 0)
         }
         .foregroundStyle(focused ? Palette.ground : Palette.text)
-        .padding(.leading, 10).padding(.trailing, 18)
-        .frame(height: 100)
-        .background(focused ? Palette.text : .white.opacity(0.05), in: RoundedRectangle(cornerRadius: 18))
+        .padding(.leading, 12).padding(.trailing, 24)
+        .frame(height: 124)
+        .background(focused ? Palette.text : Color.tvRow, in: RoundedRectangle(cornerRadius: 18))
         .focusLift(focused, scale: 1.03)
     }
 
@@ -247,16 +247,16 @@ struct TVLiveGoneReminderScreen: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
                     if shown.logoURL != nil { LiveLogo(url: shown.logoURL) { Color.clear }.frame(width: 48, height: 36) }
-                    Text(reminder.number).font(.system(size: 22, weight: .bold))
-                    Text(reminder.channelName ?? "").font(.system(size: 22)).foregroundStyle(Palette.muted)
+                    Text(reminder.number).font(.tv(.caption1, .bold))
+                    Text(reminder.channelName ?? "").font(.tv(.caption1)).foregroundStyle(Palette.muted)
                     Text("·").foregroundStyle(Palette.muted)
-                    Text("Your reminder").font(.system(size: 22)).foregroundStyle(Palette.muted)
+                    Text("Your reminder").font(.tv(.caption1)).foregroundStyle(Palette.muted)
                 }
-                Text(reminder.title).font(.system(size: 54, weight: .bold)).lineLimit(1).minimumScaleFactor(0.7)
+                Text(reminder.title).font(.tv(.title2)).lineLimit(1).minimumScaleFactor(0.7)
                     .accessibilityIdentifier("live-hero-title")
-                if let line = reminder.episodeLine { Text(line).font(.system(size: 22)).foregroundStyle(Palette.textSecondary) }
-                Text(liveWas(reminder)).font(.system(size: 20)).foregroundStyle(Palette.textSecondary).monospacedDigit()
-                Text(liveGoneKept(number: reminder.number, replacement: nil)).font(.system(size: 21)).foregroundStyle(Palette.muted)
+                if let line = reminder.episodeLine { Text(line).font(.tv(.body)).foregroundStyle(Palette.textSecondary) }
+                Text(liveWas(reminder)).font(.tv(.body)).foregroundStyle(Palette.textSecondary).monospacedDigit()
+                Text(liveGoneKept(number: reminder.number, replacement: nil)).font(.tv(.body)).foregroundStyle(Palette.muted)
                 TVLiveReminderStat(reminder: reminder, now: .now).padding(.top, 4)
                 HStack(spacing: 24) {
                     Button { if let channel { navigator.playLive(.init(channel: channel)) } } label: {

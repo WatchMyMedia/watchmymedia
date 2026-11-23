@@ -60,20 +60,17 @@ final class LiveChannelKeysTests: XCTestCase {
     }
 
     @MainActor
-    func testPageUpAndPageDownChangeChannelAndSayWhichOne() {
+    /// The banner names the new channel at once: no note of its own.
+    func testPageUpAndPageDownChangeChannelAndTheBannerSaysWhichOne() {
         let app = play()
         let title = app.staticTexts["live-player-title"]
         XCTAssertTrue(title.waitUntilExists(timeout: 15))
         XCTAssertTrue(says(title, "Cedar One"))
         remote.press(.pageUp)
         XCTAssertTrue(says(title, "Northline"), title.label)
-        let note = app.staticTexts["live-key-note"]
-        XCTAssertTrue(note.waitUntilExists(timeout: 5))
-        XCTAssertEqual(note.label, "Page Up · 5.1 Northline")
         remote.press(.pageDown)
         remote.press(.pageDown)
-        XCTAssertTrue(says(note, "Page Down · 12.1 Valley News"), "Page Down wraps past the first channel: \(note.label)")
-        XCTAssertTrue(says(title, "Valley News"), title.label)
+        XCTAssertTrue(says(title, "Valley News"), "Page Down wraps past the first channel: \(title.label)")
         snap("tv-live-page-down")
     }
 

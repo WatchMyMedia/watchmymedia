@@ -44,7 +44,7 @@ struct TVLivePlayerModelTests {
         #expect(model.cancellableTakeover?.recordingID == "r1")
         // The banner takes no focus: nothing joins the contextual actions or the transport bar.
         #expect(!model.contextualActions.contains { $0.title.contains("record") })
-        #expect(model.transportBarActions.map(\.kind) == [.previousChannel, .nextChannel, .goToChannel, .stop])
+        #expect(model.transportBarActions.map(\.kind) == [.previousChannel, .nextChannel])
         controller.state.askStillWatching = true
         #expect(model.cancellableTakeover == nil, "Not under a prompt")
         model.dispose()
@@ -67,23 +67,23 @@ struct TVLivePlayerModelTests {
         let (model, controller, repository) = try await fixture()
         repository.availableChannels = [repository.availableChannels[0]]
         #expect(model.contextualActions.isEmpty)
-        #expect(model.transportBarActions.map(\.kind) == [.stop])
+        #expect(model.transportBarActions.isEmpty)
         controller.state.status = .paused
         #expect(model.contextualActions.map(\.kind) == [.goLive])
         model.dispose()
     }
     @Test func pauseOrBehindLiveAddsGoLiveAndItReturnsToTheEdge() async throws {
         let (model, controller, _) = try await fixture()
-        #expect(model.transportBarActions.map(\.kind) == [.previousChannel, .nextChannel, .goToChannel, .stop])
+        #expect(model.transportBarActions.map(\.kind) == [.previousChannel, .nextChannel])
         controller.state.isAtLiveEdge = false
         #expect(model.contextualActions.map(\.kind) == [.goLive])
-        #expect(model.transportBarActions.map(\.kind) == [.previousChannel, .nextChannel, .goToChannel, .stop])
+        #expect(model.transportBarActions.map(\.kind) == [.previousChannel, .nextChannel])
         model.perform(.goLive)
         #expect(model.contextualActions.isEmpty)
-        #expect(model.transportBarActions.map(\.kind) == [.previousChannel, .nextChannel, .goToChannel, .stop])
+        #expect(model.transportBarActions.map(\.kind) == [.previousChannel, .nextChannel])
         controller.state.status = .paused
         #expect(model.contextualActions.map(\.kind) == [.goLive])
-        #expect(model.transportBarActions.map(\.kind) == [.previousChannel, .nextChannel, .goToChannel, .stop])
+        #expect(model.transportBarActions.map(\.kind) == [.previousChannel, .nextChannel])
         model.dispose()
     }
     @Test func firstBackAnswersStillWatchingAndSecondBackStopsAndExitsOnce() async throws {

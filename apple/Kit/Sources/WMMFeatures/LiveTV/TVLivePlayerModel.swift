@@ -9,11 +9,11 @@ public enum TVLivePlayerOverlay: Hashable, Sendable {
 }
 
 /// Live-only AVKit actions: no seek, file progress, subtitles or next episode.
-/// Last channel, Ch−, Ch+ and Go to channel are transport bar buttons, to the
-/// left of the system's: as contextual actions
-/// they took Select from the transport bar.
+/// Record, Channel down and Channel up are the transport bar's buttons, to
+/// the left of the system's (as contextual actions they took Select from the
+/// bar); Last channel and Go to channel lead the Channels tab.
 public struct TVLivePlayerAction: Hashable, Sendable, Identifiable {
-    public enum Kind: String, Hashable, Sendable { case lastChannel, previousChannel, nextChannel, goToChannel, goLive, stop }
+    public enum Kind: String, Hashable, Sendable { case record, stopRecording, lastChannel, previousChannel, nextChannel, goToChannel, goLive, stop }
     public let kind: Kind
     public let title: String
     /// Under the title while the button has focus: where it goes ("7.1 LKSD-HD · Valley Bake-Off").
@@ -27,6 +27,8 @@ public struct TVLivePlayerAction: Hashable, Sendable, Identifiable {
     /// "Channel up, 4.3 Coast Shop".
     public var accessibilityLabel: String {
         let name = switch kind {
+        case .record: "Record this programme"
+        case .stopRecording: "Stop recording this programme"
         case .lastChannel: "Last channel"
         case .previousChannel: "Channel down"
         case .nextChannel: "Channel up"
@@ -38,6 +40,8 @@ public struct TVLivePlayerAction: Hashable, Sendable, Identifiable {
     }
     public var systemImage: String {
         switch kind {
+        case .record: "record.circle"
+        case .stopRecording: "stop.circle"
         case .lastChannel: "arrow.counterclockwise"
         case .previousChannel: "chevron.down"
         case .nextChannel: "chevron.up"
@@ -49,15 +53,6 @@ public struct TVLivePlayerAction: Hashable, Sendable, Identifiable {
 
     /// "7.1 LKSD-HD", as the buttons name a channel.
     public static func label(_ channel: LiveChannel) -> String { "\(channel.number) \(channel.name)" }
-}
-
-/// A short note at the top of Live TV: which channel Page Up or Page Down
-/// tuned, or how to reach the channel buttons.
-public struct TVLiveKeyNote: Hashable, Sendable {
-    public let id: Int
-    public let text: String
-    /// How long it shows.
-    public let seconds: Double
 }
 
 /// tvOS policy around the shared live lifecycle. AVKit gets the first Back to
@@ -76,17 +71,19 @@ public final class TVLivePlayerModel {
         set { live.onExit = newValue }
     }
     public private(set) var transportBarVisible = false
-    /// The note at the top after Page Up or Page Down, or the first time the transport bar comes up.
-    public private(set) var keyNote: TVLiveKeyNote?
     /// Go to channel's keypad, while it is open.
     public private(set) var goTo: GoToChannelModel?
-    @ObservationIgnored private var notes = 0
-    @ObservationIgnored private var barHinted = false
+    /// Recordings, for the bar's Record; nil where the screen records nothing.
+    public let recordings: LiveRecordingsStore?
+    /// Record found the tuners booked: the choice of which one gives way.
+    public var clash: LiveRecordingClash?
     @ObservationIgnored private var disposed = false
     @ObservationIgnored private var pictureInPicturePossible = false
 
-    public init(request: LivePlayRequest, repository: any LiveTVRepository, controller: any LivePlaybackController, onExit: (@MainActor () -> Void)? = nil) {
+    public init(request: LivePlayRequest, repository: any LiveTVRepository, controller: any LivePlaybackController,
+                recordings: LiveRecordingsStore? = nil, onExit: (@MainActor () -> Void)? = nil) {
         live = LivePlayerModel(request: request, repository: repository, controller: controller, onExit: onExit)
+        self.recordings = recordings
     }
 
     public var overlay: TVLivePlayerOverlay? {
@@ -115,14 +112,35 @@ public final class TVLivePlayerModel {
         guard videoTakesInput, let takeover = state.takeover, takeover.canCancel else { return nil }
         return takeover
     }
-    /// The transport bar's buttons: Last channel
-    /// once there is one that can be watched, Ch− and Ch+ naming where they
-    /// go, Go to channel, then Stop.
+    /// The transport bar's buttons: Record (or Stop recording) for the
+    /// programme on now, then Channel down and Channel up naming where they
+    /// go. Back stops; Last channel and Go to channel are in Channels.
     public var transportBarActions: [TVLivePlayerAction] {
         transportBarActions(now: .now)
     }
 
     public func transportBarActions(now: Date) -> [TVLivePlayerAction] {
+        guard videoTakesInput else { return [] }
+        var actions: [TVLivePlayerAction] = []
+        if let offer = recordable(now: now) {
+            actions.append(offer.stop == nil
+                ? .init(kind: .record, title: "Record", subtitle: offer.programme.title)
+                : .init(kind: .stopRecording, title: liveStopRecording, subtitle: offer.programme.title))
+        }
+        if changesChannel {
+            let down = live.channel(steppedBy: -1).map(TVLivePlayerAction.label)
+            let up = live.channel(steppedBy: 1).map(TVLivePlayerAction.label)
+            actions += [
+                .init(kind: .previousChannel, title: "Channel down", subtitle: down, channel: down),
+                .init(kind: .nextChannel, title: "Channel up", subtitle: up, channel: up),
+            ]
+        }
+        return actions
+    }
+
+    /// Channels' first tiles, left of the channel being watched: Last channel
+    /// once there is one that can be watched, then Go to channel.
+    public func channelsPanelActions(now: Date = .now) -> [TVLivePlayerAction] {
         guard videoTakesInput else { return [] }
         var actions: [TVLivePlayerAction] = []
         if let last = live.lastChannel.map({ last in channels.first { $0.id == last.id } ?? last }), last.available, last.id != state.channel?.id {
@@ -131,20 +149,25 @@ public final class TVLivePlayerModel {
             actions.append(.init(kind: .lastChannel, title: "Last channel", subtitle: [name, on].compactMap { $0 }.joined(separator: " · "), channel: name))
         }
         if changesChannel {
-            let down = live.channel(steppedBy: -1).map(TVLivePlayerAction.label)
-            let up = live.channel(steppedBy: 1).map(TVLivePlayerAction.label)
-            actions += [
-                .init(kind: .previousChannel, title: "Channel down", subtitle: down, channel: down),
-                .init(kind: .nextChannel, title: "Channel up", subtitle: up, channel: up),
-                .init(kind: .goToChannel, title: "Go to channel", subtitle: "or press 123 on the remote"),
-            ]
+            actions.append(.init(kind: .goToChannel, title: "Go to channel", subtitle: "By its number"))
         }
-        actions.append(.init(kind: .stop, title: "Stop"))
         return actions
     }
 
-    /// Shown the first time the transport bar comes up with the channel buttons on it.
-    public static let barHint = "Select pauses · swipe up for the channel buttons"
+    /// The programme on now that the bar's Record would record, and the
+    /// recording of it this person may stop once one is under way. Nil
+    /// without listings, where the server records nothing for this person,
+    /// or while someone else's recording has it.
+    private func recordable(now: Date) -> (programme: LiveProgramme, stop: LiveRecordingMark?)? {
+        guard let recordings, recordings.available, let channel = listedChannel, let programme = channel.programme(at: now) else { return nil }
+        let actions = LiveProgrammeActions(programme: programme, channel: channel, now: now, recordingAvailable: true,
+                                           mark: recordings.mark(for: programme), reminded: false, canRemind: false)
+        switch actions.recording {
+        case .record?: return (programme, nil)
+        case .marked?: return actions.cancel.map { (programme, $0) }
+        case nil: return nil
+        }
+    }
 
 
     public func start() { guard !disposed else { return }; live.start() }
@@ -165,17 +188,16 @@ public final class TVLivePlayerModel {
     /// Page Down: the channel before, as Ch− does.
     public func pageDown() { page(-1) }
 
+    /// The banner names the new channel at once, as after any change.
     private func page(_ delta: Int) {
         guard videoTakesInput, goTo == nil, let target = live.channel(steppedBy: delta) else { return }
         live.switchChannel(target)
-        note("\(delta > 0 ? "Page Up" : "Page Down") · \(TVLivePlayerAction.label(target))", seconds: 3)
     }
 
     /// The 123 key or the Go to channel button: the keypad.
     public func openGoToChannel() {
         guard videoTakesInput, goTo == nil, changesChannel else { return }
         controller.noteUserInput()
-        keyNote = nil
         goTo = GoToChannelModel(
             channels: { [weak self] in self?.channels ?? [] },
             tune: { [weak self] channel in
@@ -191,15 +213,6 @@ public final class TVLivePlayerModel {
         goTo = nil
     }
 
-    /// The note's time is up.
-    public func clearKeyNote(_ note: TVLiveKeyNote) {
-        if keyNote == note { keyNote = nil }
-    }
-
-    private func note(_ text: String, seconds: Double) {
-        notes += 1
-        keyNote = TVLiveKeyNote(id: notes, text: text, seconds: seconds)
-    }
     public func enteredBackground() {
         live.enteredBackground(externalPlayback: controller.player?.isExternalPlaybackActive ?? false, pictureInPictureMayStart: pictureInPicturePossible)
     }
@@ -214,18 +227,14 @@ public final class TVLivePlayerModel {
         guard !disposed else { return }
         // Programmatic AVKit visibility updates must not dismiss an unanswered prompt.
         if visible && !transportBarVisible && overlay == nil { controller.noteUserInput() }
-        if visible && !transportBarVisible && !barHinted && videoTakesInput && changesChannel {
-            barHinted = true
-            note(Self.barHint, seconds: 4)
-        }
         transportBarVisible = visible
     }
     public func perform(_ kind: TVLivePlayerAction.Kind) {
         guard !disposed else { return }
         if kind == .stop { close(); return }
         guard videoTakesInput else { return }
-        keyNote = nil
         switch kind {
+        case .record, .stopRecording: record()
         case .lastChannel: switchToLastChannel()
         case .previousChannel: previousChannel()
         case .nextChannel: nextChannel()
@@ -234,6 +243,21 @@ public final class TVLivePlayerModel {
         case .stop: break
         }
     }
+    /// The bar's Record: the rest of the programme on now, just this
+    /// episode, with a clash's choice of which gives way left in ``clash``;
+    /// or Stop recording, for this person's recording of it.
+    private func record() {
+        guard let recordings, let offer = recordable(now: .now) else { return }
+        controller.noteUserInput()
+        Task { @MainActor [weak self] in
+            if let stop = offer.stop {
+                await recordings.cancel(stop, programmeID: offer.programme.id)
+            } else if let result = await recordings.record(offer.programme, options: .init()), let found = LiveRecordingClash(result) {
+                self?.clash = found
+            }
+        }
+    }
+
     public func pickQuality(_ quality: LiveQuality) {
         guard videoTakesInput, state.qualities.contains(quality) else { return }
         controller.noteUserInput(); controller.selectQuality(quality)

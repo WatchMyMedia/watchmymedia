@@ -40,7 +40,6 @@ final class LiveTVPlayerTests: XCTestCase {
         XCTAssertTrue(focused(first), "Down reaches the guide's first playable channel.")
         remote.press(.right)
         XCTAssertTrue(focused(second))
-        XCTAssertTrue(label(app.staticTexts["live-selected-channel"], contains: "Northline"))
         remote.press(.select)
         XCTAssertTrue(app.staticTexts["live-player-title"].waitUntilExists(timeout: 10))
         XCTAssertTrue(label(app.staticTexts["live-player-title"], contains: "Northline"))
@@ -64,13 +63,13 @@ final class LiveTVPlayerTests: XCTestCase {
     }
 
     @MainActor
-    func testStopWatchingIsBesideKeepWatchingAndReturnsToChannels() {
+    func testStopWatchingIsUnderKeepWatchingAndReturnsToChannels() {
         let app = play(["-liveStillWatching"])
         let keep = app.buttons["live-keep-watching"]
         let stop = app.buttons["live-stop-watching"]
         XCTAssertTrue(keep.waitUntilExists(timeout: 15))
         XCTAssertTrue(focused(keep))
-        remote.press(.right)
+        remote.press(.down)
         XCTAssertTrue(focused(stop))
         remote.press(.select)
         XCTAssertTrue(app.staticTexts["live-tv-title"].waitUntilExists(timeout: 10))
@@ -81,9 +80,10 @@ final class LiveTVPlayerTests: XCTestCase {
     func testBusyStateFocusesRetryAndRetryTunesTheSameChannel() {
         let app = play(["-liveBusy"])
         let retry = app.buttons["live-retry"]
-        XCTAssertTrue(app.staticTexts["Can't play this channel"].waitUntilExists(timeout: 15))
+        XCTAssertTrue(app.staticTexts["No tuner is free"].waitUntilExists(timeout: 15))
         XCTAssertTrue(focused(retry))
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "All tuners are in use")).firstMatch.exists)
+        XCTAssertTrue(app.buttons["live-other-channels"].exists, "the other channels, second")
         XCTAssertTrue(app.buttons["live-back"].exists)
         remote.press(.select)
         XCTAssertTrue(retry.waitUntilGone(timeout: 5))
@@ -129,7 +129,6 @@ final class LiveTVPlayerTests: XCTestCase {
         let banner = app.descendants(matching: .any)["live-recording-takeover"]
         XCTAssertTrue(banner.waitUntilExists(timeout: 15))
         XCTAssertTrue(label(banner, contains: "a recording needs this tuner. Watching stops then."))
-        XCTAssertTrue(label(banner, contains: "Swipe down · Don’t record it"))
         XCTAssertFalse(app.buttons["live-takeover-cancel"].exists, "The banner has no button to take focus")
         let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = "tv-dvr-takeover"; attachment.lifetime = .keepAlways; add(attachment)

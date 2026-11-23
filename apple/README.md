@@ -947,12 +947,20 @@ described above under Google Cast.
 
 On servers at API level 13 or later whose capabilities say `guide`, Live TV
 shows programme listings.
-The guide is a grid of channels against an hour (iPhone) or two (iPad,
-Apple TV) from the half hour, with the days listed, Now, earlier and later,
-category chips and Go to channel. On iPhone the selected programme's card sits
-above the grid and its details open in a sheet; a wide iPad shows them in a
-panel beside the grid and switches between Guide and Channels; on Apple TV the
-hero follows focus and Select watches the channel. Home's On now row, the
+The guide is a grid of channels against an hour (iPhone), two (iPad) or
+ninety minutes (Apple TV, 500 pt a half hour) from the half hour, with the
+days listed, Now, earlier and later, category chips and Go to channel. On
+iPhone the selected programme's card sits above the grid and its details open
+in a sheet; a wide iPad shows them in a panel beside the grid and switches
+between Guide and Channels. On Apple TV three lines above at most eight chips
+follow focus (what is on and where, the title, time left or when it starts,
+its times and what is next); Select on a programme on now watches it, and
+Select (a long press too) on a later one opens its sheet: Record this episode,
+Record every new episode, Remind me and Watch now, with a clash said there.
+Play/Pause on any cell watches that channel now. Moving up or down keeps the
+time, landing on what airs then on the next channel. The channel watched last
+says Watching, the guide opens on what is on it, and Back from the player lands
+there. Without listings it is the channels, five across. Home's On now row, the
 watch screen's banner and On now list, and the players' banners and channel
 panels show what is on with pictures. Pictures load through the server's
 `/api/live-tv/art/` with the usual sign-in, never from the listings provider;
@@ -970,11 +978,12 @@ On servers at API level 15 with listings, each channel in the guide
 has a star (its own 44 pt button on iPhone and iPad; on Apple TV the channel
 column takes focus and a long press stars it), and Favourites leads the chips
 once there is one: it shows the favourite channels, with or without listings,
-in channel order. A later programme offers Remind me (a long press on Apple
+in channel order. A later programme offers Remind me (in its sheet on Apple
 TV) and then says its reminder is set, moved or no longer in the listings,
 with Remove; its cell has a bell. The guide's search button and bell open
 Search listings and Reminders (pushed on iPhone, in the panel beside a wide
-iPad's grid, chips on Apple TV), and Search has On Live TV after the
+iPad's grid; on Apple TV Reminders is a chip and listings are searched from
+the Search tab), and Search has On Live TV after the
 library's groups. `LiveExtrasStore` (in `WMMFeatures`, one per app) keeps the
 stars and reminders: a change shows at once and goes back if the server
 refuses it, and the server's `live.favourites.changed` and
@@ -1041,22 +1050,28 @@ The AirPlay receiver must be able to reach the selected server address; live
 playback does not perform the file player's LAN-address handoff. Simulator playback
 does not certify physical AirPlay, PiP, cellular networks or Apple TV remotes.
 
-Apple TV uses AVKit's native Play/Pause and a linear live transport.
-Last channel (once there is one), Channel down,
-Channel up and Go to channel are transport bar buttons, before Stop and the
-system's own, each naming where it goes; as contextual actions they took
-Select from the bar. Go live stays a
-contextual action. The first time the bar comes up a note says Select
-pauses and the buttons are a swipe up. Page Up and Page Down change channel
-with a note naming it; the 123 key (tvOS 18.1) or the button opens Go to
-channel, a keypad that lists the channels whose number starts with what was
-typed and tunes the first two seconds after the last key, or the one chosen;
-digit keys type into it and Back closes it. `LiveChannelStep` (the list's
-order, skipping channels that can't be watched, wrapping) and
-`GoToChannelModel` are the rules, shared with the iPhone's channel keys.
-Swipe down opens Channels and Quality while video continues. Back closes an open native
-panel first, then stops and returns to the channel browser. The still-watching
-prompt takes focus; its first Back keeps watching, and the next Back leaves.
+Apple TV uses AVKit's native Play/Pause and a linear live transport. Nothing
+about the stream is on the picture: after a channel change, and with the bar,
+a banner at the foot says live (or behind, or paused) and the channel, the
+programme, time left in gold, its times and what is next. Record (Stop
+recording, once this person's recording of it is under way), Channel down and
+Channel up are transport bar buttons, before the system's own, each naming
+where it goes; as contextual actions they took Select from the bar. Go live
+stays a contextual action. Page Up and Page Down change channel, the banner
+naming it at once; the 123 key (tvOS 18.1) or Channels' Go to channel opens a
+keypad that lists the channels whose number starts with what was typed and
+tunes the first two seconds after the last key, or the one chosen; digit keys
+type into it and Back closes it. `LiveChannelStep` (the list's order, skipping
+channels that can't be watched, wrapping) and `GoToChannelModel` are the
+rules, shared with the iPhone's channel keys. Swipe down opens Channels and
+Quality while video continues: Channels opens on the channel being watched,
+with Last channel and Go to channel to its left; Quality says what is playing.
+Back closes an open native panel first, then stops and returns to the guide on
+that channel. The still-watching prompt takes focus; its first Back keeps
+watching, and the next Back leaves. A channel that can't play says why in the
+viewer's words (no tuner free, no signal, stopped for a recording) with what
+can be done, most useful first (`TVLiveProblem`): watch a recording that holds
+a tuner from its start, try again, other channels, back to the guide.
 
 For channel-only fakes, use `-fakes -fakesLiveTV -tab liveTV`, or
 `-fakes -fakesLiveTV -open watchmymedia://live-tv/live-1` to open a channel.
@@ -1136,14 +1151,16 @@ Record beside the reminder controls and Recordings in Live TV. A programme of
 a series (one with the listing's series key) offers just this episode or every
 new episode; Options set new-only, channel, retention and minute padding. A film
 or special records at once. When the tuners are booked, the clash shows at once
-(a sheet on iPhone and iPad, full screen on Apple TV) and asks which recording,
-not yet recording, gives way; Keep leaves the new one under Won’t record, whose
-rows offer the same choice. The guide marks a programme that will record (a red
+(a sheet on iPhone and iPad; on Apple TV one choice of which to leave out, the
+new one last with focus) and asks which recording, not yet recording, gives
+way; Keep leaves the new one under Won’t record, whose rows offer the same
+choice. The guide marks a programme that will record (a red
 dot, ringed for a series), REC while recording and a hollow orange dot for a
 clash; anything else offers Record again with its reason's words. Marks follow
 `live.recordings.changed`: the span on screen is asked for again in one request. iPhone and iPad also make manual recordings by channel and time,
 including daily, weekday and weekly repeats in the device’s time zone. Apple TV
-uses a full-screen record choice and keeps manual scheduling on the phone or web.
+records from the programme's sheet (Record with options… for the full form)
+and keeps manual scheduling on the phone or web.
 Admins set folders and recording access in the server’s web app.
 
 Recordings shows Recording now, Won’t record, Upcoming, Series and Recorded,

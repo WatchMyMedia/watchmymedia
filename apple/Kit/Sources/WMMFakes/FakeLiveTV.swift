@@ -307,5 +307,5 @@ public final class FakeLivePlaybackController: LivePlaybackController {
     public func showTakeover(canCancel: Bool = true) {
         state.takeover = .init(recordingID: "dvr-upcoming", title: "Station 9", at: .now.addingTimeInterval(120), canCancel: canCancel)
     }
-    public func showError(reason: String) { state.status = .error; state.error = LiveTVError.message(reason) }
+    public func showError(reason: String) { state.status = .error; state.error = LiveTVError.message(reason); state.stopReason = reason }
 }

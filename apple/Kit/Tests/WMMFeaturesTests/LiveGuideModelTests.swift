@@ -79,6 +79,17 @@ struct LiveGuideModelTests {
         #expect(model.showingNow)
     }
 
+    /// Apple TV's ninety minutes step by half an hour, so the grid still starts on one.
+    @Test func ninetyMinutesStepByHalfHours() async throws {
+        let (_, model) = try await make(span: 90)
+        let start = model.start
+        #expect(model.marks.count == 3)
+        model.later()
+        #expect(model.start == start.addingTimeInterval(1800))
+        model.earlier()
+        #expect(model.start == start)
+    }
+
     @Test func listingsEndAtTheEndOfTheFeed() async throws {
         let (_, model) = try await make(span: 120)
         model.choose(model.days[2])

@@ -3,14 +3,14 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Full-screen choices preserve remote focus and keep scheduling in the shared
-/// store. Only a programme of a series opens it; a film or a special records at once.
+/// Record with options… from a programme's sheet: every new episode or
+/// not, the series' settings and the padding, then Record. Full screen, so
+/// remote focus stays in the form; scheduling is the shared store's.
 struct TVLiveRecordChoice: View {
     let programme: LiveProgramme
     @Environment(LiveRecordingsStore.self) private var recordings
     @Environment(\.dismiss) private var dismiss
     @State private var options = LiveRecordingOptions()
-    @State private var showingOptions = false
     /// Record found the tuners booked: the choice of which gives way takes the screen.
     @State private var clash: LiveRecordingClash?
     var body: some View {
@@ -26,35 +26,37 @@ struct TVLiveRecordChoice: View {
     private var choice: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
-                Text(liveRecordHeading(programme.title)).font(.system(size: 46, weight: .bold)).accessibilityAddTraits(.isHeader)
-                if showingOptions {
-                    // The options form's parts (LiveRecordingForm); the board's keeps no note on Keep.
-                    let form = LiveRecordingForm(options: options, like: .programme(programme))
-                    if form.offersSeries { Toggle(liveRecordEveryNewEpisode, isOn: $options.series) }
-                    if form.showsSeriesSettings {
-                        Toggle(liveNewEpisodesOnly, isOn: $options.newOnly)
-                        Toggle(liveAnyChannel, isOn: $options.anyChannel)
-                        Picker(liveKeepTitle, selection: $options.keep) {
-                            ForEach(LiveRecordingForm.keepChoices, id: \.self) { Text(liveKeepChoice($0)).tag($0) }
-                        }
+                Text(liveRecordHeading(programme.title)).font(.tv(.title3)).accessibilityAddTraits(.isHeader)
+                // The options form's parts (LiveRecordingForm).
+                let form = LiveRecordingForm(options: options, like: .programme(programme))
+                if form.offersSeries { Toggle(liveRecordEveryNewEpisode, isOn: $options.series) }
+                if form.showsSeriesSettings {
+                    Toggle(liveNewEpisodesOnly, isOn: $options.newOnly)
+                    Toggle(liveAnyChannel, isOn: $options.anyChannel)
+                    Picker(liveKeepTitle, selection: $options.keep) {
+                        ForEach(LiveRecordingForm.keepChoices, id: \.self) { Text(liveKeepChoice($0)).tag($0) }
                     }
-                    if form.offersServerPadding { Toggle(liveUseServerPadding, isOn: $options.useServerPadding) }
-                    if form.showsPadding {
+                }
+                if form.offersServerPadding { Toggle(liveUseServerPadding, isOn: $options.useServerPadding) }
+                if form.showsPadding {
                     Picker(liveStartEarly, selection: $options.padBefore) { ForEach(LiveRecordingForm.paddingChoices, id: \.self) { Text(livePaddingChoice($0)).tag($0) } }
                     Picker(liveEndLate, selection: $options.padAfter) { ForEach(LiveRecordingForm.paddingChoices, id: \.self) { Text(livePaddingChoice($0)).tag($0) } }
-                    }
-                    Button("Record with these options") { save(options) }.buttonStyle(TVButtonStyle(kind: .primary))
-                } else {
-                    Button(liveRecordJustThisEpisode) { save(.init()) }.buttonStyle(TVButtonStyle(kind: .primary))
-                    Button(liveRecordEveryNewEpisode) { save(.init(series: true)) }.buttonStyle(TVButtonStyle())
-                    Button(liveRecordOptionsChoice) { showingOptions = true }.buttonStyle(TVButtonStyle())
                 }
-                if let message = recordings.message { Text(message).font(.system(size: 24)).foregroundStyle(Palette.warning) }
-                Text("Recordings may take a tuner from a live viewer.").font(.system(size: 23)).foregroundStyle(Palette.muted)
-                Button("Cancel") { dismiss() }.buttonStyle(TVButtonStyle())
+                HStack(spacing: 24) {
+                    Button("Record") { save(options) }.buttonStyle(TVButtonStyle(kind: .primary))
+                    Button("Cancel") { dismiss() }.buttonStyle(TVButtonStyle())
+                }
+                .padding(.top, 12)
+                .focusSection()
+                if let message = recordings.message { Text(message).font(.tv(.body)).foregroundStyle(Palette.warning) }
+                Text("Recordings may take a tuner from a live viewer.").font(.tv(.caption2)).foregroundStyle(Palette.muted)
             }
-            .frame(maxWidth: 1100, alignment: .leading).padding(70).frame(maxWidth: .infinity)
-        }.groundBackground().foregroundStyle(Palette.text)
+            .font(.tv(.body))
+            .frame(maxWidth: 1100, alignment: .leading)
+            .padding(.vertical, TVLayout.safeTop)
+            .frame(maxWidth: .infinity)
+        }
+        .groundBackground().foregroundStyle(Palette.text)
     }
     private func save(_ options: LiveRecordingOptions) {
         Task {
@@ -64,9 +66,10 @@ struct TVLiveRecordChoice: View {
     }
 }
 
-/// The clash after Record, or a Won't record row's choice, full screen (the
-/// web's dialog).
-/// Keep holds the focus, so a stray press changes nothing; Back is Keep.
+/// Recordings that overlap, and one that won't record: one choice of which
+/// to leave out. Each holder that can give way is a row; Select on it
+/// leaves it out and records the new one. The one left out is last, with
+/// focus, so a stray press changes nothing; Back keeps it so too.
 struct TVLiveRecordingClashView: View {
     @State private var clash: LiveRecordingClash
     /// After the new one took a tuner (false), or Keep (true).
@@ -76,39 +79,35 @@ struct TVLiveRecordingClashView: View {
     @FocusState private var keepFocused: Bool
     init(clash: LiveRecordingClash, done: @escaping (_ kept: Bool) -> Void) { _clash = State(initialValue: clash); self.done = done }
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 26) {
-                Text("\(Image(systemName: "circle")) \(clash.title)").font(.system(size: 42, weight: .bold)).foregroundStyle(Palette.warning)
-                    .accessibilityAddTraits(.isHeader)
-                Text(clash.message).font(.system(size: 24)).foregroundStyle(Palette.textSecondary)
+        TVSheet {
+            Text(clash.title).font(.tv(.title3)).foregroundStyle(Palette.text)
+                .accessibilityAddTraits(.isHeader)
+            Text(clash.choices.isEmpty ? clash.message : liveClashChoose(clash, now: .now))
+                .font(.tv(.body)).foregroundStyle(Palette.textSecondary)
+            VStack(spacing: 12) {
                 ForEach(clash.holders) { holder in
-                    HStack(spacing: 24) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(holder.title).font(.system(size: 28, weight: .semibold))
-                            Text(clash.line(holder)).font(.system(size: 21)).foregroundStyle(Palette.textSecondary)
-                            if let status = clash.status(holder) {
-                                Text(status).font(.system(size: 20)).foregroundStyle(holder.running ? Palette.liveText : Palette.muted)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        if clash.choices.contains(holder) {
-                            Button(clash.recordInsteadOf(holder)) { Task { await giveWay(holder) } }
-                                .buttonStyle(TVButtonStyle(kind: .primary))
-                                .disabled(recordings.changing.contains(clash.id))
-                                .accessibilityLabel(clash.recordInsteadLabel(holder))
-                        }
+                    let choosable = clash.choices.contains(holder)
+                    TVSheetRow(title: holder.title, value: holder.running ? "Recording now" : "Will record",
+                               line: [clash.line(holder), clash.status(holder) == "Recording now" ? nil : clash.status(holder)].compactMap { $0 }.joined(separator: " · ")) {
+                        if choosable { Task { await giveWay(holder) } }
                     }
-                    .padding(20).background(Palette.surface, in: RoundedRectangle(cornerRadius: 16))
-                    .frame(maxWidth: .infinity).focusSection()
+                    .disabled(!choosable || recordings.changing.contains(clash.id))
+                    .accessibilityLabel(choosable ? clash.recordInsteadLabel(holder) : holder.title)
                 }
-                if let failure { Text(failure).font(.system(size: 24)).foregroundStyle(Palette.warning) }
-                Button(clash.keep) { done(!clash.choices.isEmpty) }.buttonStyle(TVButtonStyle()).focused($keepFocused)
+                TVSheetRow(title: clash.recording.title, value: clash.choices.isEmpty ? nil : "Left out",
+                           line: "\(clash.recording.number) · \(LiveClock.device.range(clash.recording.start, clash.recording.end))",
+                           warns: true) { done(!clash.choices.isEmpty) }
+                    .focused($keepFocused)
+                    .accessibilityLabel(clash.keep)
+                    .accessibilityIdentifier("live-clash-keep")
             }
-            .frame(maxWidth: 1300, alignment: .leading).padding(70).frame(maxWidth: .infinity)
+            .padding(.top, 8)
+            .focusSection()
+            if let failure { Text(failure).font(.tv(.body)).foregroundStyle(Palette.warning) }
         }
-        .groundBackground().foregroundStyle(Palette.text)
         .defaultFocus($keepFocused, true)
         .onExitCommand { done(!clash.choices.isEmpty) }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("live-recording-clash")
     }
     private func giveWay(_ holder: LiveRecordingHolder) async {

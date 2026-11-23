@@ -76,16 +76,21 @@ final class LiveExtrasFixtureTests: XCTestCase {
         try await eventually("the server keeps the star") { (try await api.channels().first { $0.number == number }?.favourite ?? false) == !wasFavourite }
         snap("tv-fixture-star")
 
-        // Right to a later programme on that channel, and remind.
+        // Right to a later programme on that channel, and remind from its sheet.
         remote.press(.right); remote.press(.right)
         var reminded = false
         for _ in 0..<4 where !reminded {
             remote.press(.right)
-            remote.press(.select, forDuration: 1.5)
-            let remind = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Remind me")).firstMatch
-            if remind.waitForExistence(timeout: 3) { remote.press(.select); reminded = true } else { remote.press(.menu) }
+            remote.press(.select)
+            let remind = app.buttons["live-sheet-remind"]
+            if remind.waitForExistence(timeout: 3) {
+                for _ in 0..<4 where !remind.hasFocus { remote.press(.down) }
+                remote.press(.select); reminded = true
+            } else if app.descendants(matching: .any)["live-player-screen"].exists || app.descendants(matching: .any)["live-programme-sheet"].exists {
+                remote.press(.menu)
+            }
         }
-        XCTAssertTrue(reminded, "A later programme's long press offers Remind me")
+        XCTAssertTrue(reminded, "A later programme's sheet offers Remind me")
         try await eventually("the server keeps the reminder") { try await api.reminderCount() == 1 }
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", "Reminder set · 5 min before")).firstMatch.waitForExistence(timeout: 10))
         snap("tv-fixture-reminder")
