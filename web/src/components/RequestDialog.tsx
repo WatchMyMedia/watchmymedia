@@ -64,7 +64,7 @@ export function RequestDialog({ mediaType, tmdbId, preselect, onClose }: { media
               ) : (
                 <p>{sent.request.requestedBy} asked for this already. It&rsquo;s in their requests, and you&rsquo;ll see it here when it arrives.</p>
               )}
-              <button type="button" className="min-h-[40px] rounded-md border border-line-2 px-3.5 text-sm hover:bg-surface-2" onClick={onClose}>
+              <button type="button" className="btn" onClick={onClose}>
                 Done
               </button>
             </div>
@@ -113,12 +113,12 @@ export function RequestDialog({ mediaType, tmdbId, preselect, onClose }: { media
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="submit"
-                      className="min-h-[40px] rounded-md btn-primary px-4 text-sm font-semibold disabled:opacity-50"
+                      className="btn btn-primary"
                       disabled={create.isPending || (mediaType === 'tv' && chosen.length === 0) || r.state === 'requested' || r.state === 'downloading'}
                     >
                       {r.state === 'requested' || r.state === 'downloading' ? 'Requested' : requestButtonLabel(mediaType, chosen)}
                     </button>
-                    <button type="button" className="min-h-[40px] rounded-md border border-line-2 px-3.5 text-sm hover:bg-surface-2" onClick={onClose}>
+                    <button type="button" className="btn" onClick={onClose}>
                       Cancel
                     </button>
                   </div>
