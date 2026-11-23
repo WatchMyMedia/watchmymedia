@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import Hls, { PlaylistLevelType } from 'hls.js'
-import { RecordingNotReady, automaticSubtitle, downloadSubtitle, searchSubtitles, startPlayback, stopPlayback, type Decision, type OnlineSubtitle, type SubtitleTrack } from '../api/playback'
+import { RecordingNotReady, automaticSubtitle, downloadSubtitle, searchSubtitles, startPlayback, stopPlayback, type Decision, type SubtitleTrack } from '../api/playback'
 import { AutomaticSubtitles, asksForAutomaticSubtitle } from '../lib/automaticSubtitles'
 import { authScope } from '../lib/authScope'
 import type { SubtitleSelection } from '../lib/subtitleIntent'
-import { formatDuration, languageName, seCode } from '../lib/format'
+import { languageName, seCode } from '../lib/format'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { preferencesQuery, serverQuery } from '../api/queries'
+import { fileQuery, preferencesQuery, seasonQuery, serverQuery, showQuery } from '../api/queries'
+import { requestOptionsQuery } from '../api/requests'
 import { noteAutoAdvance, noteInput, shouldAskStillWatching } from '../lib/stillWatching'
 import { StillWatchingCard } from '../components/StillWatchingCard'
 import { reportProgress, type PlayState, type QualityDirective } from '../api/watch'
@@ -28,12 +29,64 @@ import { noteLocalPlay, useCast } from '../cast/sender'
 import { growingDurationMs, growingSeekMs, showGoToNow, startRetryMs, stillRecording } from '../lib/liveRecordings'
 import { backAfterNext } from '../lib/showPage'
 import { RemotePlayer } from './RemotePlayer'
+import { clock as clockText } from '../lib/clock'
+import { DEFAULT_VOLUME, chosenSubtitle, episodeName, lastWithFile, parseVolume, playerTitle, previousInSeason, previousSeason, segmentMarks, stepVolume, timeLeftLine, volumeLabel, type VolumeSetting } from '../lib/play/words'
+import { CastButton } from '../components/Cast'
+import { InfoPanel, PlayerMoreMenu, PlayerSheet, TracksPanel } from '../components/PlayerPanels'
+import { playerButton } from '../components/playerStyles'
+import { ReportProblemDialog } from '../components/ReportProblemDialog'
+import { useNow } from '../components/useNow'
+import { ArrowLeftIcon, Back10Icon, Forward10Icon, FullscreenIcon, NextIcon, PauseIcon, PipIcon, PlayIcon, PreviousIcon, SubtitlesIcon, VolumeIcon } from '../components/icons'
+
+const VOLUME_KEY = 'wmm.player.volume'
+
+function readVolume(): VolumeSetting {
+  try {
+    return parseVolume(localStorage.getItem(VOLUME_KEY))
+  } catch {
+    return DEFAULT_VOLUME
+  }
+}
+
+/**
+ * The episode before this file's, for the Previous button: the one before it
+ * on disk in its season, or the last on disk of the season before. Nothing
+ * for a movie, a recording or a trailer.
+ */
+function usePreviousEpisode(fileId: number, enabled: boolean) {
+  const file = useQuery({ ...fileQuery(fileId), enabled: enabled && fileId > 0 })
+  const showId = file.data?.showId
+  const season = file.data?.seasonNumber
+  const episodeId = file.data?.episodeId
+  const isEpisode = showId != null && season != null && episodeId != null
+  const current = useQuery({ ...seasonQuery(showId ?? 0, season ?? 0), enabled: enabled && isEpisode })
+  const inSeason = current.data && episodeId != null ? previousInSeason(current.data.episodes, episodeId) : undefined
+  const sorted = current.data ? [...current.data.episodes].sort((a, b) => a.number - b.number) : []
+  const isFirst = !!current.data && sorted.findIndex((e) => e.id === episodeId) === sorted.findIndex((e) => e.hasFile && !!e.files.length)
+  const show = useQuery({ ...showQuery(showId ?? 0), enabled: enabled && isEpisode && !!current.data && !inSeason && isFirst })
+  const earlier = show.data && season != null ? previousSeason(show.data.seasons, season) : undefined
+  const before = useQuery({ ...seasonQuery(showId ?? 0, earlier ?? 0), enabled: enabled && earlier !== undefined })
+  const fromEarlier = before.data ? lastWithFile(before.data.episodes) : undefined
+  const ep = inSeason ?? fromEarlier
+  const seasonOf = inSeason ? season : earlier
+  return {
+    file: file.data,
+    isEpisode,
+    showTitle: current.data?.show?.title,
+    previous:
+      ep && ep.files[0] && showId != null && seasonOf != null
+        ? { fileId: ep.files[0].id, showId, seasonNumber: seasonOf, episodeNumber: ep.number, episodeId: ep.id, title: ep.title }
+        : undefined,
+  }
+}
 
 // back is a path on this site and may carry a query (an old season page's ?episode=),
 // so it is followed as an href: as a `to` the query would read as part of the path.
 // Links pass to="/" too, which the router uses only when there is no back.
 // trailer marks a movie's trailer file, which returns to back when it ends.
-type Props = { fileId: number; recordingId?: string; start?: number; title?: string; back?: string; trailer?: boolean }
+// audio and subtitle are what a title's page chose before playing: a sound
+// stream index, and "off" or a track id; left out, the person's settings pick.
+type Props = { fileId: number; recordingId?: string; start?: number; title?: string; back?: string; trailer?: boolean; audio?: number; subtitle?: string }
 
 /**
  * Plays one file here, or on the TV while this browser is casting.
@@ -47,7 +100,8 @@ export function Player(props: Props) {
   const rememberSubtitle = useCallback((selection: SubtitleSelection) => { setLastSubtitle({ fileId: props.fileId, selection }) }, [props.fileId])
   if (connected && !remote) setRemote(true)
   if (remote && !props.recordingId) return <RemotePlayer {...props} onLocal={() => setRemote(false)} />
-  return <LocalPlayer key={props.recordingId ?? props.fileId} {...props} initialSubtitle={lastSubtitle?.fileId === props.fileId ? lastSubtitle.selection : { subtitleMode: 'auto' }} rememberSubtitle={rememberSubtitle} />
+  const initialSubtitle: SubtitleSelection = lastSubtitle?.fileId === props.fileId ? lastSubtitle.selection : (chosenSubtitle(props.subtitle) ?? { subtitleMode: 'auto' })
+  return <LocalPlayer key={props.recordingId ?? props.fileId} {...props} initialSubtitle={initialSubtitle} rememberSubtitle={rememberSubtitle} />
 }
 
 /**
@@ -58,7 +112,7 @@ export function Player(props: Props) {
  * outside what the session has produced restarts it at the new position.
  * VOD playlists and direct play cover the whole file: offset is 0.
  */
-function LocalPlayer({ fileId, recordingId, start, title, back, trailer, initialSubtitle, rememberSubtitle }: Props & { initialSubtitle: SubtitleSelection; rememberSubtitle: (s: SubtitleSelection) => void }) {
+function LocalPlayer({ fileId, recordingId, start, title, back, trailer, audio, initialSubtitle, rememberSubtitle }: Props & { initialSubtitle: SubtitleSelection; rememberSubtitle: (s: SubtitleSelection) => void }) {
   const [ownerScope] = useState(authScope)
   const videoRef = useRef<HTMLVideoElement>(null)
   const hlsRef = useRef<Hls | null>(null)
@@ -71,7 +125,7 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, initial
   const [time, setTime] = useState(0)
   const [bufferedEnd, setBufferedEnd] = useState(0)
   const [paused, setPaused] = useState(true)
-  const [audioIndex, setAudioIndex] = useState<number | undefined>(undefined)
+  const [audioIndex, setAudioIndex] = useState<number | undefined>(audio)
   const [subtitleId, setSubtitleId] = useState<string>('')
   const [subtitleWork] = useState(() => {
     const work = new AutomaticSubtitles<SubtitleTrack>(fileId, automaticSubtitle)
@@ -141,6 +195,45 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, initial
   // Where the viewer is hovering or dragging on the seek bar.
   const [scrub, setScrub] = useState<ScrubPreview | null>(null)
   const hideTimer = useRef<number | undefined>(undefined)
+  const rootRef = useRef<HTMLDivElement>(null)
+  // The side sheet open on the picture: Audio & subtitles, or Playback info.
+  const [sheet, setSheet] = useState<'tracks' | 'info' | null>(null)
+  const [reporting, setReporting] = useState(false)
+  // Volume, remembered on this browser.
+  const [volume, setVolume] = useState<VolumeSetting>(readVolume)
+  useEffect(() => {
+    const v = videoRef.current
+    if (v) {
+      v.volume = volume.level
+      v.muted = volume.muted
+    }
+    try {
+      localStorage.setItem(VOLUME_KEY, JSON.stringify(volume))
+    } catch {
+      // Storage refused: the level lasts for this play.
+    }
+  }, [volume])
+  // Picture in picture where the browser has it; full screen on the player.
+  const [pipSupported] = useState(() => typeof document !== 'undefined' && 'pictureInPictureEnabled' in document && !!document.pictureInPictureEnabled)
+  const [pip, setPip] = useState(false)
+  const [fullscreen, setFullscreen] = useState(false)
+  useEffect(() => {
+    const video = videoRef.current
+    const onEnter = () => setPip(true)
+    const onLeave = () => setPip(false)
+    const onFull = () => setFullscreen(!!document.fullscreenElement)
+    video?.addEventListener('enterpictureinpicture', onEnter)
+    video?.addEventListener('leavepictureinpicture', onLeave)
+    document.addEventListener('fullscreenchange', onFull)
+    return () => {
+      video?.removeEventListener('enterpictureinpicture', onEnter)
+      video?.removeEventListener('leavepictureinpicture', onLeave)
+      document.removeEventListener('fullscreenchange', onFull)
+    }
+  }, [])
+  const now = useNow(15_000)
+  const neighbours = usePreviousEpisode(fileId, !recordingId && !trailer)
+  const requestOptions = useQuery({ ...requestOptionsQuery, enabled: !recordingId && !trailer })
   const navigate = useNavigate()
   const ass = useAssRenderer(videoRef)
   const qc = useQueryClient()
@@ -673,9 +766,6 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, initial
   }
   const found = online.data
   const showOnline = !!found?.available && !!decision
-  const ownTracks = decision?.subtitles.filter((s) => s.source !== 'opensubtitles') ?? []
-  const downloaded = decision?.subtitles.filter((s) => s.source === 'opensubtitles') ?? []
-  const toDownload = (found?.results ?? []).filter((r) => !r.trackId || !downloaded.some((s) => s.id === r.trackId))
 
   // Next episode: from when the server says (the final credits, else
   // shortly before the end) the card counts down and moves on; "Watch
@@ -775,18 +865,65 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, initial
     hideTimer.current = window.setTimeout(() => setShowControls(false), 3000)
   }
 
+  const toggleMute = () => setVolume((v) => (v.muted || v.level === 0 ? { level: v.level || 0.5, muted: false } : { ...v, muted: true }))
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) void document.exitFullscreen?.()
+    else if (rootRef.current?.requestFullscreen) void rootRef.current.requestFullscreen().catch(() => undefined)
+    // An iPhone has full screen for the video alone.
+    else (videoRef.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null)?.webkitEnterFullscreen?.()
+  }
+  const togglePip = () => {
+    if (document.pictureInPictureElement) void document.exitPictureInPicture().catch(() => undefined)
+    else void videoRef.current?.requestPictureInPicture?.().catch(() => undefined)
+  }
+
+  // The player's keys: Space or K plays and pauses, Left and Right go 10 s,
+  // Up and Down change the volume, M mutes, F fills the screen, Escape
+  // closes a panel or goes back. A focused button, link or slider keeps
+  // its own keys; open menus and panels carry data-player-keys="off".
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLSelectElement || (e.target instanceof Element && e.target.closest('[data-player-keys="off"]'))) return
-      if (e.key === ' ' || e.key === 'k') {
-        e.preventDefault()
-        togglePlay()
-      } else if (e.key === 'ArrowRight') seekTo(time + 10)
-      else if (e.key === 'ArrowLeft') seekTo(time - 10)
-      else if (e.key === 'f') void videoRef.current?.parentElement?.requestFullscreen?.()
-      else if (e.key === 'Escape' && back) void navigate({ href: back })
+      const t = e.target
+      if (t instanceof HTMLSelectElement || (t instanceof Element && t.closest('[data-player-keys="off"]'))) return
       noteInput()
       poke()
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return
+      const control = t instanceof HTMLButtonElement || t instanceof HTMLAnchorElement || t instanceof HTMLInputElement
+      if (control && (e.key === ' ' || e.key === 'Enter')) return
+      if (t instanceof HTMLInputElement && e.key.startsWith('Arrow')) return
+      switch (e.key) {
+        case ' ':
+        case 'k':
+          e.preventDefault()
+          togglePlay()
+          break
+        case 'ArrowRight':
+          e.preventDefault()
+          seekTo(time + 10)
+          break
+        case 'ArrowLeft':
+          e.preventDefault()
+          seekTo(time - 10)
+          break
+        case 'ArrowUp':
+          e.preventDefault()
+          setVolume((v) => stepVolume(v, 0.1))
+          break
+        case 'ArrowDown':
+          e.preventDefault()
+          setVolume((v) => stepVolume(v, -0.1))
+          break
+        case 'm':
+          toggleMute()
+          break
+        case 'f':
+          toggleFullscreen()
+          break
+        case 'Escape':
+          if (sheet) setSheet(null)
+          else if (back && !document.fullscreenElement) void navigate({ href: back })
+          break
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -801,20 +938,41 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, initial
     noteLocalPlay({ fileId, positionMs: time * 1000, audioIndex, subtitleId: subtitleId || undefined, subtitleMode, quality: quality.id, title })
   }, [fileId, recordingId, time, audioIndex, subtitleId, subtitleMode, quality, title])
 
-  // An open menu, or the pointer on the seek bar, keeps the controls up.
-  const controlsShown = showControls || menuOpen || !!scrub
+  // An open menu or panel, a pause, or the pointer on the seek bar keeps the controls up.
+  const controlsShown = showControls || menuOpen || !!scrub || !!sheet || paused
   const goToNow = showGoToNow(recordingNow, time * 1000, duration * 1000)
+  const heading = playerTitle(title)
+  const marks = recordingId ? [] : segmentMarks(decision?.segments, duration)
+  const shownTime = scrub?.dragging ? scrub.seconds : time
+  const previous = neighbours.previous
+  const episode = neighbours.isEpisode || !!next
+  const file = neighbours.file
+  const reportable = !!requestOptions.data?.problems && !!file && (file.movieId != null || file.episodeId != null)
+  // The bar and the controls make room for the panel from md up.
+  const inset = sheet ? 'right-0 md:right-[400px]' : 'right-0'
+  const fade = controlsShown ? 'opacity-100' : 'pointer-events-none opacity-0'
+  const audioNow = audioIndex ?? decision?.audio.index ?? 0
+  const playPrevious = () => {
+    if (!previous) return
+    noteInput()
+    void navigate({
+      to: '/play/$fileId',
+      params: { fileId: String(previous.fileId) },
+      search: { title: `${neighbours.showTitle ?? heading.kicker ?? ''} · ${seCode(previous.seasonNumber, previous.episodeNumber)} ${previous.title}`, back: backAfterNext(back, previous) },
+    })
+  }
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black"
+      ref={rootRef}
+      className={`fixed inset-0 z-50 overflow-hidden bg-black text-neutral-100 ${controlsShown ? '' : 'cursor-none'}`}
       onMouseMove={poke}
       onClick={() => {
         noteInput()
         poke()
       }}
     >
-      <video ref={videoRef} className="h-full w-full" playsInline x-webkit-airplay={recordingId ? "deny" : "allow"} onDoubleClick={() => videoRef.current?.parentElement?.requestFullscreen?.()}>
+      <video ref={videoRef} className="h-full w-full" playsInline x-webkit-airplay={recordingId ? "deny" : "allow"} onDoubleClick={toggleFullscreen}>
         {!nativeVod && decision?.subtitles
           .filter((s) => s.format === 'webvtt' && s.url)
           .map((s) => (
@@ -822,7 +980,7 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, initial
           ))}
       </video>
 
-      {segment && showSkip && !showNext && (
+      {segment && showSkip && !showNext && !sheet && (
         <SkipButton key={segment.id} label={SKIP_LABELS[segment.kind] ?? 'Skip'} controlsVisible={controlsShown} autoAfterMs={autoAfter} onSkip={skipSegment} />
       )}
 
@@ -859,127 +1017,136 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, initial
       )}
 
       {starting && !error && (
-        <div role="status" className="pointer-events-none absolute left-1/2 top-[72px] z-10 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-full border border-white/20 bg-ground/90 px-3.5 py-2 text-center text-sm text-white shadow-xl">
+        <div role="status" className="pointer-events-none absolute left-1/2 top-[88px] z-20 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-full border border-white/20 bg-ground/90 px-3.5 py-2 text-center text-sm text-white shadow-xl">
           The recording is just starting…
         </div>
       )}
 
       {note && !error && !starting && (
-        <div role="status" className="pointer-events-none absolute left-1/2 top-[72px] z-10 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-full border border-white/20 bg-ground/90 px-3.5 py-2 text-center text-sm text-white shadow-xl">
+        <div role="status" className="pointer-events-none absolute left-1/2 top-[88px] z-20 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-full border border-white/20 bg-ground/90 px-3.5 py-2 text-center text-sm text-white shadow-xl">
           {note}
         </div>
       )}
 
       {error && (
-        <div className="absolute inset-x-0 top-16 mx-auto max-w-lg rounded-md border border-red-900 bg-red-950/90 px-4 py-3 text-sm text-red-200">{error}</div>
+        <div role="alert" className="absolute inset-x-4 top-24 z-20 mx-auto max-w-lg rounded-xl border border-red-900 bg-red-950/90 px-4 py-3 text-sm text-red-200">{error}</div>
       )}
 
       {stopMessage !== null && (
-        <div className="absolute inset-0 z-30 grid place-items-center bg-black/85 p-6" role="alertdialog" aria-labelledby="stopped-title">
-          <div className="max-w-md rounded-lg border border-line-2 bg-surface p-6 text-center">
+        <div className="absolute inset-0 z-40 grid place-items-center bg-black/85 p-6" role="alertdialog" aria-labelledby="stopped-title">
+          <div className="max-w-md rounded-[14px] border border-line-2 bg-surface p-6 text-center">
             <h2 id="stopped-title" className="text-lg font-semibold">Playback stopped</h2>
             <p className="mt-2 text-sm text-neutral-300">
               {stopMessage ? <>The server&rsquo;s admin stopped this play: &ldquo;{stopMessage}&rdquo;</> : <>The server&rsquo;s admin stopped this play.</>}
             </p>
-            <Link to="/" href={back} className="btn-primary mt-5 inline-block rounded-md px-4 py-2 text-sm font-semibold">
+            <Link to="/" href={back} className="btn btn-primary mt-5">
               Back
             </Link>
           </div>
         </div>
       )}
 
-      <div className={`absolute inset-x-0 top-0 flex items-center gap-4 bg-gradient-to-b from-black/80 to-transparent p-4 transition-opacity ${controlsShown ? 'opacity-100' : 'opacity-0'}`}>
-        <Link to="/" href={back} className="rounded-md border border-white/20 px-3 py-1.5 text-sm text-white hover:bg-white/10">
-          ‹ Back
+      <header className={`absolute left-0 top-0 z-[12] flex items-center gap-2 bg-gradient-to-b from-black/72 to-transparent px-2 pb-11 pt-2 transition-opacity md:gap-3.5 md:px-7 md:pt-5 ${inset} ${fade}`}>
+        <Link to="/" href={back} aria-label={heading.kicker ? `Back to ${heading.kicker}` : 'Back'} className={playerButton}>
+          <ArrowLeftIcon size={22} />
         </Link>
-        <div className="min-w-0 flex-1 truncate text-sm text-white">{title}</div>
-        {decision && (
-          <span className="flex shrink-0 items-center gap-2 text-xs text-white/60" title={[decision.auto ? `Automatic: ${decision.auto.reason}` : '', ...decision.reasons].filter(Boolean).join('; ')}>
-            {decision.auto && <span className="rounded-full border border-accent/70 px-1.5 text-[11px] font-semibold text-accent">Auto · {(decision.adaptive ? observedHeight ? `${observedHeight}p` : "Starting" : stepName(decision.auto.step))}</span>}
-            <span>
-              {decision.mode === 'direct' ? 'Direct play' : decision.mode === 'remux' ? 'Direct stream' : decision.mode === 'audio' ? 'Audio transcode' : 'Transcoding'}
-              {!decision.adaptive && !decision.video.copy && decision.video.height ? ` · ${decision.video.height}p` : ''}
-              {decision.video.toneMap ? ' · tone-mapped' : ''}
-            </span>
-          </span>
-        )}
+        <div className="flex min-w-0 flex-col leading-[1.3]">
+          {heading.kicker && <span className="truncate text-[13px] text-neutral-300 md:text-[13.5px]">{heading.kicker}</span>}
+          <h1 className="truncate text-base font-[650] md:text-xl">{heading.heading || 'Playing'}</h1>
+        </div>
+        <div className="ml-auto flex shrink-0 items-center gap-0.5 md:gap-1" onClick={(e) => e.stopPropagation()}>
+          {!recordingId && <CastButton variant="player" />}
+          {airplay.available && !recordingId && (
+            <button type="button" onClick={() => airplay.pick()} className={`${playerButton} ${airplay.active ? 'text-accent' : ''}`} aria-label="AirPlay" title="AirPlay">
+              <AirPlayIcon />
+            </button>
+          )}
+          {pipSupported && !airplay.active && (
+            <button type="button" onClick={togglePip} aria-pressed={pip} aria-label="Picture in picture" title="Picture in picture" className={`${playerButton} ${pip ? 'text-accent' : ''}`}>
+              <PipIcon size={22} />
+            </button>
+          )}
+          <PlayerMoreMenu
+            onOpenChange={setMenuOpen}
+            items={[
+              ...(decision ? [{ label: 'Playback info', onPick: () => setSheet('info') }] : []),
+              ...(reportable ? [{ label: 'Report a problem', onPick: () => setReporting(true) }] : []),
+            ]}
+          />
+        </div>
+      </header>
+
+      <div
+        className={`absolute top-[46%] z-[11] flex -translate-x-1/2 -translate-y-1/2 items-center gap-7 transition-opacity md:gap-10 ${sheet ? 'left-1/2 md:left-[calc((100%-400px)/2)]' : 'left-1/2'} ${fade} ${sheet ? 'max-md:hidden' : ''}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button type="button" onClick={() => seekTo(time - 10)} aria-label="Back 10 seconds" className="grid size-14 place-items-center rounded-full bg-ground/50 ring-1 ring-inset ring-white/18 hover:bg-white/14 md:size-[68px]">
+          <Back10Icon size={30} />
+        </button>
+        <button type="button" onClick={togglePlay} aria-label={paused ? 'Play' : 'Pause'} className="grid size-20 place-items-center rounded-full bg-ground/55 ring-1 ring-inset ring-white/22 hover:bg-white/14 md:size-24">
+          {paused ? <PlayIcon size={40} className="ml-1" /> : <PauseIcon size={40} />}
+        </button>
+        <button type="button" onClick={() => seekTo(time + 10)} aria-label="Forward 10 seconds" className="grid size-14 place-items-center rounded-full bg-ground/50 ring-1 ring-inset ring-white/18 hover:bg-white/14 md:size-[68px]">
+          <Forward10Icon size={30} />
+        </button>
       </div>
 
       {/* While the seek bar shows a thumbnail, it sits above Skip and the next episode card. */}
-      <div className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-4 transition-opacity ${scrub ? 'z-[15]' : ''} ${controlsShown ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`absolute bottom-0 left-0 bg-gradient-to-t from-black/88 to-transparent px-4 pb-3 pt-16 transition-opacity md:px-12 md:pb-5 md:pt-[70px] ${scrub ? 'z-[15]' : 'z-[12]'} ${inset} ${fade} ${sheet ? 'max-md:hidden' : ''}`}>
         {/* Only while recording: when it ends the label goes and the play carries on. */}
-        {recordingNow && <div className="mb-2 flex items-center justify-between gap-3"><span role="status" className="rounded border border-red-500/60 bg-red-500/10 px-2 py-1 text-xs font-bold text-red-300">● Recording</span>{goToNow && <button type="button" onClick={(e) => { e.stopPropagation(); seekTo(growingSeekMs(duration * 1000, duration * 1000) / 1000) }} className="ml-auto min-h-10 rounded-md border border-white/20 px-3 text-sm">Go to now</button>}</div>}
-        <Scrubber time={time} duration={plannedDuration} available={growing ? duration : undefined} bufferedEnd={bufferedEnd} trickplay={trickplay} controlsShown={controlsShown} onSeek={seekTo} onPreview={setScrub} />
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-white">
-          <button type="button" onClick={(e) => { e.stopPropagation(); togglePlay() }} className="min-h-[40px] min-w-[44px] rounded-md bg-white/10 px-3 hover:bg-white/20">
-            {paused ? '▶' : '❚❚'}
+        {recordingNow && <div className="mb-2 flex items-center justify-between gap-3"><span role="status" className="rounded border border-red-500/60 bg-red-500/10 px-2 py-1 text-xs font-bold text-red-300">● Recording</span>{goToNow && <button type="button" onClick={(e) => { e.stopPropagation(); seekTo(growingSeekMs(duration * 1000, duration * 1000) / 1000) }} className="btn btn-clear btn-sm ml-auto">Go to now</button>}</div>}
+        <Scrubber time={time} duration={plannedDuration} available={growing ? duration : undefined} bufferedEnd={bufferedEnd} trickplay={trickplay} controlsShown={controlsShown} marks={marks} onSeek={seekTo} onPreview={setScrub} />
+        <div className="mt-1 flex justify-between gap-4 text-[13px] tabular-nums md:text-[13.5px]">
+          <span>{clockText(shownTime * 1000)}</span>
+          <span>{growing || trailer ? clockText(duration * 1000) : timeLeftLine(shownTime, duration, now)}</span>
+        </div>
+        <div className="mt-1 flex items-center gap-0.5 md:mt-1.5 md:gap-1" onClick={(e) => e.stopPropagation()}>
+          <button type="button" onClick={togglePlay} aria-label={paused ? 'Play' : 'Pause'} className={playerButton}>
+            {paused ? <PlayIcon size={22} /> : <PauseIcon size={22} />}
           </button>
-          <span className="tabular-nums text-white/80">
-            {formatDuration((scrub?.dragging ? scrub.seconds : time) * 1000)} / {formatDuration(duration * 1000)}
-          </span>
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            {decision && decision.audioTracks.length > 1 && (
-              <select
-                value={audioIndex ?? decision.audio.index}
-                onChange={(e) => {
-                  const idx = Number(e.target.value)
-                  setAudioIndex(idx)
-                  void load(time, { audioIndex: idx })
-                }}
-                className="min-h-[36px] rounded-md border border-white/20 bg-black/60 px-2 text-sm"
+          {episode && (
+            <>
+              <button type="button" onClick={playPrevious} disabled={!previous} aria-label={previous ? `Previous episode: ${episodeName(previous.seasonNumber, previous.episodeNumber, previous.title)}` : 'Previous episode'} className={playerButton}>
+                <PreviousIcon size={22} />
+              </button>
+              <button type="button" onClick={playNextNow} disabled={!next} aria-label={next ? `Next episode: ${episodeName(next.seasonNumber, next.episodeNumber, next.title)}` : 'Next episode'} className={playerButton}>
+                <NextIcon size={22} />
+              </button>
+            </>
+          )}
+          {/* A phone's own buttons set its volume. */}
+          <button type="button" onClick={toggleMute} aria-label={volumeLabel(volume)} title={volumeLabel(volume)} className={`${playerButton} max-sm:hidden md:ml-2`}>
+            <VolumeIcon size={22} muted={volume.muted || volume.level === 0} />
+          </button>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={volume.muted ? 0 : Math.round(volume.level * 100)}
+            aria-label="Volume"
+            aria-valuetext={volume.muted ? 'Muted' : `${Math.round(volume.level * 100)}%`}
+            onChange={(e) => {
+              const level = Number(e.target.value) / 100
+              setVolume({ level, muted: level === 0 })
+            }}
+            className="hidden w-[110px] accent-neutral-100 sm:block"
+          />
+          <div className="ml-auto flex items-center gap-1 md:gap-2">
+            {decision && (decision.audioTracks.length > 1 || (apiLevel ?? 0) >= 18 || decision.subtitles.length > 0 || showOnline) && (
+              <button
+                type="button"
+                aria-expanded={sheet === 'tracks'}
+                aria-label="Audio & subtitles"
+                onClick={() => setSheet(sheet === 'tracks' ? null : 'tracks')}
+                className="btn btn-ghost px-2.5 text-neutral-100 hover:bg-white/14 md:px-4"
               >
-                {decision.audioTracks.map((a) => (
-                  <option key={a.index} value={a.index}>
-                    {[a.language?.toUpperCase(), a.codec.toUpperCase(), a.channels ? `${a.channels}ch` : '', a.title].filter(Boolean).join(' · ')}
-                  </option>
-                ))}
-              </select>
+                <SubtitlesIcon size={20} />
+                <span className="max-sm:sr-only">Audio &amp; subtitles</span>
+              </button>
             )}
-            {decision && ((apiLevel ?? 0) >= 18 || decision.subtitles.length > 0 || showOnline) && (
-              <select
-                value={subtitleWork.intent.automatic && !subtitleId ? '__account' : subtitleId}
-                aria-label="Subtitles"
-                onChange={(e) => void chooseSubtitle(e.target.value)}
-                className="min-h-[36px] max-w-[18rem] rounded-md border border-white/20 bg-black/60 px-2 text-sm"
-              >
-                {subtitleWork.intent.automatic && !subtitleId && <option value="__account" disabled>Using your subtitle settings</option>}
-                <option value="">Subtitles off</option>
-                {ownTracks.length > 0 && (
-                  <optgroup label={showOnline ? 'In this file' : 'Subtitles'}>
-                    {ownTracks.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {trackLabel(s)}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-                {showOnline && found && (
-                  <optgroup label="OpenSubtitles">
-                    {downloaded.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {trackLabel(s)}
-                      </option>
-                    ))}
-                    {toDownload.map((r) => (
-                      <option key={r.id} value={`online:${r.id}`} disabled={!found.canDownload || found.quota.remaining === 0 || fetching !== null}>
-                        {onlineLabel(r)}
-                      </option>
-                    ))}
-                    {found.error && <option disabled>Search failed</option>}
-                    {!found.error && downloaded.length === 0 && toDownload.length === 0 && <option disabled>None found ({found.languages.join(', ')})</option>}
-                    {!found.canDownload && toDownload.length > 0 && <option disabled>Only admins can download</option>}
-                    {found.canDownload && found.quota.remaining === 0 && <option disabled>No downloads left today</option>}
-                  </optgroup>
-                )}
-              </select>
-            )}
-            {showOnline && found && (
-              <a href="https://opensubtitles.com" target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-[11px] text-white/50 hover:text-white/80">
-                {found.attribution}
-              </a>
-            )}
-            {subNote && <span className="text-xs text-white/70">{subNote}</span>}
             <QualityMenu
+              chip
               value={quality}
               options={qualitiesFor(apiLevel)}
               autoStep={decision?.adaptive ? observedHeight ? String(observedHeight) : undefined : decision?.auto?.step}
@@ -991,28 +1158,56 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, initial
                 void load(time, { quality: q, resume: false })
               }}
             />
-            {airplay.available && !recordingId && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); airplay.pick() }}
-                className={`min-h-[40px] min-w-[44px] rounded-md px-3 hover:bg-white/20 ${airplay.active ? 'bg-accent text-black' : 'bg-white/10'}`}
-                aria-label="AirPlay"
-                title="AirPlay"
-              >
-                <AirPlayIcon />
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); void videoRef.current?.parentElement?.requestFullscreen?.() }}
-              className="min-h-[40px] min-w-[44px] rounded-md bg-white/10 px-3 hover:bg-white/20"
-              aria-label="Fullscreen"
-            >
-              ⛶
+            <button type="button" onClick={toggleFullscreen} aria-label={fullscreen ? 'Leave full screen' : 'Full screen'} aria-pressed={fullscreen} className={playerButton}>
+              <FullscreenIcon size={22} exit={fullscreen} />
             </button>
           </div>
         </div>
       </div>
+
+      {sheet === 'tracks' && decision && (
+        <PlayerSheet title="Audio & subtitles" onClose={() => setSheet(null)}>
+          <TracksPanel
+            decision={decision}
+            audioIndex={audioNow}
+            onAudio={(idx) => {
+              setAudioIndex(idx)
+              void load(time, { audioIndex: idx })
+            }}
+            subtitleId={subtitleId}
+            automatic={subtitleWork.intent.automatic}
+            onSubtitle={(value) => void chooseSubtitle(value)}
+            online={showOnline ? found : undefined}
+            fetching={fetching}
+            note={subNote}
+          />
+        </PlayerSheet>
+      )}
+
+      {sheet === 'info' && decision && (
+        <PlayerSheet title="Playback info" onClose={() => setSheet(null)}>
+          <InfoPanel
+            decision={decision}
+            source={file?.probe}
+            subtitleId={subtitleId}
+            bufferedSeconds={Math.max(0, bufferedEnd - time)}
+            observedHeight={observedHeight}
+            onReport={reportable ? () => setReporting(true) : undefined}
+          />
+        </PlayerSheet>
+      )}
+
+      {reporting && file && (file.movieId != null || file.episodeId != null) && (
+        <div data-player-keys="off" onClick={(e) => e.stopPropagation()}>
+          <ReportProblemDialog
+            itemType={file.movieId != null ? 'movie' : 'episode'}
+            itemId={(file.movieId ?? file.episodeId) as number}
+            fileId={fileId}
+            title={[heading.kicker, heading.heading].filter(Boolean).join(' · ')}
+            onClose={() => setReporting(false)}
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -1024,17 +1219,4 @@ function AirPlayIcon() {
       <path d="M12 14l5 6H7z" fill="currentColor" stroke="none" />
     </svg>
   )
-}
-
-const short = (s: string, n = 40) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
-
-function trackLabel(s: SubtitleTrack) {
-  if (s.source === 'opensubtitles') return [languageName(s.language), s.hearingImpaired ? 'HI' : '', s.forced ? 'forced' : '', s.release ? short(s.release) : ''].filter(Boolean).join(' · ')
-  return [s.language?.toUpperCase() || 'und', s.title, s.forced ? 'forced' : '', s.external ? 'external' : '', s.burnInOnly ? 'burn-in' : ''].filter(Boolean).join(' · ')
-}
-
-function onlineLabel(r: OnlineSubtitle) {
-  return [`↓ ${languageName(r.language)}`, r.hashMatch ? 'matches this file' : '', r.hearingImpaired ? 'HI' : '', r.forced ? 'forced' : '', r.aiTranslated ? 'AI translated' : '', short(r.release)]
-    .filter(Boolean)
-    .join(' · ')
 }
