@@ -73,12 +73,12 @@ export function StackedColumns({
   return (
     <div className="space-y-2">
       {!single && (
-        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
           {series.map((s) => (
-            <li key={s.key} className="flex items-center gap-1.5 text-neutral-300">
-              <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: s.color }} />
+            <li key={s.key} className="flex items-center gap-[7px] text-neutral-300">
+              <span className="inline-block size-3 rounded-[3px]" style={{ background: s.color }} />
               {s.label}
-              <span className="text-neutral-500">{format(s.values.reduce((a, b) => a + b, 0))}</span>
+              <span className="text-neutral-400">{format(s.values.reduce((a, b) => a + b, 0))}</span>
             </li>
           ))}
         </ul>
@@ -141,7 +141,7 @@ export function StackedColumns({
               <g key={b}>
                 {segs}
                 {i === peak && (
-                  <text x={x + colW / 2} y={y(max) - 5} textAnchor="middle" fontSize={11} fill="#c3c2b7">
+                  <text x={x + colW / 2} y={y(max) - 5} textAnchor="middle" fontSize={11} fill="#f5f5f5">
                     {format(max)}
                   </text>
                 )}

@@ -1,53 +1,52 @@
+import { useQuery } from '@tanstack/react-query'
 import { Link, Outlet, useRouterState } from '@tanstack/react-router'
+import { liveActivityQuery } from '../../api/activity'
+import { liveTVActivityQuery, liveTVCapabilitiesQuery } from '../../api/queries'
 import { useSettingsAccess } from '../settings/shared'
 import { adminAwayWording } from '../../lib/adminAway'
 import { useActivityAdmin, useActivityManage } from './shared'
 
-/** Activity: Now playing · History · Stats · Users · Downloads, each its own route. */
+/**
+ * Activity: Now playing, History, Stats, and for admins People and
+ * Downloads, each its own route. Plex's imported viewings are History's
+ * other source, so their address stays under History's tab.
+ */
 export function ActivityLayout() {
   const admin = useActivityAdmin()
   const manage = useActivityManage()
   const { adminLimit } = useSettingsAccess()
   const path = useRouterState({ select: (s) => s.location.pathname })
-  const tab = (active: boolean) =>
-    `min-h-[36px] whitespace-nowrap rounded-full px-3 py-1.5 text-sm ${active ? 'bg-neutral-100 text-black' : 'text-neutral-300 hover:text-neutral-100'}`
+  const live = useQuery(liveActivityQuery)
+  const caps = useQuery(liveTVCapabilitiesQuery)
+  const liveTV = useQuery({ ...liveTVActivityQuery, enabled: !!caps.data?.enabled && !!caps.data.allowed })
+  const playing = (live.data?.plays.length ?? 0) + (liveTV.data?.items.length ?? 0)
+  const tabs: { to: '/activity' | '/activity/history' | '/activity/stats' | '/activity/users' | '/activity/downloads'; label: string; on: boolean; n?: number }[] = [
+    { to: '/activity', label: 'Now playing', on: path === '/activity' || path === '/activity/', n: playing || undefined },
+    { to: '/activity/history', label: 'History', on: path.startsWith('/activity/history') || path.startsWith('/activity/plex-history') },
+    { to: '/activity/stats', label: 'Stats', on: path.startsWith('/activity/stats') },
+    ...(admin
+      ? [
+          { to: '/activity/users' as const, label: 'People', on: path.startsWith('/activity/users') },
+          { to: '/activity/downloads' as const, label: 'Downloads', on: path.startsWith('/activity/downloads') },
+        ]
+      : []),
+  ]
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">{admin ? 'Activity' : 'Your activity'}</h1>
-          <p className="text-sm text-neutral-400">
-            {admin ? 'Who is watching now, everything played, and the numbers behind it.' : 'What you are playing and have played. Only you and the server’s admins see this.'}
-          </p>
-          {/* Admins away from home read everything; the actions need home. */}
-          {admin && !manage && (
-            <p className="mt-1 text-sm text-neutral-500">{adminAwayWording(adminLimit ?? 'network').long}</p>
-          )}
-        </div>
-      </div>
-      <nav className="scrollbar-hide -mx-1 flex gap-1 overflow-x-auto px-1" aria-label="Activity sections">
-        <Link to="/activity" className={tab(path === '/activity' || path === '/activity/')}>
-          Now playing
-        </Link>
-        <Link to="/activity/history" className={tab(path.startsWith('/activity/history'))}>
-          History
-        </Link>
-        <Link to="/activity/plex-history" className={tab(path.startsWith('/activity/plex-history'))}>
-          Imported from Plex
-        </Link>
-        <Link to="/activity/stats" className={tab(path.startsWith('/activity/stats'))}>
-          Stats
-        </Link>
-        {admin && (
-          <Link to="/activity/users" className={tab(path.startsWith('/activity/users'))}>
-            Users
+    <div className="pt-2">
+      <h1 className="text-[28px] font-bold tracking-[-.02em]">{admin ? 'Activity' : 'Your activity'}</h1>
+      <p className="mt-1 text-neutral-400">
+        {admin ? 'Who is watching now, everything played, and the numbers behind it.' : 'What you are watching and have watched here. Only you and the server’s admins can see it.'}
+      </p>
+      {/* Admins away from home read everything; the actions need home. */}
+      {admin && !manage && <p className="mt-1 text-sm text-dim">{adminAwayWording(adminLimit ?? 'network').long}</p>}
+      <nav className="tabs mt-[18px]" aria-label="Activity">
+        {tabs.map((t) => (
+          // The router marks a link to a parent path active on its children; the tab's own rule decides here.
+          <Link key={t.to} to={t.to} activeProps={{}} activeOptions={{ exact: true }} aria-current={t.on ? 'page' : undefined} className="tab">
+            {t.label}
+            {t.n !== undefined && <span className="n">{t.n}</span>}
           </Link>
-        )}
-        {admin && (
-          <Link to="/activity/downloads" className={tab(path.startsWith('/activity/downloads'))}>
-            Downloads
-          </Link>
-        )}
+        ))}
       </nav>
       <Outlet />
     </div>

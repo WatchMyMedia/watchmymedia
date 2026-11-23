@@ -1,8 +1,10 @@
 import { useState } from 'react'
 
 /**
- * A chart's frame: title, subtitle, and a toggle to its table view, the
- * accessible twin that shows every value without hovering.
+ * A chart's frame: its heading, a note and a key, and its table view, the
+ * accessible twin that shows every value without hovering. asTable, from
+ * the page, turns every chart into its table at once; without it the card
+ * has its own Table button.
  */
 export function ChartCard({
   title,
@@ -10,33 +12,46 @@ export function ChartCard({
   chart,
   table,
   dimmed = false,
+  asTable: pageTable,
+  keys,
+  className = '',
 }: {
   title: string
   subtitle?: string
   chart: React.ReactNode
   table: React.ReactNode
   dimmed?: boolean
+  asTable?: boolean
+  keys?: React.ReactNode
+  className?: string
 }) {
-  const [asTable, setAsTable] = useState(false)
+  const [ownTable, setOwnTable] = useState(false)
+  const asTable = pageTable ?? ownTable
   return (
-    <figure className="min-w-0 rounded-lg border border-line bg-surface p-4">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <figcaption>
-          <h3 className="font-semibold">{title}</h3>
-          {subtitle && <p className="text-sm text-neutral-400">{subtitle}</p>}
-        </figcaption>
-        <button
-          type="button"
-          onClick={() => setAsTable((t) => !t)}
-          aria-pressed={asTable}
-          className="shrink-0 rounded-md border border-line-2 px-2 py-1 text-xs text-neutral-400 hover:text-neutral-100"
-        >
-          {asTable ? 'Chart' : 'Table'}
-        </button>
-      </div>
+    <figure className={`panel m-0 min-w-0 px-5 pb-4 pt-[18px] ${className}`}>
+      <figcaption className="rowh mb-4">
+        <h2>{title}</h2>
+        {subtitle && <span className="note">{subtitle}</span>}
+        {keys && <span className="ml-auto flex flex-wrap gap-4">{keys}</span>}
+        {pageTable === undefined && (
+          <button type="button" onClick={() => setOwnTable((t) => !t)} aria-pressed={asTable} className={`btn btn-sm btn-ghost ${keys ? '' : 'ml-auto'}`}>
+            {asTable ? 'Chart' : 'Table'}
+          </button>
+        )}
+      </figcaption>
       {/* Refetching keeps the last render, dimmed, so nothing jumps. */}
       <div className={`transition-opacity ${dimmed ? 'opacity-50' : ''}`}>{asTable ? <div className="max-h-80 overflow-auto">{table}</div> : chart}</div>
     </figure>
+  )
+}
+
+/** A series' key: its colour and its name. */
+export function Key({ color, children }: { color: string; children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-[7px] text-[13px] text-neutral-300">
+      <i aria-hidden="true" className="block size-3 rounded-[3px]" style={{ background: color }} />
+      {children}
+    </span>
   )
 }
 
@@ -45,7 +60,7 @@ export function DataTable({ head, rows }: { head: string[]; rows: (string | numb
   return (
     <table className="w-full text-sm">
       <thead className="sticky top-0 bg-surface">
-        <tr className="text-left text-xs uppercase tracking-wider text-neutral-500">
+        <tr className="text-left text-xs uppercase tracking-wider text-dim">
           {head.map((h, i) => (
             <th key={h} className={`py-1.5 pr-3 font-medium ${i > 0 ? 'text-right' : ''}`}>
               {h}

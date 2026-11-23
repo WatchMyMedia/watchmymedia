@@ -6,7 +6,7 @@ import { hourLabel, weekday } from './format'
 const ORDER = [1, 2, 3, 4, 5, 6, 0]
 
 /**
- * Weekday × hour. More is lighter blue; an empty hour is a neutral tile.
+ * Weekday × hour. More is brighter gold; an empty hour is a neutral tile.
  * Each cell shows its value on hover, or with the arrow keys once focused.
  */
 export function Heatmap({ values, max, format, label }: { values: number[][]; max: number; format: (v: number) => string; label: string }) {
@@ -39,12 +39,12 @@ export function Heatmap({ values, max, format, label }: { values: number[][]; ma
         <div className="grid grid-cols-[2.75rem_repeat(24,minmax(0,1fr))] gap-[2px]" aria-hidden="true">
           {ORDER.map((d, r) => (
             <div key={d} className="contents">
-              <span className="pr-1 text-right text-[11px] leading-none text-neutral-500 [align-self:center]">{weekday(d)}</span>
+              <span className="pr-1 text-left text-[11.5px] leading-none text-neutral-400 [align-self:center]">{weekday(d)}</span>
               {values[d].map((v, h) => (
                 <span
                   key={h}
                   onPointerMove={() => setActive([r, h])}
-                  className={`aspect-square rounded-[2px] ${active?.[0] === r && active?.[1] === h ? 'ring-2 ring-neutral-100' : ''}`}
+                  className={`h-5 rounded-[3px] ${active?.[0] === r && active?.[1] === h ? 'ring-2 ring-neutral-100' : ''}`}
                   style={{ background: color(v) }}
                 />
               ))}
@@ -53,7 +53,7 @@ export function Heatmap({ values, max, format, label }: { values: number[][]; ma
           <span />
           {/* A label every three hours, each as wide as its three cells. */}
           {Array.from({ length: 8 }, (_, i) => (
-            <span key={i} className="col-span-3 whitespace-nowrap pt-1 text-[10px] leading-none text-neutral-500">
+            <span key={i} className="col-span-3 whitespace-nowrap pt-1.5 text-[11px] leading-none text-neutral-400">
               {hourLabel(i * 3)}
             </span>
           ))}
@@ -71,13 +71,13 @@ export function Heatmap({ values, max, format, label }: { values: number[][]; ma
           </div>
         )}
       </div>
-      <div className="flex items-center gap-2 text-xs text-neutral-500">
-        <span className="inline-block h-3 w-3 rounded-[2px]" style={{ background: EMPTY }} /> none
-        <span className="ml-3">fewer</span>
+      <div className="flex items-center gap-1.5 text-xs text-neutral-400">
+        Less
+        <span className="inline-block h-3 w-4 rounded-[3px]" style={{ background: EMPTY }} />
         {RAMP.map((c) => (
-          <span key={c} className="inline-block h-3 w-3 rounded-[2px]" style={{ background: c }} />
+          <span key={c} className="inline-block h-3 w-4 rounded-[3px]" style={{ background: c }} />
         ))}
-        <span>more</span>
+        More
       </div>
     </div>
   )
