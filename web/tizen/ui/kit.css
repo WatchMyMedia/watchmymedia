@@ -12,8 +12,13 @@ button { border: 0; background: none; padding: 0; text-align: inherit; cursor: p
 :focus { outline: none; }
 .tv-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-/* Unavailable: translucent, and still focusable so a press can say why. */
+/* Unavailable: translucent, and still focusable so a press can say why. With
+   focus the ring stays at full strength and only the contents stay dim. */
 [aria-disabled="true"] { opacity: var(--off-opacity); cursor: default; }
+[aria-disabled="true"]:focus { opacity: 1; }
+.tv-btn[aria-disabled="true"]:focus { color: var(--faint); background: var(--quiet); border-color: var(--line-3); }
+.tv-btn[aria-disabled="true"]:focus svg { opacity: var(--off-opacity); }
+.tv-option[aria-disabled="true"]:focus { color: var(--faint); }
 /* A press, held until OK is let go: the item settles back and darkens. */
 .tv-pressed { filter: brightness(.82); }
 
