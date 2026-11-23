@@ -116,6 +116,7 @@ fun MovieScreen(
     onOpenShow: (Long) -> Unit = {},
     onOpenTrailer: (TrailerPlay.YouTube) -> Unit = {},
 ) {
+    onOpenPerson: (media.watchmy.client.model.Person, from: String) -> Unit = { _, _ -> },
     val services = LocalAppServices.current
     val context = LocalContext.current
     // YouTube's player in a WebView here, else the YouTube app.
@@ -166,6 +167,7 @@ fun MovieScreen(
                     onTrailer = onTrailer,
                     hasFile = main != null,
                 ) {
+                    onOpenPerson = { p -> onOpenPerson(p, movie.title) },
                     RelatedRows(state.related, services.library, memory, onOpenMovie, onOpenShow, Modifier.padding(bottom = 60.dp))
                 }
                 LaunchedEffect(Unit) {
@@ -290,6 +292,7 @@ private fun MovieContent(
     onTrailer: () -> Unit,
     hasFile: Boolean,
     related: @Composable () -> Unit,
+    onOpenPerson: (media.watchmy.client.model.Person) -> Unit,
 ) {
     val density = LocalDensity.current
     // The compact heading takes the top of the screen once the page has scrolled: rows stay under it.
@@ -304,7 +307,7 @@ private fun MovieContent(
                     PageBackdrop(library.imageUrl(movie.backdropPath, ImageSize.W1280), movie.title, Modifier.fillMaxWidth().overflowHeight(1080.dp, reported = 0.dp))
                     Column(Modifier.padding(top = 150.dp, bottom = 36.dp)) {
                         Header(movie, memory, { lastButton.value = it }, play, onMore, trailer, trailerInApp, onTrailer, hasFile, Modifier.padding(start = ContentStart, end = ContentEnd).heightIn(min = 502.dp))
-                        CastRow(movie.cast, library, memory, Modifier.padding(top = 18.dp).upTo(memory) { listOf(lastButton.value) + MovieButtons })
+                        CastRow(movie.cast, library, memory, Modifier.padding(top = 18.dp).upTo(memory) { listOf(lastButton.value) + MovieButtons }, onOpenPerson = onOpenPerson)
                     }
                 }
                 related()

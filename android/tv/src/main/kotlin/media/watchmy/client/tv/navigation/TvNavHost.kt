@@ -112,6 +112,7 @@ private fun ShowPage(nav: NavHostController, showId: Long, arrival: ShowArrival)
         onNavigate = { r -> nav.navigateSection(r) },
         onOpenShow = { id -> nav.navigate(TvRoutes.Show(id)) },
         onOpenMovie = { id -> nav.navigate(TvRoutes.Movie(id)) },
+        onOpenPerson = { p, from -> p.personId?.let { nav.navigate(TvRoutes.Person(it, p.name, from)) } },
     )
 }
 
@@ -313,12 +314,26 @@ fun TvNavHost(
                         onNavigate = { r -> nav.navigateSection(r) },
                         onOpenMovie = { id -> nav.navigate(TvRoutes.Movie(id)) },
                         onOpenShow = { id -> nav.navigate(TvRoutes.Show(id)) },
-                        onOpenTrailer = { t -> nav.navigate(TvRoutes.Trailer(t.movieId, t.movieTitle, t.trailers.map { it.key }, t.trailers.map { it.name })) },
+                        onOpenTrailer = { t -> nav.navigate(TvRoutes.Trailer(t.movieId, t.movieTitle, t.trailers.map { it.key }, t.trailers.map { it.name }, t.trailers.map { it.teaser })) },
+                        onOpenPerson = { p, from -> p.personId?.let { nav.navigate(TvRoutes.Person(it, p.name, from)) } },
+                    )
+                }
+                composable<TvRoutes.Person> {
+                    val r = it.toRoute<TvRoutes.Person>()
+                    media.watchmy.client.tv.detail.PersonScreen(
+                        personId = r.personId,
+                        name = r.name,
+                        from = r.from,
+                        onBack = { nav.popBackStack() },
+                        onOpenMovie = { id -> nav.navigate(TvRoutes.Movie(id)) },
+                        onOpenShow = { id -> nav.navigate(TvRoutes.Show(id)) },
+                        onNavigate = { route -> nav.navigateSection(route) },
                     )
                 }
                 composable<TvRoutes.Trailer> {
                     val r = it.toRoute<TvRoutes.Trailer>()
-                    val trailers = r.keys.zip(r.names) { key, name -> Trailer.YouTube(name, key) }.filter { t -> isYouTubeKey(t.key) }
+                    val trailers = r.keys.zip(r.names) { key, name -> Trailer.YouTube(name, key) }
+                        .mapIndexed { i, t -> t.copy(teaser = r.teasers.getOrNull(i) == true) }.filter { t -> isYouTubeKey(t.key) }
                     TvTrailerScreen(movieTitle = r.movieTitle, trailers = trailers, onBack = { nav.popBackStack() })
                 }
                 composable<TvRoutes.Search> {

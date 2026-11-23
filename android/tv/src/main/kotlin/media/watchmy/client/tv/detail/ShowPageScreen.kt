@@ -92,6 +92,7 @@ fun ShowPageScreen(
     onNavigate: (Any) -> Unit = {},
     onOpenShow: (Long) -> Unit = {},
     onOpenMovie: (Long) -> Unit = {},
+    onOpenPerson: (media.watchmy.client.model.Person, from: String) -> Unit = { _, _ -> },
 ) {
     val services = LocalAppServices.current
     val vm = viewModel(key = "show-$showId") { ShowPageViewModel(services.library, showId, arrival, services.requests, follows = services.follows, saved = createSavedStateHandle(), watchlists = services.watchlists) }
@@ -122,6 +123,7 @@ fun ShowPageScreen(
                     },
                     onAsk = { asking = it },
                     onAboutMore = if (state.aboutFlags().hasMore) ({ panel = ShowPanel.About }) else null,
+                    onOpenPerson = { p -> onOpenPerson(p, show.title) },
                 ) {
                     RelatedRows(state.related, services.library, memory, onOpenMovie, onOpenShow, Modifier.padding(top = 40.dp))
                 }
@@ -257,6 +259,7 @@ private fun PageContent(
     onMore: () -> Unit,
     onAsk: (Int) -> Unit,
     onAboutMore: (() -> Unit)?,
+    onOpenPerson: (media.watchmy.client.model.Person) -> Unit,
     related: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -296,7 +299,7 @@ private fun PageContent(
                 })
                 AboutPeek(show, rowFocused, Modifier.padding(top = 30.dp))
                 About(show, state.aboutFlags(), vm, library, memory, { aboutButton.value = it }, episodeFocus, onAboutMore, Modifier.padding(top = 140.dp))
-                CastRow(show.cast, library, memory, Modifier.padding(top = 40.dp).upTo(memory) { listOf(aboutButton.value) + AboutButtons })
+                CastRow(show.cast, library, memory, Modifier.padding(top = 40.dp).upTo(memory) { listOf(aboutButton.value) + AboutButtons }, onOpenPerson = onOpenPerson)
                 related()
             }
             ScrolledHeading(scroll, back = show.title) {

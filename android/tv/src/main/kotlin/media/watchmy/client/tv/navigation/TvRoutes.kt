@@ -14,12 +14,14 @@ object TvRoutes {
     /** The show page with this episode on top, from Home, Search and the other pages that link an episode. */
     @Serializable data class Episode(val showId: Long, val season: Int, val episodeId: Long)
     @Serializable data class Movie(val id: Long)
+    /** A cast member's titles, from a title page's cast ([from] is that title, for Back's words). */
+    @Serializable data class Person(val personId: Long, val name: String, val from: String? = null)
     /**
      * A movie's YouTube trailers, played in the app
      * and tried in turn: [keys] are their YouTube ids and [names] their
      * names, best first.
      */
-    @Serializable data class Trailer(val movieId: Long, val movieTitle: String, val keys: List<String>, val names: List<String>)
+    @Serializable data class Trailer(val movieId: Long, val movieTitle: String, val keys: List<String>, val names: List<String>, val teasers: List<Boolean> = emptyList())
     @Serializable data object Search
     @Serializable data object LiveTV
     /** Live channels have their own route and never masquerade as a media file. */
