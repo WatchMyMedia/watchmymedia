@@ -185,8 +185,8 @@ internal fun TvGuideHero(
             HeroTitle(programme.title)
             val reminder = state?.reminderFor(programme)
             FactsRow(
+                // When it is on and the tags first; the episode last, where it gives way to them on a long line.
                 buildList {
-                    programme.episodeLine()?.let { add { Text(it, style = TvType.Body, color = WmmColors.TextSoft, maxLines = 1) } }
                     add { Text(format.span(programme.startMs, programme.endMs), style = TvType.Body, color = WmmColors.TextSoft, maxLines = 1) }
                     val left = if (airing) liveMinutesLeft(now, programme.endMs) else liveStartsIn(now, programme.startMs).replaceFirstChar { it.lowercase() }
                     add { Text(left, style = TvType.BodyStrong, color = WmmColors.Text, maxLines = 1) }
@@ -202,6 +202,7 @@ internal fun TvGuideHero(
                             if (reminder != null) TvTag("Reminder set", gold = true)
                         }
                     }
+                    programme.episodeLine()?.let { add { Text(it, style = TvType.Body, color = WmmColors.TextSoft, maxLines = 1, overflow = TextOverflow.Ellipsis) } }
                 },
             )
             programme.description?.let {
@@ -225,7 +226,7 @@ private fun HeroTitle(text: String) {
     Text(text, style = TvType.Title, color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
-/** Facts in a line with a grey dot between each (`.facts`). */
+/** Facts in a line with a grey dot between each (`.facts`); the last one gives way (ellipsized) where the line runs out. */
 @Composable
 internal fun FactsRow(items: List<@Composable () -> Unit>, modifier: Modifier = Modifier) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -277,9 +278,10 @@ internal fun TvProgrammeChoices(
                 style = TvType.Second, color = TvPalette.Muted, maxLines = 1,
             )
             Text(current.title, style = TvType.Heading, color = WmmColors.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            // The episode on a line of its own: beside the times it pushed the New tag off the panel's edge.
+            current.episodeLine()?.let { Text(it, style = TvType.Second, color = WmmColors.TextSoft, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             FactsRow(
                 buildList {
-                    current.episodeLine()?.let { add { Text(it, style = TvType.Second, color = WmmColors.TextSoft, maxLines = 1) } }
                     add { Text(format.span(current.startMs, current.endMs), style = TvType.Second, color = WmmColors.TextSoft, maxLines = 1) }
                     if (current.new) add { TvTag("New", gold = true) }
                 },
