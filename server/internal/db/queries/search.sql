@@ -105,7 +105,7 @@ WHERE ((x.words LIKE sqlc.arg(word1) AND x.words LIKE sqlc.arg(word2) AND x.word
 -- name: ListSearchEpisodesByIDs :many
 -- The episodes search shows, each with its newest present file (0 when it
 -- has none any more).
-SELECT e.*, se.number AS season_number, s.title AS show_title, s.poster_path AS show_poster_path,
+SELECT e.*, se.number AS season_number, s.title AS show_title, s.poster_path AS show_poster_path, s.tmdb_id AS show_tmdb_id,
        CAST(COALESCE((SELECT MAX(f.id) FROM episode_files ef
                       CROSS JOIN media_files f ON f.id = ef.media_file_id
                       WHERE ef.episode_id = e.id AND f.status = 'present'), 0) AS INTEGER) AS file_id
@@ -113,3 +113,19 @@ FROM episodes e
 JOIN seasons se ON se.id = e.season_id
 JOIN shows s ON s.id = e.show_id
 WHERE e.id IN (sqlc.slice(ids));
+
+-- name: ListWatchStatesForItems :many
+-- The signed-in person's state for the few titles a search shows.
+SELECT item_id, completed, position_ms, duration_ms FROM watch_state
+WHERE user_id = sqlc.arg(user_id) AND item_type = sqlc.arg(item_type) AND item_id IN (sqlc.slice(ids));
+
+-- name: ListShowWatchedCountsByIDs :many
+-- ListShowWatchedCounts for the few shows a search shows: each show's
+-- watched episodes that have a file present.
+SELECT e.show_id, COUNT(DISTINCT e.id) AS watched
+FROM episodes e
+CROSS JOIN watch_state w ON w.user_id = sqlc.arg(user_id) AND w.item_type = 'episode' AND w.item_id = e.id AND w.completed = 1
+WHERE e.show_id IN (sqlc.slice(ids))
+  AND EXISTS (SELECT 1 FROM episode_files ef CROSS JOIN media_files f ON f.id = ef.media_file_id
+      WHERE ef.episode_id = e.id AND f.status = 'present')
+GROUP BY e.show_id;

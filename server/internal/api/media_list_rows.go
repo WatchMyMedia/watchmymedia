@@ -648,7 +648,7 @@ func libraryItemsByTMDB(ctx context.Context, deps Deps, entries []lists.Entry, m
 			keep("tv", r.TmdbID, showItem(db.ListShowItemsRow{ID: r.ID, LibraryID: r.LibraryID, TmdbID: r.TmdbID, Title: r.Title, Year: r.Year, Overview: r.Overview,
 				Status: r.Status, Genres: r.Genres, Rating: r.Rating, PosterPath: r.PosterPath, BackdropPath: r.BackdropPath, LastAirDate: r.LastAirDate,
 				NextAirDate: r.NextAirDate, ContentRating: r.ContentRating, EpisodeCount: r.EpisodeCount, AddedAt: r.AddedAt, MaxHeight: r.MaxHeight,
-				HasHdr: r.HasHdr, TotalSize: r.TotalSize}))
+				HasHdr: r.HasHdr, TotalSize: r.TotalSize, SeasonCount: r.SeasonCount}))
 		}
 	}
 	for k, it := range out {

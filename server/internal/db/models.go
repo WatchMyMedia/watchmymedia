@@ -259,6 +259,7 @@ type LiveTvRecording struct {
 	Data        string  `json:"data"`
 	CreatedAt   int64   `json:"created_at"`
 	UpdatedAt   int64   `json:"updated_at"`
+	Bytes       int64   `json:"bytes"`
 }
 
 type LiveTvRecordingProgress struct {
@@ -425,6 +426,17 @@ type Movie struct {
 	CollectionID      *int64   `json:"collection_id"`
 	CollectionName    *string  `json:"collection_name"`
 	RelatedCheckedAt  *string  `json:"related_checked_at"`
+	Crew              string   `json:"crew"`
+	CastCheckedAt     *string  `json:"cast_checked_at"`
+}
+
+type MovieCast struct {
+	MovieID     int64   `json:"movie_id"`
+	Billing     int64   `json:"billing"`
+	PersonID    int64   `json:"person_id"`
+	Name        string  `json:"name"`
+	Character   string  `json:"character"`
+	ProfilePath *string `json:"profile_path"`
 }
 
 type MovieTag struct {
@@ -786,6 +798,17 @@ type Show struct {
 	PosterTmdb       *string  `json:"poster_tmdb"`
 	PosterSource     string   `json:"poster_source"`
 	RelatedCheckedAt *string  `json:"related_checked_at"`
+	Crew             string   `json:"crew"`
+	CastCheckedAt    *string  `json:"cast_checked_at"`
+}
+
+type ShowCast struct {
+	ShowID      int64   `json:"show_id"`
+	Billing     int64   `json:"billing"`
+	PersonID    int64   `json:"person_id"`
+	Name        string  `json:"name"`
+	Character   string  `json:"character"`
+	ProfilePath *string `json:"profile_path"`
 }
 
 type ShowFollow struct {
@@ -803,10 +826,28 @@ type ShowTag struct {
 	Rank   int64  `json:"rank"`
 }
 
+type ShowTrackChoice struct {
+	UserID           int64   `json:"user_id"`
+	TmdbID           int64   `json:"tmdb_id"`
+	AudioLanguage    *string `json:"audio_language"`
+	SubtitleLanguage *string `json:"subtitle_language"`
+	SubtitleOff      int64   `json:"subtitle_off"`
+	UpdatedAt        string  `json:"updated_at"`
+}
+
 type ShowsSearch struct {
 	Title         string `json:"title"`
 	OriginalTitle string `json:"original_title"`
 	Words         string `json:"words"`
+}
+
+type TmdbCollection struct {
+	ID           int64   `json:"id"`
+	Name         string  `json:"name"`
+	PosterPath   *string `json:"poster_path"`
+	BackdropPath *string `json:"backdrop_path"`
+	Parts        string  `json:"parts"`
+	FetchedAt    string  `json:"fetched_at"`
 }
 
 type Trickplay struct {
@@ -863,12 +904,13 @@ type WatchRevision struct {
 }
 
 type WatchState struct {
-	UserID      int64  `json:"user_id"`
-	ItemType    string `json:"item_type"`
-	ItemID      int64  `json:"item_id"`
-	MediaFileID *int64 `json:"media_file_id"`
-	PositionMs  int64  `json:"position_ms"`
-	DurationMs  int64  `json:"duration_ms"`
-	Completed   int64  `json:"completed"`
-	UpdatedAt   string `json:"updated_at"`
+	UserID      int64   `json:"user_id"`
+	ItemType    string  `json:"item_type"`
+	ItemID      int64   `json:"item_id"`
+	MediaFileID *int64  `json:"media_file_id"`
+	PositionMs  int64   `json:"position_ms"`
+	DurationMs  int64   `json:"duration_ms"`
+	Completed   int64   `json:"completed"`
+	UpdatedAt   string  `json:"updated_at"`
+	HiddenAt    *string `json:"hidden_at"`
 }

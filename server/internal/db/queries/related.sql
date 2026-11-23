@@ -117,3 +117,55 @@ SELECT id, tmdb_id, library_id, title, year, rating FROM movies WHERE id IN (sql
 
 -- name: ListShowRelatedRefs :many
 SELECT id, tmdb_id, library_id, title, year, rating FROM shows WHERE id IN (sqlc.slice(ids));
+
+-- name: ListLibraryCollectionMovieIDs :many
+-- A library's movies of one TMDB collection, for its grid of them.
+SELECT id FROM movies INDEXED BY movies_collection_idx
+WHERE collection_id = sqlc.arg(collection_id) AND library_id = sqlc.arg(library_id);
+
+-- name: ListCollectionsToFetch :many
+-- TMDB collections the library's movies name that aren't kept, or were
+-- fetched before stale, for the refresher, from the movies that have one.
+SELECT DISTINCT m.collection_id
+FROM movies m INDEXED BY movies_collection_idx
+LEFT JOIN tmdb_collections c ON c.id = m.collection_id
+WHERE m.collection_id IS NOT NULL AND (c.id IS NULL OR c.fetched_at < sqlc.arg(stale))
+LIMIT sqlc.arg(max_rows);
+
+-- name: UpsertTMDBCollection :exec
+INSERT INTO tmdb_collections (id, name, poster_path, backdrop_path, parts, fetched_at) VALUES (?, ?, ?, ?, ?, ?)
+ON CONFLICT (id) DO UPDATE SET name = excluded.name, poster_path = excluded.poster_path,
+    backdrop_path = excluded.backdrop_path, parts = excluded.parts, fetched_at = excluded.fetched_at;
+
+-- name: MarkTMDBCollectionFetched :exec
+-- A collection TMDB no longer has: kept as it was, so it isn't asked for
+-- again until it is stale; one never kept gets the name the movies gave it.
+INSERT INTO tmdb_collections (id, name, fetched_at) VALUES (?, ?, ?)
+ON CONFLICT (id) DO UPDATE SET fetched_at = excluded.fetched_at;
+
+-- name: GetTMDBCollection :one
+SELECT * FROM tmdb_collections WHERE id = ?;
+
+-- name: ListLibraryCollections :many
+-- A library's collections with two of their movies or more with a present
+-- file, with what TMDB lists in each when it is kept, and the first film's
+-- picture for one without its own.
+SELECT m.collection_id, CAST(MAX(m.collection_name) AS TEXT) AS collection_name, COUNT(*) AS movies,
+    MIN(m.year) AS first_year, MAX(m.year) AS last_year,
+    (SELECT m2.poster_path FROM movies m2 INDEXED BY movies_collection_idx
+        WHERE m2.collection_id = m.collection_id AND m2.library_id = m.library_id
+        ORDER BY m2.release_date, m2.id LIMIT 1) AS first_poster_path,
+    (SELECT m2.backdrop_path FROM movies m2 INDEXED BY movies_collection_idx
+        WHERE m2.collection_id = m.collection_id AND m2.library_id = m.library_id
+        ORDER BY m2.release_date, m2.id LIMIT 1) AS first_backdrop_path,
+    c.name AS tmdb_name, c.poster_path, c.backdrop_path, c.parts
+FROM movies m INDEXED BY movies_collection_idx
+LEFT JOIN tmdb_collections c ON c.id = m.collection_id
+WHERE m.collection_id IS NOT NULL AND m.library_id = sqlc.arg(library_id)
+  AND EXISTS (SELECT 1 FROM media_files f WHERE f.movie_id = m.id AND f.status = 'present')
+GROUP BY m.collection_id
+HAVING COUNT(*) >= 2;
+
+-- name: GetCollectionName :one
+-- The name a movie of the collection gave it.
+SELECT collection_name FROM movies INDEXED BY movies_collection_idx WHERE collection_id = ? LIMIT 1;

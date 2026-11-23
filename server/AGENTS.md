@@ -41,6 +41,7 @@ Under `internal/`:
 | `artwork` | The pictures admins chose in place of TMDB's posters: uploads and links copied once, re-encoded as JPEG and named `c-<hash>.jpg` under `<data_dir>/artwork`, the address check on links, and the sweep. `images` serves them scaled on the TMDB image route; the routes are `internal/api/posters.go`. `poster_path` stays the poster to show: change it only through `SetMoviePoster`, `SetShowPoster` and `SetSeasonPoster`, and keep the upserts' `poster_source` guard, or a refresh overwrites an admin's choice |
 | `trailers` | Movies' YouTube trailers from TMDB: choosing the best three, `movies.trailers`, the background refresh (`Refresher`) and whether the Trailers from YouTube setting is on |
 | `related` | Related titles at the end of movie and show pages: each title's tags from TMDB (`movie_tags`, `show_tags`: recommendations, keywords, genres, billed cast, director or creator, language) and a movie's collection, written when the matcher stores a title (`StoreMovie`, `StoreShow`, in its transaction); the scoring (`Similar`, weights in `score.go`); and the background job (`Refresher`) that fills in titles matched before and refetches a title whose page was opened with data older than 30 or 90 days. Pages never wait on TMDB. The routes are `internal/api/related.go` |
+| `people` | The people behind a title: its billed 12 with TMDB's person IDs, in `credits` (the cast row) and in `movie_cast`/`show_cast` (which find a person's titles for `GET /api/people/{personId}`), and a few of its crew (`crew`). A person is told apart by TMDB's person ID, never by name. Stored with the title by the matcher (`StoreMovie`, `StoreShow`, in its transaction) and whenever the related refresher fetches the title's details; titles matched before person IDs were kept have `cast_checked_at` NULL, and the refresher's fill-in fetches them one title per transaction, so it can stop and start again without fetching a title twice. A title TMDB no longer has is marked checked with its cast as it was |
 | `lists` | The lists rows are made from: a `Source` per kind (TMDB's trending, charts, discover, lists and collections; MDBList with the admin's key; a saved library filter; an import of an IMDb or Letterboxd export or pasted lines), what they fetched in `media_lists` and `media_list_entries`, and the refresh job (`Service.Run`), with a fake MDBList in `internal/lists/mdblisttest`. Each person's watchlists are lists of kind `watchlist`, never fetched, whose rules (limits apart from the lists', names, a new title's rank below the lowest, what is kept for a title the library lacks, leaving once finished) are all in `internal/lists/watchlist.go`. Each person's row layouts (`user_preferences` `rows.*`, the household's in `settings` `rows.default.*`), their merge, the arranged screens and matching entries to the library are in `api` (`screen_layout.go`, `media_list_rows.go`) |
 | `playback` | Direct play, remux and transcode decisions, bounded event and VOD HLS sessions, owned temporary-storage accounting, hardware encoders, Automatic quality's policy (`auto.go`) |
 | `streamtest` | Test-only aggregate/per-viewer HTTP media shaper for `cmd/livetvfixture`; never wire it into the production server. `make streaming-check` runs the isolated F0/F1 harness. |
@@ -119,6 +120,12 @@ SQLite plans joins without statistics, and a plan that looks fine after
   `sqlc.slice` for `?N` by byte offset, so a `§` or an em dash earlier in
   the file shifts every later swap, and sqlc reports parse errors in
   unrelated queries ("extraneous input 'SELECTid'").
+- sqlc parses the migrations too, with a grammar narrower than SQLite's.
+  `UPDATE ... FROM` fails there ("extraneous input '<EOF>'" at 1:1 of the
+  migration): use correlated subqueries, as `00051_recording_facts.sql`
+  does. In a query, `path LIKE sqlc.narg('x') ESCAPE '\'` fails ("no
+  viable alternative at input 'LIKE'"): write
+  `LIKE CAST(sqlc.narg(x) AS TEXT)`, without `ESCAPE`.
 - A query's parameters are all `?` or all `sqlc.arg(name)`. Mixed, sqlc
   generates without complaint and the query fails when it runs ("missing
   argument with index 19"); `?` with a numbered `?13` is refused at
@@ -171,7 +178,7 @@ SQLite plans joins without statistics, and a plan that looks fine after
   with ten 250-entry lists, three library lists and five 500-title
   watchlists on Home, checks the watchlists' query plans, and times each
   page alone and the web Home's requests as one burst, arranged and not;
-  `TestRelatedSpeed` (`internal/api/related_speed_test.go`) gives it TMDB-like tags and times a movie's and a show's related rows, alone and ten at once, and checks their plans; `TestNewEpisodesSpeed` (`internal/api/follows_speed_test.go`) adds 500
+  `TestRelatedSpeed` (`internal/api/related_speed_test.go`) gives it TMDB-like tags and times a movie's and a show's related rows, alone and ten at once, and checks their plans; `TestPersonSpeed` (`internal/api/people_speed_test.go`) gives every title a billed cast of 12 and times a person's page for the busiest person and a typical one, alone and ten at once, and checks its plans; `TestNewEpisodesSpeed` (`internal/api/follows_speed_test.go`) adds 500
   follows and a week of arrivals to it and times the new-episodes feed, the
   follows list and Home's followed row, alone and ten at once, and fails
   when their plans read a whole table; `TestSearchSpeed`

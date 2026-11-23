@@ -106,7 +106,7 @@ LIMIT sqlc.arg(max_rows);
 -- arrivals as ListFollowedArrivals since a date, newest first, with what
 -- an episode card shows and the episode row's tallest present file.
 SELECT a.id, a.tmdb_id, a.arrived_at, a.season AS season_number, a.number AS episode_number,
-    e.id AS episode_id, e.show_id, e.title, e.overview, e.air_date, e.still_path,
+    e.id AS episode_id, e.show_id, e.title, e.overview, e.air_date, e.still_path, e.runtime_min,
     s.title AS show_title, s.poster_path AS show_poster_path, s.backdrop_path AS show_backdrop_path,
     CAST(COALESCE((SELECT mf.id FROM episode_files ef CROSS JOIN media_files mf ON mf.id = ef.media_file_id
         WHERE ef.episode_id = e.id AND mf.status = 'present' ORDER BY mf.height DESC LIMIT 1), 0) AS INTEGER) AS file_id
@@ -131,3 +131,8 @@ WHERE f.user_id = sqlc.arg(user_id) AND a.quiet = 0 AND a.arrived_at >= sqlc.arg
       WHERE s3.tmdb_id = a.tmdb_id)
 ORDER BY a.id DESC
 LIMIT sqlc.arg(max_rows);
+
+-- name: ListFollowedTMDBIDs :many
+-- The TMDB IDs of the shows a person follows, for a library's Following
+-- filter.
+SELECT tmdb_id FROM show_follows WHERE user_id = ?;

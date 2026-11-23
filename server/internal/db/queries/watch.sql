@@ -1,4 +1,6 @@
 -- name: UpsertWatchState :one
+-- A position or watched mark made here. Either brings back a title the
+-- person removed from Continue watching (hidden_at).
 INSERT INTO watch_state (user_id, item_type, item_id, media_file_id, position_ms, duration_ms, completed)
 VALUES (?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (user_id, item_type, item_id) DO UPDATE SET
@@ -6,6 +8,7 @@ ON CONFLICT (user_id, item_type, item_id) DO UPDATE SET
     position_ms   = excluded.position_ms,
     duration_ms   = excluded.duration_ms,
     completed     = excluded.completed,
+    hidden_at     = NULL,
     updated_at    = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 RETURNING *;
 
@@ -61,7 +64,7 @@ DELETE FROM watch_state WHERE user_id = ? AND item_type = 'episode'
 
 -- name: ListContinueWatching :many
 SELECT * FROM watch_state
-WHERE user_id = ? AND completed = 0 AND position_ms > 0
+WHERE user_id = ? AND completed = 0 AND position_ms > 0 AND hidden_at IS NULL
 ORDER BY updated_at DESC
 LIMIT ?;
 
@@ -161,19 +164,22 @@ LIMIT 1;
 
 -- name: ListContinueWatchingItems :many
 -- Continue watching, newest first: the user's unfinished movies and
--- episodes whose file is still present, with what a card shows.
+-- episodes whose file is still present and which they haven't removed
+-- from the row, with what a card shows.
 SELECT w.item_type, w.item_id, w.media_file_id, w.position_ms, w.duration_ms, w.updated_at,
     m.title AS movie_title, m.year AS movie_year, m.poster_path AS movie_poster_path, m.backdrop_path AS movie_backdrop_path,
-    e.number AS episode_number, e.title AS episode_title, e.still_path AS episode_still_path,
+    m.content_rating AS movie_content_rating, m.overview AS movie_overview, m.tmdb_id AS movie_tmdb_id,
+    e.number AS episode_number, e.title AS episode_title, e.still_path AS episode_still_path, e.overview AS episode_overview,
     se.number AS season_number,
-    s.id AS show_id, s.title AS show_title, s.poster_path AS show_poster_path, s.backdrop_path AS show_backdrop_path
+    s.id AS show_id, s.title AS show_title, s.poster_path AS show_poster_path, s.backdrop_path AS show_backdrop_path,
+    s.content_rating AS show_content_rating, s.tmdb_id AS show_tmdb_id
 FROM watch_state w INDEXED BY watch_state_user_updated_idx
 CROSS JOIN media_files f ON f.id = w.media_file_id
 LEFT JOIN movies m ON w.item_type = 'movie' AND m.id = w.item_id
 LEFT JOIN episodes e ON w.item_type = 'episode' AND e.id = w.item_id
 LEFT JOIN seasons se ON se.id = e.season_id
 LEFT JOIN shows s ON s.id = e.show_id
-WHERE w.user_id = ? AND w.completed = 0 AND w.position_ms > 0 AND f.status = 'present'
+WHERE w.user_id = ? AND w.completed = 0 AND w.position_ms > 0 AND w.hidden_at IS NULL AND f.status = 'present'
   AND (m.id IS NOT NULL OR s.id IS NOT NULL AND se.id IS NOT NULL)
 ORDER BY w.updated_at DESC
 LIMIT ?;
@@ -184,9 +190,9 @@ LIMIT ?;
 -- Each library's added_at index is walked from
 -- the cutoff, so only the window's files are read, not every episode.
 -- Episode files are reached through episode_files, which leaves trailer
--- files out. Only the show id is needed, so the watch_state lookup is a
--- NOT EXISTS on its primary key.
-SELECT DISTINCT e.show_id
+-- files out. Only the show id and how many episodes are needed, so the
+-- watch_state lookup is a NOT EXISTS on its primary key.
+SELECT e.show_id, COUNT(DISTINCT e.id) AS episodes
 FROM libraries l
 CROSS JOIN media_files f INDEXED BY media_files_added_idx
     ON f.library_id = l.id AND f.status = 'present' AND f.added_at >= sqlc.arg(since)
@@ -194,7 +200,8 @@ CROSS JOIN episode_files ef ON ef.media_file_id = f.id
 CROSS JOIN episodes e ON e.id = ef.episode_id
 WHERE l.type = 'tv'
   AND NOT EXISTS (SELECT 1 FROM watch_state w
-      WHERE w.user_id = sqlc.arg(user_id) AND w.item_type = 'episode' AND w.item_id = e.id AND w.completed = 1);
+      WHERE w.user_id = sqlc.arg(user_id) AND w.item_type = 'episode' AND w.item_id = e.id AND w.completed = 1)
+GROUP BY e.show_id;
 
 -- name: ListWatchedEpisodeIDs :many
 -- Which of some episodes the user has finished.
@@ -275,15 +282,17 @@ SELECT user_id FROM watch_guards WHERE watch_guards.item_type = sqlc.arg(item_ty
 ORDER BY user_id;
 
 -- name: ReplaceWatchState :exec
--- Puts a copy of state on another item, keeping when it was saved.
-INSERT INTO watch_state (user_id, item_type, item_id, media_file_id, position_ms, duration_ms, completed, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+-- Puts a copy of state on another item, keeping when it was saved and
+-- whether it was removed from Continue watching.
+INSERT INTO watch_state (user_id, item_type, item_id, media_file_id, position_ms, duration_ms, completed, updated_at, hidden_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (user_id, item_type, item_id) DO UPDATE SET
     media_file_id = excluded.media_file_id,
     position_ms   = excluded.position_ms,
     duration_ms   = excluded.duration_ms,
     completed     = excluded.completed,
-    updated_at    = excluded.updated_at;
+    updated_at    = excluded.updated_at,
+    hidden_at     = excluded.hidden_at;
 
 -- name: DeleteWatchGuardsForItem :exec
 DELETE FROM watch_guards WHERE item_type = ? AND item_id = ?;
@@ -298,7 +307,8 @@ JOIN shows sh ON sh.id = e.show_id
 WHERE e.id = ?;
 
 -- name: UpsertWatchStateAt :exec
--- A change made offline, saved with when it happened rather than now.
+-- A change made offline, saved with when it happened rather than now. As
+-- a play here does, it brings back a title removed from Continue watching.
 INSERT INTO watch_state (user_id, item_type, item_id, media_file_id, position_ms, duration_ms, completed, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (user_id, item_type, item_id) DO UPDATE SET
@@ -306,6 +316,7 @@ ON CONFLICT (user_id, item_type, item_id) DO UPDATE SET
     position_ms   = excluded.position_ms,
     duration_ms   = excluded.duration_ms,
     completed     = excluded.completed,
+    hidden_at     = NULL,
     updated_at    = excluded.updated_at;
 
 -- name: ClaimWatchGuardAt :exec
@@ -316,3 +327,15 @@ VALUES (?, ?, ?, 'local', ?, ?)
 ON CONFLICT (user_id, item_type, item_id) DO UPDATE SET
     owner = 'local', import_run = NULL, revision = excluded.revision,
     updated_at = excluded.updated_at;
+
+-- name: HideFromContinueWatching :execrows
+-- Takes an item off the person's Continue watching and keeps its place.
+-- Nothing changes when it has no state or is off the row already.
+UPDATE watch_state SET hidden_at = sqlc.arg(hidden_at)
+WHERE user_id = sqlc.arg(user_id) AND item_type = sqlc.arg(item_type) AND item_id = sqlc.arg(item_id)
+  AND hidden_at IS NULL;
+
+-- name: UnhideFromContinueWatching :execrows
+-- Puts an item the person took off Continue watching back on it.
+UPDATE watch_state SET hidden_at = NULL
+WHERE user_id = ? AND item_type = ? AND item_id = ? AND hidden_at IS NOT NULL;

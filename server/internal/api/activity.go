@@ -378,6 +378,12 @@ type StatsInput struct {
 
 type CardsOutput struct{ Body activity.Cards }
 
+// StatsCardsInput is StatsInput with whether to count conversions.
+type StatsCardsInput struct {
+	StatsInput
+	Conversions bool `query:"conversions" required:"false" doc:"Also count why the period's plays were converted (conversions). From API level 34."`
+}
+
 type SeriesInput struct {
 	Days   int    `query:"days" minimum:"0" maximum:"36500" default:"30" doc:"0 is all time."`
 	By     string `query:"by" enum:"plays,time" default:"plays"`
@@ -595,7 +601,7 @@ func registerActivity(h huma.API, deps Deps) {
 		Path:        Prefix + "/stats/cards",
 		Summary:     "Top shows, movies, users and devices, peak streams and recent plays",
 		Tags:        []string{"activity"},
-	}, func(ctx context.Context, in *StatsInput) (*CardsOutput, error) {
+	}, func(ctx context.Context, in *StatsCardsInput) (*CardsOutput, error) {
 		v, err := viewer(ctx)
 		if err != nil {
 			return nil, err
@@ -603,7 +609,8 @@ func registerActivity(h huma.API, deps Deps) {
 		if deps.Activity == nil {
 			return nil, noActivity()
 		}
-		c, err := deps.Activity.Cards(ctx, activity.StatsQuery{Days: in.Days, ByTime: in.By == "time", UserID: scopeUser(v, in.User), LibraryID: in.Library})
+		c, err := deps.Activity.Cards(ctx, activity.StatsQuery{Days: in.Days, ByTime: in.By == "time", UserID: scopeUser(v, in.User), LibraryID: in.Library,
+			Conversions: in.Conversions})
 		return &CardsOutput{Body: c}, err
 	})
 

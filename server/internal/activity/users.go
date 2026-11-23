@@ -3,9 +3,11 @@ package activity
 import (
 	"context"
 	"database/sql"
+	"net/netip"
 	"time"
 
 	"watchmymedia/server/internal/db"
+	"watchmymedia/server/internal/netguard"
 )
 
 // UserSummary is a row of the Users tab.
@@ -31,8 +33,12 @@ type Window struct {
 
 // DeviceSummary is a device a user has played on.
 type DeviceSummary struct {
-	Device      Device    `json:"device"`
-	LastIP      string    `json:"lastIp"`
+	Device Device `json:"device"`
+	LastIP string `json:"lastIp"`
+	// Network is from API level 34.
+	// Network is a plain string, so a kind added later can't break decoding
+	// in an older app.
+	Network     string    `json:"network,omitempty" required:"false" doc:"The network lastIp is on: local (at home), tailnet or remote. Absent without an address (API level 34)."`
 	FirstSeenAt time.Time `json:"firstSeenAt"`
 	LastSeenAt  time.Time `json:"lastSeenAt"`
 	Plays       int64     `json:"plays"`
@@ -41,10 +47,12 @@ type DeviceSummary struct {
 // UserDetail is a user's page.
 type UserDetail struct {
 	UserSummary
-	Windows   []Window        `json:"windows" nullable:"false"`
-	DeviceSet []DeviceSummary `json:"deviceList" nullable:"false"`
-	TopShows  []StatItem      `json:"topShows" nullable:"false"`
-	TopMovies []StatItem      `json:"topMovies" nullable:"false"`
+	// FirstPlayAt is from API level 34.
+	FirstPlayAt *time.Time      `json:"firstPlayAt,omitempty" required:"false" doc:"When the person's first play in the history started; absent with none (API level 34)."`
+	Windows     []Window        `json:"windows" nullable:"false"`
+	DeviceSet   []DeviceSummary `json:"deviceList" nullable:"false"`
+	TopShows    []StatItem      `json:"topShows" nullable:"false"`
+	TopMovies   []StatItem      `json:"topMovies" nullable:"false"`
 }
 
 // Users summarises every account's activity.
@@ -144,6 +152,9 @@ func (t *Tracker) User(ctx context.Context, id int64) (UserDetail, error) {
 			return err
 		}
 		s.FirstSeenAt, s.LastSeenAt = db.ParseTime(first), db.ParseTime(last)
+		if ip, err := netip.ParseAddr(s.LastIP); err == nil {
+			s.Network = netguard.Classify(ip)
+		}
 		return nil
 	}, `
 		SELECT d.id, d.name, d.product, d.platform, d.version, d.last_ip, d.first_seen_at, d.last_seen_at,
@@ -153,6 +164,19 @@ func (t *Tracker) User(ctx context.Context, id int64) (UserDetail, error) {
 		return d, err
 	}
 	d.DeviceSet = append(d.DeviceSet, devices...)
+	// The first play: the earliest start in each half of the person's index
+	// (user_id, group_latest, started_at), each a single seek.
+	var first sql.NullString
+	if err := t.db.QueryRowContext(ctx, `
+		SELECT MIN(started_at) FROM (
+			SELECT MIN(started_at) AS started_at FROM plays INDEXED BY plays_user_idx WHERE user_id = ? AND group_latest = 0
+			UNION ALL
+			SELECT MIN(started_at) FROM plays INDEXED BY plays_user_idx WHERE user_id = ? AND group_latest = 1)`, id, id).Scan(&first); err != nil {
+		return d, err
+	}
+	if first.Valid {
+		d.FirstPlayAt = db.ParseTimePtr(&first.String)
+	}
 	cards, err := t.Cards(ctx, StatsQuery{UserID: id})
 	if err != nil {
 		return d, err

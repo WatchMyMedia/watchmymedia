@@ -128,6 +128,18 @@ func (q *Queries) DeleteShowTags(ctx context.Context, showID int64) error {
 	return err
 }
 
+const getCollectionName = `-- name: GetCollectionName :one
+SELECT collection_name FROM movies INDEXED BY movies_collection_idx WHERE collection_id = ? LIMIT 1
+`
+
+// The name a movie of the collection gave it.
+func (q *Queries) GetCollectionName(ctx context.Context, collectionID *int64) (*string, error) {
+	row := q.db.QueryRowContext(ctx, getCollectionName, collectionID)
+	var collection_name *string
+	err := row.Scan(&collection_name)
+	return collection_name, err
+}
+
 const getMovieRelatedInfo = `-- name: GetMovieRelatedInfo :one
 SELECT id, tmdb_id, library_id, year, release_date, collection_id, collection_name, related_checked_at
 FROM movies WHERE id = ?
@@ -184,6 +196,24 @@ func (q *Queries) GetShowRelatedInfo(ctx context.Context, id int64) (GetShowRela
 		&i.Year,
 		&i.FirstAirDate,
 		&i.RelatedCheckedAt,
+	)
+	return i, err
+}
+
+const getTMDBCollection = `-- name: GetTMDBCollection :one
+SELECT id, name, poster_path, backdrop_path, parts, fetched_at FROM tmdb_collections WHERE id = ?
+`
+
+func (q *Queries) GetTMDBCollection(ctx context.Context, id int64) (TmdbCollection, error) {
+	row := q.db.QueryRowContext(ctx, getTMDBCollection, id)
+	var i TmdbCollection
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.PosterPath,
+		&i.BackdropPath,
+		&i.Parts,
+		&i.FetchedAt,
 	)
 	return i, err
 }
@@ -261,6 +291,148 @@ func (q *Queries) ListCollectionMovies(ctx context.Context, arg ListCollectionMo
 	for rows.Next() {
 		var i ListCollectionMoviesRow
 		if err := rows.Scan(&i.ID, &i.TmdbID, &i.LibraryID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCollectionsToFetch = `-- name: ListCollectionsToFetch :many
+SELECT DISTINCT m.collection_id
+FROM movies m INDEXED BY movies_collection_idx
+LEFT JOIN tmdb_collections c ON c.id = m.collection_id
+WHERE m.collection_id IS NOT NULL AND (c.id IS NULL OR c.fetched_at < ?1)
+LIMIT ?2
+`
+
+type ListCollectionsToFetchParams struct {
+	Stale   string `json:"stale"`
+	MaxRows int64  `json:"max_rows"`
+}
+
+// TMDB collections the library's movies name that aren't kept, or were
+// fetched before stale, for the refresher, from the movies that have one.
+func (q *Queries) ListCollectionsToFetch(ctx context.Context, arg ListCollectionsToFetchParams) ([]*int64, error) {
+	rows, err := q.db.QueryContext(ctx, listCollectionsToFetch, arg.Stale, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []*int64{}
+	for rows.Next() {
+		var collection_id *int64
+		if err := rows.Scan(&collection_id); err != nil {
+			return nil, err
+		}
+		items = append(items, collection_id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLibraryCollectionMovieIDs = `-- name: ListLibraryCollectionMovieIDs :many
+SELECT id FROM movies INDEXED BY movies_collection_idx
+WHERE collection_id = ?1 AND library_id = ?2
+`
+
+type ListLibraryCollectionMovieIDsParams struct {
+	CollectionID *int64 `json:"collection_id"`
+	LibraryID    int64  `json:"library_id"`
+}
+
+// A library's movies of one TMDB collection, for its grid of them.
+func (q *Queries) ListLibraryCollectionMovieIDs(ctx context.Context, arg ListLibraryCollectionMovieIDsParams) ([]int64, error) {
+	rows, err := q.db.QueryContext(ctx, listLibraryCollectionMovieIDs, arg.CollectionID, arg.LibraryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLibraryCollections = `-- name: ListLibraryCollections :many
+SELECT m.collection_id, CAST(MAX(m.collection_name) AS TEXT) AS collection_name, COUNT(*) AS movies,
+    MIN(m.year) AS first_year, MAX(m.year) AS last_year,
+    (SELECT m2.poster_path FROM movies m2 INDEXED BY movies_collection_idx
+        WHERE m2.collection_id = m.collection_id AND m2.library_id = m.library_id
+        ORDER BY m2.release_date, m2.id LIMIT 1) AS first_poster_path,
+    (SELECT m2.backdrop_path FROM movies m2 INDEXED BY movies_collection_idx
+        WHERE m2.collection_id = m.collection_id AND m2.library_id = m.library_id
+        ORDER BY m2.release_date, m2.id LIMIT 1) AS first_backdrop_path,
+    c.name AS tmdb_name, c.poster_path, c.backdrop_path, c.parts
+FROM movies m INDEXED BY movies_collection_idx
+LEFT JOIN tmdb_collections c ON c.id = m.collection_id
+WHERE m.collection_id IS NOT NULL AND m.library_id = ?1
+  AND EXISTS (SELECT 1 FROM media_files f WHERE f.movie_id = m.id AND f.status = 'present')
+GROUP BY m.collection_id
+HAVING COUNT(*) >= 2
+`
+
+type ListLibraryCollectionsRow struct {
+	CollectionID      *int64      `json:"collection_id"`
+	CollectionName    string      `json:"collection_name"`
+	Movies            int64       `json:"movies"`
+	FirstYear         interface{} `json:"first_year"`
+	LastYear          interface{} `json:"last_year"`
+	FirstPosterPath   *string     `json:"first_poster_path"`
+	FirstBackdropPath *string     `json:"first_backdrop_path"`
+	TmdbName          *string     `json:"tmdb_name"`
+	PosterPath        *string     `json:"poster_path"`
+	BackdropPath      *string     `json:"backdrop_path"`
+	Parts             *string     `json:"parts"`
+}
+
+// A library's collections with two of their movies or more with a present
+// file, with what TMDB lists in each when it is kept, and the first film's
+// picture for one without its own.
+func (q *Queries) ListLibraryCollections(ctx context.Context, libraryID int64) ([]ListLibraryCollectionsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listLibraryCollections, libraryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLibraryCollectionsRow{}
+	for rows.Next() {
+		var i ListLibraryCollectionsRow
+		if err := rows.Scan(
+			&i.CollectionID,
+			&i.CollectionName,
+			&i.Movies,
+			&i.FirstYear,
+			&i.LastYear,
+			&i.FirstPosterPath,
+			&i.FirstBackdropPath,
+			&i.TmdbName,
+			&i.PosterPath,
+			&i.BackdropPath,
+			&i.Parts,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -755,6 +927,24 @@ func (q *Queries) ListShowsRecommending(ctx context.Context, value string) ([]in
 	return items, nil
 }
 
+const markTMDBCollectionFetched = `-- name: MarkTMDBCollectionFetched :exec
+INSERT INTO tmdb_collections (id, name, fetched_at) VALUES (?, ?, ?)
+ON CONFLICT (id) DO UPDATE SET fetched_at = excluded.fetched_at
+`
+
+type MarkTMDBCollectionFetchedParams struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	FetchedAt string `json:"fetched_at"`
+}
+
+// A collection TMDB no longer has: kept as it was, so it isn't asked for
+// again until it is stale; one never kept gets the name the movies gave it.
+func (q *Queries) MarkTMDBCollectionFetched(ctx context.Context, arg MarkTMDBCollectionFetchedParams) error {
+	_, err := q.db.ExecContext(ctx, markTMDBCollectionFetched, arg.ID, arg.Name, arg.FetchedAt)
+	return err
+}
+
 const setMovieRelated = `-- name: SetMovieRelated :execrows
 UPDATE movies SET collection_id = ?, collection_name = ?, related_checked_at = ? WHERE id = ?
 `
@@ -794,4 +984,31 @@ func (q *Queries) SetShowRelatedChecked(ctx context.Context, arg SetShowRelatedC
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const upsertTMDBCollection = `-- name: UpsertTMDBCollection :exec
+INSERT INTO tmdb_collections (id, name, poster_path, backdrop_path, parts, fetched_at) VALUES (?, ?, ?, ?, ?, ?)
+ON CONFLICT (id) DO UPDATE SET name = excluded.name, poster_path = excluded.poster_path,
+    backdrop_path = excluded.backdrop_path, parts = excluded.parts, fetched_at = excluded.fetched_at
+`
+
+type UpsertTMDBCollectionParams struct {
+	ID           int64   `json:"id"`
+	Name         string  `json:"name"`
+	PosterPath   *string `json:"poster_path"`
+	BackdropPath *string `json:"backdrop_path"`
+	Parts        string  `json:"parts"`
+	FetchedAt    string  `json:"fetched_at"`
+}
+
+func (q *Queries) UpsertTMDBCollection(ctx context.Context, arg UpsertTMDBCollectionParams) error {
+	_, err := q.db.ExecContext(ctx, upsertTMDBCollection,
+		arg.ID,
+		arg.Name,
+		arg.PosterPath,
+		arg.BackdropPath,
+		arg.Parts,
+		arg.FetchedAt,
+	)
+	return err
 }

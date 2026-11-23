@@ -150,7 +150,38 @@ type HealthOutput struct {
 // MediaListEntry.watchlisted and .addedAt, Requestable.watchlisted,
 // MediaList.removeWatched, and listMediaListEntries' sort and mediaType.
 // Apps offer saving only from this level.
-const APILevel = 33
+// 34: what the redesigned pages show. The people behind the cast:
+// Credit.personId (TMDB's person ID; absent until a title matched before
+// is fetched again), MovieDetail.crew and ShowDetail.crew, and
+// GET /people/{personId} (getPerson), a person's titles in the library
+// with the part played. Cards: BrowseItem.unwatchedCount, .newEpisodeCount,
+// .seasonCount and .added; EpisodeCard.runtimeMin; HomeHero.showTitle,
+// .episodeNumber, .airDate and .runtimeMin; search's Movie.watched and
+// .progress, Show.watched, .unwatchedCount and .seasonCount, and
+// SearchEpisode.runtimeMin and .progress. Libraries: ItemTotals.unwatched,
+// .inProgress, .newEpisodes, .following and .addedThisMonth;
+// listLibraryItems' filters, order, contentRating and collection, and the
+// filter values inProgress and following; ItemFacets.contentRatings and
+// ItemList.contentRatingCounts; GET /libraries/{id}/collections and
+// /libraries/{id}/collections/{collectionId}, whose missing films can be
+// requested; MovieDetail.collection. Continue watching: PUT and DELETE
+// /watch/{type}/{id}/hidden, ContinueItem.contentRating and .overview.
+// Playback: planPlayback's tracks and PlaybackPlan.audioTracks and
+// .subtitles, MovieTrailer.kind, a show's sound and subtitles (PUT and
+// DELETE /shows/{id}/tracks, ShowDetail.tracks) and
+// Preferences.hideSpoilers. Recordings: LiveTVRecording.kind, .year, .new,
+// .repeat, .categories, .progress, .watched and .nextAiring;
+// LiveTVConflictRef.repeat and .nextAiring; LiveTVRecordings.counts,
+// .reserveBytes and .totalBytes. Statistics and files:
+// ActivityCards.conversions, ActivityPeak.converted,
+// ActivityUserDetail.firstPlayAt, ActivityDeviceSummary.network,
+// OfflineTransfer.ip, and listLibraryFiles' q and probe=failed with
+// MediaFileList.unreadable and MediaFile.title, .year and .episode.
+// Titles on several servers, for apps that show one card for a title more
+// than one server has: GET /movies?tmdbId= and /shows?tmdbId=
+// (findMoviesByTMDB, findShowsByTMDB), ContinueItem.tmdbId,
+// EpisodeCard.showTmdbId and SearchEpisode.showTmdbId.
+const APILevel = 34
 
 // ServerInfo identifies the server to apps before anyone signs in.
 type ServerInfo struct {

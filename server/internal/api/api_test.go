@@ -557,6 +557,10 @@ func TestRowsItemsAndHome(t *testing.T) {
 	if c := again.RecentlyAdded[0]; c.Subtitle != "2 episodes" || c.EpisodeID != 0 || c.SeasonNumber != nil {
 		t.Errorf("two added episodes = %q, %d, season %v", c.Subtitle, c.EpisodeID, c.SeasonNumber)
 	}
+	// The same facts as fields: two of season 1's three, a new show.
+	if a := again.RecentlyAdded[0].Added; a == nil || a.Episodes != 2 || a.SeasonNumber == nil || *a.SeasonNumber != 1 || a.SeasonComplete || !a.NewShow {
+		t.Errorf("added = %+v", a)
+	}
 }
 
 // The show page's quality, HDR, size and date added come from that show's

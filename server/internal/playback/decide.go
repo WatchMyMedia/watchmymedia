@@ -94,7 +94,7 @@ type Request struct {
 	AudioIndex *int `json:"audioIndex,omitempty"`
 	// SubtitleID selects a subtitle track and takes precedence over the
 	// person's defaults. Omit it with SubtitleMode auto to use preferences.
-	SubtitleID   string `json:"subtitleId,omitempty"`
+	SubtitleID   string `json:"subtitleId,omitempty" doc:"A subtitles[].id from a decision or a plan with tracks: s<index> for a stream inside the file (its ffprobe index), x<n> for a subtitle file beside the video (n counts them from 0 in the order the server lists them), d<id> for a downloaded one."`
 	SubtitleMode string `json:"subtitleMode,omitempty" enum:"auto,off" required:"false" doc:"From API level 18: auto uses the person's subtitle preferences; off explicitly disables them. A subtitleId takes precedence. Omitted, older players keep their existing behavior."`
 	// BurnIn forces the selected subtitle to be burned into the video.
 	BurnIn  bool   `json:"burnIn,omitempty"`

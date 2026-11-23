@@ -11,7 +11,7 @@ import (
 )
 
 const listMoviesByIDs = `-- name: ListMoviesByIDs :many
-SELECT id, library_id, tmdb_id, imdb_id, title, original_title, year, release_date, overview, tagline, runtime_min, genres, rating, poster_path, backdrop_path, created_at, updated_at, credits, content_rating, trailers, trailers_checked_at, poster_tmdb, poster_source, collection_id, collection_name, related_checked_at FROM movies WHERE id IN (/*SLICE:ids*/?)
+SELECT id, library_id, tmdb_id, imdb_id, title, original_title, year, release_date, overview, tagline, runtime_min, genres, rating, poster_path, backdrop_path, created_at, updated_at, credits, content_rating, trailers, trailers_checked_at, poster_tmdb, poster_source, collection_id, collection_name, related_checked_at, crew, cast_checked_at FROM movies WHERE id IN (/*SLICE:ids*/?)
 `
 
 func (q *Queries) ListMoviesByIDs(ctx context.Context, ids []int64) ([]Movie, error) {
@@ -60,6 +60,8 @@ func (q *Queries) ListMoviesByIDs(ctx context.Context, ids []int64) ([]Movie, er
 			&i.CollectionID,
 			&i.CollectionName,
 			&i.RelatedCheckedAt,
+			&i.Crew,
+			&i.CastCheckedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -75,7 +77,7 @@ func (q *Queries) ListMoviesByIDs(ctx context.Context, ids []int64) ([]Movie, er
 }
 
 const listSearchEpisodesByIDs = `-- name: ListSearchEpisodesByIDs :many
-SELECT e.id, e.season_id, e.show_id, e.number, e.title, e.overview, e.air_date, e.still_path, e.runtime_min, e.rating, e.file_named, se.number AS season_number, s.title AS show_title, s.poster_path AS show_poster_path,
+SELECT e.id, e.season_id, e.show_id, e.number, e.title, e.overview, e.air_date, e.still_path, e.runtime_min, e.rating, e.file_named, se.number AS season_number, s.title AS show_title, s.poster_path AS show_poster_path, s.tmdb_id AS show_tmdb_id,
        CAST(COALESCE((SELECT MAX(f.id) FROM episode_files ef
                       CROSS JOIN media_files f ON f.id = ef.media_file_id
                       WHERE ef.episode_id = e.id AND f.status = 'present'), 0) AS INTEGER) AS file_id
@@ -100,6 +102,7 @@ type ListSearchEpisodesByIDsRow struct {
 	SeasonNumber   int64    `json:"season_number"`
 	ShowTitle      string   `json:"show_title"`
 	ShowPosterPath *string  `json:"show_poster_path"`
+	ShowTmdbID     int64    `json:"show_tmdb_id"`
 	FileID         int64    `json:"file_id"`
 }
 
@@ -139,6 +142,7 @@ func (q *Queries) ListSearchEpisodesByIDs(ctx context.Context, ids []int64) ([]L
 			&i.SeasonNumber,
 			&i.ShowTitle,
 			&i.ShowPosterPath,
+			&i.ShowTmdbID,
 			&i.FileID,
 		); err != nil {
 			return nil, err
@@ -154,8 +158,64 @@ func (q *Queries) ListSearchEpisodesByIDs(ctx context.Context, ids []int64) ([]L
 	return items, nil
 }
 
+const listShowWatchedCountsByIDs = `-- name: ListShowWatchedCountsByIDs :many
+SELECT e.show_id, COUNT(DISTINCT e.id) AS watched
+FROM episodes e
+CROSS JOIN watch_state w ON w.user_id = ?1 AND w.item_type = 'episode' AND w.item_id = e.id AND w.completed = 1
+WHERE e.show_id IN (/*SLICE:ids*/?)
+  AND EXISTS (SELECT 1 FROM episode_files ef CROSS JOIN media_files f ON f.id = ef.media_file_id
+      WHERE ef.episode_id = e.id AND f.status = 'present')
+GROUP BY e.show_id
+`
+
+type ListShowWatchedCountsByIDsParams struct {
+	UserID int64   `json:"user_id"`
+	Ids    []int64 `json:"ids"`
+}
+
+type ListShowWatchedCountsByIDsRow struct {
+	ShowID  int64 `json:"show_id"`
+	Watched int64 `json:"watched"`
+}
+
+// ListShowWatchedCounts for the few shows a search shows: each show's
+// watched episodes that have a file present.
+func (q *Queries) ListShowWatchedCountsByIDs(ctx context.Context, arg ListShowWatchedCountsByIDsParams) ([]ListShowWatchedCountsByIDsRow, error) {
+	query := listShowWatchedCountsByIDs
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.UserID)
+	if len(arg.Ids) > 0 {
+		for _, v := range arg.Ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(arg.Ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListShowWatchedCountsByIDsRow{}
+	for rows.Next() {
+		var i ListShowWatchedCountsByIDsRow
+		if err := rows.Scan(&i.ShowID, &i.Watched); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listShowsByIDs = `-- name: ListShowsByIDs :many
-SELECT id, library_id, tmdb_id, title, original_title, year, first_air_date, overview, status, genres, rating, poster_path, backdrop_path, created_at, updated_at, last_air_date, next_air_date, credits, content_rating, poster_tmdb, poster_source, related_checked_at FROM shows WHERE id IN (/*SLICE:ids*/?)
+SELECT id, library_id, tmdb_id, title, original_title, year, first_air_date, overview, status, genres, rating, poster_path, backdrop_path, created_at, updated_at, last_air_date, next_air_date, credits, content_rating, poster_tmdb, poster_source, related_checked_at, crew, cast_checked_at FROM shows WHERE id IN (/*SLICE:ids*/?)
 `
 
 func (q *Queries) ListShowsByIDs(ctx context.Context, ids []int64) ([]Show, error) {
@@ -200,6 +260,67 @@ func (q *Queries) ListShowsByIDs(ctx context.Context, ids []int64) ([]Show, erro
 			&i.PosterTmdb,
 			&i.PosterSource,
 			&i.RelatedCheckedAt,
+			&i.Crew,
+			&i.CastCheckedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listWatchStatesForItems = `-- name: ListWatchStatesForItems :many
+SELECT item_id, completed, position_ms, duration_ms FROM watch_state
+WHERE user_id = ?1 AND item_type = ?2 AND item_id IN (/*SLICE:ids*/?)
+`
+
+type ListWatchStatesForItemsParams struct {
+	UserID   int64   `json:"user_id"`
+	ItemType string  `json:"item_type"`
+	Ids      []int64 `json:"ids"`
+}
+
+type ListWatchStatesForItemsRow struct {
+	ItemID     int64 `json:"item_id"`
+	Completed  int64 `json:"completed"`
+	PositionMs int64 `json:"position_ms"`
+	DurationMs int64 `json:"duration_ms"`
+}
+
+// The signed-in person's state for the few titles a search shows.
+func (q *Queries) ListWatchStatesForItems(ctx context.Context, arg ListWatchStatesForItemsParams) ([]ListWatchStatesForItemsRow, error) {
+	query := listWatchStatesForItems
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.UserID)
+	queryParams = append(queryParams, arg.ItemType)
+	if len(arg.Ids) > 0 {
+		for _, v := range arg.Ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(arg.Ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListWatchStatesForItemsRow{}
+	for rows.Next() {
+		var i ListWatchStatesForItemsRow
+		if err := rows.Scan(
+			&i.ItemID,
+			&i.Completed,
+			&i.PositionMs,
+			&i.DurationMs,
 		); err != nil {
 			return nil, err
 		}

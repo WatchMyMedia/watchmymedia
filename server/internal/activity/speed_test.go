@@ -91,10 +91,17 @@ func seedHistory(tb testing.TB, conn *sql.DB, n int, end time.Time) {
 		}
 	}
 	modes := []string{"direct", "direct", "direct", "direct", "direct", "direct", "direct", "remux", "remux", "audio", "transcode", "transcode"}
+	// What Decide writes for each mode, so the statistics read real reasons.
+	reasons := map[string]string{
+		"direct":    `[]`,
+		"remux":     `["client cannot play the mkv container"]`,
+		"audio":     `["client cannot decode dts audio","audio converted to EAC3 5.1, which keeps it surround"]`,
+		"transcode": `["client cannot decode hevc video","3840x2160 exceeds the client's 1920x1080","bitrate 24000 kb/s exceeds the client's 8000 kb/s"]`,
+	}
 	ins, err := tx.PrepareContext(ctx, `INSERT INTO plays (public_id, user_id, user_name, device_id, history_item_id, library_id, item_type, show_id,
 		state, started_at, stopped_at, last_seen_at, played_ms, paused_ms, start_position_ms, end_position_ms, max_position_ms, duration_ms, completed, end_reason,
-		mode, ip, network, local_day, local_hour, local_weekday, group_id, group_latest, group_started_at, group_played_ms, group_count)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'stopped', ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 'stopped', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+		mode, reasons, quality, ip, network, local_day, local_hour, local_weekday, group_id, group_latest, group_started_at, group_played_ms, group_count)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'stopped', ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, 'stopped', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -118,6 +125,10 @@ func seedHistory(tb testing.TB, conn *sql.DB, n int, end time.Time) {
 			ip = fmt.Sprintf("100.64.%d.%d", r.IntN(4), r.IntN(256))
 		}
 		mode := modes[r.IntN(len(modes))]
+		quality := "original"
+		if strings.HasPrefix(ip, "203.") {
+			quality = "1080"
+		}
 		sittings := 1
 		if r.IntN(100) < 15 {
 			sittings = 2 + r.IntN(2)
@@ -151,7 +162,7 @@ func seedHistory(tb testing.TB, conn *sql.DB, n int, end time.Time) {
 			loc := started.UTC()
 			_, err := ins.ExecContext(ctx, strconv.FormatInt(row, 36)+"x", user, fmt.Sprintf("user%02d", user), device, it.id, it.libraryID, it.typ, show,
 				db.FormatTime(started), db.FormatTime(stopped), db.FormatTime(stopped), played, from, pos, pos, it.duration, completed,
-				mode, ip, netguard.Classify(netip.MustParseAddr(ip)), loc.Format(time.DateOnly), loc.Hour(), int(loc.Weekday()),
+				mode, reasons[mode], quality, ip, netguard.Classify(netip.MustParseAddr(ip)), loc.Format(time.DateOnly), loc.Hour(), int(loc.Weekday()),
 				groupID, db.BoolInt(last), groupStarted, groupPlayed, s+1)
 			if err != nil {
 				tb.Fatal(err)
@@ -233,6 +244,12 @@ func TestHistorySpeed(t *testing.T) {
 		{"cards, 30 days", 50 * time.Millisecond, fresh(func() error { _, err := tr.Cards(ctx, StatsQuery{Days: 30}); return err })},
 		// 250,000 plays put 50,000 in a year, five times a busy household's.
 		{"cards, 365 days", 60 * time.Millisecond, fresh(func() error { _, err := tr.Cards(ctx, StatsQuery{Days: 365}); return err })},
+		// Counting conversions reads their own index after the cards': 10 ms
+		// more for a year at this size.
+		{"cards and conversions, 365 days", 75 * time.Millisecond, fresh(func() error {
+			_, err := tr.Cards(ctx, StatsQuery{Days: 365, Conversions: true})
+			return err
+		})},
 		{"series by day, 90 days", 50 * time.Millisecond, fresh(func() error { _, err := tr.Series(ctx, SeriesQuery{Days: 90, Split: "type"}); return err })},
 		{"series by month, all time", 50 * time.Millisecond, fresh(func() error {
 			_, err := tr.Series(ctx, SeriesQuery{Split: "mode", Bucket: "month"})

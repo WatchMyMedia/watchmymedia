@@ -15,16 +15,25 @@ SELECT COUNT(*) FROM media_files
 WHERE library_id = ?1 AND extra_kind IS NULL
   AND (?2 IS NULL OR status = ?2)
   AND (?3 IS NULL OR match_status = ?3)
+  AND (?4 IS NULL OR path LIKE CAST(?4 AS TEXT) OR path LIKE CAST(?5 AS TEXT))
 `
 
 type CountMediaFilesParams struct {
 	LibraryID   int64       `json:"library_id"`
 	Status      interface{} `json:"status"`
 	MatchStatus interface{} `json:"match_status"`
+	PathLike    interface{} `json:"path_like"`
+	PathLikeNfd *string     `json:"path_like_nfd"`
 }
 
 func (q *Queries) CountMediaFiles(ctx context.Context, arg CountMediaFilesParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countMediaFiles, arg.LibraryID, arg.Status, arg.MatchStatus)
+	row := q.db.QueryRowContext(ctx, countMediaFiles,
+		arg.LibraryID,
+		arg.Status,
+		arg.MatchStatus,
+		arg.PathLike,
+		arg.PathLikeNfd,
+	)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -66,6 +75,35 @@ func (q *Queries) CountMediaFilesByStatus(ctx context.Context) ([]CountMediaFile
 		return nil, err
 	}
 	return items, nil
+}
+
+const countUnreadableMediaFiles = `-- name: CountUnreadableMediaFiles :one
+SELECT COUNT(*) FROM media_files INDEXED BY media_files_unreadable_idx
+WHERE library_id = ?1 AND probe_error IS NOT NULL AND extra_kind IS NULL
+  AND (?2 IS NULL OR status = ?2)
+  AND (?3 IS NULL OR match_status = ?3)
+  AND (?4 IS NULL OR path LIKE CAST(?4 AS TEXT) OR path LIKE CAST(?5 AS TEXT))
+`
+
+type CountUnreadableMediaFilesParams struct {
+	LibraryID   int64       `json:"library_id"`
+	Status      interface{} `json:"status"`
+	MatchStatus interface{} `json:"match_status"`
+	PathLike    interface{} `json:"path_like"`
+	PathLikeNfd *string     `json:"path_like_nfd"`
+}
+
+func (q *Queries) CountUnreadableMediaFiles(ctx context.Context, arg CountUnreadableMediaFilesParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countUnreadableMediaFiles,
+		arg.LibraryID,
+		arg.Status,
+		arg.MatchStatus,
+		arg.PathLike,
+		arg.PathLikeNfd,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const getFileEpisode = `-- name: GetFileEpisode :one
@@ -276,24 +314,32 @@ SELECT id, library_id, path, size, mtime, status, parsed, probe, probe_error, co
 WHERE library_id = ?1 AND extra_kind IS NULL
   AND (?2 IS NULL OR status = ?2)
   AND (?3 IS NULL OR match_status = ?3)
+  AND (?4 IS NULL OR path LIKE CAST(?4 AS TEXT) OR path LIKE CAST(?5 AS TEXT))
 ORDER BY path
-LIMIT ?5 OFFSET ?4
+LIMIT ?7 OFFSET ?6
 `
 
 type ListMediaFilesParams struct {
 	LibraryID   int64       `json:"library_id"`
 	Status      interface{} `json:"status"`
 	MatchStatus interface{} `json:"match_status"`
+	PathLike    interface{} `json:"path_like"`
+	PathLikeNfd *string     `json:"path_like_nfd"`
 	Offset      int64       `json:"offset"`
 	Limit       int64       `json:"limit"`
 }
 
-// A library's files, without trailers (they belong to their movie).
+// A library's files, without trailers (they belong to their movie). The
+// path patterns, when given, are the words searched for, in order, as
+// typed (NFC) and decomposed (NFD), as file names on real servers often
+// are; LIKE's _ and % in them match loosely.
 func (q *Queries) ListMediaFiles(ctx context.Context, arg ListMediaFilesParams) ([]MediaFile, error) {
 	rows, err := q.db.QueryContext(ctx, listMediaFiles,
 		arg.LibraryID,
 		arg.Status,
 		arg.MatchStatus,
+		arg.PathLike,
+		arg.PathLikeNfd,
 		arg.Offset,
 		arg.Limit,
 	)
@@ -601,6 +647,93 @@ func (q *Queries) ListScanFilesUnder(ctx context.Context, arg ListScanFilesUnder
 			&i.DvProfile,
 			&i.ExtraKind,
 			&i.DvOutdated,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUnreadableMediaFiles = `-- name: ListUnreadableMediaFiles :many
+SELECT id, library_id, path, size, mtime, status, parsed, probe, probe_error, container, video_codec, audio_codec, width, height, duration_ms, first_seen_at, last_seen_at, seen_in_scan, created_at, updated_at, movie_id, match_status, match_locked, match_candidates, match_error, matched_at, hdr, added_at, match_ignored, dv_profile, extra_kind, extra_of FROM media_files INDEXED BY media_files_unreadable_idx
+WHERE library_id = ?1 AND probe_error IS NOT NULL AND extra_kind IS NULL
+  AND (?2 IS NULL OR status = ?2)
+  AND (?3 IS NULL OR match_status = ?3)
+  AND (?4 IS NULL OR path LIKE CAST(?4 AS TEXT) OR path LIKE CAST(?5 AS TEXT))
+ORDER BY path
+LIMIT ?7 OFFSET ?6
+`
+
+type ListUnreadableMediaFilesParams struct {
+	LibraryID   int64       `json:"library_id"`
+	Status      interface{} `json:"status"`
+	MatchStatus interface{} `json:"match_status"`
+	PathLike    interface{} `json:"path_like"`
+	PathLikeNfd *string     `json:"path_like_nfd"`
+	Offset      int64       `json:"offset"`
+	Limit       int64       `json:"limit"`
+}
+
+// ListMediaFiles for the files ffprobe could not read, through their own
+// small index: probe_error sits after the probe in a row, so reading it
+// for every file would read every probe.
+func (q *Queries) ListUnreadableMediaFiles(ctx context.Context, arg ListUnreadableMediaFilesParams) ([]MediaFile, error) {
+	rows, err := q.db.QueryContext(ctx, listUnreadableMediaFiles,
+		arg.LibraryID,
+		arg.Status,
+		arg.MatchStatus,
+		arg.PathLike,
+		arg.PathLikeNfd,
+		arg.Offset,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []MediaFile{}
+	for rows.Next() {
+		var i MediaFile
+		if err := rows.Scan(
+			&i.ID,
+			&i.LibraryID,
+			&i.Path,
+			&i.Size,
+			&i.Mtime,
+			&i.Status,
+			&i.Parsed,
+			&i.Probe,
+			&i.ProbeError,
+			&i.Container,
+			&i.VideoCodec,
+			&i.AudioCodec,
+			&i.Width,
+			&i.Height,
+			&i.DurationMs,
+			&i.FirstSeenAt,
+			&i.LastSeenAt,
+			&i.SeenInScan,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.MovieID,
+			&i.MatchStatus,
+			&i.MatchLocked,
+			&i.MatchCandidates,
+			&i.MatchError,
+			&i.MatchedAt,
+			&i.Hdr,
+			&i.AddedAt,
+			&i.MatchIgnored,
+			&i.DvProfile,
+			&i.ExtraKind,
+			&i.ExtraOf,
 		); err != nil {
 			return nil, err
 		}

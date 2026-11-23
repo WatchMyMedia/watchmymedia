@@ -20,6 +20,7 @@ import (
 	"watchmymedia/server/internal/db"
 	"watchmymedia/server/internal/library"
 	"watchmymedia/server/internal/metadata"
+	"watchmymedia/server/internal/people"
 )
 
 // newWindow is how long after its newest file arrived an item can carry the
@@ -72,9 +73,23 @@ type BrowseItem struct {
 	Status       string `json:"status,omitempty"`
 	LastAirDate  string `json:"lastAirDate,omitempty"`
 	NextAirDate  string `json:"nextAirDate,omitempty"`
+	// UnwatchedCount, NewEpisodeCount, SeasonCount and Added are from API
+	// level 34.
+	UnwatchedCount  *int64     `json:"unwatchedCount,omitempty" required:"false" doc:"Shows: episodes with a present file the signed-in person hasn't finished (\"4 episodes left\"); equal to episodeCount when they haven't started. Absent for movies and on servers below API level 34."`
+	NewEpisodeCount int64      `json:"newEpisodeCount,omitempty" required:"false" doc:"Shows marked isNew: how many of the episodes added in the last 7 days the signed-in person hasn't finished (\"2 new\")."`
+	SeasonCount     int64      `json:"seasonCount,omitempty" required:"false" doc:"Shows: seasons with an episode that has a present file, specials left out."`
+	Added           *AddedShow `json:"added,omitempty" required:"false" doc:"Recently added shows: what the card stands for, which subtitle words for older apps."`
 
 	FileName    string `json:"fileName,omitempty" doc:"Unmatched: the file's path in the library, or the folder for a group of files."`
 	LibraryType string `json:"libraryType,omitempty" enum:",movie,tv" doc:"Unmatched: the library's type, for the link to its Unmatched view."`
+}
+
+// AddedShow is what a recently added show's card stands for.
+type AddedShow struct {
+	Episodes       int64  `json:"episodes" doc:"Episodes added in the row's window."`
+	SeasonNumber   *int64 `json:"seasonNumber,omitempty" doc:"The season they were all added to, when it was one."`
+	SeasonComplete bool   `json:"seasonComplete" doc:"That season now has every episode TMDB lists."`
+	NewShow        bool   `json:"newShow" doc:"The show had no episodes in the library before them."`
 }
 
 // EpisodeCard is an episode as shown in a "recently aired" row.
@@ -95,6 +110,9 @@ type EpisodeCard struct {
 	AddedAt          *time.Time `json:"addedAt,omitempty"`
 	IsNew            bool       `json:"isNew" doc:"A present file arrived within the last 7 days and the signed-in user has not watched the episode."`
 	Watched          bool       `json:"watched" required:"false" doc:"The signed-in user has watched it."`
+	// RuntimeMin and ShowTMDBID are from API level 34.
+	RuntimeMin int64 `json:"runtimeMin,omitempty" required:"false" doc:"The episode's length in minutes, as TMDB lists it."`
+	ShowTMDBID int64 `json:"showTmdbId,omitempty" required:"false" doc:"The show's TMDB id, so an app signed in to several servers shows one card for an episode on more than one."`
 }
 
 type LibraryRows struct {
@@ -134,6 +152,12 @@ type HomeHero struct {
 	ContentRating string `json:"contentRating,omitempty"`
 	Quality       string `json:"quality,omitempty" enum:",4K,1080p,720p,SD" doc:"The episode's best file, or the movie's or show's best."`
 	HDR           bool   `json:"hdr" required:"false"`
+	// ShowTitle, EpisodeNumber, AirDate and RuntimeMin are from API level
+	// 34: what kicker and facts word, as fields.
+	ShowTitle     string `json:"showTitle,omitempty" required:"false" doc:"Episodes and shows: the show's title."`
+	EpisodeNumber int64  `json:"episodeNumber,omitempty" required:"false" doc:"Episodes: its number in seasonNumber."`
+	AirDate       string `json:"airDate,omitempty" required:"false" doc:"Episodes: when it aired, YYYY-MM-DD."`
+	RuntimeMin    int64  `json:"runtimeMin,omitempty" required:"false" doc:"The episode's or movie's length in minutes."`
 }
 
 type HomeTotals struct {
@@ -165,17 +189,24 @@ type HomeOutput struct{ Body HomeData }
 type ItemsInput struct {
 	ID     int64  `path:"id" doc:"Library ID."`
 	Sort   string `query:"sort" enum:"title,added,year,rating,released,runtime,aired" default:"title"`
-	Filter string `query:"filter" enum:",continuing,ended,4k,hdr,unwatched" required:"false"`
-	Genre  string `query:"genre" required:"false"`
-	Decade int    `query:"decade" required:"false" doc:"e.g. 1990"`
-	Q      string `query:"q" required:"false" doc:"Title contains."`
-	Limit  int64  `query:"limit" default:"100" minimum:"1" maximum:"1000"`
-	Offset int64  `query:"offset" default:"0" minimum:"0"`
+	Order  string `query:"order" enum:",asc,desc" required:"false" doc:"Ascending or descending; absent for the sort's own direction: A to Z for title, the most or newest first for the rest. \"Shortest first\" is sort=runtime&order=asc. From API level 34."`
+	Filter string `query:"filter" enum:",continuing,ended,4k,hdr,unwatched,inProgress,following" required:"false" doc:"inProgress (movies part watched, shows started and not finished) and following (TV: shows the person follows) are from API level 34."`
+	// Filters, ContentRating and Collection are from API level 34.
+	Filters       []string `query:"filters" enum:"continuing,ended,4k,hdr,unwatched,inProgress,following" required:"false" doc:"More filters, comma separated, all of which an item must meet, with filter as one more. From API level 34."`
+	ContentRating []string `query:"contentRating" required:"false" doc:"Ratings to keep, comma separated, as facets.contentRatings lists them: TMDB's US certification, or unrated. From API level 34."`
+	Collection    int64    `query:"collection" required:"false" doc:"Movies: only those of this TMDB collection, as listLibraryCollections lists them. From API level 34."`
+	Genre         string   `query:"genre" required:"false"`
+	Decade        int      `query:"decade" required:"false" doc:"e.g. 1990"`
+	Q             string   `query:"q" required:"false" doc:"Title contains."`
+	Limit         int64    `query:"limit" default:"100" minimum:"1" maximum:"1000"`
+	Offset        int64    `query:"offset" default:"0" minimum:"0"`
 }
 
 type ItemFacets struct {
 	Genres  []string `json:"genres" nullable:"false"`
 	Decades []int    `json:"decades" nullable:"false"`
+	// ContentRatings is from API level 34.
+	ContentRatings []string `json:"contentRatings" required:"false" nullable:"false" doc:"The library's content ratings, in the order the US systems rank them (movies' G to NC-17, then TV's TV-Y to TV-MA, then any other), with unrated last when some items have none. From API level 34."`
 }
 
 // ItemTotals count the whole library whatever the filter, for its header
@@ -186,6 +217,13 @@ type ItemTotals struct {
 	Continuing int64 `json:"continuing" doc:"TV: shows that have not ended or been canceled."`
 	Unmatched  int64 `json:"unmatched" doc:"Items for files not matched yet: one per file, or per show folder."`
 	TotalSize  int64 `json:"totalSize" doc:"Bytes across every item's present files."`
+	// Unwatched, InProgress, NewEpisodes, Following and AddedThisMonth are
+	// from API level 34.
+	Unwatched      int64 `json:"unwatched" required:"false" doc:"Movies the signed-in person hasn't finished, or shows with an episode they haven't seen (\"58 you haven't watched\")."`
+	InProgress     int64 `json:"inProgress" required:"false" doc:"Movies part watched, or shows started and not finished, as filter inProgress lists them."`
+	NewEpisodes    int64 `json:"newEpisodes" required:"false" doc:"TV: shows with a new episode the signed-in person hasn't finished (isNew)."`
+	Following      int64 `json:"following" required:"false" doc:"TV: shows the signed-in person follows, as filter following lists them."`
+	AddedThisMonth int64 `json:"addedThisMonth" required:"false" doc:"Items whose newest present file arrived this calendar month, in the server's time zone."`
 }
 
 // LetterOffset is where a letter's first item sits in the whole sorted list,
@@ -205,6 +243,8 @@ type ItemList struct {
 	Letters []LetterOffset `json:"letters,omitempty" required:"false" nullable:"false" doc:"Sorting by title: each letter present in the whole filtered list, in list order, with its first item's offset."`
 	// Always sent, including an empty object; optional for older servers.
 	GenreCounts map[string]int64 `json:"genreCounts" required:"false" nullable:"false" doc:"Items per genre after filter, decade and q, before the genre filter and pagination. Includes every library genre, with zero when none match."`
+	// ContentRatingCounts is from API level 34.
+	ContentRatingCounts map[string]int64 `json:"contentRatingCounts" required:"false" nullable:"false" doc:"Items per content rating (as facets.contentRatings names them) after every other filter, before contentRating and pagination, with zero when none match. From API level 34."`
 }
 
 type ItemsOutput struct{ Body ItemList }
@@ -229,16 +269,28 @@ func registerRows(h huma.API, deps Deps) {
 		if err != nil {
 			return nil, err
 		}
-		totals := totalsOf(items, unmatched)
-		items = append(items, unmatched...)
 		marks, err := loadWatchMarks(ctx, deps)
 		if err != nil {
 			return nil, err
 		}
 		marks.apply(items)
+		marks.apply(unmatched)
+		var fc filterContext
+		if lib.Type == library.TypeTV {
+			if fc.followed, err = followedShows(ctx, deps); err != nil {
+				return nil, err
+			}
+		}
+		if in.Collection != 0 {
+			if fc.collection, err = collectionMovies(ctx, deps, lib.ID, in.Collection); err != nil {
+				return nil, err
+			}
+		}
+		totals := totalsOf(items, unmatched, fc.followed, monthStart(time.Now()))
+		items = append(items, unmatched...)
 		facets := facetsOf(items)
-		items, genreCounts := filterItems(items, in)
-		sortItems(items, in.Sort)
+		items, genreCounts, ratingCounts := filterItemsWith(items, in, fc)
+		sortItemsOrder(items, in.Sort, in.Order)
 		var letters []LetterOffset
 		if in.Sort == "title" {
 			letters = letterOffsets(items)
@@ -246,7 +298,8 @@ func registerRows(h huma.API, deps Deps) {
 		total := int64(len(items))
 		start := min(in.Offset, total)
 		end := min(start+in.Limit, total)
-		return &ItemsOutput{Body: ItemList{Items: items[start:end], Total: total, Limit: in.Limit, Offset: in.Offset, Facets: facets, Totals: totals, Letters: letters, GenreCounts: genreCounts}}, nil
+		return &ItemsOutput{Body: ItemList{Items: items[start:end], Total: total, Limit: in.Limit, Offset: in.Offset, Facets: facets, Totals: totals, Letters: letters,
+			GenreCounts: genreCounts, ContentRatingCounts: ratingCounts}}, nil
 	})
 
 	huma.Register(h, huma.Operation{
@@ -408,9 +461,25 @@ func homeData(ctx context.Context, deps Deps, marks *watchMarks, want rowWants) 
 			newEpisodes = append(newEpisodes, eps...)
 		}
 	}
+	// Each library gave its newest; across libraries of a kind the rows are
+	// newest first too, a row's worth in all.
+	out.RecentlyAddedMovies = newestFirst(out.RecentlyAddedMovies, func(it BrowseItem) string { return db.FormatTime(it.AddedAt) })
+	out.RecentlyAddedShows = newestFirst(out.RecentlyAddedShows, func(it BrowseItem) string { return db.FormatTime(it.AddedAt) })
+	out.RecentlyReleased = newestFirst(out.RecentlyReleased, func(it BrowseItem) string { return it.ReleaseDate })
+	out.RecentlyAired = newestFirst(out.RecentlyAired, func(c EpisodeCard) string { return c.AirDate })
 	out.Hero = pickHero(out, newEpisodes)
 	episodeHeroDetails(ctx, deps, out.Hero)
 	return out, nil
+}
+
+// homeRowLength is how many items each of Home's fixed rows holds.
+const homeRowLength = 20
+
+// newestFirst merges rows from several libraries, newest first by key,
+// keeping each library's own order among equals, a row's worth in all.
+func newestFirst[T any](items []T, key func(T) string) []T {
+	sort.SliceStable(items, func(i, j int) bool { return key(items[i]) > key(items[j]) })
+	return items[:min(len(items), homeRowLength)]
 }
 
 // --- building blocks --------------------------------------------------------
@@ -477,6 +546,7 @@ func showItem(r db.ListShowItemsRow) BrowseItem {
 		Quality: qualityLabel(toInt64(r.MaxHeight)), HDR: toInt64(r.HasHdr) == 1, AddedAt: added, IsNew: time.Since(added) < newWindow,
 		TotalSize: toInt64(r.TotalSize), EpisodeCount: r.EpisodeCount, Status: deref(r.Status),
 		LastAirDate: deref(r.LastAirDate), NextAirDate: deref(r.NextAirDate), ContentRating: deref(r.ContentRating),
+		SeasonCount: r.SeasonCount,
 	}
 }
 
@@ -506,15 +576,31 @@ func libraryItems(ctx context.Context, deps Deps, lib db.Library) ([]BrowseItem,
 	return nil, fmt.Errorf("unsupported library type %q", lib.Type)
 }
 
-// totalsOf counts a library's matched items (from libraryItems) and its
-// unmatched ones.
-func totalsOf(items, unmatched []BrowseItem) ItemTotals {
+// totalsOf counts a library's matched items (from libraryItems, marked for
+// the signed-in person) and its unmatched ones. followed are the TMDB IDs
+// of the shows the person follows; month is when this month began.
+func totalsOf(items, unmatched []BrowseItem, followed map[int64]bool, month time.Time) ItemTotals {
 	t := ItemTotals{Items: int64(len(items)), Unmatched: int64(len(unmatched))}
 	for _, it := range items {
 		t.Episodes += it.EpisodeCount
 		t.TotalSize += it.TotalSize
 		if it.Kind == "show" && !ended(it.Status) {
 			t.Continuing++
+		}
+		if !it.Watched {
+			t.Unwatched++
+		}
+		if inProgress(it) {
+			t.InProgress++
+		}
+		if it.Kind == "show" && it.IsNew {
+			t.NewEpisodes++
+		}
+		if it.Kind == "show" && followed[it.TMDBID] {
+			t.Following++
+		}
+		if !it.AddedAt.Before(month) {
+			t.AddedThisMonth++
 		}
 	}
 	for _, it := range unmatched {
@@ -538,54 +624,74 @@ func facetsOf(items []BrowseItem) ItemFacets {
 			dset[int(it.Year)/10*10] = true
 		}
 	}
-	f := ItemFacets{Genres: []string{}, Decades: []int{}}
+	f := ItemFacets{Genres: []string{}, Decades: []int{}, ContentRatings: []string{}}
 	for g := range gset {
 		f.Genres = append(f.Genres, g)
 	}
 	for d := range dset {
 		f.Decades = append(f.Decades, d)
 	}
+	rset := map[string]bool{}
+	for _, it := range items {
+		if it.Kind != "unmatched" && !rset[ratingOf(it)] {
+			rset[ratingOf(it)] = true
+			f.ContentRatings = append(f.ContentRatings, ratingOf(it))
+		}
+	}
 	sort.Strings(f.Genres)
 	sort.Sort(sort.Reverse(sort.IntSlice(f.Decades)))
+	sortRatings(f.ContentRatings)
 	return f
+}
+
+// filterContext is what some filters need beyond the items: the TMDB IDs
+// of the shows the person follows, and the movies of the collection asked
+// for.
+type filterContext struct {
+	followed   map[int64]bool
+	collection map[int64]bool
 }
 
 // filterItems also counts genres before applying the selected genre, so a
 // filter panel can show each choice's total without loading the library again.
 func filterItems(items []BrowseItem, in *ItemsInput) ([]BrowseItem, map[string]int64) {
+	out, genres, _ := filterItemsWith(items, in, filterContext{})
+	return out, genres
+}
+
+// filterItemsWith filters items as in asks, and counts genres and content
+// ratings each after every other filter, so a panel shows each choice's
+// total without loading the library again.
+func filterItemsWith(items []BrowseItem, in *ItemsInput, fc filterContext) ([]BrowseItem, map[string]int64, map[string]int64) {
 	q := strings.ToLower(strings.TrimSpace(in.Q))
+	filters := slices.Clone(in.Filters)
+	if in.Filter != "" {
+		filters = append(filters, in.Filter)
+	}
+	ratings := map[string]bool{}
+	for _, r := range in.ContentRating {
+		if r = strings.TrimSpace(r); r != "" {
+			ratings[r] = true
+		}
+	}
 	out := items[:0:0]
-	genreCounts := map[string]int64{}
+	genreCounts, ratingCounts := map[string]int64{}, map[string]int64{}
 	for _, it := range items {
 		for _, genre := range it.Genres {
 			if _, ok := genreCounts[genre]; !ok {
 				genreCounts[genre] = 0
 			}
 		}
-		if it.Kind == "unmatched" && (in.Filter == "continuing" || in.Filter == "unwatched") {
+		if it.Kind != "unmatched" {
+			if _, ok := ratingCounts[ratingOf(it)]; !ok {
+				ratingCounts[ratingOf(it)] = 0
+			}
+		}
+		if !passes(it, filters, fc) {
 			continue
 		}
-		switch in.Filter {
-		case "continuing":
-			if ended(it.Status) {
-				continue
-			}
-		case "ended":
-			if !ended(it.Status) {
-				continue
-			}
-		case "4k":
-			if it.Quality != "4K" {
-				continue
-			}
-		case "hdr":
-			if !it.HDR {
-				continue
-			}
-		case "unwatched":
-			if it.Watched {
-				continue
-			}
+		if in.Collection != 0 && !fc.collection[it.ID] {
+			continue
 		}
 		if in.Decade > 0 && (it.Year < int64(in.Decade) || it.Year >= int64(in.Decade)+10) {
 			continue
@@ -593,17 +699,149 @@ func filterItems(items []BrowseItem, in *ItemsInput) ([]BrowseItem, map[string]i
 		if q != "" && !strings.Contains(strings.ToLower(it.Title), q) {
 			continue
 		}
-		for i, genre := range it.Genres {
-			if !slices.Contains(it.Genres[:i], genre) {
-				genreCounts[genre]++
+		genreOK := in.Genre == "" || containsFold(it.Genres, in.Genre)
+		ratingOK := len(ratings) == 0 || (it.Kind != "unmatched" && ratings[ratingOf(it)])
+		if ratingOK {
+			for i, genre := range it.Genres {
+				if !slices.Contains(it.Genres[:i], genre) {
+					genreCounts[genre]++
+				}
 			}
 		}
-		if in.Genre != "" && !containsFold(it.Genres, in.Genre) {
-			continue
+		if genreOK && it.Kind != "unmatched" {
+			ratingCounts[ratingOf(it)]++
 		}
-		out = append(out, it)
+		if genreOK && ratingOK {
+			out = append(out, it)
+		}
 	}
-	return out, genreCounts
+	return out, genreCounts, ratingCounts
+}
+
+// passes reports whether an item meets every filter. Items for unmatched
+// files meet only those about the file: 4K and HDR.
+func passes(it BrowseItem, filters []string, fc filterContext) bool {
+	for _, f := range filters {
+		if it.Kind == "unmatched" && f != "4k" && f != "hdr" && f != "ended" {
+			return false
+		}
+		switch f {
+		case "continuing":
+			if ended(it.Status) {
+				return false
+			}
+		case "ended":
+			if !ended(it.Status) {
+				return false
+			}
+		case "4k":
+			if it.Quality != "4K" {
+				return false
+			}
+		case "hdr":
+			if !it.HDR {
+				return false
+			}
+		case "unwatched":
+			if it.Watched {
+				return false
+			}
+		case "inProgress":
+			if !inProgress(it) {
+				return false
+			}
+		case "following":
+			if it.Kind != "show" || !fc.followed[it.TMDBID] {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// inProgress reports a movie part watched, or a show started and not
+// finished.
+func inProgress(it BrowseItem) bool {
+	switch it.Kind {
+	case "movie":
+		return !it.Watched && it.Progress > 0
+	case "show":
+		return !it.Watched && it.UnwatchedCount != nil && *it.UnwatchedCount < it.EpisodeCount
+	}
+	return false
+}
+
+// unrated is the content rating filter's name for items TMDB gives none.
+const unrated = "unrated"
+
+func ratingOf(it BrowseItem) string {
+	if it.ContentRating == "" {
+		return unrated
+	}
+	return it.ContentRating
+}
+
+// ratingOrder ranks the US systems' certifications: movies', then TV's.
+var ratingOrder = map[string]int{"G": 1, "PG": 2, "PG-13": 3, "R": 4, "NC-17": 5,
+	"TV-Y": 11, "TV-Y7": 12, "TV-G": 13, "TV-PG": 14, "TV-14": 15, "TV-MA": 16}
+
+// sortRatings puts ratings in ratingOrder, any other after them by name,
+// and unrated last.
+func sortRatings(ratings []string) {
+	rank := func(r string) int {
+		switch {
+		case r == unrated:
+			return 1000
+		case ratingOrder[r] > 0:
+			return ratingOrder[r]
+		}
+		return 100
+	}
+	sort.SliceStable(ratings, func(i, j int) bool {
+		a, b := rank(ratings[i]), rank(ratings[j])
+		if a != b {
+			return a < b
+		}
+		return ratings[i] < ratings[j]
+	})
+}
+
+// monthStart is when the calendar month of now began, in the server's time
+// zone.
+func monthStart(now time.Time) time.Time {
+	now = now.Local()
+	return time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.Local)
+}
+
+// followedShows are the TMDB IDs of the shows the signed-in person
+// follows.
+func followedShows(ctx context.Context, deps Deps) (map[int64]bool, error) {
+	user, ok := auth.UserFrom(ctx)
+	if !ok {
+		return map[int64]bool{}, nil
+	}
+	ids, err := deps.Queries.ListFollowedTMDBIDs(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int64]bool, len(ids))
+	for _, id := range ids {
+		out[id] = true
+	}
+	return out, nil
+}
+
+// collectionMovies are a library's movies of a TMDB collection.
+func collectionMovies(ctx context.Context, deps Deps, libraryID, collectionID int64) (map[int64]bool, error) {
+	ids, err := deps.Queries.ListLibraryCollectionMovieIDs(ctx, db.ListLibraryCollectionMovieIDsParams{LibraryID: libraryID, CollectionID: &collectionID})
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[int64]bool, len(ids))
+	for _, id := range ids {
+		out[id] = true
+	}
+	return out, nil
 }
 
 func containsFold(list []string, s string) bool {
@@ -615,7 +853,20 @@ func containsFold(list []string, s string) bool {
 	return false
 }
 
-func sortItems(items []BrowseItem, by string) {
+func sortItems(items []BrowseItem, by string) { sortItemsOrder(items, by, "") }
+
+// sortItemsOrder sorts by a key, in its own direction or the order asked:
+// A to Z for title, the most or newest first for the rest.
+func sortItemsOrder(items []BrowseItem, by, order string) {
+	less := sortLess(items, by)
+	if (order == "asc" && by != "title") || (order == "desc" && by == "title") {
+		forward := less
+		less = func(i, j int) bool { return forward(j, i) }
+	}
+	sort.SliceStable(items, less)
+}
+
+func sortLess(items []BrowseItem, by string) func(i, j int) bool {
 	less := func(i, j int) bool { return titleKey(items[i].Title) < titleKey(items[j].Title) }
 	switch by {
 	case "added":
@@ -631,7 +882,7 @@ func sortItems(items []BrowseItem, by string) {
 	case "aired":
 		less = func(i, j int) bool { return items[i].LastAirDate > items[j].LastAirDate }
 	}
-	sort.SliceStable(items, less)
+	return less
 }
 
 // titleKey sorts "The Matrix" under M.
@@ -754,7 +1005,8 @@ func recentlyAired(ctx context.Context, deps Deps, lib db.Library, limit int) ([
 		c := EpisodeCard{
 			EpisodeID: r.ID, ShowID: r.ShowID, ShowTitle: r.ShowTitle, SeasonNumber: r.SeasonNumber, EpisodeNumber: r.Number,
 			Title: r.Title, Overview: r.Overview, AirDate: deref(r.AirDate), StillPath: deref(r.StillPath),
-			ShowPosterPath: deref(r.ShowPosterPath), ShowBackdropPath: deref(r.ShowBackdropPath), Watched: watched[r.ID],
+			ShowPosterPath: deref(r.ShowPosterPath), ShowBackdropPath: deref(r.ShowBackdropPath), Watched: watched[r.ID], ShowTMDBID: r.ShowTmdbID,
+			RuntimeMin: deref(r.RuntimeMin),
 		}
 		if id := toInt64(r.FileID); id > 0 {
 			c.HasFile, c.FileID = true, &id
@@ -845,6 +1097,15 @@ func recentlyAddedShows(ctx context.Context, deps Deps, lib db.Library, limit in
 			default:
 				item.Subtitle = fmt.Sprintf("%d episodes", len(g.episodes))
 			}
+			// The same facts as fields, for apps that word the card
+			// themselves.
+			added := &AddedShow{Episodes: int64(len(g.episodes)), NewShow: item.EpisodeCount > 0 && item.EpisodeCount <= int64(len(g.episodes))}
+			if len(g.seasons) == 1 {
+				n := g.first.SeasonNumber
+				added.SeasonNumber = &n
+				added.SeasonComplete = g.seasons[n] > 0 && int64(len(g.perSeas[n])) >= g.seasons[n]
+			}
+			item.Added = added
 			out = append(out, item)
 		}
 	}
@@ -898,9 +1159,11 @@ func watchedEpisodes(ctx context.Context, deps Deps, ids []int64) (map[int64]boo
 // titles on their watchlists, read once per request however many items it
 // marks.
 type watchMarks struct {
-	movies      map[int64]db.WatchState
-	shows       map[int64]int64
-	newShows    map[int64]bool
+	movies map[int64]db.WatchState
+	shows  map[int64]int64
+	// newShows is how many new episodes each show with one has that the
+	// person hasn't finished.
+	newShows    map[int64]int64
 	watchlisted watchlisted
 }
 
@@ -927,7 +1190,7 @@ func loadWatchMarks(ctx context.Context, deps Deps) (*watchMarks, error) {
 	if err != nil {
 		return nil, err
 	}
-	m := &watchMarks{movies: make(map[int64]db.WatchState, len(movieStates)), shows: make(map[int64]int64, len(showCounts)), newShows: make(map[int64]bool, len(newShows)),
+	m := &watchMarks{movies: make(map[int64]db.WatchState, len(movieStates)), shows: make(map[int64]int64, len(showCounts)), newShows: make(map[int64]int64, len(newShows)),
 		watchlisted: saved}
 	for _, w := range movieStates {
 		m.movies[w.ItemID] = w
@@ -935,14 +1198,15 @@ func loadWatchMarks(ctx context.Context, deps Deps) (*watchMarks, error) {
 	for _, c := range showCounts {
 		m.shows[c.ShowID] = c.Watched
 	}
-	for _, id := range newShows {
-		m.newShows[id] = true
+	for _, s := range newShows {
+		m.newShows[s.ShowID] = s.Episodes
 	}
 	return m, nil
 }
 
 // apply fills Watched and Progress: a movie's from its state, a show's
-// when every episode on disk is watched. It also takes New off what the
+// when every episode on disk is watched, with how many are left and how
+// many are new. It also takes New off what the
 // person has watched: a finished movie, or a show none of whose recently
 // added episodes is still unwatched. It only ever clears New, so a card
 // that already judged its own episodes (recentlyAddedShows) keeps its
@@ -967,7 +1231,12 @@ func (m *watchMarks) apply(items []BrowseItem) {
 			}
 		case "show":
 			it.Watched = it.EpisodeCount > 0 && m.shows[it.ID] >= it.EpisodeCount
-			it.IsNew = it.IsNew && m.newShows[it.ID]
+			it.IsNew = it.IsNew && m.newShows[it.ID] > 0
+			it.NewEpisodeCount = 0
+			if it.IsNew {
+				it.NewEpisodeCount = m.newShows[it.ID]
+			}
+			it.UnwatchedCount = new(max(0, it.EpisodeCount-m.shows[it.ID]))
 		}
 	}
 }
@@ -1003,6 +1272,7 @@ func pickHero(h HomeData, newEpisodes []db.ListNewEpisodeFilesRow) *HomeHero {
 			Facts:    seCode(e.SeasonNumber, e.EpisodeNumber) + " · Aired " + deref(e.AirDate),
 			Overview: e.Overview, BackdropPath: deref(e.ShowBackdropPath), PosterPath: deref(e.ShowPosterPath),
 			ShowID: &showID, EpisodeID: &epID, FileID: &fileID, SeasonNumber: e.SeasonNumber,
+			ShowTitle: e.ShowTitle, EpisodeNumber: e.EpisodeNumber, AirDate: deref(e.AirDate), RuntimeMin: deref(e.RuntimeMin),
 		}
 	}
 	if m, ok := firstMatched(h.RecentlyAddedMovies); ok {
@@ -1019,13 +1289,13 @@ func pickHero(h HomeData, newEpisodes []db.ListNewEpisodeFilesRow) *HomeHero {
 		}
 		return &HomeHero{Kind: "movie", Kicker: "Recently added", Title: m.Title, Facts: strings.Join(facts, " · "),
 			Overview: m.Overview, BackdropPath: m.BackdropPath, PosterPath: m.PosterPath, MovieID: &id,
-			ContentRating: m.ContentRating, Quality: m.Quality, HDR: m.HDR}
+			ContentRating: m.ContentRating, Quality: m.Quality, HDR: m.HDR, RuntimeMin: m.RuntimeMin}
 	}
 	if s, ok := firstMatched(h.RecentlyAddedShows); ok {
 		id := s.ID
 		return &HomeHero{Kind: "show", Kicker: "Recently added", Title: s.Title, Facts: s.Subtitle,
 			Overview: s.Overview, BackdropPath: s.BackdropPath, PosterPath: s.PosterPath, ShowID: &id,
-			ContentRating: s.ContentRating, Quality: s.Quality, HDR: s.HDR}
+			ContentRating: s.ContentRating, Quality: s.Quality, HDR: s.HDR, ShowTitle: s.Title}
 	}
 	return nil
 }
@@ -1193,10 +1463,10 @@ func unmatchedItems(ctx context.Context, deps Deps, lib db.Library, withEpisodes
 }
 
 // credits decodes the stored cast list.
-func credits(raw string) []metadata.Credit {
-	var out []metadata.Credit
+func credits(raw string) []people.Credit {
+	var out []people.Credit
 	if err := json.Unmarshal([]byte(raw), &out); err != nil || out == nil {
-		return []metadata.Credit{}
+		return []people.Credit{}
 	}
 	return out
 }

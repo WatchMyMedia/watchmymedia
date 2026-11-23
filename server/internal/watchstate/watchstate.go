@@ -182,6 +182,30 @@ func (s *Service) MarkUnwatched(ctx context.Context, userID int64, itemType stri
 	return err
 }
 
+// Hide takes an item off the user's Continue watching and keeps its place:
+// the position, the watched mark and the guard stay as they are, so it
+// takes no revision. A progress report on the item, here or from offline,
+// brings it back; an import does not. Nothing happens when the item has no
+// state or is off the row already.
+func (s *Service) Hide(ctx context.Context, userID int64, itemType string, id int64) error {
+	n, err := s.q.HideFromContinueWatching(ctx, db.HideFromContinueWatchingParams{
+		HiddenAt: new(db.FormatTime(time.Now())), UserID: userID, ItemType: itemType, ItemID: id,
+	})
+	if err == nil && n > 0 {
+		s.publish(userID, itemType, []int64{id})
+	}
+	return err
+}
+
+// Unhide puts an item Hide took off Continue watching back on it.
+func (s *Service) Unhide(ctx context.Context, userID int64, itemType string, id int64) error {
+	n, err := s.q.UnhideFromContinueWatching(ctx, db.UnhideFromContinueWatchingParams{UserID: userID, ItemType: itemType, ItemID: id})
+	if err == nil && n > 0 {
+		s.publish(userID, itemType, []int64{id})
+	}
+	return err
+}
+
 // today is the date an episode must have aired by to be marked watched with
 // its season or show, as Episode.aired reads it (UTC).
 func today() *string { return new(time.Now().UTC().Format(time.DateOnly)) }
@@ -318,6 +342,7 @@ func move(ctx context.Context, q *db.Queries, rev, userID int64, itemType string
 		if err := q.ReplaceWatchState(ctx, db.ReplaceWatchStateParams{
 			UserID: userID, ItemType: itemType, ItemID: m.To, MediaFileID: srcState.MediaFileID,
 			PositionMs: srcState.PositionMs, DurationMs: srcState.DurationMs, Completed: srcState.Completed, UpdatedAt: srcState.UpdatedAt,
+			HiddenAt: srcState.HiddenAt,
 		}); err != nil {
 			return err
 		}

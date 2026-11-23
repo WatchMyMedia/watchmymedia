@@ -109,6 +109,9 @@ func registerLiveTVRecordings(h huma.API, deps Deps) {
 			return nil, err
 		}
 		out, err := deps.Recordings.Get(ctx, in.ID, a)
+		if err == nil {
+			out, err = deps.Recordings.WithFacts(ctx, out, a)
+		}
 		markRecordingDeletion(ctx, deps, []*dvr.Recording{&out})
 		return &LiveTVRecordingOutput{Body: out}, recordingError(err)
 	})

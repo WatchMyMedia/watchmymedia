@@ -62,6 +62,14 @@ func TestDVRSpeed(t *testing.T) {
 	}
 	assertPlan(t, conn, "live_tv_recording_programme", "SELECT * FROM live_tv_recordings INDEXED BY live_tv_recording_programme WHERE programme_id IN ("+marks+")", args...)
 	assertPlan(t, conn, "live_tv_programme_series", "SELECT * FROM live_tv_programmes WHERE series_key=? AND end_at>? ORDER BY start_at,channel_id", "series", start.Unix())
+	// The first page's counts read the section and bytes index alone.
+	var counted string
+	for _, step := range planOf(t, conn, "SELECT section, COUNT(*), SUM(bytes) FROM live_tv_recordings INDEXED BY live_tv_recording_section_bytes GROUP BY section") {
+		counted += step + "; "
+	}
+	if !strings.Contains(counted, "COVERING INDEX live_tv_recording_section_bytes") || strings.Contains(counted, "TEMP B-TREE") {
+		t.Fatalf("the section counts read more than their index: %s", counted)
+	}
 	runs := []time.Duration{}
 	for range 30 {
 		before := time.Now()
@@ -69,7 +77,8 @@ func TestDVRSpeed(t *testing.T) {
 		errs := make(chan error, 5)
 		for _, sect := range []string{"now", "conflicts", "upcoming", "recorded"} {
 			wg.Go(func() {
-				page, err := s.List(t.Context(), Actor{Admin: true}, sect, "")
+				// A person, so their place in each recording is read too.
+				page, err := s.List(t.Context(), Actor{UserID: 1, Admin: true}, sect, "")
 				if err == nil && len(page.Items) != 20 {
 					err = fmt.Errorf("%s has %d rows", sect, len(page.Items))
 				}
@@ -103,7 +112,7 @@ func TestDVRSpeed(t *testing.T) {
 		t.Fatalf("DVR page burst exceeded budget: %s > %s", p95, budget)
 	}
 }
-func assertPlan(t testing.TB, conn *sql.DB, index, query string, args ...any) {
+func planOf(t testing.TB, conn *sql.DB, query string, args ...any) []string {
 	t.Helper()
 	rows, err := conn.QueryContext(context.Background(), "EXPLAIN QUERY PLAN "+query, args...)
 	if err != nil {
@@ -122,6 +131,11 @@ func assertPlan(t testing.TB, conn *sql.DB, index, query string, args ...any) {
 	if err = rows.Err(); err != nil {
 		t.Fatal(err)
 	}
+	return details
+}
+func assertPlan(t testing.TB, conn *sql.DB, index, query string, args ...any) {
+	t.Helper()
+	details := planOf(t, conn, query, args...)
 	found := false
 	for _, d := range details {
 		if strings.Contains(d, "TEMP B-TREE") {

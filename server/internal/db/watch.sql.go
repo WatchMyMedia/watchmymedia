@@ -249,7 +249,7 @@ func (q *Queries) GetWatchGuard(ctx context.Context, arg GetWatchGuardParams) (W
 }
 
 const getWatchState = `-- name: GetWatchState :one
-SELECT user_id, item_type, item_id, media_file_id, position_ms, duration_ms, completed, updated_at FROM watch_state WHERE user_id = ? AND item_type = ? AND item_id = ?
+SELECT user_id, item_type, item_id, media_file_id, position_ms, duration_ms, completed, updated_at, hidden_at FROM watch_state WHERE user_id = ? AND item_type = ? AND item_id = ?
 `
 
 type GetWatchStateParams struct {
@@ -270,8 +270,37 @@ func (q *Queries) GetWatchState(ctx context.Context, arg GetWatchStateParams) (W
 		&i.DurationMs,
 		&i.Completed,
 		&i.UpdatedAt,
+		&i.HiddenAt,
 	)
 	return i, err
+}
+
+const hideFromContinueWatching = `-- name: HideFromContinueWatching :execrows
+UPDATE watch_state SET hidden_at = ?1
+WHERE user_id = ?2 AND item_type = ?3 AND item_id = ?4
+  AND hidden_at IS NULL
+`
+
+type HideFromContinueWatchingParams struct {
+	HiddenAt *string `json:"hidden_at"`
+	UserID   int64   `json:"user_id"`
+	ItemType string  `json:"item_type"`
+	ItemID   int64   `json:"item_id"`
+}
+
+// Takes an item off the person's Continue watching and keeps its place.
+// Nothing changes when it has no state or is off the row already.
+func (q *Queries) HideFromContinueWatching(ctx context.Context, arg HideFromContinueWatchingParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, hideFromContinueWatching,
+		arg.HiddenAt,
+		arg.UserID,
+		arg.ItemType,
+		arg.ItemID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const insertImportWatchGuard = `-- name: InsertImportWatchGuard :exec
@@ -316,8 +345,8 @@ func (q *Queries) InsertImportedWatch(ctx context.Context, arg InsertImportedWat
 }
 
 const listContinueWatching = `-- name: ListContinueWatching :many
-SELECT user_id, item_type, item_id, media_file_id, position_ms, duration_ms, completed, updated_at FROM watch_state
-WHERE user_id = ? AND completed = 0 AND position_ms > 0
+SELECT user_id, item_type, item_id, media_file_id, position_ms, duration_ms, completed, updated_at, hidden_at FROM watch_state
+WHERE user_id = ? AND completed = 0 AND position_ms > 0 AND hidden_at IS NULL
 ORDER BY updated_at DESC
 LIMIT ?
 `
@@ -345,6 +374,7 @@ func (q *Queries) ListContinueWatching(ctx context.Context, arg ListContinueWatc
 			&i.DurationMs,
 			&i.Completed,
 			&i.UpdatedAt,
+			&i.HiddenAt,
 		); err != nil {
 			return nil, err
 		}
@@ -362,16 +392,18 @@ func (q *Queries) ListContinueWatching(ctx context.Context, arg ListContinueWatc
 const listContinueWatchingItems = `-- name: ListContinueWatchingItems :many
 SELECT w.item_type, w.item_id, w.media_file_id, w.position_ms, w.duration_ms, w.updated_at,
     m.title AS movie_title, m.year AS movie_year, m.poster_path AS movie_poster_path, m.backdrop_path AS movie_backdrop_path,
-    e.number AS episode_number, e.title AS episode_title, e.still_path AS episode_still_path,
+    m.content_rating AS movie_content_rating, m.overview AS movie_overview, m.tmdb_id AS movie_tmdb_id,
+    e.number AS episode_number, e.title AS episode_title, e.still_path AS episode_still_path, e.overview AS episode_overview,
     se.number AS season_number,
-    s.id AS show_id, s.title AS show_title, s.poster_path AS show_poster_path, s.backdrop_path AS show_backdrop_path
+    s.id AS show_id, s.title AS show_title, s.poster_path AS show_poster_path, s.backdrop_path AS show_backdrop_path,
+    s.content_rating AS show_content_rating, s.tmdb_id AS show_tmdb_id
 FROM watch_state w INDEXED BY watch_state_user_updated_idx
 CROSS JOIN media_files f ON f.id = w.media_file_id
 LEFT JOIN movies m ON w.item_type = 'movie' AND m.id = w.item_id
 LEFT JOIN episodes e ON w.item_type = 'episode' AND e.id = w.item_id
 LEFT JOIN seasons se ON se.id = e.season_id
 LEFT JOIN shows s ON s.id = e.show_id
-WHERE w.user_id = ? AND w.completed = 0 AND w.position_ms > 0 AND f.status = 'present'
+WHERE w.user_id = ? AND w.completed = 0 AND w.position_ms > 0 AND w.hidden_at IS NULL AND f.status = 'present'
   AND (m.id IS NOT NULL OR s.id IS NOT NULL AND se.id IS NOT NULL)
 ORDER BY w.updated_at DESC
 LIMIT ?
@@ -383,28 +415,35 @@ type ListContinueWatchingItemsParams struct {
 }
 
 type ListContinueWatchingItemsRow struct {
-	ItemType          string  `json:"item_type"`
-	ItemID            int64   `json:"item_id"`
-	MediaFileID       *int64  `json:"media_file_id"`
-	PositionMs        int64   `json:"position_ms"`
-	DurationMs        int64   `json:"duration_ms"`
-	UpdatedAt         string  `json:"updated_at"`
-	MovieTitle        *string `json:"movie_title"`
-	MovieYear         *int64  `json:"movie_year"`
-	MoviePosterPath   *string `json:"movie_poster_path"`
-	MovieBackdropPath *string `json:"movie_backdrop_path"`
-	EpisodeNumber     *int64  `json:"episode_number"`
-	EpisodeTitle      *string `json:"episode_title"`
-	EpisodeStillPath  *string `json:"episode_still_path"`
-	SeasonNumber      *int64  `json:"season_number"`
-	ShowID            *int64  `json:"show_id"`
-	ShowTitle         *string `json:"show_title"`
-	ShowPosterPath    *string `json:"show_poster_path"`
-	ShowBackdropPath  *string `json:"show_backdrop_path"`
+	ItemType           string  `json:"item_type"`
+	ItemID             int64   `json:"item_id"`
+	MediaFileID        *int64  `json:"media_file_id"`
+	PositionMs         int64   `json:"position_ms"`
+	DurationMs         int64   `json:"duration_ms"`
+	UpdatedAt          string  `json:"updated_at"`
+	MovieTitle         *string `json:"movie_title"`
+	MovieYear          *int64  `json:"movie_year"`
+	MoviePosterPath    *string `json:"movie_poster_path"`
+	MovieBackdropPath  *string `json:"movie_backdrop_path"`
+	MovieContentRating *string `json:"movie_content_rating"`
+	MovieOverview      *string `json:"movie_overview"`
+	MovieTmdbID        *int64  `json:"movie_tmdb_id"`
+	EpisodeNumber      *int64  `json:"episode_number"`
+	EpisodeTitle       *string `json:"episode_title"`
+	EpisodeStillPath   *string `json:"episode_still_path"`
+	EpisodeOverview    *string `json:"episode_overview"`
+	SeasonNumber       *int64  `json:"season_number"`
+	ShowID             *int64  `json:"show_id"`
+	ShowTitle          *string `json:"show_title"`
+	ShowPosterPath     *string `json:"show_poster_path"`
+	ShowBackdropPath   *string `json:"show_backdrop_path"`
+	ShowContentRating  *string `json:"show_content_rating"`
+	ShowTmdbID         *int64  `json:"show_tmdb_id"`
 }
 
 // Continue watching, newest first: the user's unfinished movies and
-// episodes whose file is still present, with what a card shows.
+// episodes whose file is still present and which they haven't removed
+// from the row, with what a card shows.
 func (q *Queries) ListContinueWatchingItems(ctx context.Context, arg ListContinueWatchingItemsParams) ([]ListContinueWatchingItemsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listContinueWatchingItems, arg.UserID, arg.Limit)
 	if err != nil {
@@ -425,14 +464,20 @@ func (q *Queries) ListContinueWatchingItems(ctx context.Context, arg ListContinu
 			&i.MovieYear,
 			&i.MoviePosterPath,
 			&i.MovieBackdropPath,
+			&i.MovieContentRating,
+			&i.MovieOverview,
+			&i.MovieTmdbID,
 			&i.EpisodeNumber,
 			&i.EpisodeTitle,
 			&i.EpisodeStillPath,
+			&i.EpisodeOverview,
 			&i.SeasonNumber,
 			&i.ShowID,
 			&i.ShowTitle,
 			&i.ShowPosterPath,
 			&i.ShowBackdropPath,
+			&i.ShowContentRating,
+			&i.ShowTmdbID,
 		); err != nil {
 			return nil, err
 		}
@@ -554,7 +599,7 @@ func (q *Queries) ListShowEpisodeIDs(ctx context.Context, showID int64) ([]int64
 }
 
 const listShowWatchStates = `-- name: ListShowWatchStates :many
-SELECT w.user_id, w.item_type, w.item_id, w.media_file_id, w.position_ms, w.duration_ms, w.completed, w.updated_at FROM watch_state w
+SELECT w.user_id, w.item_type, w.item_id, w.media_file_id, w.position_ms, w.duration_ms, w.completed, w.updated_at, w.hidden_at FROM watch_state w
 JOIN episodes e ON e.id = w.item_id
 WHERE w.user_id = ? AND w.item_type = 'episode' AND e.show_id = ?
 `
@@ -582,6 +627,7 @@ func (q *Queries) ListShowWatchStates(ctx context.Context, arg ListShowWatchStat
 			&i.DurationMs,
 			&i.Completed,
 			&i.UpdatedAt,
+			&i.HiddenAt,
 		); err != nil {
 			return nil, err
 		}
@@ -638,7 +684,7 @@ func (q *Queries) ListShowWatchedCounts(ctx context.Context, userID int64) ([]Li
 }
 
 const listShowsWithNewEpisodes = `-- name: ListShowsWithNewEpisodes :many
-SELECT DISTINCT e.show_id
+SELECT e.show_id, COUNT(DISTINCT e.id) AS episodes
 FROM libraries l
 CROSS JOIN media_files f INDEXED BY media_files_added_idx
     ON f.library_id = l.id AND f.status = 'present' AND f.added_at >= ?1
@@ -647,6 +693,7 @@ CROSS JOIN episodes e ON e.id = ef.episode_id
 WHERE l.type = 'tv'
   AND NOT EXISTS (SELECT 1 FROM watch_state w
       WHERE w.user_id = ?2 AND w.item_type = 'episode' AND w.item_id = e.id AND w.completed = 1)
+GROUP BY e.show_id
 `
 
 type ListShowsWithNewEpisodesParams struct {
@@ -654,26 +701,31 @@ type ListShowsWithNewEpisodesParams struct {
 	UserID int64  `json:"user_id"`
 }
 
+type ListShowsWithNewEpisodesRow struct {
+	ShowID   int64 `json:"show_id"`
+	Episodes int64 `json:"episodes"`
+}
+
 // Shows with an episode whose present file arrived since the cutoff and
 // which the user has not finished: what keeps a show card's New badge.
 // Each library's added_at index is walked from
 // the cutoff, so only the window's files are read, not every episode.
 // Episode files are reached through episode_files, which leaves trailer
-// files out. Only the show id is needed, so the watch_state lookup is a
-// NOT EXISTS on its primary key.
-func (q *Queries) ListShowsWithNewEpisodes(ctx context.Context, arg ListShowsWithNewEpisodesParams) ([]int64, error) {
+// files out. Only the show id and how many episodes are needed, so the
+// watch_state lookup is a NOT EXISTS on its primary key.
+func (q *Queries) ListShowsWithNewEpisodes(ctx context.Context, arg ListShowsWithNewEpisodesParams) ([]ListShowsWithNewEpisodesRow, error) {
 	rows, err := q.db.QueryContext(ctx, listShowsWithNewEpisodes, arg.Since, arg.UserID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []int64{}
+	items := []ListShowsWithNewEpisodesRow{}
 	for rows.Next() {
-		var show_id int64
-		if err := rows.Scan(&show_id); err != nil {
+		var i ListShowsWithNewEpisodesRow
+		if err := rows.Scan(&i.ShowID, &i.Episodes); err != nil {
 			return nil, err
 		}
-		items = append(items, show_id)
+		items = append(items, i)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
@@ -685,7 +737,7 @@ func (q *Queries) ListShowsWithNewEpisodes(ctx context.Context, arg ListShowsWit
 }
 
 const listWatchStatesByType = `-- name: ListWatchStatesByType :many
-SELECT user_id, item_type, item_id, media_file_id, position_ms, duration_ms, completed, updated_at FROM watch_state WHERE user_id = ? AND item_type = ?
+SELECT user_id, item_type, item_id, media_file_id, position_ms, duration_ms, completed, updated_at, hidden_at FROM watch_state WHERE user_id = ? AND item_type = ?
 `
 
 type ListWatchStatesByTypeParams struct {
@@ -711,6 +763,7 @@ func (q *Queries) ListWatchStatesByType(ctx context.Context, arg ListWatchStates
 			&i.DurationMs,
 			&i.Completed,
 			&i.UpdatedAt,
+			&i.HiddenAt,
 		); err != nil {
 			return nil, err
 		}
@@ -992,28 +1045,31 @@ func (q *Queries) NextWatchRevision(ctx context.Context) (int64, error) {
 }
 
 const replaceWatchState = `-- name: ReplaceWatchState :exec
-INSERT INTO watch_state (user_id, item_type, item_id, media_file_id, position_ms, duration_ms, completed, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO watch_state (user_id, item_type, item_id, media_file_id, position_ms, duration_ms, completed, updated_at, hidden_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (user_id, item_type, item_id) DO UPDATE SET
     media_file_id = excluded.media_file_id,
     position_ms   = excluded.position_ms,
     duration_ms   = excluded.duration_ms,
     completed     = excluded.completed,
-    updated_at    = excluded.updated_at
+    updated_at    = excluded.updated_at,
+    hidden_at     = excluded.hidden_at
 `
 
 type ReplaceWatchStateParams struct {
-	UserID      int64  `json:"user_id"`
-	ItemType    string `json:"item_type"`
-	ItemID      int64  `json:"item_id"`
-	MediaFileID *int64 `json:"media_file_id"`
-	PositionMs  int64  `json:"position_ms"`
-	DurationMs  int64  `json:"duration_ms"`
-	Completed   int64  `json:"completed"`
-	UpdatedAt   string `json:"updated_at"`
+	UserID      int64   `json:"user_id"`
+	ItemType    string  `json:"item_type"`
+	ItemID      int64   `json:"item_id"`
+	MediaFileID *int64  `json:"media_file_id"`
+	PositionMs  int64   `json:"position_ms"`
+	DurationMs  int64   `json:"duration_ms"`
+	Completed   int64   `json:"completed"`
+	UpdatedAt   string  `json:"updated_at"`
+	HiddenAt    *string `json:"hidden_at"`
 }
 
-// Puts a copy of state on another item, keeping when it was saved.
+// Puts a copy of state on another item, keeping when it was saved and
+// whether it was removed from Continue watching.
 func (q *Queries) ReplaceWatchState(ctx context.Context, arg ReplaceWatchStateParams) error {
 	_, err := q.db.ExecContext(ctx, replaceWatchState,
 		arg.UserID,
@@ -1024,8 +1080,29 @@ func (q *Queries) ReplaceWatchState(ctx context.Context, arg ReplaceWatchStatePa
 		arg.DurationMs,
 		arg.Completed,
 		arg.UpdatedAt,
+		arg.HiddenAt,
 	)
 	return err
+}
+
+const unhideFromContinueWatching = `-- name: UnhideFromContinueWatching :execrows
+UPDATE watch_state SET hidden_at = NULL
+WHERE user_id = ? AND item_type = ? AND item_id = ? AND hidden_at IS NOT NULL
+`
+
+type UnhideFromContinueWatchingParams struct {
+	UserID   int64  `json:"user_id"`
+	ItemType string `json:"item_type"`
+	ItemID   int64  `json:"item_id"`
+}
+
+// Puts an item the person took off Continue watching back on it.
+func (q *Queries) UnhideFromContinueWatching(ctx context.Context, arg UnhideFromContinueWatchingParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, unhideFromContinueWatching, arg.UserID, arg.ItemType, arg.ItemID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const unmarkSeasonWatched = `-- name: UnmarkSeasonWatched :exec
@@ -1066,8 +1143,9 @@ ON CONFLICT (user_id, item_type, item_id) DO UPDATE SET
     position_ms   = excluded.position_ms,
     duration_ms   = excluded.duration_ms,
     completed     = excluded.completed,
+    hidden_at     = NULL,
     updated_at    = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-RETURNING user_id, item_type, item_id, media_file_id, position_ms, duration_ms, completed, updated_at
+RETURNING user_id, item_type, item_id, media_file_id, position_ms, duration_ms, completed, updated_at, hidden_at
 `
 
 type UpsertWatchStateParams struct {
@@ -1080,6 +1158,8 @@ type UpsertWatchStateParams struct {
 	Completed   int64  `json:"completed"`
 }
 
+// A position or watched mark made here. Either brings back a title the
+// person removed from Continue watching (hidden_at).
 func (q *Queries) UpsertWatchState(ctx context.Context, arg UpsertWatchStateParams) (WatchState, error) {
 	row := q.db.QueryRowContext(ctx, upsertWatchState,
 		arg.UserID,
@@ -1100,6 +1180,7 @@ func (q *Queries) UpsertWatchState(ctx context.Context, arg UpsertWatchStatePara
 		&i.DurationMs,
 		&i.Completed,
 		&i.UpdatedAt,
+		&i.HiddenAt,
 	)
 	return i, err
 }
@@ -1112,6 +1193,7 @@ ON CONFLICT (user_id, item_type, item_id) DO UPDATE SET
     position_ms   = excluded.position_ms,
     duration_ms   = excluded.duration_ms,
     completed     = excluded.completed,
+    hidden_at     = NULL,
     updated_at    = excluded.updated_at
 `
 
@@ -1126,7 +1208,8 @@ type UpsertWatchStateAtParams struct {
 	UpdatedAt   string `json:"updated_at"`
 }
 
-// A change made offline, saved with when it happened rather than now.
+// A change made offline, saved with when it happened rather than now. As
+// a play here does, it brings back a title removed from Continue watching.
 func (q *Queries) UpsertWatchStateAt(ctx context.Context, arg UpsertWatchStateAtParams) error {
 	_, err := q.db.ExecContext(ctx, upsertWatchStateAt,
 		arg.UserID,

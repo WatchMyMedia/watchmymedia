@@ -3,8 +3,11 @@ package activity
 import (
 	"context"
 	"errors"
+	"maps"
 	"testing"
 	"time"
+
+	"watchmymedia/server/internal/db"
 )
 
 func titles(p Page) []string {
@@ -242,6 +245,78 @@ func TestCountLibraryPlays(t *testing.T) {
 	}
 }
 
+// The statistics count why plays were converted, and how many streams at
+// the busiest moment were.
+func TestStatsCountWhyPlaysWereConverted(t *testing.T) {
+	tr, c, _ := newTracker(t, noMin())
+	ctx := t.Context()
+	begin := func(user, item int64, s Stream) string {
+		t.Helper()
+		id, err := tr.Begin(ctx, Start{UserID: user, UserName: "x", RecordHistory: true, Item: movie(item, "Thief"), IP: mustAddr("192.168.1.5"), Stream: s})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = tr.Heartbeat(ctx, id, user, 0, Report{State: StatePlaying})
+		return id
+	}
+	stop := func(user int64, id string) {
+		t.Helper()
+		if _, err := tr.Heartbeat(ctx, id, user, 0, Report{State: StateStopped}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	direct := begin(1, 1, Stream{Mode: "direct", Reasons: []string{}})
+	c.add(time.Minute)
+	device := begin(1, 2, Stream{Mode: "transcode", Quality: "original", Reasons: []string{"client cannot decode vp9 video", "3840x2160 exceeds the client's 1920x1080", "audio converted to EAC3 5.1, which keeps it surround"}})
+	c.add(time.Minute)
+	away := begin(2, 3, Stream{Mode: "transcode", Quality: "720", Reasons: []string{"1920x1080 exceeds the client's 1280x720", "bitrate 8000 kb/s exceeds the client's 4000 kb/s"}})
+	c.add(time.Minute)
+	stop(1, direct)
+	stop(1, device)
+	stop(2, away)
+	c.add(time.Minute)
+	box := begin(2, 4, Stream{Mode: "remux", Quality: "original", Reasons: []string{"client cannot play the mkv container"}})
+	c.add(time.Minute)
+	stop(2, box)
+
+	if plain, err := tr.Cards(ctx, StatsQuery{Days: 30}); err != nil || plain.Conversions != nil {
+		t.Fatalf("cards not asked for conversions counted them: %+v, %v", plain.Conversions, err)
+	}
+	cards, err := tr.Cards(ctx, StatsQuery{Days: 30, Conversions: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cards.Conversions == nil {
+		t.Fatal("no conversions")
+	}
+	got := map[string]int64{}
+	for _, r := range cards.Conversions.Reasons {
+		got[r.Reason] = r.Plays
+	}
+	want := map[string]int64{"video-format": 1, "resolution": 1, "smaller": 1, "container": 1}
+	if cards.Conversions.Plays != 3 || !maps.Equal(got, want) {
+		t.Errorf("conversions = %d %v, want 3 %v", cards.Conversions.Plays, got, want)
+	}
+	if cards.Peak.All.Count != 3 || cards.Peak.All.Converted == nil || *cards.Peak.All.Converted != 2 || cards.Peak.Direct.Converted != nil {
+		t.Errorf("peak = %+v, converted %v", cards.Peak.All, cards.Peak.All.Converted)
+	}
+}
+
+// Automatic's step, kept with the play, says whether it was sent smaller.
+func TestConversionKindsReadAutomaticsStep(t *testing.T) {
+	t.Parallel()
+	reasons := `["1920x1080 exceeds the client's 1280x720"]`
+	if k := conversionKinds(reasons, "auto", `{"on":true,"step":"720"}`); !k["smaller"] || len(k) != 1 {
+		t.Errorf("a step down: %v", k)
+	}
+	if k := conversionKinds(reasons, "auto", `{"on":true,"step":"original"}`); !k["resolution"] || len(k) != 1 {
+		t.Errorf("at the original: %v", k)
+	}
+	if k := conversionKinds(`[]`, "", ""); !k["other"] {
+		t.Errorf("no reasons kept: %v", k)
+	}
+}
+
 func TestStats(t *testing.T) {
 	tr, c := seedSmall(t)
 	ctx := context.Background()
@@ -313,5 +388,16 @@ func TestStats(t *testing.T) {
 	d, err := tr.User(ctx, 2)
 	if err != nil || len(d.Windows) != 4 || d.Windows[0].Plays != 2 || len(d.DeviceSet) != 1 || d.DeviceSet[0].LastIP == "" {
 		t.Errorf("bob = %+v, %v", d, err)
+	}
+	// The first play and the network each address is on.
+	var first string
+	if err := tr.db.QueryRowContext(ctx, `SELECT MIN(started_at) FROM plays WHERE user_id = 2`).Scan(&first); err != nil {
+		t.Fatal(err)
+	}
+	if d.FirstPlayAt == nil || !d.FirstPlayAt.Equal(db.ParseTime(first)) || d.DeviceSet[0].Network != "remote" { // bob's phone was last seen at 203.0.113.7
+		t.Errorf("bob's first play %v (want %s), network %q", d.FirstPlayAt, first, d.DeviceSet[0].Network)
+	}
+	if none, err := tr.User(ctx, 3); err == nil && none.FirstPlayAt != nil {
+		t.Errorf("someone with no plays: %v", none.FirstPlayAt)
 	}
 }

@@ -3,6 +3,7 @@ package activity
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"watchmymedia/server/internal/db"
+	"watchmymedia/server/internal/playback"
 )
 
 // Statistics read the covering index on plays (named, so the planner does
@@ -23,6 +25,9 @@ type StatsQuery struct {
 	ByTime    bool
 	UserID    int64
 	LibraryID int64
+	// Conversions also counts why the plays were converted, which reads
+	// another index: only the pages that show it ask.
+	Conversions bool
 }
 
 // StatItem is one entry of a top list.
@@ -44,6 +49,8 @@ type StatItem struct {
 type Peak struct {
 	Count int        `json:"count"`
 	At    *time.Time `json:"at,omitempty"`
+	// Converted is set on the overall peak only (API level 34).
+	Converted *int `json:"converted,omitempty" required:"false" doc:"The overall peak only: how many of its streams were not played directly (API level 34)."`
 }
 
 // Peaks splits peak concurrency by stream mode, as Tautulli does.
@@ -66,6 +73,23 @@ type Cards struct {
 	TopDevices    []StatItem   `json:"topDevices" nullable:"false"`
 	Peak          Peaks        `json:"peak"`
 	Recent        []HistoryRow `json:"recent" nullable:"false"`
+	// Conversions is from API level 34.
+	Conversions *Conversions `json:"conversions,omitempty" required:"false" doc:"With conversions=true: why the period's plays were converted rather than played directly (API level 34)."`
+}
+
+// Conversions counts the reasons a period's plays were not played
+// directly.
+type Conversions struct {
+	Plays   int64              `json:"plays" doc:"Plays not played directly, counted as plays are."`
+	Reasons []ConversionReason `json:"reasons" nullable:"false" doc:"How many of them had each reason, most first; a play counts once under each of its reasons, so these can add up to more than plays."`
+}
+
+// ConversionReason is how many plays had one kind of reason.
+type ConversionReason struct {
+	// Reason is a plain string so a kind added later can't break decoding
+	// in an older app.
+	Reason string `json:"reason" doc:"video-format (a codec, profile, bit depth or HDR the device can't play), resolution, bitrate, smaller (a quality below the original, chosen or Automatic's, such as away from home), audio-format, audio-channels, audio-track (the chosen track needed a remux), container, subtitles (burned in) or other. Apps show kinds they don't know as other."`
+	Plays  int64  `json:"plays"`
 }
 
 const topN = 5
@@ -164,7 +188,88 @@ func (t *Tracker) cards(ctx context.Context, q StatsQuery) (Cards, error) {
 		return c, err
 	}
 	c.Recent = recent.Items
+	if q.Conversions {
+		conv, err := t.conversions(ctx, where, args)
+		if err != nil {
+			return c, err
+		}
+		c.Conversions = &conv
+	}
 	return c, nil
+}
+
+// conversions reads the reasons of the period's plays that were not played
+// directly, from the index that holds only those plays. Plays of one file
+// on one kind of device share their reasons, so each is worked out once.
+func (t *Tracker) conversions(ctx context.Context, where string, args []any) (Conversions, error) {
+	out := Conversions{Reasons: []ConversionReason{}}
+	//nolint:gosec // G202: the clauses joined in are fixed text; every value is a bound argument.
+	rows, err := t.db.QueryContext(ctx, `
+		SELECT p.reasons, p.quality, p.auto
+		FROM plays p INDEXED BY plays_conversions_idx WHERE `+where+` AND p.group_latest = 1 AND p.mode != 'direct'`, args...)
+	if err != nil {
+		return out, err
+	}
+	defer func() { _ = rows.Close() }()
+	counts := map[string]int64{}
+	seen := map[[3]string]map[string]bool{}
+	for rows.Next() {
+		var reasons, quality, auto string
+		if err := rows.Scan(&reasons, &quality, &auto); err != nil {
+			return out, err
+		}
+		out.Plays++
+		key := [3]string{reasons, quality, auto}
+		kinds, ok := seen[key]
+		if !ok {
+			kinds = conversionKinds(reasons, quality, auto)
+			seen[key] = kinds
+		}
+		for k := range kinds {
+			counts[k]++
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return out, err
+	}
+	for _, k := range playback.ReasonKinds {
+		if n := counts[k]; n > 0 {
+			out.Reasons = append(out.Reasons, ConversionReason{Reason: k, Plays: n})
+		}
+	}
+	sort.SliceStable(out.Reasons, func(i, j int) bool { return out.Reasons[i].Plays > out.Reasons[j].Plays })
+	return out, nil
+}
+
+// conversionKinds are the kinds of a play's stored reasons. A play at a
+// quality below the original counts its size and bit rate reasons as
+// smaller: the quality chose them, not the device.
+func conversionKinds(reasons, quality, auto string) map[string]bool {
+	var list []string
+	_ = json.Unmarshal([]byte(reasons), &list)
+	step := quality
+	if quality == playback.QualityAuto {
+		var a struct {
+			Step string `json:"step"`
+		}
+		_ = json.Unmarshal([]byte(auto), &a)
+		step = a.Step
+	}
+	smaller := step != "" && step != "original" && step != playback.QualityAuto
+	kinds := map[string]bool{}
+	for _, r := range list {
+		k := playback.ReasonKind(r)
+		if smaller && (k == playback.ReasonResolution || k == playback.ReasonBitrate) {
+			k = playback.ReasonSmaller
+		}
+		if k != "" {
+			kinds[k] = true
+		}
+	}
+	if len(kinds) == 0 {
+		kinds[playback.ReasonOther] = true
+	}
+	return kinds
 }
 
 type agg struct {
@@ -347,15 +452,26 @@ func peaks(edges []edge) Peaks {
 		return edges[i].d < edges[j].d
 	})
 	var all, direct, remux, trans int
-	bump := func(p *Peak, n int, at string) {
+	bump := func(p *Peak, n int, at string) bool {
 		if n > p.Count {
 			tm := db.ParseTime(at)
 			p.Count, p.At = n, &tm
+			return true
 		}
+		return false
 	}
+	ps.All.Converted = new(0)
 	for _, e := range edges {
 		all += e.d
-		bump(&ps.All, all, e.at)
+		// The streams converted now: those running, with this edge's own
+		// counted before the mode's total below takes it in.
+		converted := remux + trans
+		if e.mode != 0 {
+			converted += e.d
+		}
+		if bump(&ps.All, all, e.at) {
+			ps.All.Converted = new(converted)
+		}
 		switch e.mode {
 		case 0:
 			direct += e.d

@@ -86,11 +86,15 @@ ORDER BY updated_at DESC;
 UPDATE media_files SET added_at = ? WHERE id = ?;
 
 -- name: ListMediaFiles :many
--- A library's files, without trailers (they belong to their movie).
+-- A library's files, without trailers (they belong to their movie). The
+-- path patterns, when given, are the words searched for, in order, as
+-- typed (NFC) and decomposed (NFD), as file names on real servers often
+-- are; LIKE's _ and % in them match loosely.
 SELECT * FROM media_files
 WHERE library_id = sqlc.arg('library_id') AND extra_kind IS NULL
   AND (sqlc.narg('status') IS NULL OR status = sqlc.narg('status'))
   AND (sqlc.narg('match_status') IS NULL OR match_status = sqlc.narg('match_status'))
+  AND (sqlc.narg(path_like) IS NULL OR path LIKE CAST(sqlc.narg(path_like) AS TEXT) OR path LIKE CAST(sqlc.narg(path_like_nfd) AS TEXT))
 ORDER BY path
 LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
@@ -98,7 +102,27 @@ LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 SELECT COUNT(*) FROM media_files
 WHERE library_id = sqlc.arg('library_id') AND extra_kind IS NULL
   AND (sqlc.narg('status') IS NULL OR status = sqlc.narg('status'))
-  AND (sqlc.narg('match_status') IS NULL OR match_status = sqlc.narg('match_status'));
+  AND (sqlc.narg('match_status') IS NULL OR match_status = sqlc.narg('match_status'))
+  AND (sqlc.narg(path_like) IS NULL OR path LIKE CAST(sqlc.narg(path_like) AS TEXT) OR path LIKE CAST(sqlc.narg(path_like_nfd) AS TEXT));
+
+-- name: ListUnreadableMediaFiles :many
+-- ListMediaFiles for the files ffprobe could not read, through their own
+-- small index: probe_error sits after the probe in a row, so reading it
+-- for every file would read every probe.
+SELECT * FROM media_files INDEXED BY media_files_unreadable_idx
+WHERE library_id = sqlc.arg('library_id') AND probe_error IS NOT NULL AND extra_kind IS NULL
+  AND (sqlc.narg('status') IS NULL OR status = sqlc.narg('status'))
+  AND (sqlc.narg('match_status') IS NULL OR match_status = sqlc.narg('match_status'))
+  AND (sqlc.narg(path_like) IS NULL OR path LIKE CAST(sqlc.narg(path_like) AS TEXT) OR path LIKE CAST(sqlc.narg(path_like_nfd) AS TEXT))
+ORDER BY path
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
+
+-- name: CountUnreadableMediaFiles :one
+SELECT COUNT(*) FROM media_files INDEXED BY media_files_unreadable_idx
+WHERE library_id = sqlc.arg('library_id') AND probe_error IS NOT NULL AND extra_kind IS NULL
+  AND (sqlc.narg('status') IS NULL OR status = sqlc.narg('status'))
+  AND (sqlc.narg('match_status') IS NULL OR match_status = sqlc.narg('match_status'))
+  AND (sqlc.narg(path_like) IS NULL OR path LIKE CAST(sqlc.narg(path_like) AS TEXT) OR path LIKE CAST(sqlc.narg(path_like_nfd) AS TEXT));
 
 -- name: CountMediaFilesByStatus :many
 -- Each library's files, without trailers: from the library index alone,

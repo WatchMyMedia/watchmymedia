@@ -14,3 +14,16 @@ func FreeBytes(dir string) (uint64, error) {
 	}
 	return free, nil
 }
+
+// TotalBytes is the size of the disk that holds dir.
+func TotalBytes(dir string) (uint64, error) {
+	p, err := windows.UTF16PtrFromString(dir)
+	if err != nil {
+		return 0, err
+	}
+	var total uint64
+	if err := windows.GetDiskFreeSpaceEx(p, nil, &total, nil); err != nil {
+		return 0, err
+	}
+	return total, nil
+}

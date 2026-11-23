@@ -3,12 +3,14 @@ package related
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"sync"
 	"time"
 
 	"watchmymedia/server/internal/db"
+	"watchmymedia/server/internal/people"
 	"watchmymedia/server/internal/tmdb"
 )
 
@@ -19,8 +21,11 @@ const maxWanted = 256
 // Refresher fetches titles' related data from TMDB in the background:
 // first the titles whose pages were opened with old
 // data (Want), then, a batch at a time, the titles matched before related
-// titles existed. Matching fetches it for new titles. Pages never wait for
-// it: they use what is stored meanwhile.
+// titles existed, then the titles matched before their cast's person IDs
+// were kept. Each fetch stores the title's cast and crew too
+// (people.StoreMovie), since the same details carry them. Matching fetches
+// both for new titles. Pages never wait for it: they use what is stored
+// meanwhile.
 type Refresher struct {
 	q    *db.Queries
 	tmdb *tmdb.Client
@@ -137,10 +142,13 @@ func (r *Refresher) RunOnce(ctx context.Context) (more bool, err error) {
 			return false, err
 		}
 	}
-	fetched := 0
+	fetched, cast := 0, 0
 	defer func() {
 		if fetched > 0 {
 			r.log.Info("related titles' data filled in", "titles", fetched)
+		}
+		if cast > 0 {
+			r.log.Info("cast person IDs filled in", "titles", cast)
 		}
 	}()
 	if budget > 0 {
@@ -168,6 +176,49 @@ func (r *Refresher) RunOnce(ctx context.Context) (more bool, err error) {
 			fetched++
 		}
 		budget -= len(shows)
+	}
+	// Titles matched before person IDs were kept. Each is its own
+	// transaction and marked when stored, so a run stopped halfway loses
+	// nothing and the next starts from those still unchecked.
+	if budget > 0 {
+		movies, err := r.q.ListMoviesForCast(ctx, int64(budget))
+		if err != nil {
+			return false, err
+		}
+		for _, m := range movies {
+			if err := r.refreshMovie(ctx, m.ID, m.TmdbID); err != nil {
+				return false, err
+			}
+			cast++
+		}
+		budget -= len(movies)
+	}
+	if budget > 0 {
+		shows, err := r.q.ListShowsForCast(ctx, int64(budget))
+		if err != nil {
+			return false, err
+		}
+		for _, s := range shows {
+			if err := r.refreshShow(ctx, s.ID, s.TmdbID); err != nil {
+				return false, err
+			}
+			cast++
+		}
+		budget -= len(shows)
+	}
+	// TMDB's collections the library's movies name, so a collection's page
+	// can offer the films the library lacks.
+	if budget > 0 {
+		ids, err := r.q.ListCollectionsToFetch(ctx, db.ListCollectionsToFetchParams{Stale: db.FormatTime(r.Now().Add(-collectionsEvery)), MaxRows: int64(budget)})
+		if err != nil {
+			return false, err
+		}
+		for _, id := range ids {
+			if err := r.refreshCollection(ctx, id); err != nil {
+				return false, err
+			}
+		}
+		budget -= len(ids)
 	}
 	r.mu.Lock()
 	left := len(r.order)
@@ -202,12 +253,56 @@ func (r *Refresher) refreshWanted(ctx context.Context, w want) error {
 	return nil
 }
 
+// collectionsEvery is how often a collection is fetched again: TMDB adds a
+// film to one now and then.
+const collectionsEvery = 30 * 24 * time.Hour
+
+// refreshCollection stores what TMDB lists in a collection. One TMDB no
+// longer has is marked fetched as it was, so it isn't asked for again
+// until it is stale.
+func (r *Refresher) refreshCollection(ctx context.Context, id *int64) error {
+	if id == nil {
+		return nil
+	}
+	c, err := r.tmdb.GetCollection(ctx, int(*id))
+	now := db.FormatTime(r.Now())
+	if errors.Is(err, tmdb.ErrNotFound) {
+		name, err := r.q.GetCollectionName(ctx, id)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		return r.q.MarkTMDBCollectionFetched(ctx, db.MarkTMDBCollectionFetchedParams{ID: *id, Name: deref(name), FetchedAt: now})
+	}
+	if err != nil {
+		return err
+	}
+	parts := c.Parts
+	if parts == nil {
+		parts = []tmdb.CollectionPart{}
+	}
+	b, _ := json.Marshal(parts)
+	return r.q.UpsertTMDBCollection(ctx, db.UpsertTMDBCollectionParams{ID: *id, Name: c.Name, PosterPath: nilIfEmpty(c.PosterPath),
+		BackdropPath: nilIfEmpty(c.BackdropPath), Parts: string(b), FetchedAt: now})
+}
+
+func nilIfEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
 func (r *Refresher) refreshMovie(ctx context.Context, id, tmdbID int64) error {
 	mv, err := r.tmdb.GetMovie(ctx, int(tmdbID))
 	if err != nil && !errors.Is(err, tmdb.ErrNotFound) {
 		return err
 	}
-	return r.q.Transaction(ctx, func(q *db.Queries) error { return StoreMovie(ctx, q, id, mv, r.Now()) })
+	return r.q.Transaction(ctx, func(q *db.Queries) error {
+		if err := StoreMovie(ctx, q, id, mv, r.Now()); err != nil {
+			return err
+		}
+		return people.StoreMovie(ctx, q, id, mv, r.Now())
+	})
 }
 
 func (r *Refresher) refreshShow(ctx context.Context, id, tmdbID int64) error {
@@ -215,5 +310,10 @@ func (r *Refresher) refreshShow(ctx context.Context, id, tmdbID int64) error {
 	if err != nil && !errors.Is(err, tmdb.ErrNotFound) {
 		return err
 	}
-	return r.q.Transaction(ctx, func(q *db.Queries) error { return StoreShow(ctx, q, id, tv, r.Now()) })
+	return r.q.Transaction(ctx, func(q *db.Queries) error {
+		if err := StoreShow(ctx, q, id, tv, r.Now()); err != nil {
+			return err
+		}
+		return people.StoreShow(ctx, q, id, tv, r.Now())
+	})
 }

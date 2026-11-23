@@ -130,6 +130,65 @@ func (q *Queries) ListFileMatchStates(ctx context.Context, ids []int64) ([]ListF
 	return items, nil
 }
 
+const listFilesEpisodes = `-- name: ListFilesEpisodes :many
+SELECT ef.media_file_id, s.title AS show_title, se.number AS season_number, e.number AS episode_number, e.title AS episode_title
+FROM episode_files ef
+CROSS JOIN episodes e ON e.id = ef.episode_id
+CROSS JOIN seasons se ON se.id = e.season_id
+CROSS JOIN shows s ON s.id = e.show_id
+WHERE ef.media_file_id IN (/*SLICE:file_ids*/?)
+ORDER BY ef.media_file_id, se.number, e.number
+`
+
+type ListFilesEpisodesRow struct {
+	MediaFileID   int64  `json:"media_file_id"`
+	ShowTitle     string `json:"show_title"`
+	SeasonNumber  int64  `json:"season_number"`
+	EpisodeNumber int64  `json:"episode_number"`
+	EpisodeTitle  string `json:"episode_title"`
+}
+
+// The episodes a page of files hold, each file's in order: the first is
+// the one a row names.
+func (q *Queries) ListFilesEpisodes(ctx context.Context, fileIds []int64) ([]ListFilesEpisodesRow, error) {
+	query := listFilesEpisodes
+	var queryParams []interface{}
+	if len(fileIds) > 0 {
+		for _, v := range fileIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:file_ids*/?", strings.Repeat(",?", len(fileIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:file_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListFilesEpisodesRow{}
+	for rows.Next() {
+		var i ListFilesEpisodesRow
+		if err := rows.Scan(
+			&i.MediaFileID,
+			&i.ShowTitle,
+			&i.SeasonNumber,
+			&i.EpisodeNumber,
+			&i.EpisodeTitle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMediaFilesByIDs = `-- name: ListMediaFilesByIDs :many
 SELECT id, library_id, path, size, mtime, status, parsed, probe, probe_error, container, video_codec, audio_codec, width, height, duration_ms, first_seen_at, last_seen_at, seen_in_scan, created_at, updated_at, movie_id, match_status, match_locked, match_candidates, match_error, matched_at, hdr, added_at, match_ignored, dv_profile, extra_kind, extra_of FROM media_files WHERE id IN (/*SLICE:ids*/?)
 `
@@ -188,6 +247,50 @@ func (q *Queries) ListMediaFilesByIDs(ctx context.Context, ids []int64) ([]Media
 			&i.ExtraKind,
 			&i.ExtraOf,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMovieTitlesByIDs = `-- name: ListMovieTitlesByIDs :many
+SELECT id, title, year FROM movies WHERE id IN (/*SLICE:ids*/?)
+`
+
+type ListMovieTitlesByIDsRow struct {
+	ID    int64  `json:"id"`
+	Title string `json:"title"`
+	Year  *int64 `json:"year"`
+}
+
+// The titles of a page of files' movies.
+func (q *Queries) ListMovieTitlesByIDs(ctx context.Context, ids []int64) ([]ListMovieTitlesByIDsRow, error) {
+	query := listMovieTitlesByIDs
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMovieTitlesByIDsRow{}
+	for rows.Next() {
+		var i ListMovieTitlesByIDsRow
+		if err := rows.Scan(&i.ID, &i.Title, &i.Year); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

@@ -193,3 +193,31 @@ func (c *Client) Summary(ctx context.Context, mediaType string, id int) (ListIte
 	}
 	return got[0], nil
 }
+
+// CollectionDetails is a collection with its own name and pictures and
+// every film TMDB lists in it, /collection/{id}.
+type CollectionDetails struct {
+	ID           int              `json:"id"`
+	Name         string           `json:"name"`
+	PosterPath   string           `json:"poster_path"`
+	BackdropPath string           `json:"backdrop_path"`
+	Parts        []CollectionPart `json:"parts"`
+}
+
+// CollectionPart is one film of a collection.
+type CollectionPart struct {
+	ID          int    `json:"id"`
+	Title       string `json:"title"`
+	Overview    string `json:"overview"`
+	ReleaseDate string `json:"release_date"`
+	PosterPath  string `json:"poster_path"`
+}
+
+// GetCollection is a collection's details and films.
+func (c *Client) GetCollection(ctx context.Context, id int) (*CollectionDetails, error) {
+	var r CollectionDetails
+	if err := c.get(ctx, "/collection/"+strconv.Itoa(id), nil, &r); err != nil {
+		return nil, err
+	}
+	return &r, nil
+}

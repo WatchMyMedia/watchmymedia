@@ -201,8 +201,68 @@ func (q *Queries) ListMovieItems(ctx context.Context, libraryID int64) ([]ListMo
 	return items, nil
 }
 
+const listMoviesByTMDB = `-- name: ListMoviesByTMDB :many
+SELECT m.id, m.library_id, m.tmdb_id, m.imdb_id, m.title, m.original_title, m.year, m.release_date, m.overview, m.tagline, m.runtime_min, m.genres, m.rating, m.poster_path, m.backdrop_path, m.created_at, m.updated_at, m.credits, m.content_rating, m.trailers, m.trailers_checked_at, m.poster_tmdb, m.poster_source, m.collection_id, m.collection_name, m.related_checked_at, m.crew, m.cast_checked_at FROM movies m INDEXED BY movies_tmdb_idx
+WHERE m.tmdb_id = ? AND EXISTS (SELECT 1 FROM media_files f WHERE f.movie_id = m.id AND f.status = 'present')
+ORDER BY m.library_id, m.id
+`
+
+// Every library's copy of a movie with a present file, first library
+// first, for an app that shows one card for a title on several servers.
+func (q *Queries) ListMoviesByTMDB(ctx context.Context, tmdbID int64) ([]Movie, error) {
+	rows, err := q.db.QueryContext(ctx, listMoviesByTMDB, tmdbID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Movie{}
+	for rows.Next() {
+		var i Movie
+		if err := rows.Scan(
+			&i.ID,
+			&i.LibraryID,
+			&i.TmdbID,
+			&i.ImdbID,
+			&i.Title,
+			&i.OriginalTitle,
+			&i.Year,
+			&i.ReleaseDate,
+			&i.Overview,
+			&i.Tagline,
+			&i.RuntimeMin,
+			&i.Genres,
+			&i.Rating,
+			&i.PosterPath,
+			&i.BackdropPath,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Credits,
+			&i.ContentRating,
+			&i.Trailers,
+			&i.TrailersCheckedAt,
+			&i.PosterTmdb,
+			&i.PosterSource,
+			&i.CollectionID,
+			&i.CollectionName,
+			&i.RelatedCheckedAt,
+			&i.Crew,
+			&i.CastCheckedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listNewEpisodeFiles = `-- name: ListNewEpisodeFiles :many
-SELECT e.id AS episode_id, e.show_id, e.number AS episode_number, e.title, e.overview, e.air_date,
+SELECT e.id AS episode_id, e.show_id, e.number AS episode_number, e.title, e.overview, e.air_date, e.runtime_min,
     se.number AS season_number, s.title AS show_title, s.poster_path AS show_poster_path, s.backdrop_path AS show_backdrop_path,
     f.id AS file_id, f.added_at, f.height,
     EXISTS (SELECT 1 FROM watch_state w
@@ -237,6 +297,7 @@ type ListNewEpisodeFilesRow struct {
 	Title            string  `json:"title"`
 	Overview         string  `json:"overview"`
 	AirDate          *string `json:"air_date"`
+	RuntimeMin       *int64  `json:"runtime_min"`
 	SeasonNumber     int64   `json:"season_number"`
 	ShowTitle        string  `json:"show_title"`
 	ShowPosterPath   *string `json:"show_poster_path"`
@@ -277,6 +338,7 @@ func (q *Queries) ListNewEpisodeFiles(ctx context.Context, arg ListNewEpisodeFil
 			&i.Title,
 			&i.Overview,
 			&i.AirDate,
+			&i.RuntimeMin,
 			&i.SeasonNumber,
 			&i.ShowTitle,
 			&i.ShowPosterPath,
@@ -458,7 +520,7 @@ func (q *Queries) ListRecentlyAddedMovieItems(ctx context.Context, arg ListRecen
 }
 
 const listRecentlyAiredEpisodes = `-- name: ListRecentlyAiredEpisodes :many
-SELECT e.id, e.season_id, e.show_id, e.number, e.title, e.overview, e.air_date, e.still_path, e.runtime_min, e.rating, e.file_named, top.season_number, top.show_title, s.poster_path AS show_poster_path, s.backdrop_path AS show_backdrop_path,
+SELECT e.id, e.season_id, e.show_id, e.number, e.title, e.overview, e.air_date, e.still_path, e.runtime_min, e.rating, e.file_named, top.season_number, top.show_title, s.poster_path AS show_poster_path, s.backdrop_path AS show_backdrop_path, s.tmdb_id AS show_tmdb_id,
     COALESCE((SELECT f.id FROM episode_files ef JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
        WHERE ef.episode_id = e.id ORDER BY f.height DESC LIMIT 1), 0) AS file_id,
     COALESCE((SELECT MAX(f.added_at) FROM episode_files ef JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
@@ -500,6 +562,7 @@ type ListRecentlyAiredEpisodesRow struct {
 	ShowTitle        string      `json:"show_title"`
 	ShowPosterPath   *string     `json:"show_poster_path"`
 	ShowBackdropPath *string     `json:"show_backdrop_path"`
+	ShowTmdbID       int64       `json:"show_tmdb_id"`
 	FileID           interface{} `json:"file_id"`
 	AddedAt          interface{} `json:"added_at"`
 }
@@ -539,6 +602,7 @@ func (q *Queries) ListRecentlyAiredEpisodes(ctx context.Context, arg ListRecentl
 			&i.ShowTitle,
 			&i.ShowPosterPath,
 			&i.ShowBackdropPath,
+			&i.ShowTmdbID,
 			&i.FileID,
 			&i.AddedAt,
 		); err != nil {
@@ -734,11 +798,13 @@ SELECT s.id, s.library_id, s.tmdb_id, s.title, s.year, s.overview, s.status, s.g
     MAX(f.added_at) AS added_at,
     MAX(f.height) AS max_height,
     MAX(CASE WHEN f.hdr != '' THEN 1 ELSE 0 END) AS has_hdr,
-    SUM(f.size) AS total_size
+    SUM(f.size) AS total_size,
+    COUNT(DISTINCT CASE WHEN se.number > 0 THEN se.id END) AS season_count
 FROM shows s
 JOIN episodes e ON e.show_id = s.id
 JOIN episode_files ef ON ef.episode_id = e.id
 JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
+JOIN seasons se ON se.id = e.season_id
 WHERE s.library_id = ?
 GROUP BY s.id
 `
@@ -763,6 +829,7 @@ type ListShowItemsRow struct {
 	MaxHeight     interface{} `json:"max_height"`
 	HasHdr        interface{} `json:"has_hdr"`
 	TotalSize     *float64    `json:"total_size"`
+	SeasonCount   int64       `json:"season_count"`
 }
 
 // A library's shows with present episode files, for its grid; as
@@ -796,6 +863,7 @@ func (q *Queries) ListShowItems(ctx context.Context, libraryID int64) ([]ListSho
 			&i.MaxHeight,
 			&i.HasHdr,
 			&i.TotalSize,
+			&i.SeasonCount,
 		); err != nil {
 			return nil, err
 		}
@@ -817,11 +885,13 @@ SELECT s.id, s.library_id, s.tmdb_id, s.title, s.year, s.overview, s.status, s.g
     MAX(f.added_at) AS added_at,
     MAX(f.height) AS max_height,
     MAX(CASE WHEN f.hdr != '' THEN 1 ELSE 0 END) AS has_hdr,
-    SUM(f.size) AS total_size
+    SUM(f.size) AS total_size,
+    COUNT(DISTINCT CASE WHEN se.number > 0 THEN se.id END) AS season_count
 FROM shows s
 JOIN episodes e ON e.show_id = s.id
 JOIN episode_files ef ON ef.episode_id = e.id
 JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
+JOIN seasons se ON se.id = e.season_id
 WHERE s.library_id = ?1 AND s.id IN (/*SLICE:ids*/?)
 GROUP BY s.id
 `
@@ -851,6 +921,7 @@ type ListShowItemsByIDsRow struct {
 	MaxHeight     interface{} `json:"max_height"`
 	HasHdr        interface{} `json:"has_hdr"`
 	TotalSize     *float64    `json:"total_size"`
+	SeasonCount   int64       `json:"season_count"`
 }
 
 // ListShowItems for a few shows, such as Recently added's.
@@ -894,6 +965,7 @@ func (q *Queries) ListShowItemsByIDs(ctx context.Context, arg ListShowItemsByIDs
 			&i.MaxHeight,
 			&i.HasHdr,
 			&i.TotalSize,
+			&i.SeasonCount,
 		); err != nil {
 			return nil, err
 		}
@@ -952,6 +1024,64 @@ func (q *Queries) ListShowSeasons(ctx context.Context, showID int64) ([]ListShow
 			&i.Season.FileNamed,
 			&i.AvailableCount,
 			&i.FileNamedCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listShowsByTMDB = `-- name: ListShowsByTMDB :many
+SELECT s.id, s.library_id, s.tmdb_id, s.title, s.original_title, s.year, s.first_air_date, s.overview, s.status, s.genres, s.rating, s.poster_path, s.backdrop_path, s.created_at, s.updated_at, s.last_air_date, s.next_air_date, s.credits, s.content_rating, s.poster_tmdb, s.poster_source, s.related_checked_at, s.crew, s.cast_checked_at FROM shows s INDEXED BY shows_tmdb_idx
+WHERE s.tmdb_id = ? AND EXISTS (SELECT 1 FROM episodes e
+    CROSS JOIN episode_files ef ON ef.episode_id = e.id
+    CROSS JOIN media_files f ON f.id = ef.media_file_id
+    WHERE e.show_id = s.id AND f.status = 'present')
+ORDER BY s.library_id, s.id
+`
+
+// Every library's copy of a show with a present episode file.
+func (q *Queries) ListShowsByTMDB(ctx context.Context, tmdbID int64) ([]Show, error) {
+	rows, err := q.db.QueryContext(ctx, listShowsByTMDB, tmdbID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Show{}
+	for rows.Next() {
+		var i Show
+		if err := rows.Scan(
+			&i.ID,
+			&i.LibraryID,
+			&i.TmdbID,
+			&i.Title,
+			&i.OriginalTitle,
+			&i.Year,
+			&i.FirstAirDate,
+			&i.Overview,
+			&i.Status,
+			&i.Genres,
+			&i.Rating,
+			&i.PosterPath,
+			&i.BackdropPath,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.LastAirDate,
+			&i.NextAirDate,
+			&i.Credits,
+			&i.ContentRating,
+			&i.PosterTmdb,
+			&i.PosterSource,
+			&i.RelatedCheckedAt,
+			&i.Crew,
+			&i.CastCheckedAt,
 		); err != nil {
 			return nil, err
 		}

@@ -13,6 +13,13 @@ request an API key under Settings → API, then add it in WatchMyMedia’s Setti
 in Settings wins over both. Without a key the server still scans and lists files
 but cannot match them. Setup and Home explain how to add the key later.
 
+Matching stores a title's cast with TMDB's ID for each person, so a cast member opens
+their movies and shows in the library, and the movie's TMDB collection, so a collection
+lists the films the library lacks. Titles matched by an earlier version are fetched from
+TMDB again once, in the background, 200 at a time with a two-minute pause between
+batches: about 40 minutes for a library of 4,000 titles. Pages never wait for it.
+Until a title is done, its cast members don't link to their titles.
+
 ## Scanning
 
 Libraries are scanned at startup, when files change on disk (just the files that changed),

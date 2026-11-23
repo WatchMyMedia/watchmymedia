@@ -14,31 +14,34 @@ import (
 	"watchmymedia/server/internal/auth"
 	"watchmymedia/server/internal/db"
 	"watchmymedia/server/internal/integrations"
-	"watchmymedia/server/internal/metadata"
+	"watchmymedia/server/internal/people"
 	"watchmymedia/server/internal/probe"
 )
 
 // Movie is a matched movie with at least one present file.
 type Movie struct {
-	ID            int64             `json:"id"`
-	LibraryID     int64             `json:"libraryId"`
-	TMDBID        int64             `json:"tmdbId"`
-	IMDBID        string            `json:"imdbId,omitempty"`
-	Title         string            `json:"title"`
-	OriginalTitle string            `json:"originalTitle,omitempty"`
-	Year          int64             `json:"year,omitempty"`
-	ReleaseDate   string            `json:"releaseDate,omitempty"`
-	Overview      string            `json:"overview"`
-	Tagline       string            `json:"tagline,omitempty"`
-	RuntimeMin    int64             `json:"runtimeMin,omitempty"`
-	Genres        []string          `json:"genres" nullable:"false"`
-	Rating        float64           `json:"rating,omitempty" doc:"TMDB vote average, 0-10."`
-	ContentRating string            `json:"contentRating,omitempty" example:"PG-13" doc:"US certification from TMDB; empty when it has none."`
-	PosterPath    string            `json:"posterPath,omitempty" doc:"Image path; fetch via /api/images/{size}{posterPath}. TMDB's, or a picture an admin chose."`
-	PosterSource  string            `json:"posterSource,omitempty" required:"false" enum:"tmdb,upload,url" doc:"Set when an admin chose the poster: another of TMDB's, an upload or a link. Absent for the match's own poster."`
-	BackdropPath  string            `json:"backdropPath,omitempty"`
-	FileCount     int64             `json:"fileCount"`
-	Credits       []metadata.Credit `json:"credits" nullable:"false"`
+	ID            int64           `json:"id"`
+	LibraryID     int64           `json:"libraryId"`
+	TMDBID        int64           `json:"tmdbId"`
+	IMDBID        string          `json:"imdbId,omitempty"`
+	Title         string          `json:"title"`
+	OriginalTitle string          `json:"originalTitle,omitempty"`
+	Year          int64           `json:"year,omitempty"`
+	ReleaseDate   string          `json:"releaseDate,omitempty"`
+	Overview      string          `json:"overview"`
+	Tagline       string          `json:"tagline,omitempty"`
+	RuntimeMin    int64           `json:"runtimeMin,omitempty"`
+	Genres        []string        `json:"genres" nullable:"false"`
+	Rating        float64         `json:"rating,omitempty" doc:"TMDB vote average, 0-10."`
+	ContentRating string          `json:"contentRating,omitempty" example:"PG-13" doc:"US certification from TMDB; empty when it has none."`
+	PosterPath    string          `json:"posterPath,omitempty" doc:"Image path; fetch via /api/images/{size}{posterPath}. TMDB's, or a picture an admin chose."`
+	PosterSource  string          `json:"posterSource,omitempty" required:"false" enum:"tmdb,upload,url" doc:"Set when an admin chose the poster: another of TMDB's, an upload or a link. Absent for the match's own poster."`
+	BackdropPath  string          `json:"backdropPath,omitempty"`
+	FileCount     int64           `json:"fileCount"`
+	Credits       []people.Credit `json:"credits" nullable:"false"`
+	// Watched and Progress are from API level 34, on search's results.
+	Watched  *bool   `json:"watched,omitempty" required:"false" doc:"Search results and findMoviesByTMDB: the signed-in person finished it. Absent elsewhere; a movie's page has watch."`
+	Progress float64 `json:"progress,omitempty" required:"false" doc:"Search results and findMoviesByTMDB: the fraction watched (0-1) when partway through."`
 }
 
 type MovieList struct {
@@ -66,29 +69,38 @@ type MovieDetail struct {
 	Trailers []MovieTrailer `json:"trailers,omitempty" required:"false" nullable:"false" doc:"The movie's trailers, best first: trailer files in the library, then YouTube trailers while they are on. Apps play the first one whose source they know. Absent when it has none, and on older servers."`
 	// Watchlists is from API level 33.
 	Watchlists []int64 `json:"watchlists" required:"false" nullable:"false" doc:"The signed-in person's watchlists that hold the movie (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33."`
+	// Crew is from API level 34.
+	Crew []people.CrewMember `json:"crew" required:"false" nullable:"false" doc:"Its directors, writers, composers and producers, in that order; empty until the server has fetched the movie's credits with person IDs. Absent on servers below API level 34."`
+	// Collection is from API level 34.
+	Collection *MovieCollection `json:"collection,omitempty" required:"false" doc:"Its TMDB collection, where it falls in it and how many of it this library has (\"Part 2 of 3 · you have all three\"). Absent when it belongs to none."`
 }
 
 // Show is a matched series with at least one present episode file.
 type Show struct {
-	ID            int64             `json:"id"`
-	LibraryID     int64             `json:"libraryId"`
-	TMDBID        int64             `json:"tmdbId"`
-	Title         string            `json:"title"`
-	OriginalTitle string            `json:"originalTitle,omitempty"`
-	Year          int64             `json:"year,omitempty"`
-	FirstAirDate  string            `json:"firstAirDate,omitempty"`
-	Overview      string            `json:"overview"`
-	Status        string            `json:"status,omitempty" example:"Ended"`
-	Genres        []string          `json:"genres" nullable:"false"`
-	Rating        float64           `json:"rating,omitempty"`
-	ContentRating string            `json:"contentRating,omitempty" example:"TV-14" doc:"US certification from TMDB; empty when it has none."`
-	PosterPath    string            `json:"posterPath,omitempty"`
-	PosterSource  string            `json:"posterSource,omitempty" required:"false" enum:"tmdb,upload,url" doc:"Set when an admin chose the poster; absent for the match's own."`
-	BackdropPath  string            `json:"backdropPath,omitempty"`
-	EpisodeCount  int64             `json:"episodeCount" doc:"Episodes with a present file."`
-	LastAirDate   string            `json:"lastAirDate,omitempty"`
-	NextAirDate   string            `json:"nextAirDate,omitempty"`
-	Credits       []metadata.Credit `json:"credits" nullable:"false"`
+	ID            int64           `json:"id"`
+	LibraryID     int64           `json:"libraryId"`
+	TMDBID        int64           `json:"tmdbId"`
+	Title         string          `json:"title"`
+	OriginalTitle string          `json:"originalTitle,omitempty"`
+	Year          int64           `json:"year,omitempty"`
+	FirstAirDate  string          `json:"firstAirDate,omitempty"`
+	Overview      string          `json:"overview"`
+	Status        string          `json:"status,omitempty" example:"Ended"`
+	Genres        []string        `json:"genres" nullable:"false"`
+	Rating        float64         `json:"rating,omitempty"`
+	ContentRating string          `json:"contentRating,omitempty" example:"TV-14" doc:"US certification from TMDB; empty when it has none."`
+	PosterPath    string          `json:"posterPath,omitempty"`
+	PosterSource  string          `json:"posterSource,omitempty" required:"false" enum:"tmdb,upload,url" doc:"Set when an admin chose the poster; absent for the match's own."`
+	BackdropPath  string          `json:"backdropPath,omitempty"`
+	EpisodeCount  int64           `json:"episodeCount" doc:"Episodes with a present file."`
+	LastAirDate   string          `json:"lastAirDate,omitempty"`
+	NextAirDate   string          `json:"nextAirDate,omitempty"`
+	Credits       []people.Credit `json:"credits" nullable:"false"`
+	// Watched, UnwatchedCount and SeasonCount are from API level 34, on
+	// search's results.
+	Watched        *bool  `json:"watched,omitempty" required:"false" doc:"Search results and findShowsByTMDB: the signed-in person has watched every episode with a present file."`
+	UnwatchedCount *int64 `json:"unwatchedCount,omitempty" required:"false" doc:"Search results and findShowsByTMDB: episodes with a present file they haven't finished, as on cards."`
+	SeasonCount    int64  `json:"seasonCount,omitempty" required:"false" doc:"Search results and findShowsByTMDB: seasons with a present episode, specials left out, as on cards."`
 }
 
 type ShowList struct {
@@ -131,6 +143,10 @@ type ShowDetail struct {
 	Following bool `json:"following" required:"false" doc:"The signed-in person follows the show (followShow). Absent on servers below API level 29."`
 	// Watchlists is from API level 33.
 	Watchlists []int64 `json:"watchlists" required:"false" nullable:"false" doc:"The signed-in person's watchlists that hold the show (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33."`
+	// Crew is from API level 34.
+	Crew []people.CrewMember `json:"crew" required:"false" nullable:"false" doc:"Its creators, job Creator; empty until the server has fetched the show's credits with person IDs. Absent on servers below API level 34."`
+	// Tracks is from API level 34.
+	Tracks *ShowTracks `json:"tracks,omitempty" required:"false" doc:"The sound and subtitles the signed-in person picked for the show (setShowTracks), which its episodes start with. Absent when they have none, and on older servers."`
 }
 
 type NextEpisode struct {
@@ -243,7 +259,7 @@ func registerBrowse(h huma.API, deps Deps) {
 		if err != nil {
 			return nil, err
 		}
-		out := &GetMovieOutput{Body: MovieDetail{Movie: movieFromDB(row), Files: make([]MediaFileDetail, 0, len(files)), Watchlists: []int64{}}}
+		out := &GetMovieOutput{Body: MovieDetail{Movie: movieFromDB(row), Files: make([]MediaFileDetail, 0, len(files)), Watchlists: []int64{}, Crew: people.Crew(row.Crew)}}
 		var maxHeight int64
 		for _, f := range files {
 			// Only present files, as on the season page: one that went
@@ -274,6 +290,9 @@ func registerBrowse(h huma.API, deps Deps) {
 			return nil, err
 		}
 		out.Body.Trailers = append(out.Body.Trailers, movieTrailers(deps, row.Trailers)...)
+		if out.Body.Collection, err = movieCollection(ctx, deps, row); err != nil {
+			return nil, err
+		}
 		if user, ok := auth.UserFrom(ctx); ok {
 			w, err := deps.Queries.GetWatchState(ctx, db.GetWatchStateParams{UserID: user.ID, ItemType: "movie", ItemID: row.ID})
 			switch {
@@ -350,7 +369,7 @@ func registerBrowse(h huma.API, deps Deps) {
 		if err != nil {
 			return nil, err
 		}
-		out := &GetShowOutput{Body: ShowDetail{Show: showFromDB(row), Seasons: make([]Season, 0, len(seasons)), Watchlists: []int64{}}}
+		out := &GetShowOutput{Body: ShowDetail{Show: showFromDB(row), Seasons: make([]Season, 0, len(seasons)), Watchlists: []int64{}, Crew: people.Crew(row.Crew)}}
 		for _, s := range seasons {
 			// Episodes named after files are the season's too, though TMDB's
 			// count leaves them out: "6 of 3" would read as nonsense.
@@ -389,6 +408,9 @@ func registerBrowse(h huma.API, deps Deps) {
 				return nil, err
 			}
 			if out.Body.Watchlists, err = watchlistsHolding(ctx, deps, user.ID, "tv", row.TmdbID); err != nil {
+				return nil, err
+			}
+			if out.Body.Tracks, err = showTracks(ctx, deps, user.ID, row.TmdbID); err != nil {
 				return nil, err
 			}
 			n, err := deps.Queries.NextUnwatchedEpisode(ctx, db.NextUnwatchedEpisodeParams{UserID: user.ID, ShowID: row.ID})

@@ -1310,6 +1310,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/libraries/{id}/collections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A movie library's TMDB collections
+         * @description The collections the library has two films of or more. Empty for a TV library. From API level 34.
+         */
+        get: operations["listLibraryCollections"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/libraries/{id}/collections/{collectionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A collection's films: the library's, and the ones it lacks to request
+         * @description 404 when the library has fewer than two of its films. The reply never waits on TMDB. From API level 34.
+         */
+        get: operations["getLibraryCollection"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/libraries/{id}/files": {
         parameters: {
             query?: never;
@@ -2241,6 +2281,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/movies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The library's copies of a movie, by its TMDB id
+         * @description For an app signed in to several servers, which shows a title on more than one as one card and offers each server's copy when it plays. Answers with an empty list, never an error, when the library doesn't have it. From API level 34.
+         */
+        get: operations["findMoviesByTMDB"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/movies/{id}": {
         parameters: {
             query?: never;
@@ -2454,6 +2514,26 @@ export interface paths {
          * @description The device says what it holds and sends the progress and marks it made offline, each with when it happened (corrected by sentAt against the server's clock). The newest local change wins: an entry older than a play or mark made since on the server is dropped (newer). Offline viewing changes watch state only, never History. The reply lists every download of this device with its state. 401 when the device was signed out, which means delete every download.
          */
         post: operations["syncOffline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/people/{personId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A cast member's movies and shows in the library
+         * @description The titles in every library with the person in their billed cast, matched by TMDB person ID, never by name, with the part played. Titles matched before the server kept person IDs count once their credits are fetched again in the background. 404 when no title in the library has the person. From API level 34.
+         */
+        get: operations["getPerson"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3286,6 +3366,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/shows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The library's copies of a show, by its TMDB id
+         * @description For an app signed in to several servers, which shows a title on more than one as one card and offers each server's copy when it plays. Answers with an empty list, never an error, when the library doesn't have it. From API level 34.
+         */
+        get: operations["findShowsByTMDB"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/shows/{id}": {
         parameters: {
             query?: never;
@@ -3541,6 +3641,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/shows/{id}/tracks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Remember the sound and subtitles the signed-in person picked for a show
+         * @description Apps send it when the person picks a track in the player during one of the show's episodes, so the next episodes start the same way. Kept by the show's TMDB id, for every library's copy. Fields left out keep their values. From API level 34.
+         */
+        put: operations["setShowTracks"];
+        post?: never;
+        /**
+         * Forget the sound and subtitles remembered for a show
+         * @description Its episodes start on the person's own languages again. From API level 34.
+         */
+        delete: operations["forgetShowTracks"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/shows/{id}/watched": {
         parameters: {
             query?: never;
@@ -3713,6 +3837,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/watch/{type}/{id}/hidden": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Take a movie or episode off Continue watching, keeping its place
+         * @description The position and watched mark stay. Playing the item again brings it back. Nothing happens when the signed-in person has no progress on it. From API level 34.
+         */
+        put: operations["hideFromContinueWatching"];
+        post?: never;
+        /**
+         * Put a movie or episode taken off Continue watching back on it
+         * @description Undoes hideFromContinueWatching. From API level 34.
+         */
+        delete: operations["showInContinueWatching"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/watch/{type}/{id}/watched": {
         parameters: {
             query?: never;
@@ -3774,6 +3922,8 @@ export interface components {
             tailnet: number;
         };
         ActivityCards: {
+            /** @description With conversions=true: why the period's plays were converted rather than played directly (API level 34). */
+            conversions?: components["schemas"]["ActivityConversions"];
             peak: components["schemas"]["ActivityPeaks"];
             /** Format: int64 */
             playedMs: number;
@@ -3786,6 +3936,21 @@ export interface components {
             topMovies: components["schemas"]["ActivityStatItem"][];
             topShows: components["schemas"]["ActivityStatItem"][];
             topUsers: components["schemas"]["ActivityStatItem"][];
+        };
+        ActivityConversionReason: {
+            /** Format: int64 */
+            plays: number;
+            /** @description video-format (a codec, profile, bit depth or HDR the device can't play), resolution, bitrate, smaller (a quality below the original, chosen or Automatic's, such as away from home), audio-format, audio-channels, audio-track (the chosen track needed a remux), container, subtitles (burned in) or other. Apps show kinds they don't know as other. */
+            reason: string;
+        };
+        ActivityConversions: {
+            /**
+             * Format: int64
+             * @description Plays not played directly, counted as plays are.
+             */
+            plays: number;
+            /** @description How many of them had each reason, most first; a play counts once under each of its reasons, so these can add up to more than plays. */
+            reasons: components["schemas"]["ActivityConversionReason"][];
         };
         ActivityDevice: {
             /** Format: int64 */
@@ -3802,6 +3967,8 @@ export interface components {
             lastIp: string;
             /** Format: date-time */
             lastSeenAt: string;
+            /** @description The network lastIp is on: local (at home), tailnet or remote. Absent without an address (API level 34). */
+            network?: string;
             /** Format: int64 */
             plays: number;
         };
@@ -4026,6 +4193,11 @@ export interface components {
         ActivityPeak: {
             /** Format: date-time */
             at?: string;
+            /**
+             * Format: int64
+             * @description The overall peak only: how many of its streams were not played directly (API level 34).
+             */
+            converted?: number;
             /** Format: int64 */
             count: number;
         };
@@ -4189,6 +4361,11 @@ export interface components {
             deviceList: components["schemas"]["ActivityDeviceSummary"][];
             /** Format: int64 */
             devices: number;
+            /**
+             * Format: date-time
+             * @description When the person's first play in the history started; absent with none (API level 34).
+             */
+            firstPlayAt?: string;
             isAdmin: boolean;
             lastPlayed?: components["schemas"]["ActivityHistoryRow"];
             /** Format: date-time */
@@ -4283,6 +4460,22 @@ export interface components {
         };
         AdaptiveStream: {
             renditions: components["schemas"]["AdaptiveRendition"][];
+        };
+        AddedShow: {
+            /**
+             * Format: int64
+             * @description Episodes added in the row's window.
+             */
+            episodes: number;
+            /** @description The show had no episodes in the library before them. */
+            newShow: boolean;
+            /** @description That season now has every episode TMDB lists. */
+            seasonComplete: boolean;
+            /**
+             * Format: int64
+             * @description The season they were all added to, when it was one.
+             */
+            seasonNumber?: number;
         };
         ApplyMatchInputBody: {
             /** @description Episode numbers; default to what the file name says. */
@@ -4383,6 +4576,8 @@ export interface components {
             path: string;
         };
         BrowseItem: {
+            /** @description Recently added shows: what the card stands for, which subtitle words for older apps. */
+            added?: components["schemas"]["AddedShow"];
             /**
              * Format: date-time
              * @description When the newest present file was added (see MediaFile.addedAt).
@@ -4423,6 +4618,11 @@ export interface components {
              * @enum {string}
              */
             libraryType?: "" | "movie" | "tv";
+            /**
+             * Format: int64
+             * @description Shows marked isNew: how many of the episodes added in the last 7 days the signed-in person hasn't finished ("2 new").
+             */
+            newEpisodeCount?: number;
             nextAirDate?: string;
             overview: string;
             posterPath?: string;
@@ -4438,6 +4638,11 @@ export interface components {
             releaseDate?: string;
             /** Format: int64 */
             runtimeMin?: number;
+            /**
+             * Format: int64
+             * @description Shows: seasons with an episode that has a present file, specials left out.
+             */
+            seasonCount?: number;
             /**
              * Format: int64
              * @description Recently added shows: that episode's season.
@@ -4456,6 +4661,11 @@ export interface components {
              * @description Bytes across present files.
              */
             totalSize: number;
+            /**
+             * Format: int64
+             * @description Shows: episodes with a present file the signed-in person hasn't finished ("4 episodes left"); equal to episodeCount when they haven't started. Absent for movies and on servers below API level 34.
+             */
+            unwatchedCount?: number;
             watched: boolean;
             /** @description It is on one of the signed-in person's watchlists: a card's menu offers Remove from Watchlist rather than Add. */
             watchlisted?: boolean;
@@ -4578,6 +4788,11 @@ export interface components {
         };
         ContinueItem: {
             backdropPath?: string;
+            /**
+             * @description The movie's or the show's US certification from TMDB; absent when it has none.
+             * @example TV-14
+             */
+            contentRating?: string;
             /** Format: int64 */
             durationMs: number;
             /** Format: int64 */
@@ -4590,6 +4805,8 @@ export interface components {
             kind: "movie" | "episode";
             /** Format: int64 */
             movieId?: number;
+            /** @description The episode's summary, or the movie's; absent when TMDB has none. */
+            overview?: string;
             /** Format: int64 */
             positionMs: number;
             posterPath?: string;
@@ -4600,6 +4817,11 @@ export interface components {
             stillPath?: string;
             subtitle?: string;
             title: string;
+            /**
+             * Format: int64
+             * @description The movie's TMDB id, or for an episode its show's, so an app signed in to several servers shows one card for a title on more than one.
+             */
+            tmdbId?: number;
             /** Format: date-time */
             updatedAt: string;
         };
@@ -4673,7 +4895,25 @@ export interface components {
         Credit: {
             character?: string;
             name: string;
+            /**
+             * Format: int64
+             * @description TMDB's person ID: getPerson lists the person's titles in the library. Absent for a credit stored before person IDs were kept, until the server fetches the title's credits again, and on servers below API level 34; such a card opens nothing.
+             */
+            personId?: number;
             profilePath?: string;
+        };
+        CrewMember: {
+            /**
+             * @description As TMDB words it: Director, Screenplay, Writer, Story, Original Music Composer, Producer, or Creator for a show.
+             * @example Director
+             */
+            job: string;
+            name: string;
+            /**
+             * Format: int64
+             * @description TMDB's person ID.
+             */
+            personId: number;
         };
         DecideRequestInputBody: {
             approve: boolean;
@@ -4944,6 +5184,11 @@ export interface components {
             /** @description A present file arrived within the last 7 days and the signed-in user has not watched the episode. */
             isNew: boolean;
             overview: string;
+            /**
+             * Format: int64
+             * @description The episode's length in minutes, as TMDB lists it.
+             */
+            runtimeMin?: number;
             /** Format: int64 */
             seasonNumber: number;
             showBackdropPath?: string;
@@ -4951,6 +5196,11 @@ export interface components {
             showId: number;
             showPosterPath?: string;
             showTitle: string;
+            /**
+             * Format: int64
+             * @description The show's TMDB id, so an app signed in to several servers shows one card for an episode on more than one.
+             */
+            showTmdbId?: number;
             stillPath?: string;
             title: string;
             /** @description The signed-in user has watched it. */
@@ -5170,10 +5420,17 @@ export interface components {
             tvLibraryId?: number;
         };
         HomeHero: {
+            /** @description Episodes: when it aired, YYYY-MM-DD. */
+            airDate?: string;
             backdropPath?: string;
             contentRating?: string;
             /** Format: int64 */
             episodeId?: number;
+            /**
+             * Format: int64
+             * @description Episodes: its number in seasonNumber.
+             */
+            episodeNumber?: number;
             /** @example S02E01 · Aired 3 days ago · 47 min */
             facts: string;
             /** Format: int64 */
@@ -5192,10 +5449,17 @@ export interface components {
              * @enum {string}
              */
             quality?: "" | "4K" | "1080p" | "720p" | "SD";
+            /**
+             * Format: int64
+             * @description The episode's or movie's length in minutes.
+             */
+            runtimeMin?: number;
             /** Format: int64 */
             seasonNumber?: number;
             /** Format: int64 */
             showId?: number;
+            /** @description Episodes and shows: the show's title. */
+            showTitle?: string;
             title: string;
         };
         HomeTotals: {
@@ -5328,10 +5592,16 @@ export interface components {
             supported: boolean;
         };
         ItemFacets: {
+            /** @description The library's content ratings, in the order the US systems rank them (movies' G to NC-17, then TV's TV-Y to TV-MA, then any other), with unrated last when some items have none. From API level 34. */
+            contentRatings?: string[];
             decades: number[];
             genres: string[];
         };
         ItemList: {
+            /** @description Items per content rating (as facets.contentRatings names them) after every other filter, before contentRating and pagination, with zero when none match. From API level 34. */
+            contentRatingCounts?: {
+                [key: string]: number;
+            };
             facets: components["schemas"]["ItemFacets"];
             /** @description Items per genre after filter, decade and q, before the genre filter and pagination. Includes every library genre, with zero when none match. */
             genreCounts?: {
@@ -5354,6 +5624,11 @@ export interface components {
         ItemTotals: {
             /**
              * Format: int64
+             * @description Items whose newest present file arrived this calendar month, in the server's time zone.
+             */
+            addedThisMonth?: number;
+            /**
+             * Format: int64
              * @description TV: shows that have not ended or been canceled.
              */
             continuing: number;
@@ -5364,9 +5639,24 @@ export interface components {
             episodes: number;
             /**
              * Format: int64
+             * @description TV: shows the signed-in person follows, as filter following lists them.
+             */
+            following?: number;
+            /**
+             * Format: int64
+             * @description Movies part watched, or shows started and not finished, as filter inProgress lists them.
+             */
+            inProgress?: number;
+            /**
+             * Format: int64
              * @description Matched movies or shows with a present file.
              */
             items: number;
+            /**
+             * Format: int64
+             * @description TV: shows with a new episode the signed-in person hasn't finished (isNew).
+             */
+            newEpisodes?: number;
             /**
              * Format: int64
              * @description Bytes across every item's present files.
@@ -5377,6 +5667,11 @@ export interface components {
              * @description Items for files not matched yet: one per file, or per show folder.
              */
             unmatched: number;
+            /**
+             * Format: int64
+             * @description Movies the signed-in person hasn't finished, or shows with an episode they haven't seen ("58 you haven't watched").
+             */
+            unwatched?: number;
         };
         LetterOffset: {
             /** @description A–Z, or # for titles starting with a digit or symbol. Leading The, A and An are skipped. */
@@ -5442,6 +5737,70 @@ export interface components {
         LibraryChanged: {
             /** Format: int64 */
             libraryId: number;
+        };
+        LibraryCollection: {
+            backdropPath?: string;
+            /**
+             * Format: int64
+             * @description Its movies in this library with a present file.
+             */
+            count: number;
+            /**
+             * Format: int64
+             * @description The year of its earliest film in the library.
+             */
+            firstYear?: number;
+            /**
+             * Format: int64
+             * @description TMDB collection ID; listLibraryItems takes it as collection.
+             */
+            id: number;
+            /** Format: int64 */
+            lastYear?: number;
+            name: string;
+            /** @description The collection's own picture, else its first film's. */
+            posterPath?: string;
+            /**
+             * Format: int64
+             * @description The films TMDB lists in it; absent until the server has fetched the collection.
+             */
+            total?: number;
+        };
+        LibraryCollectionDetail: {
+            backdropPath?: string;
+            /**
+             * Format: int64
+             * @description Its movies in this library with a present file.
+             */
+            count: number;
+            /**
+             * Format: int64
+             * @description The year of its earliest film in the library.
+             */
+            firstYear?: number;
+            /**
+             * Format: int64
+             * @description TMDB collection ID; listLibraryItems takes it as collection.
+             */
+            id: number;
+            /** Format: int64 */
+            lastYear?: number;
+            /** @description The films TMDB lists in it that this library lacks, in release order, each with where it stands as request search says it (available when another library has it). Request opens createRequest as from search. Empty until the server has fetched the collection. */
+            missing: components["schemas"]["Requestable"][];
+            /** @description The library's films of it with a present file, in release order, marked for the signed-in person as cards are. */
+            movies: components["schemas"]["BrowseItem"][];
+            name: string;
+            /** @description The collection's own picture, else its first film's. */
+            posterPath?: string;
+            /**
+             * Format: int64
+             * @description The films TMDB lists in it; absent until the server has fetched the collection.
+             */
+            total?: number;
+        };
+        LibraryCollections: {
+            /** @description By name. */
+            items: components["schemas"]["LibraryCollection"][];
         };
         LibraryList: {
             items: components["schemas"]["Library"][];
@@ -5554,6 +5913,14 @@ export interface components {
             items: components["schemas"]["LiveTVSessionView"][];
             recordings?: components["schemas"]["LiveTVRecording"][];
         };
+        LiveTVAiring: {
+            channelId: string;
+            channelName: string;
+            number: string;
+            programmeId: string;
+            /** Format: date-time */
+            start: string;
+        };
         LiveTVCapabilities: {
             /** @description This account may watch live television. */
             allowed: boolean;
@@ -5607,7 +5974,11 @@ export interface components {
             /** Format: date-time */
             end: string;
             id: string;
+            /** @description For a repeat: when the same episode airs again in the listings, so it could give way and be recorded then (API level 34). */
+            nextAiring?: components["schemas"]["LiveTVAiring"];
             number: string;
+            /** @description Its listing called it a repeat (API level 34). */
+            repeat?: boolean;
             /** @description Already recording, so it can't give way. */
             running: boolean;
             /** Format: date-time */
@@ -5891,6 +6262,8 @@ export interface components {
             canCancel: boolean;
             /** @description The current delete policy permits removing this finished recording's owned file. */
             canDelete?: boolean;
+            /** @description The listing's categories, such as Documentary or Sports (API level 34). */
+            categories?: string[];
             channelId: string;
             channelName: string;
             /** @description For a recording that won't record (state conflict): the recordings holding the tuners while it would run. Choosing one with PATCH {prefer, over} makes that one give way. */
@@ -5904,8 +6277,14 @@ export interface components {
             episodeTitle?: string;
             gaps: components["schemas"]["LiveTVGap"][];
             id: string;
+            /** @description What was recorded, from its listing: episode, show (a programme without episodes, such as news) or movie; absent for a recording made by time. Other values may follow (API level 34). */
+            kind?: string;
             /** Format: int64 */
             mediaFileId?: number;
+            /** @description The listing called it new. From API level 34; absent for a recording scheduled before, whose listing was gone. */
+            new?: boolean;
+            /** @description For a repeat that won't record (state conflict): when the same episode airs again in the listings (API level 34). */
+            nextAiring?: components["schemas"]["LiveTVAiring"];
             number: string;
             /** Format: int64 */
             padAfter: number;
@@ -5913,7 +6292,11 @@ export interface components {
             padBefore: number;
             pictureUrl?: string;
             programmeId?: string;
+            /** @description Where the signed-in person is in it: its own position while it isn't in the library, then the watch state of the movie or episode it became. Absent when they haven't started it (API level 34). */
+            progress?: components["schemas"]["LiveTVViewerProgress"];
             reason?: string;
+            /** @description The listing called it a repeat (API level 34). */
+            repeat?: boolean;
             ruleId?: string;
             /** Format: int64 */
             season?: number;
@@ -5928,6 +6311,13 @@ export interface components {
             /** Format: int64 */
             userId?: number;
             userName: string;
+            /** @description The signed-in person finished the movie or episode it became (API level 34). */
+            watched?: boolean;
+            /**
+             * Format: int64
+             * @description A movie's year, or the year an episode first aired, from the listing (API level 34).
+             */
+            year?: number;
         };
         LiveTVRecordingCreate: {
             anyChannel?: boolean;
@@ -6035,11 +6425,23 @@ export interface components {
             prefer?: boolean;
         };
         LiveTVRecordings: {
+            /** @description The recordings in each section and their bytes, and the rules, for the tabs. On the first page only (API level 34). */
+            counts?: components["schemas"]["LiveTVSectionCounts"];
             /** Format: int64 */
             freeBytes?: number;
             items: components["schemas"]["LiveTVRecording"][];
             nextCursor?: string;
+            /**
+             * Format: int64
+             * @description Space the recorder keeps free on the disk: freeBytes less this is the room recordings can use. On the first page, with freeBytes (API level 34).
+             */
+            reserveBytes?: number;
             rules?: components["schemas"]["LiveTVRecordingRule"][];
+            /**
+             * Format: int64
+             * @description The size of the disk recordings go to. On the first page, with freeBytes (API level 34).
+             */
+            totalBytes?: number;
             /** Format: int64 */
             tuners?: number;
         };
@@ -6084,6 +6486,20 @@ export interface components {
         LiveTVSearchOutputBody: {
             /** @description On now and later, soonest first. */
             items: components["schemas"]["LiveTVSearchHit"][];
+        };
+        LiveTVSectionCount: {
+            /** Format: int64 */
+            bytes: number;
+            /** Format: int64 */
+            items: number;
+        };
+        LiveTVSectionCounts: {
+            conflicts: components["schemas"]["LiveTVSectionCount"];
+            now: components["schemas"]["LiveTVSectionCount"];
+            recorded: components["schemas"]["LiveTVSectionCount"];
+            /** @description The recording rules; bytes is 0. */
+            series: components["schemas"]["LiveTVSectionCount"];
+            upcoming: components["schemas"]["LiveTVSectionCount"];
         };
         LiveTVSessionView: {
             /** @description Current live output step while Automatic is selected. */
@@ -6198,6 +6614,12 @@ export interface components {
             /** @description Retry with the same ID to retrieve the same session for two minutes after it ends; use a new ID for a deliberate retry or channel change. */
             requestId: string;
         };
+        LiveTVViewerProgress: {
+            /** Format: int64 */
+            durationMs: number;
+            /** Format: int64 */
+            positionMs: number;
+        };
         ManualSegment: {
             /**
              * Format: int64
@@ -6272,6 +6694,8 @@ export interface components {
              * @example 8
              */
             dvProfile?: number;
+            /** @description The files list only: the first episode an episode file holds (API level 34). */
+            episode?: components["schemas"]["MediaFileEpisode"];
             /** Format: date-time */
             firstSeenAt: string;
             /**
@@ -6318,10 +6742,17 @@ export interface components {
             size: number;
             /** @enum {string} */
             status: "present" | "missing";
+            /** @description The files list only: the movie's or show's title the file was matched to (API level 34). */
+            title?: string;
             /** @example h264 */
             videoCodec?: string;
             /** Format: int64 */
             width?: number;
+            /**
+             * Format: int64
+             * @description The files list only: the matched movie's year (API level 34).
+             */
+            year?: number;
         };
         MediaFileDetail: {
             /**
@@ -6342,6 +6773,8 @@ export interface components {
              * @example 8
              */
             dvProfile?: number;
+            /** @description The files list only: the first episode an episode file holds (API level 34). */
+            episode?: components["schemas"]["MediaFileEpisode"];
             /** Format: int64 */
             episodeId?: number;
             /** Format: int64 */
@@ -6397,10 +6830,24 @@ export interface components {
             size: number;
             /** @enum {string} */
             status: "present" | "missing";
+            /** @description The files list only: the movie's or show's title the file was matched to (API level 34). */
+            title?: string;
             /** @example h264 */
             videoCodec?: string;
             /** Format: int64 */
             width?: number;
+            /**
+             * Format: int64
+             * @description The files list only: the matched movie's year (API level 34).
+             */
+            year?: number;
+        };
+        MediaFileEpisode: {
+            /** Format: int64 */
+            episodeNumber: number;
+            /** Format: int64 */
+            seasonNumber: number;
+            title?: string;
         };
         MediaFileList: {
             items: components["schemas"]["MediaFile"][];
@@ -6413,6 +6860,11 @@ export interface components {
              * @description Total files matching the filter.
              */
             total: number;
+            /**
+             * Format: int64
+             * @description Present files in the library ffprobe could not read, whatever the filter (API level 34).
+             */
+            unreadable?: number;
         };
         MediaInfo: {
             audio: components["schemas"]["AudioStream"][];
@@ -6735,6 +7187,11 @@ export interface components {
             posterSource?: "tmdb" | "upload" | "url";
             /**
              * Format: double
+             * @description Search results and findMoviesByTMDB: the fraction watched (0-1) when partway through.
+             */
+            progress?: number;
+            /**
+             * Format: double
              * @description TMDB vote average, 0-10.
              */
             rating?: number;
@@ -6745,19 +7202,52 @@ export interface components {
             title: string;
             /** Format: int64 */
             tmdbId: number;
+            /** @description Search results and findMoviesByTMDB: the signed-in person finished it. Absent elsewhere; a movie's page has watch. */
+            watched?: boolean;
             /** Format: int64 */
             year?: number;
+        };
+        MovieCollection: {
+            /**
+             * Format: int64
+             * @description The collection's films in this movie's library with a present file, it included.
+             */
+            have: number;
+            /**
+             * Format: int64
+             * @description TMDB collection ID.
+             */
+            id: number;
+            name: string;
+            /**
+             * Format: int64
+             * @description Its place among the collection's films by release, from 1; absent until the server has fetched the collection.
+             */
+            part?: number;
+            /**
+             * Format: int64
+             * @description The films TMDB lists in it; absent until fetched.
+             */
+            total?: number;
+        };
+        MovieCopies: {
+            /** @description Every library's copy with a present file, the first library's first, marked for the signed-in person as search's are (watched, progress). Empty when the library has none. */
+            items: components["schemas"]["Movie"][];
         };
         MovieDetail: {
             /** Format: date-time */
             addedAt?: string;
             backdropPath?: string;
+            /** @description Its TMDB collection, where it falls in it and how many of it this library has ("Part 2 of 3 · you have all three"). Absent when it belongs to none. */
+            collection?: components["schemas"]["MovieCollection"];
             /**
              * @description US certification from TMDB; empty when it has none.
              * @example PG-13
              */
             contentRating?: string;
             credits: components["schemas"]["Credit"][];
+            /** @description Its directors, writers, composers and producers, in that order; empty until the server has fetched the movie's credits with person IDs. Absent on servers below API level 34. */
+            crew?: components["schemas"]["CrewMember"][];
             /** @description A download of it in Radarr's queue, such as an upgrade. */
             download?: components["schemas"]["QueueDownload"];
             /** Format: int64 */
@@ -6781,6 +7271,11 @@ export interface components {
              * @enum {string}
              */
             posterSource?: "tmdb" | "upload" | "url";
+            /**
+             * Format: double
+             * @description Search results and findMoviesByTMDB: the fraction watched (0-1) when partway through.
+             */
+            progress?: number;
             /** @enum {string} */
             quality?: "" | "4K" | "1080p" | "720p" | "SD";
             /**
@@ -6801,6 +7296,8 @@ export interface components {
             trailers?: components["schemas"]["MovieTrailer"][];
             /** @description The signed-in user's progress. */
             watch?: components["schemas"]["WatchState"];
+            /** @description Search results and findMoviesByTMDB: the signed-in person finished it. Absent elsewhere; a movie's page has watch. */
+            watched?: boolean;
             /** @description The signed-in person's watchlists that hold the movie (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33. */
             watchlists?: number[];
             /** Format: int64 */
@@ -6828,6 +7325,11 @@ export interface components {
             fileId?: number;
             /** @description The YouTube video id, for source "youtube". */
             key?: string;
+            /**
+             * @description What TMDB calls it: trailer or teaser; trailer for a trailer file. Absent on older servers.
+             * @example teaser
+             */
+            kind?: string;
             /** @description TMDB's name for it ("Official Trailer"), or the file's. */
             name: string;
             /** @description "youtube": Key is a YouTube video id, played by YouTube's own player or app. "file": play FileID like any other file. Apps skip sources they don't know. */
@@ -7105,6 +7607,8 @@ export interface components {
             encoder?: string;
             /** Format: int64 */
             fileId: number;
+            /** @description The address fetching it, for admins only (API level 34). */
+            ip?: string;
             item: components["schemas"]["OfflineItem"];
             /** Format: date-time */
             lastSeenAt: string;
@@ -7226,6 +7730,119 @@ export interface components {
             /** @description The same folder as this server sees it. */
             to: string;
         };
+        PersonDetail: {
+            /** @description Movies with them in the billed cast and a present file, newest first, one card per title however many libraries have it. */
+            movies: components["schemas"]["PersonTitle"][];
+            name: string;
+            /**
+             * Format: int64
+             * @description TMDB person ID.
+             */
+            personId: number;
+            /** @description Their picture; fetch via /api/images/{size}{profilePath}. */
+            profilePath?: string;
+            /** @description Shows likewise. */
+            shows: components["schemas"]["PersonTitle"][];
+        };
+        PersonTitle: {
+            /** @description Recently added shows: what the card stands for, which subtitle words for older apps. */
+            added?: components["schemas"]["AddedShow"];
+            /**
+             * Format: date-time
+             * @description When the newest present file was added (see MediaFile.addedAt).
+             */
+            addedAt: string;
+            backdropPath?: string;
+            /** @description The part, as TMDB words it; two parts in one title are joined with " / ". Absent when TMDB names none. */
+            character?: string;
+            contentRating?: string;
+            /**
+             * Format: int64
+             * @description Shows: episodes with a present file.
+             */
+            episodeCount?: number;
+            /**
+             * Format: int64
+             * @description Recently added shows: the one episode added, when the subtitle is its code. Apps open its page rather than the show's.
+             */
+            episodeId?: number;
+            /**
+             * Format: int64
+             * @description Movies: versions on disk.
+             */
+            fileCount?: number;
+            /** @description Unmatched: the file's path in the library, or the folder for a group of files. */
+            fileName?: string;
+            genres: string[];
+            hdr: boolean;
+            /** Format: int64 */
+            id: number;
+            /** @description A present file arrived within the last 7 days and the signed-in user has not watched it: the film, or for a show an episode added in that time. */
+            isNew: boolean;
+            /** @enum {string} */
+            kind: "movie" | "show" | "unmatched";
+            lastAirDate?: string;
+            /** Format: int64 */
+            libraryId: number;
+            /**
+             * @description Unmatched: the library's type, for the link to its Unmatched view.
+             * @enum {string}
+             */
+            libraryType?: "" | "movie" | "tv";
+            /**
+             * Format: int64
+             * @description Shows marked isNew: how many of the episodes added in the last 7 days the signed-in person hasn't finished ("2 new").
+             */
+            newEpisodeCount?: number;
+            nextAirDate?: string;
+            overview: string;
+            posterPath?: string;
+            /** Format: double */
+            progress?: number;
+            /**
+             * @description Best resolution across present files.
+             * @enum {string}
+             */
+            quality?: "" | "4K" | "1080p" | "720p" | "SD";
+            /** Format: double */
+            rating?: number;
+            releaseDate?: string;
+            /** Format: int64 */
+            runtimeMin?: number;
+            /**
+             * Format: int64
+             * @description Shows: seasons with an episode that has a present file, specials left out.
+             */
+            seasonCount?: number;
+            /**
+             * Format: int64
+             * @description Recently added shows: that episode's season.
+             */
+            seasonNumber?: number;
+            status?: string;
+            subtitle?: string;
+            title: string;
+            /**
+             * Format: int64
+             * @description The movie's or show's TMDB id, which saving it to a watchlist takes. Absent for a title TMDB hasn't matched, which can't be saved.
+             */
+            tmdbId?: number;
+            /**
+             * Format: int64
+             * @description Bytes across present files.
+             */
+            totalSize: number;
+            /**
+             * Format: int64
+             * @description Shows: episodes with a present file the signed-in person hasn't finished ("4 episodes left"); equal to episodeCount when they haven't started. Absent for movies and on servers below API level 34.
+             */
+            unwatchedCount?: number;
+            watched: boolean;
+            /** @description It is on one of the signed-in person's watchlists: a card's menu offers Remove from Watchlist rather than Add. */
+            watchlisted?: boolean;
+            /** Format: int64 */
+            year?: number;
+        };
         Ping: {
             time: string;
         };
@@ -7233,6 +7850,8 @@ export interface components {
             /** @description The files to plan, such as a movie's versions. */
             fileIds: number[] | null;
             profile: components["schemas"]["Profile"];
+            /** @description Also list each file's audio tracks and subtitles, those beside the file and downloaded ones included, so a person can choose them before playing. From API level 34; older servers ignore it. */
+            tracks?: boolean;
         };
         PlanList: {
             /** @description In the order asked; files that are missing, not probed yet or unknown are left out. */
@@ -7259,6 +7878,8 @@ export interface components {
         };
         PlaybackPlan: {
             audio: components["schemas"]["AudioPlan"];
+            /** @description With tracks: the file's audio tracks, as a decision lists them. Send the chosen one's index as audioIndex. */
+            audioTracks?: components["schemas"]["AudioTrack"][];
             /** Format: int64 */
             fileId: number;
             /** @enum {string} */
@@ -7267,6 +7888,8 @@ export interface components {
             protocol: "file" | "hls";
             /** @description Why a cheaper mode was not possible. */
             reasons: string[];
+            /** @description With tracks: every subtitle a play could show, inside the file, beside it and downloaded, as a decision lists them but without URLs. Send the chosen one's id as subtitleId. */
+            subtitles?: components["schemas"]["SubtitleTrack"][];
             video: components["schemas"]["VideoPlan"];
         };
         PlaysOlderThan: {
@@ -7729,6 +8352,8 @@ export interface components {
             audio?: components["schemas"]["AudioPreferences"];
             /** @description Play the next episode by itself after the credits. */
             autoplayNext: boolean;
+            /** @description The person asked not to see what happens in episodes they haven't watched. The server hides nothing; each app hides what it draws for those episodes. Off by default (API level 34). */
+            hideSpoilers?: boolean;
             /**
              * Format: int64
              * @description Minutes before a programme starts that a Live TV reminder comes: 0, 1, 5, 10 or 15 (API level 15).
@@ -8073,6 +8698,7 @@ export interface components {
              * @description Position to start from; only used by HLS sessions. Omitted, a play of something partway through starts preparing where it resumes (resumeMs); 0 starts at the beginning.
              */
             startMs?: number;
+            /** @description A subtitles[].id from a decision or a plan with tracks: s<index> for a stream inside the file (its ffprobe index), x<n> for a subtitle file beside the video (n counts them from 0 in the order the server lists them), d<id> for a downloaded one. */
             subtitleId?: string;
             /**
              * @description From API level 18: auto uses the person's subtitle preferences; off explicitly disables them. A subtitleId takes precedence. Omitted, older players keep their existing behavior.
@@ -8355,12 +8981,27 @@ export interface components {
             id: number;
             /** Format: int64 */
             number: number;
+            /**
+             * Format: double
+             * @description The fraction the signed-in person has watched (0-1) when partway through.
+             */
+            progress?: number;
+            /**
+             * Format: int64
+             * @description Its length in minutes, as TMDB lists it.
+             */
+            runtimeMin?: number;
             /** Format: int64 */
             seasonNumber: number;
             /** Format: int64 */
             showId: number;
             showPosterPath?: string;
             showTitle: string;
+            /**
+             * Format: int64
+             * @description The show's TMDB id, so an app searching several servers shows one row for an episode on more than one.
+             */
+            showTmdbId?: number;
             stillPath?: string;
             title: string;
             /** @description The signed-in user has watched it. */
@@ -8746,13 +9387,29 @@ export interface components {
             posterSource?: "tmdb" | "upload" | "url";
             /** Format: double */
             rating?: number;
+            /**
+             * Format: int64
+             * @description Search results and findShowsByTMDB: seasons with a present episode, specials left out, as on cards.
+             */
+            seasonCount?: number;
             /** @example Ended */
             status?: string;
             title: string;
             /** Format: int64 */
             tmdbId: number;
+            /**
+             * Format: int64
+             * @description Search results and findShowsByTMDB: episodes with a present file they haven't finished, as on cards.
+             */
+            unwatchedCount?: number;
+            /** @description Search results and findShowsByTMDB: the signed-in person has watched every episode with a present file. */
+            watched?: boolean;
             /** Format: int64 */
             year?: number;
+        };
+        ShowCopies: {
+            /** @description Every library's copy with a present episode file, the first library's first, marked for the signed-in person as search's are (watched, unwatchedCount, seasonCount). Empty when the library has none. */
+            items: components["schemas"]["Show"][];
         };
         ShowDetail: {
             /** Format: date-time */
@@ -8764,6 +9421,8 @@ export interface components {
              */
             contentRating?: string;
             credits: components["schemas"]["Credit"][];
+            /** @description Its creators, job Creator; empty until the server has fetched the show's credits with person IDs. Absent on servers below API level 34. */
+            crew?: components["schemas"]["CrewMember"][];
             /**
              * Format: int64
              * @description Episodes with a present file.
@@ -8797,6 +9456,11 @@ export interface components {
             quality?: "" | "4K" | "1080p" | "720p" | "SD";
             /** Format: double */
             rating?: number;
+            /**
+             * Format: int64
+             * @description Search results and findShowsByTMDB: seasons with a present episode, specials left out, as on cards.
+             */
+            seasonCount?: number;
             seasons: components["schemas"]["Season"][];
             /** @example Ended */
             status?: string;
@@ -8810,6 +9474,15 @@ export interface components {
             totalEpisodes: number;
             /** Format: int64 */
             totalSize: number;
+            /** @description The sound and subtitles the signed-in person picked for the show (setShowTracks), which its episodes start with. Absent when they have none, and on older servers. */
+            tracks?: components["schemas"]["ShowTracks"];
+            /**
+             * Format: int64
+             * @description Search results and findShowsByTMDB: episodes with a present file they haven't finished, as on cards.
+             */
+            unwatchedCount?: number;
+            /** @description Search results and findShowsByTMDB: the signed-in person has watched every episode with a present file. */
+            watched?: boolean;
             /** @description The signed-in person's watchlists that hold the show (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33. */
             watchlists?: number[];
             /** Format: int64 */
@@ -8842,6 +9515,28 @@ export interface components {
             tmdbId: number;
             /** Format: int64 */
             year?: number;
+        };
+        ShowTracks: {
+            /**
+             * @description BCP 47. A play that names no audioIndex starts on this language when the file has it, before the person's audio languages. Absent: their audio languages alone.
+             * @example ja
+             */
+            audioLanguage?: string;
+            /**
+             * @description BCP 47. A play with subtitleMode auto starts subtitles in this language, before the person's subtitle languages. Absent: their subtitle settings, unless subtitlesOff.
+             * @example en
+             */
+            subtitleLanguage?: string;
+            /** @description A play with subtitleMode auto starts without subtitles. */
+            subtitlesOff: boolean;
+        };
+        ShowTracksInputBody: {
+            /** @description BCP 47; an empty string forgets it. Omitted: kept. */
+            audioLanguage?: string;
+            /** @description BCP 47, which also turns subtitlesOff off; an empty string forgets it. Omitted: kept. */
+            subtitleLanguage?: string;
+            /** @description true forgets subtitleLanguage. Omitted: kept. */
+            subtitlesOff?: boolean;
         };
         SignIn: {
             /**
@@ -9253,6 +9948,8 @@ export interface components {
             /** @description Audio fields to change; omitted fields keep their values. From API level 21; older servers reject it. */
             audio?: components["schemas"]["UpdateAudioPreferences"];
             autoplayNext?: boolean;
+            /** @description From API level 34; older servers reject it. */
+            hideSpoilers?: boolean;
             /**
              * Format: int64
              * @description 0, 1, 5, 10 or 15.
@@ -12453,6 +13150,72 @@ export interface operations {
             };
         };
     };
+    listLibraryCollections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Library ID. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryCollections"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getLibraryCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Library ID. */
+                id: number;
+                /** @description TMDB collection ID. */
+                collectionId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryCollectionDetail"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     listLibraryFiles: {
         parameters: {
             query?: {
@@ -12460,6 +13223,10 @@ export interface operations {
                 status?: "present" | "missing";
                 /** @description Filter by metadata match status; omit for all. */
                 match?: "pending" | "matched" | "unmatched" | "failed";
+                /** @description failed: only the files ffprobe could not read (API level 34). */
+                probe?: "failed";
+                /** @description Words in the file's path, in order, any case (API level 34). */
+                q?: string;
                 limit?: number;
                 offset?: number;
             };
@@ -12530,7 +13297,16 @@ export interface operations {
         parameters: {
             query?: {
                 sort?: "title" | "added" | "year" | "rating" | "released" | "runtime" | "aired";
-                filter?: "" | "continuing" | "ended" | "4k" | "hdr" | "unwatched";
+                /** @description Ascending or descending; absent for the sort's own direction: A to Z for title, the most or newest first for the rest. "Shortest first" is sort=runtime&order=asc. From API level 34. */
+                order?: "" | "asc" | "desc";
+                /** @description inProgress (movies part watched, shows started and not finished) and following (TV: shows the person follows) are from API level 34. */
+                filter?: "" | "continuing" | "ended" | "4k" | "hdr" | "unwatched" | "inProgress" | "following";
+                /** @description More filters, comma separated, all of which an item must meet, with filter as one more. From API level 34. */
+                filters?: ("continuing" | "ended" | "4k" | "hdr" | "unwatched" | "inProgress" | "following")[] | null;
+                /** @description Ratings to keep, comma separated, as facets.contentRatings lists them: TMDB's US certification, or unrated. From API level 34. */
+                contentRating?: string[] | null;
+                /** @description Movies: only those of this TMDB collection, as listLibraryCollections lists them. From API level 34. */
+                collection?: number;
                 genre?: string;
                 /** @description e.g. 1990 */
                 decade?: number;
@@ -14736,6 +15512,38 @@ export interface operations {
             };
         };
     };
+    findMoviesByTMDB: {
+        parameters: {
+            query: {
+                /** @description The movie's or show's TMDB id, as cards and search carry it (tmdbId, showTmdbId). */
+                tmdbId: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MovieCopies"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     getMovie: {
         parameters: {
             query?: never;
@@ -15150,6 +15958,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OfflineSync"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    getPerson: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description TMDB person ID, from a credit's personId. */
+                personId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PersonDetail"];
                 };
             };
             /** @description Error */
@@ -16926,6 +17766,38 @@ export interface operations {
             };
         };
     };
+    findShowsByTMDB: {
+        parameters: {
+            query: {
+                /** @description The movie's or show's TMDB id, as cards and search carry it (tmdbId, showTmdbId). */
+                tmdbId: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShowCopies"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     getShow: {
         parameters: {
             query?: never;
@@ -17486,6 +18358,72 @@ export interface operations {
             };
         };
     };
+    setShowTracks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Show ID. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShowTracksInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShowTracks"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    forgetShowTracks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Show ID. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     markShowWatched: {
         parameters: {
             query?: never;
@@ -17555,6 +18493,8 @@ export interface operations {
                 /** @description Admins only; others always see their own. */
                 user?: number;
                 library?: number;
+                /** @description Also count why the period's plays were converted (conversions). From API level 34. */
+                conversions?: boolean;
             };
             header?: never;
             path?: never;
@@ -17886,6 +18826,66 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ContinueList"];
                 };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    hideFromContinueWatching: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                type: "movie" | "episode";
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    showInContinueWatching: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                type: "movie" | "episode";
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Error */
             default: {

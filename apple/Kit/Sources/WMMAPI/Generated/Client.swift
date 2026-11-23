@@ -2315,8 +2315,36 @@ public struct Client: APIProtocol {
                     in: &request,
                     style: .form,
                     explode: false,
+                    name: "order",
+                    value: input.query.order
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: false,
                     name: "filter",
                     value: input.query.filter
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: false,
+                    name: "filters",
+                    value: input.query.filters
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: false,
+                    name: "contentRating",
+                    value: input.query.contentRating
+                )
+                try converter.setQueryItemAsURI(
+                    in: &request,
+                    style: .form,
+                    explode: false,
+                    name: "collection",
+                    value: input.query.collection
                 )
                 try converter.setQueryItemAsURI(
                     in: &request,

@@ -18,6 +18,7 @@ import (
 	"watchmymedia/server/internal/activity"
 	"watchmymedia/server/internal/auth"
 	"watchmymedia/server/internal/db"
+	"watchmymedia/server/internal/offline"
 	"watchmymedia/server/internal/playback"
 )
 
@@ -270,6 +271,18 @@ func TestOfflineTokenScope(t *testing.T) {
 // A direct download is the original file with Range, counted as a
 // transfer and on its record, and never a play. A file changed on disk, or
 // replaced by a new version, is refused (410) and marked.
+// Only admins are told the address a download is fetched from.
+func TestOfflineTransferAddressIsForAdmins(t *testing.T) {
+	t.Parallel()
+	tr := offline.Transfer{IP: "192.168.1.40", Network: "local"}
+	if v := transferView(Deps{}, tr, true); v.IP != "192.168.1.40" {
+		t.Errorf("an admin sees %q", v.IP)
+	}
+	if v := transferView(Deps{}, tr, false); v.IP != "" {
+		t.Errorf("a member sees %q", v.IP)
+	}
+}
+
 func TestOfflineDirectDownload(t *testing.T) {
 	t.Parallel()
 	var tracker *activity.Tracker
@@ -303,7 +316,7 @@ func TestOfflineDirectDownload(t *testing.T) {
 	var list OfflineDownloadList
 	e.as(t, e.admin, http.MethodGet, "/api/offline/downloads", "", &list)
 	if len(list.Transfers) != 1 || list.Transfers[0].Progress != 1 || list.Transfers[0].BytesSent != int64(len(data)-1000) ||
-		list.Transfers[0].Network != "local" || list.Transfers[0].DeviceName != "phone" {
+		list.Transfers[0].Network != "local" || list.Transfers[0].DeviceName != "phone" || list.Transfers[0].IP == "" {
 		t.Errorf("transfers = %+v", list.Transfers)
 	}
 	if len(list.Items) != 1 || list.Items[0].BytesSent != int64(len(data)-1000) || list.Items[0].DeviceState != "downloading" {

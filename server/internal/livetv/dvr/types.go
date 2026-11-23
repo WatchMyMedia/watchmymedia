@@ -77,6 +77,34 @@ type Recording struct {
 	// ConflictsWith is the plan's snapshot of who holds the tuners, so a
 	// clash can be shown and resolved without another request per row.
 	ConflictsWith []ConflictRef `json:"conflictsWith,omitempty" required:"false" nullable:"false" doc:"For a recording that won't record (state conflict): the recordings holding the tuners while it would run. Choosing one with PATCH {prefer, over} makes that one give way."`
+
+	// New, Repeat and Categories are copied from the listing when the
+	// recording is scheduled, as the rest of its listing is (API level 34).
+	New        bool     `json:"new,omitempty" required:"false" doc:"The listing called it new. From API level 34; absent for a recording scheduled before, whose listing was gone."`
+	Repeat     bool     `json:"repeat,omitempty" required:"false" doc:"The listing called it a repeat (API level 34)."`
+	Categories []string `json:"categories,omitempty" required:"false" nullable:"false" doc:"The listing's categories, such as Documentary or Sports (API level 34)."`
+
+	// The fields below are worked out for each reply and never stored.
+	ProgrammeKind string          `json:"kind,omitempty" required:"false" doc:"What was recorded, from its listing: episode, show (a programme without episodes, such as news) or movie; absent for a recording made by time. Other values may follow (API level 34)."`
+	Year          int             `json:"year,omitempty" required:"false" doc:"A movie's year, or the year an episode first aired, from the listing (API level 34)."`
+	Progress      *ViewerProgress `json:"progress,omitempty" required:"false" doc:"Where the signed-in person is in it: its own position while it isn't in the library, then the watch state of the movie or episode it became. Absent when they haven't started it (API level 34)."`
+	Watched       bool            `json:"watched,omitempty" required:"false" doc:"The signed-in person finished the movie or episode it became (API level 34)."`
+	NextAiring    *Airing         `json:"nextAiring,omitempty" required:"false" doc:"For a repeat that won't record (state conflict): when the same episode airs again in the listings (API level 34)."`
+}
+
+// ViewerProgress is how far one person has watched a recording.
+type ViewerProgress struct {
+	PositionMs int64 `json:"positionMs"`
+	DurationMs int64 `json:"durationMs"`
+}
+
+// Airing is another showing of a programme in the listings.
+type Airing struct {
+	ChannelID   string    `json:"channelId"`
+	Number      string    `json:"number"`
+	ChannelName string    `json:"channelName"`
+	ProgrammeID string    `json:"programmeId"`
+	Start       time.Time `json:"start"`
 }
 
 // ConflictRef names a recording that holds a tuner another one needed.
@@ -89,6 +117,9 @@ type ConflictRef struct {
 	End         time.Time `json:"end"`
 	UserName    string    `json:"userName"`
 	Running     bool      `json:"running" doc:"Already recording, so it can't give way."`
+	Repeat      bool      `json:"repeat,omitempty" required:"false" doc:"Its listing called it a repeat (API level 34)."`
+	// NextAiring is worked out for each reply and never stored.
+	NextAiring *Airing `json:"nextAiring,omitempty" required:"false" doc:"For a repeat: when the same episode airs again in the listings, so it could give way and be recorded then (API level 34)."`
 }
 type RecordingRule struct {
 	ID         string     `json:"id"`
@@ -117,6 +148,26 @@ type Recordings struct {
 	NextCursor string          `json:"nextCursor,omitempty" required:"false"`
 	Tuners     int             `json:"tuners,omitempty" required:"false"`
 	FreeBytes  int64           `json:"freeBytes,omitempty" required:"false"`
+	// Counts, ReserveBytes and TotalBytes come with the first page, as
+	// Tuners and FreeBytes do (API level 34).
+	Counts       *SectionCounts `json:"counts,omitempty" required:"false" doc:"The recordings in each section and their bytes, and the rules, for the tabs. On the first page only (API level 34)."`
+	ReserveBytes int64          `json:"reserveBytes,omitempty" required:"false" doc:"Space the recorder keeps free on the disk: freeBytes less this is the room recordings can use. On the first page, with freeBytes (API level 34)."`
+	TotalBytes   int64          `json:"totalBytes,omitempty" required:"false" doc:"The size of the disk recordings go to. On the first page, with freeBytes (API level 34)."`
+}
+
+// SectionCounts are the recordings in each section of Recordings.
+type SectionCounts struct {
+	Now       SectionCount `json:"now"`
+	Conflicts SectionCount `json:"conflicts"`
+	Upcoming  SectionCount `json:"upcoming"`
+	Recorded  SectionCount `json:"recorded"`
+	Series    SectionCount `json:"series" doc:"The recording rules; bytes is 0."`
+}
+
+// SectionCount is one section's recordings and the bytes they hold.
+type SectionCount struct {
+	Items int64 `json:"items"`
+	Bytes int64 `json:"bytes"`
 }
 type Create struct {
 	ProgrammeID string `json:"programmeId" minLength:"1" maxLength:"128"`
@@ -179,12 +230,13 @@ type rule struct {
 	FirstDate       string
 }
 type Options struct {
-	Now       func() time.Time
-	FreeBytes func(string) (uint64, error)
-	Log       *slog.Logger
-	Scanner   *scanner.Scanner
-	Bus       *events.Bus
-	Watch     *watchstate.Service
+	Now        func() time.Time
+	FreeBytes  func(string) (uint64, error)
+	TotalBytes func(string) (uint64, error)
+	Log        *slog.Logger
+	Scanner    *scanner.Scanner
+	Bus        *events.Bus
+	Watch      *watchstate.Service
 }
 type Source struct {
 	Path      string

@@ -115,7 +115,8 @@ func TestLibraryTotals(t *testing.T) {
 	f := newClientFixture(t)
 	var items ItemList
 	doJSON(t, f.srv.client, http.MethodGet, fmt.Sprintf("%s/api/libraries/%d/items?filter=continuing", f.srv.URL, f.tvID), "", &items)
-	want := ItemTotals{Items: 2, Episodes: 3, Continuing: 1, Unmatched: 0, TotalSize: 300}
+	// Both shows arrived this week and nobody has watched them.
+	want := ItemTotals{Items: 2, Episodes: 3, Continuing: 1, Unmatched: 0, TotalSize: 300, Unwatched: 2, NewEpisodes: 2, AddedThisMonth: 2}
 	if items.Total != 1 || items.Totals != want {
 		t.Errorf("filtered total %d, totals %+v, want %+v", items.Total, items.Totals, want)
 	}

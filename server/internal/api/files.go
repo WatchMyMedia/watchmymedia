@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"golang.org/x/text/unicode/norm"
 
 	"watchmymedia/server/internal/db"
 	"watchmymedia/server/internal/livetv/dvr"
@@ -49,6 +51,18 @@ type MediaFile struct {
 	MovieID      *int64 `json:"movieId,omitempty"`
 	// Candidates are the best TMDB results considered, kept for unmatched files.
 	Candidates []metadata.Candidate `json:"candidates,omitempty"`
+	// Title and Episode name what the file was matched to, on the files
+	// list (API level 34).
+	Title   string            `json:"title,omitempty" required:"false" doc:"The files list only: the movie's or show's title the file was matched to (API level 34)."`
+	Year    int64             `json:"year,omitempty" required:"false" doc:"The files list only: the matched movie's year (API level 34)."`
+	Episode *MediaFileEpisode `json:"episode,omitempty" required:"false" doc:"The files list only: the first episode an episode file holds (API level 34)."`
+}
+
+// MediaFileEpisode is the episode a file was matched to.
+type MediaFileEpisode struct {
+	SeasonNumber  int64  `json:"seasonNumber"`
+	EpisodeNumber int64  `json:"episodeNumber"`
+	Title         string `json:"title,omitempty"`
 }
 
 // MediaFileDetail adds the full ffprobe result.
@@ -68,12 +82,16 @@ type MediaFileList struct {
 	Total  int64       `json:"total" doc:"Total files matching the filter."`
 	Limit  int64       `json:"limit"`
 	Offset int64       `json:"offset"`
+	// Unreadable is from API level 34.
+	Unreadable int64 `json:"unreadable" required:"false" doc:"Present files in the library ffprobe could not read, whatever the filter (API level 34)."`
 }
 
 type ListFilesInput struct {
 	ID     int64  `path:"id" doc:"Library ID."`
 	Status string `query:"status" enum:"present,missing" required:"false" doc:"Filter by status; omit for all."`
 	Match  string `query:"match" enum:"pending,matched,unmatched,failed" required:"false" doc:"Filter by metadata match status; omit for all."`
+	Probe  string `query:"probe" enum:"failed" required:"false" doc:"failed: only the files ffprobe could not read (API level 34)."`
+	Q      string `query:"q" required:"false" maxLength:"200" doc:"Words in the file's path, in order, any case (API level 34)."`
 	Limit  int64  `query:"limit" default:"100" minimum:"1" maximum:"500"`
 	Offset int64  `query:"offset" default:"0" minimum:"0"`
 }
@@ -132,19 +150,34 @@ func registerFiles(h huma.API, deps Deps) {
 		if in.Match != "" {
 			match = in.Match
 		}
-		total, err := deps.Queries.CountMediaFiles(ctx, db.CountMediaFilesParams{LibraryID: lib.ID, Status: status, MatchStatus: match})
-		if err != nil {
-			return nil, err
+		like, likeNFD := pathPatterns(in.Q)
+		var total int64
+		var rows []db.MediaFile
+		if in.Probe == "failed" {
+			if total, err = deps.Queries.CountUnreadableMediaFiles(ctx, db.CountUnreadableMediaFilesParams{LibraryID: lib.ID, Status: status, MatchStatus: match, PathLike: like, PathLikeNfd: likeNFD}); err != nil {
+				return nil, err
+			}
+			rows, err = deps.Queries.ListUnreadableMediaFiles(ctx, db.ListUnreadableMediaFilesParams{LibraryID: lib.ID, Status: status, MatchStatus: match, PathLike: like, PathLikeNfd: likeNFD, Limit: in.Limit, Offset: in.Offset})
+		} else {
+			if total, err = deps.Queries.CountMediaFiles(ctx, db.CountMediaFilesParams{LibraryID: lib.ID, Status: status, MatchStatus: match, PathLike: like, PathLikeNfd: likeNFD}); err != nil {
+				return nil, err
+			}
+			rows, err = deps.Queries.ListMediaFiles(ctx, db.ListMediaFilesParams{LibraryID: lib.ID, Status: status, MatchStatus: match, PathLike: like, PathLikeNfd: likeNFD, Limit: in.Limit, Offset: in.Offset})
 		}
-		rows, err := deps.Queries.ListMediaFiles(ctx, db.ListMediaFilesParams{LibraryID: lib.ID, Status: status, MatchStatus: match, Limit: in.Limit, Offset: in.Offset})
 		if err != nil {
 			return nil, err
 		}
 		out := &ListFilesOutput{}
 		out.Body.Total, out.Body.Limit, out.Body.Offset = total, in.Limit, in.Offset
+		if out.Body.Unreadable, err = deps.Queries.CountUnreadableMediaFiles(ctx, db.CountUnreadableMediaFilesParams{LibraryID: lib.ID, Status: "present"}); err != nil {
+			return nil, err
+		}
 		out.Body.Items = make([]MediaFile, 0, len(rows))
 		for _, r := range rows {
 			out.Body.Items = append(out.Body.Items, mediaFileFromDB(r, lib.Path))
+		}
+		if err := nameMatchedFiles(ctx, deps, out.Body.Items); err != nil {
+			return nil, err
 		}
 		var fs []*MediaFile
 		for i := range out.Body.Items {
@@ -308,6 +341,69 @@ func decorateRecordingFiles(ctx context.Context, deps Deps, files []*MediaFile) 
 	}
 	for _, file := range files {
 		file.Recording = metadata[file.ID]
+	}
+	return nil
+}
+
+// pathPatterns are LIKE patterns for words typed to find a file: the words
+// in order, as typed (NFC) and decomposed (NFD), since names on real
+// servers are often decomposed. Nil for none.
+func pathPatterns(q string) (any, *string) {
+	words := strings.Fields(q)
+	if len(words) == 0 {
+		return nil, nil
+	}
+	nfc := "%" + strings.Join(words, "%") + "%"
+	nfc = norm.NFC.String(nfc)
+	nfd := norm.NFD.String(nfc)
+	return nfc, &nfd
+}
+
+// nameMatchedFiles puts on a page of files what each was matched to: a
+// movie's title and year, or an episode file's show and its first episode.
+func nameMatchedFiles(ctx context.Context, deps Deps, files []MediaFile) error {
+	var movies, others []int64
+	for _, f := range files {
+		if f.MovieID != nil {
+			movies = append(movies, *f.MovieID)
+		} else if f.MatchStatus == "matched" || f.MatchStatus == "unmatched" {
+			others = append(others, f.ID)
+		}
+	}
+	titles := map[int64]db.ListMovieTitlesByIDsRow{}
+	if len(movies) > 0 {
+		rows, err := deps.Queries.ListMovieTitlesByIDs(ctx, movies)
+		if err != nil {
+			return err
+		}
+		for _, r := range rows {
+			titles[r.ID] = r
+		}
+	}
+	episodes := map[int64]db.ListFilesEpisodesRow{}
+	if len(others) > 0 {
+		rows, err := deps.Queries.ListFilesEpisodes(ctx, others)
+		if err != nil {
+			return err
+		}
+		for _, r := range rows {
+			if _, ok := episodes[r.MediaFileID]; !ok {
+				episodes[r.MediaFileID] = r
+			}
+		}
+	}
+	for i := range files {
+		f := &files[i]
+		if f.MovieID != nil {
+			if m, ok := titles[*f.MovieID]; ok {
+				f.Title, f.Year = m.Title, deref(m.Year)
+			}
+			continue
+		}
+		if e, ok := episodes[f.ID]; ok {
+			f.Title = e.ShowTitle
+			f.Episode = &MediaFileEpisode{SeasonNumber: e.SeasonNumber, EpisodeNumber: e.EpisodeNumber, Title: e.EpisodeTitle}
+		}
 	}
 	return nil
 }

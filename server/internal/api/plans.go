@@ -15,6 +15,8 @@ type PlanInput struct {
 	Body struct {
 		Profile playback.Profile `json:"profile"`
 		FileIDs []int64          `json:"fileIds" minItems:"1" maxItems:"100" doc:"The files to plan, such as a movie's versions."`
+		// Tracks is from API level 34.
+		Tracks bool `json:"tracks,omitempty" required:"false" doc:"Also list each file's audio tracks and subtitles, those beside the file and downloaded ones included, so a person can choose them before playing. From API level 34; older servers ignore it."`
 	}
 }
 
@@ -28,6 +30,9 @@ type PlaybackPlan struct {
 	Reasons  []string           `json:"reasons" nullable:"false" doc:"Why a cheaper mode was not possible."`
 	Video    playback.VideoPlan `json:"video"`
 	Audio    playback.AudioPlan `json:"audio"`
+	// AudioTracks and Subtitles are from API level 34, with tracks.
+	AudioTracks []playback.AudioTrack    `json:"audioTracks,omitempty" required:"false" nullable:"false" doc:"With tracks: the file's audio tracks, as a decision lists them. Send the chosen one's index as audioIndex."`
+	Subtitles   []playback.SubtitleTrack `json:"subtitles,omitempty" required:"false" nullable:"false" doc:"With tracks: every subtitle a play could show, inside the file, beside it and downloaded, as a decision lists them but without URLs. Send the chosen one's id as subtitleId."`
 }
 
 type PlanList struct {
@@ -71,13 +76,36 @@ func registerPlans(h huma.API, deps Deps) {
 				continue
 			}
 			// Sidecar subtitles only matter once one is picked, so the
-			// folder is not listed.
-			req, why := withPreferredAudio(playback.Request{Profile: in.Body.Profile}, info, audioLanguages)
-			d := playback.Decide(info, filepath.Ext(row.Path), req, nil, caps)
+			// folder is listed only when the caller asks for the tracks.
+			var sidecars []playback.Sidecar
+			if in.Body.Tracks {
+				sidecars = playback.FindSidecars(row.Path)
+			}
+			languages := audioLanguages
+			if user, ok := auth.UserFrom(ctx); ok {
+				// An episode would start on the sound picked for its show.
+				tracks, err := withShowTracks(ctx, deps, user.ID, row.ID, trackPreferences{audio: audioLanguages})
+				if err != nil {
+					return nil, err
+				}
+				languages = tracks.audio
+			}
+			req, why := withPreferredAudio(playback.Request{Profile: in.Body.Profile}, info, languages)
+			d := playback.Decide(info, filepath.Ext(row.Path), req, sidecars, caps)
 			if why != "" {
 				d.Reasons = append(d.Reasons, why)
 			}
-			out.Body.Items = append(out.Body.Items, PlaybackPlan{FileID: row.ID, Mode: d.Mode, Protocol: d.Protocol, Reasons: d.Reasons, Video: d.Video, Audio: d.Audio})
+			plan := PlaybackPlan{FileID: row.ID, Mode: d.Mode, Protocol: d.Protocol, Reasons: d.Reasons, Video: d.Video, Audio: d.Audio}
+			if in.Body.Tracks {
+				plan.AudioTracks, plan.Subtitles = d.AudioTracks, d.Subtitles
+				for _, r := range deps.OnlineSubtitles.List(ctx, row.ID) {
+					plan.Subtitles = append(plan.Subtitles, downloadedTrack(r))
+				}
+				for i := range plan.Subtitles {
+					plan.Subtitles[i].URL = ""
+				}
+			}
+			out.Body.Items = append(out.Body.Items, plan)
 		}
 		return out, nil
 	})
