@@ -4,6 +4,7 @@ import { FixMatchDialog } from './FixMatchDialog'
 import { SegmentEditorDialog } from './SegmentEditorDialog'
 import { useAuth } from '../authContext'
 import type { components } from '../api/schema'
+import { fileTitle } from '../lib/libraryFiles'
 
 type MediaFile = components['schemas']['MediaFile']
 
@@ -51,7 +52,11 @@ function FileRow({ file, type, onFix, onSegments }: { file: MediaFile; type: 'mo
   const g = file.parsed
   let title: string
   let subtitle = ''
-  if (type === 'tv' && g.kind === 'episode') {
+  const matched = fileTitle(file)
+  if (matched) {
+    title = matched.title
+    subtitle = matched.episode ?? ''
+  } else if (type === 'tv' && g.kind === 'episode') {
     // Daily shows are named by air date; matching places them in TMDB's seasons.
     title = `${g.title} · ${episodeCode(g.season, g.episodes) || (g.airDate ? `aired ${formatDate(g.airDate)}` : '?')}`
     subtitle = g.episodeTitle ?? ''
@@ -65,7 +70,7 @@ function FileRow({ file, type, onFix, onSegments }: { file: MediaFile; type: 'mo
         <div className="truncate font-medium">
           {title}
           {subtitle && <span className="font-normal text-neutral-400"> — {subtitle}</span>}
-          {g.kind === 'unknown' && (
+          {!matched && g.kind === 'unknown' && (
             <span className="ml-2 rounded bg-amber-900/50 px-1.5 py-0.5 text-xs text-amber-300">unrecognised name</span>
           )}
         </div>

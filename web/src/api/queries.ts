@@ -115,11 +115,12 @@ export const libraryCollectionQuery = (id: number, collectionId: number) =>
 export type FileStatus = 'present' | 'missing' | undefined
 export type MatchStatus = 'pending' | 'matched' | 'unmatched' | 'failed' | undefined
 
-export const filesQuery = (id: number, status: FileStatus, match: MatchStatus, limit: number, offset: number) =>
+/** A page of a library's files; find (words in the path) and probe=failed (files ffprobe couldn't read) are from API level 34. */
+export const filesQuery = (id: number, status: FileStatus, match: MatchStatus, limit: number, offset: number, find: { q?: string; probe?: 'failed' } = {}) =>
   queryOptions({
-    queryKey: ['files', id, { status, match, limit, offset }],
+    queryKey: ['files', id, { status, match, limit, offset, q: find.q || undefined, probe: find.probe }],
     queryFn: async () =>
-      unwrap(await api.GET('/api/libraries/{id}/files', { params: { path: { id }, query: { status, match, limit, offset } } })),
+      unwrap(await api.GET('/api/libraries/{id}/files', { params: { path: { id }, query: { status, match, limit, offset, q: find.q || undefined, probe: find.probe } } })),
     placeholderData: (prev) => prev,
   })
 
