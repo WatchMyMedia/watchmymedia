@@ -949,3 +949,64 @@ func TestMigrationSearchIndex(t *testing.T) {
 		t.Errorf("a title changed before the index finds %v", got)
 	}
 }
+
+// Migration 51 copies whether a recording was new or a repeat, and its
+// categories, from its listing while the listing is kept, and keeps each
+// recording's bytes beside its data.
+func TestMigrationRecordingFacts(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	p, q := migrateTo(t, 46)
+	exec := func(query string, args ...any) {
+		t.Helper()
+		if _, err := q.db.ExecContext(ctx, query, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	exec(`INSERT INTO live_tv_sources (id, device_id, name, address, model, firmware, tuner_count) VALUES ('s', 'd', 'Tuner', 'tuner.test', 'HDHR', '1', 2)`)
+	exec(`INSERT INTO live_tv_channels (id, source_id, provider_key, number, name, stream_path, major, minor, last_seen_at) VALUES ('c', 's', 'k', '7.1', 'Seven', '/auto/v7.1', 7, 1, '')`)
+	exec(`INSERT INTO live_tv_programmes (id, channel_id, start_at, end_at, title, is_new, is_repeat, categories) VALUES ('kept', 'c', 100, 200, 'Inspector Vane', 0, 1, '["Drama"]')`)
+	recording := func(id, programme string, bytes int64) {
+		exec(`INSERT INTO live_tv_recordings (id, source_id, channel_id, number, programme_id, start_at, end_at, priority, state, section, data, created_at, updated_at)
+			VALUES (?, 's', 'c', '7.1', ?, 100, 200, 1, 'done', 'recorded', ?, 1, 1)`, id, programme, fmt.Sprintf(`{"title":"Inspector Vane","bytes":%d}`, bytes))
+	}
+	recording("kept", "kept", 4096)
+	recording("pruned", "gone", 2048)
+	recording("manual", "", 0)
+	if _, err := p.UpTo(ctx, 51); err != nil {
+		t.Fatal(err)
+	}
+	type facts struct {
+		bytes        int64
+		isNew, isRep string
+		categories   string
+	}
+	read := func(id string) facts {
+		t.Helper()
+		var f facts
+		if err := q.db.QueryRowContext(ctx, `SELECT bytes, COALESCE(json_extract(data, '$.new'), 'none'), COALESCE(json_extract(data, '$.repeat'), 'none'), COALESCE(json(json_extract(data, '$.categories')), 'none') FROM live_tv_recordings WHERE id = ?`, id).
+			Scan(&f.bytes, &f.isNew, &f.isRep, &f.categories); err != nil {
+			t.Fatal(err)
+		}
+		return f
+	}
+	if got := read("kept"); got != (facts{4096, "0", "1", `["Drama"]`}) {
+		t.Errorf("a recording whose listing is kept: %+v", got)
+	}
+	if got := read("pruned"); got != (facts{2048, "none", "none", "none"}) {
+		t.Errorf("a recording whose listing is gone: %+v", got)
+	}
+	if got := read("manual"); got != (facts{0, "none", "none", "none"}) {
+		t.Errorf("a recording made by time: %+v", got)
+	}
+	if _, err := p.DownTo(ctx, 46); err != nil {
+		t.Fatal(err)
+	}
+	var data string
+	if err := q.db.QueryRowContext(ctx, `SELECT data FROM live_tv_recordings WHERE id = 'kept'`).Scan(&data); err != nil {
+		t.Fatal(err)
+	}
+	if data != `{"title":"Inspector Vane","bytes":4096}` {
+		t.Errorf("down left %s", data)
+	}
+}

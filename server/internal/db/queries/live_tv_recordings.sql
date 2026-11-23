@@ -2,12 +2,12 @@
 -- A rule or person deleted while a recording runs leaves the writer holding
 -- the old id: store NULL for it, as ON DELETE SET NULL did, rather than
 -- failing every later write with a foreign key error.
-INSERT INTO live_tv_recordings(id,rule_id,user_id,source_id,channel_id,number,programme_id,series_key,start_at,end_at,priority,state,section,path,media_file_id,data,created_at,updated_at)
+INSERT INTO live_tv_recordings(id,rule_id,user_id,source_id,channel_id,number,programme_id,series_key,start_at,end_at,priority,state,section,path,media_file_id,data,created_at,updated_at,bytes)
 VALUES (sqlc.arg(id),
  (SELECT rr.id FROM live_tv_recording_rules rr WHERE rr.id=sqlc.narg(rule_id)),
  (SELECT u.id FROM users u WHERE u.id=sqlc.narg(user_id)),
- sqlc.arg(source_id),sqlc.arg(channel_id),sqlc.arg(number),sqlc.arg(programme_id),sqlc.arg(series_key),sqlc.arg(start_at),sqlc.arg(end_at),sqlc.arg(priority),sqlc.arg(state),sqlc.arg(section),sqlc.narg(path),sqlc.narg(media_file_id),sqlc.arg(data),sqlc.arg(created_at),sqlc.arg(updated_at))
-ON CONFLICT(id) DO UPDATE SET rule_id=excluded.rule_id,user_id=excluded.user_id,source_id=excluded.source_id,channel_id=excluded.channel_id,number=excluded.number,programme_id=excluded.programme_id,series_key=excluded.series_key,start_at=excluded.start_at,end_at=excluded.end_at,priority=excluded.priority,state=excluded.state,section=excluded.section,path=excluded.path,media_file_id=excluded.media_file_id,data=excluded.data,updated_at=excluded.updated_at;
+ sqlc.arg(source_id),sqlc.arg(channel_id),sqlc.arg(number),sqlc.arg(programme_id),sqlc.arg(series_key),sqlc.arg(start_at),sqlc.arg(end_at),sqlc.arg(priority),sqlc.arg(state),sqlc.arg(section),sqlc.narg(path),sqlc.narg(media_file_id),sqlc.arg(data),sqlc.arg(created_at),sqlc.arg(updated_at),sqlc.arg(bytes))
+ON CONFLICT(id) DO UPDATE SET rule_id=excluded.rule_id,user_id=excluded.user_id,source_id=excluded.source_id,channel_id=excluded.channel_id,number=excluded.number,programme_id=excluded.programme_id,series_key=excluded.series_key,start_at=excluded.start_at,end_at=excluded.end_at,priority=excluded.priority,state=excluded.state,section=excluded.section,path=excluded.path,media_file_id=excluded.media_file_id,data=excluded.data,updated_at=excluded.updated_at,bytes=excluded.bytes;
 
 -- name: GetDVRRecording :one
 SELECT * FROM live_tv_recordings WHERE id=?;
@@ -132,3 +132,37 @@ SELECT
 FROM live_tv_recordings INDEXED BY live_tv_recording_state
 WHERE state IN ('scheduled', 'conflict', 'gone', 'recording')
     AND source_id = sqlc.arg(source_id) AND end_at > sqlc.arg(now);
+
+-- name: CountDVRSections :many
+-- Each section's recordings and their bytes, for the tabs' counts: from
+-- the section and bytes index alone, without reading a row's listing.
+SELECT section, COUNT(*) AS items, CAST(COALESCE(SUM(bytes), 0) AS INTEGER) AS bytes
+FROM live_tv_recordings INDEXED BY live_tv_recording_section_bytes
+GROUP BY section;
+
+-- name: CountDVRRules :one
+SELECT COUNT(*) FROM live_tv_recording_rules;
+
+-- name: ListDVRRecordingsByIDs :many
+SELECT * FROM live_tv_recordings WHERE id IN (sqlc.slice(ids));
+
+-- name: ListDVRViewerProgress :many
+-- Where one person is in each of a page of recordings: the recording's own
+-- progress while it is not in the library yet, else the watch state of
+-- the movie or first episode its library file holds.
+SELECT r.id AS recording_id,
+    p.position_ms AS recording_position_ms, p.duration_ms AS recording_duration_ms,
+    w.position_ms AS watch_position_ms, w.duration_ms AS watch_duration_ms, w.completed AS watch_completed
+FROM live_tv_recordings r
+LEFT JOIN live_tv_recording_progress p ON p.recording_id = r.id AND p.user_id = sqlc.arg(user_id)
+LEFT JOIN media_files f ON f.id = r.media_file_id
+LEFT JOIN watch_state w ON w.user_id = sqlc.arg(user_id)
+    AND w.item_type = CASE WHEN f.movie_id IS NOT NULL THEN 'movie' ELSE 'episode' END
+    AND w.item_id = COALESCE(f.movie_id, (
+        SELECT ef.episode_id FROM episode_files ef
+        CROSS JOIN episodes e2 ON e2.id = ef.episode_id
+        CROSS JOIN seasons se2 ON se2.id = e2.season_id
+        WHERE ef.media_file_id = f.id
+        ORDER BY se2.number, e2.number
+        LIMIT 1))
+WHERE r.id IN (sqlc.slice(ids));

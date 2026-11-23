@@ -53,6 +53,9 @@ func New(q *db.Queries, store *settings.Store, live *livetv.Service, sessions *l
 	if opts.FreeBytes == nil {
 		opts.FreeBytes = bgwork.FreeBytes
 	}
+	if opts.TotalBytes == nil {
+		opts.TotalBytes = bgwork.TotalBytes
+	}
 	if opts.Now == nil {
 		opts.Now = time.Now
 	}
@@ -181,6 +184,8 @@ func (s *Service) fromProgramme(p db.LiveTvProgramme, ch db.LiveTvChannel, a Act
 	if p.PictureSource == "tmdb" {
 		r.PictureURL = p.Picture
 	}
+	r.New, r.Repeat = p.IsNew != 0, p.IsRepeat != 0
+	r.Categories = listingCategories(p.Categories)
 	if p.Season != nil {
 		r.Season = new(int(*p.Season))
 	}
@@ -593,13 +598,13 @@ func blockers(r record, records []record, plan map[string]bool) []ConflictRef {
 		if w.ID == r.ID || !plan[w.ID] || !ahead || w.SourceID != r.SourceID || w.ChannelID == r.ChannelID || !w.from().Before(r.until()) || !w.until().After(r.from()) {
 			continue
 		}
-		out = append(out, ConflictRef{ID: w.ID, Title: w.Title, Number: w.Number, ChannelName: w.ChannelName, Start: w.Start, End: w.End, UserName: w.UserName, Running: w.State == "recording"})
+		out = append(out, ConflictRef{ID: w.ID, Title: w.Title, Number: w.Number, ChannelName: w.ChannelName, Start: w.Start, End: w.End, UserName: w.UserName, Running: w.State == "recording", Repeat: w.Repeat})
 	}
 	return out
 }
 func sameRefs(a, b []ConflictRef) bool {
 	return slices.EqualFunc(a, b, func(x, y ConflictRef) bool {
-		return x.ID == y.ID && x.Title == y.Title && x.Running == y.Running && x.Start.Equal(y.Start) && x.End.Equal(y.End)
+		return x.ID == y.ID && x.Title == y.Title && x.Running == y.Running && x.Repeat == y.Repeat && x.Start.Equal(y.Start) && x.End.Equal(y.End)
 	})
 }
 func (s *Service) Reconcile(ctx context.Context) error {

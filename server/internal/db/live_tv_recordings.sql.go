@@ -10,6 +10,54 @@ import (
 	"strings"
 )
 
+const countDVRRules = `-- name: CountDVRRules :one
+SELECT COUNT(*) FROM live_tv_recording_rules
+`
+
+func (q *Queries) CountDVRRules(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countDVRRules)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countDVRSections = `-- name: CountDVRSections :many
+SELECT section, COUNT(*) AS items, CAST(COALESCE(SUM(bytes), 0) AS INTEGER) AS bytes
+FROM live_tv_recordings INDEXED BY live_tv_recording_section_bytes
+GROUP BY section
+`
+
+type CountDVRSectionsRow struct {
+	Section string `json:"section"`
+	Items   int64  `json:"items"`
+	Bytes   int64  `json:"bytes"`
+}
+
+// Each section's recordings and their bytes, for the tabs' counts: from
+// the section and bytes index alone, without reading a row's listing.
+func (q *Queries) CountDVRSections(ctx context.Context) ([]CountDVRSectionsRow, error) {
+	rows, err := q.db.QueryContext(ctx, countDVRSections)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CountDVRSectionsRow{}
+	for rows.Next() {
+		var i CountDVRSectionsRow
+		if err := rows.Scan(&i.Section, &i.Items, &i.Bytes); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const countDVRSourceRecordings = `-- name: CountDVRSourceRecordings :one
 SELECT
     CAST(COALESCE(SUM(state IN ('scheduled', 'conflict', 'gone')), 0) AS INTEGER) AS scheduled,
@@ -138,7 +186,7 @@ func (q *Queries) GetDVRProgress(ctx context.Context, arg GetDVRProgressParams) 
 }
 
 const getDVRRecording = `-- name: GetDVRRecording :one
-SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at FROM live_tv_recordings WHERE id=?
+SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at, bytes FROM live_tv_recordings WHERE id=?
 `
 
 func (q *Queries) GetDVRRecording(ctx context.Context, id string) (LiveTvRecording, error) {
@@ -163,12 +211,13 @@ func (q *Queries) GetDVRRecording(ctx context.Context, id string) (LiveTvRecordi
 		&i.Data,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Bytes,
 	)
 	return i, err
 }
 
 const getDVRRecordingByFile = `-- name: GetDVRRecordingByFile :one
-SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at FROM live_tv_recordings WHERE media_file_id=?
+SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at, bytes FROM live_tv_recordings WHERE media_file_id=?
 `
 
 func (q *Queries) GetDVRRecordingByFile(ctx context.Context, mediaFileID *int64) (LiveTvRecording, error) {
@@ -193,12 +242,13 @@ func (q *Queries) GetDVRRecordingByFile(ctx context.Context, mediaFileID *int64)
 		&i.Data,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Bytes,
 	)
 	return i, err
 }
 
 const getDVRRecordingByPath = `-- name: GetDVRRecordingByPath :one
-SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at FROM live_tv_recordings WHERE path=?
+SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at, bytes FROM live_tv_recordings WHERE path=?
 `
 
 func (q *Queries) GetDVRRecordingByPath(ctx context.Context, path *string) (LiveTvRecording, error) {
@@ -223,6 +273,7 @@ func (q *Queries) GetDVRRecordingByPath(ctx context.Context, path *string) (Live
 		&i.Data,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Bytes,
 	)
 	return i, err
 }
@@ -330,7 +381,7 @@ func (q *Queries) ListDVRAdCandidates(ctx context.Context, arg ListDVRAdCandidat
 }
 
 const listDVRByRule = `-- name: ListDVRByRule :many
-SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at FROM live_tv_recordings WHERE rule_id=? ORDER BY start_at,id
+SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at, bytes FROM live_tv_recordings WHERE rule_id=? ORDER BY start_at,id
 `
 
 func (q *Queries) ListDVRByRule(ctx context.Context, ruleID *string) ([]LiveTvRecording, error) {
@@ -361,6 +412,7 @@ func (q *Queries) ListDVRByRule(ctx context.Context, ruleID *string) ([]LiveTvRe
 			&i.Data,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Bytes,
 		); err != nil {
 			return nil, err
 		}
@@ -376,7 +428,7 @@ func (q *Queries) ListDVRByRule(ctx context.Context, ruleID *string) ([]LiveTvRe
 }
 
 const listDVRBySeries = `-- name: ListDVRBySeries :many
-SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at FROM live_tv_recordings WHERE series_key=? ORDER BY start_at,id
+SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at, bytes FROM live_tv_recordings WHERE series_key=? ORDER BY start_at,id
 `
 
 func (q *Queries) ListDVRBySeries(ctx context.Context, seriesKey string) ([]LiveTvRecording, error) {
@@ -407,6 +459,7 @@ func (q *Queries) ListDVRBySeries(ctx context.Context, seriesKey string) ([]Live
 			&i.Data,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Bytes,
 		); err != nil {
 			return nil, err
 		}
@@ -422,7 +475,7 @@ func (q *Queries) ListDVRBySeries(ctx context.Context, seriesKey string) ([]Live
 }
 
 const listDVRFileMetadata = `-- name: ListDVRFileMetadata :many
-SELECT r.id, r.rule_id, r.user_id, r.source_id, r.channel_id, r.number, r.programme_id, r.series_key, r.start_at, r.end_at, r.priority, r.state, r.section, r.path, r.media_file_id, r.data, r.created_at, r.updated_at, a.media_file_id AS analyzed,
+SELECT r.id, r.rule_id, r.user_id, r.source_id, r.channel_id, r.number, r.programme_id, r.series_key, r.start_at, r.end_at, r.priority, r.state, r.section, r.path, r.media_file_id, r.data, r.created_at, r.updated_at, r.bytes, a.media_file_id AS analyzed,
  EXISTS(SELECT 1 FROM media_segments ms WHERE ms.media_file_id=r.media_file_id AND ms.kind='commercial' AND ms.state='active') AS has_ads
 FROM live_tv_recordings r INDEXED BY live_tv_recording_file
 LEFT JOIN segment_analyses a ON a.media_file_id=r.media_file_id AND a.source='blackframe'
@@ -473,6 +526,7 @@ func (q *Queries) ListDVRFileMetadata(ctx context.Context, fileIds []*int64) ([]
 			&i.LiveTvRecording.Data,
 			&i.LiveTvRecording.CreatedAt,
 			&i.LiveTvRecording.UpdatedAt,
+			&i.LiveTvRecording.Bytes,
 			&i.Analyzed,
 			&i.HasAds,
 		); err != nil {
@@ -490,7 +544,7 @@ func (q *Queries) ListDVRFileMetadata(ctx context.Context, fileIds []*int64) ([]
 }
 
 const listDVRManualCandidates = `-- name: ListDVRManualCandidates :many
-SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at FROM live_tv_recordings INDEXED BY live_tv_recording_manual
+SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at, bytes FROM live_tv_recordings INDEXED BY live_tv_recording_manual
 WHERE user_id=? AND channel_id=? AND start_at=? AND end_at=? AND programme_id=''
  AND state IN ('scheduled','conflict','recording','gone')
 `
@@ -535,6 +589,7 @@ func (q *Queries) ListDVRManualCandidates(ctx context.Context, arg ListDVRManual
 			&i.Data,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Bytes,
 		); err != nil {
 			return nil, err
 		}
@@ -550,7 +605,7 @@ func (q *Queries) ListDVRManualCandidates(ctx context.Context, arg ListDVRManual
 }
 
 const listDVRPending = `-- name: ListDVRPending :many
-SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at FROM live_tv_recordings WHERE state IN ('scheduled','conflict','recording','gone') ORDER BY start_at,id
+SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at, bytes FROM live_tv_recordings WHERE state IN ('scheduled','conflict','recording','gone') ORDER BY start_at,id
 `
 
 func (q *Queries) ListDVRPending(ctx context.Context) ([]LiveTvRecording, error) {
@@ -581,6 +636,7 @@ func (q *Queries) ListDVRPending(ctx context.Context) ([]LiveTvRecording, error)
 			&i.Data,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Bytes,
 		); err != nil {
 			return nil, err
 		}
@@ -596,7 +652,7 @@ func (q *Queries) ListDVRPending(ctx context.Context) ([]LiveTvRecording, error)
 }
 
 const listDVRProgrammeMarks = `-- name: ListDVRProgrammeMarks :many
-SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at FROM live_tv_recordings INDEXED BY live_tv_recording_programme
+SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at, bytes FROM live_tv_recordings INDEXED BY live_tv_recording_programme
 WHERE programme_id IN (/*SLICE:programme_ids*/?)
 `
 
@@ -638,6 +694,7 @@ func (q *Queries) ListDVRProgrammeMarks(ctx context.Context, programmeIds []stri
 			&i.Data,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Bytes,
 		); err != nil {
 			return nil, err
 		}
@@ -715,7 +772,7 @@ func (q *Queries) ListDVRProgressRecordingIDs(ctx context.Context) ([]string, er
 }
 
 const listDVRRecordedSection = `-- name: ListDVRRecordedSection :many
-SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at FROM live_tv_recordings INDEXED BY live_tv_recording_section
+SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at, bytes FROM live_tv_recordings INDEXED BY live_tv_recording_section
 WHERE section='recorded' AND start_at <= ?1
  AND (start_at < ?1 OR id < CAST(?2 AS TEXT))
 ORDER BY start_at DESC,id DESC LIMIT ?3
@@ -756,6 +813,7 @@ func (q *Queries) ListDVRRecordedSection(ctx context.Context, arg ListDVRRecorde
 			&i.Data,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Bytes,
 		); err != nil {
 			return nil, err
 		}
@@ -771,7 +829,7 @@ func (q *Queries) ListDVRRecordedSection(ctx context.Context, arg ListDVRRecorde
 }
 
 const listDVRRecordingSection = `-- name: ListDVRRecordingSection :many
-SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at FROM live_tv_recordings INDEXED BY live_tv_recording_section
+SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at, bytes FROM live_tv_recordings INDEXED BY live_tv_recording_section
 WHERE section=?1 AND start_at >= ?2
  AND (start_at > ?2 OR id > CAST(?3 AS TEXT))
 ORDER BY start_at,id LIMIT ?4
@@ -817,6 +875,64 @@ func (q *Queries) ListDVRRecordingSection(ctx context.Context, arg ListDVRRecord
 			&i.Data,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Bytes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDVRRecordingsByIDs = `-- name: ListDVRRecordingsByIDs :many
+SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at, bytes FROM live_tv_recordings WHERE id IN (/*SLICE:ids*/?)
+`
+
+func (q *Queries) ListDVRRecordingsByIDs(ctx context.Context, ids []string) ([]LiveTvRecording, error) {
+	query := listDVRRecordingsByIDs
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []LiveTvRecording{}
+	for rows.Next() {
+		var i LiveTvRecording
+		if err := rows.Scan(
+			&i.ID,
+			&i.RuleID,
+			&i.UserID,
+			&i.SourceID,
+			&i.ChannelID,
+			&i.Number,
+			&i.ProgrammeID,
+			&i.SeriesKey,
+			&i.StartAt,
+			&i.EndAt,
+			&i.Priority,
+			&i.State,
+			&i.Section,
+			&i.Path,
+			&i.MediaFileID,
+			&i.Data,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Bytes,
 		); err != nil {
 			return nil, err
 		}
@@ -927,7 +1043,7 @@ func (q *Queries) ListDVRSeriesProgrammes(ctx context.Context, arg ListDVRSeries
 }
 
 const listDVRUnlinked = `-- name: ListDVRUnlinked :many
-SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at FROM live_tv_recordings WHERE media_file_id IS NULL AND state IN ('done','partial') AND path IS NOT NULL
+SELECT id, rule_id, user_id, source_id, channel_id, number, programme_id, series_key, start_at, end_at, priority, state, section, path, media_file_id, data, created_at, updated_at, bytes FROM live_tv_recordings WHERE media_file_id IS NULL AND state IN ('done','partial') AND path IS NOT NULL
 `
 
 func (q *Queries) ListDVRUnlinked(ctx context.Context) ([]LiveTvRecording, error) {
@@ -958,6 +1074,84 @@ func (q *Queries) ListDVRUnlinked(ctx context.Context) ([]LiveTvRecording, error
 			&i.Data,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Bytes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDVRViewerProgress = `-- name: ListDVRViewerProgress :many
+SELECT r.id AS recording_id,
+    p.position_ms AS recording_position_ms, p.duration_ms AS recording_duration_ms,
+    w.position_ms AS watch_position_ms, w.duration_ms AS watch_duration_ms, w.completed AS watch_completed
+FROM live_tv_recordings r
+LEFT JOIN live_tv_recording_progress p ON p.recording_id = r.id AND p.user_id = ?1
+LEFT JOIN media_files f ON f.id = r.media_file_id
+LEFT JOIN watch_state w ON w.user_id = ?1
+    AND w.item_type = CASE WHEN f.movie_id IS NOT NULL THEN 'movie' ELSE 'episode' END
+    AND w.item_id = COALESCE(f.movie_id, (
+        SELECT ef.episode_id FROM episode_files ef
+        CROSS JOIN episodes e2 ON e2.id = ef.episode_id
+        CROSS JOIN seasons se2 ON se2.id = e2.season_id
+        WHERE ef.media_file_id = f.id
+        ORDER BY se2.number, e2.number
+        LIMIT 1))
+WHERE r.id IN (/*SLICE:ids*/?)
+`
+
+type ListDVRViewerProgressParams struct {
+	UserID int64    `json:"user_id"`
+	Ids    []string `json:"ids"`
+}
+
+type ListDVRViewerProgressRow struct {
+	RecordingID         string `json:"recording_id"`
+	RecordingPositionMs *int64 `json:"recording_position_ms"`
+	RecordingDurationMs *int64 `json:"recording_duration_ms"`
+	WatchPositionMs     *int64 `json:"watch_position_ms"`
+	WatchDurationMs     *int64 `json:"watch_duration_ms"`
+	WatchCompleted      *int64 `json:"watch_completed"`
+}
+
+// Where one person is in each of a page of recordings: the recording's own
+// progress while it is not in the library yet, else the watch state of
+// the movie or first episode its library file holds.
+func (q *Queries) ListDVRViewerProgress(ctx context.Context, arg ListDVRViewerProgressParams) ([]ListDVRViewerProgressRow, error) {
+	query := listDVRViewerProgress
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.UserID)
+	if len(arg.Ids) > 0 {
+		for _, v := range arg.Ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(arg.Ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDVRViewerProgressRow{}
+	for rows.Next() {
+		var i ListDVRViewerProgressRow
+		if err := rows.Scan(
+			&i.RecordingID,
+			&i.RecordingPositionMs,
+			&i.RecordingDurationMs,
+			&i.WatchPositionMs,
+			&i.WatchDurationMs,
+			&i.WatchCompleted,
 		); err != nil {
 			return nil, err
 		}
@@ -997,12 +1191,12 @@ func (q *Queries) PutDVRProgress(ctx context.Context, arg PutDVRProgressParams) 
 }
 
 const putDVRRecording = `-- name: PutDVRRecording :exec
-INSERT INTO live_tv_recordings(id,rule_id,user_id,source_id,channel_id,number,programme_id,series_key,start_at,end_at,priority,state,section,path,media_file_id,data,created_at,updated_at)
+INSERT INTO live_tv_recordings(id,rule_id,user_id,source_id,channel_id,number,programme_id,series_key,start_at,end_at,priority,state,section,path,media_file_id,data,created_at,updated_at,bytes)
 VALUES (?1,
  (SELECT rr.id FROM live_tv_recording_rules rr WHERE rr.id=?2),
  (SELECT u.id FROM users u WHERE u.id=?3),
- ?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)
-ON CONFLICT(id) DO UPDATE SET rule_id=excluded.rule_id,user_id=excluded.user_id,source_id=excluded.source_id,channel_id=excluded.channel_id,number=excluded.number,programme_id=excluded.programme_id,series_key=excluded.series_key,start_at=excluded.start_at,end_at=excluded.end_at,priority=excluded.priority,state=excluded.state,section=excluded.section,path=excluded.path,media_file_id=excluded.media_file_id,data=excluded.data,updated_at=excluded.updated_at
+ ?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19)
+ON CONFLICT(id) DO UPDATE SET rule_id=excluded.rule_id,user_id=excluded.user_id,source_id=excluded.source_id,channel_id=excluded.channel_id,number=excluded.number,programme_id=excluded.programme_id,series_key=excluded.series_key,start_at=excluded.start_at,end_at=excluded.end_at,priority=excluded.priority,state=excluded.state,section=excluded.section,path=excluded.path,media_file_id=excluded.media_file_id,data=excluded.data,updated_at=excluded.updated_at,bytes=excluded.bytes
 `
 
 type PutDVRRecordingParams struct {
@@ -1024,6 +1218,7 @@ type PutDVRRecordingParams struct {
 	Data        string  `json:"data"`
 	CreatedAt   int64   `json:"created_at"`
 	UpdatedAt   int64   `json:"updated_at"`
+	Bytes       int64   `json:"bytes"`
 }
 
 // A rule or person deleted while a recording runs leaves the writer holding
@@ -1049,6 +1244,7 @@ func (q *Queries) PutDVRRecording(ctx context.Context, arg PutDVRRecordingParams
 		arg.Data,
 		arg.CreatedAt,
 		arg.UpdatedAt,
+		arg.Bytes,
 	)
 	return err
 }

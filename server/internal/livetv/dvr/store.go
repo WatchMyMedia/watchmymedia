@@ -135,6 +135,7 @@ func put(ctx context.Context, q *db.Queries, r record, now int64) error {
 	if r.Gaps == nil {
 		r.Gaps = []Gap{}
 	}
+	unstored(&r.Recording)
 	data, err := json.Marshal(r)
 	if err != nil {
 		return err
@@ -146,7 +147,7 @@ func put(ctx context.Context, q *db.Queries, r record, now int64) error {
 	if r.RuleID != "" {
 		ruleID = &r.RuleID
 	}
-	return q.PutDVRRecording(ctx, db.PutDVRRecordingParams{ID: r.ID, RuleID: ruleID, UserID: r.UserID, SourceID: r.SourceID, ChannelID: r.ChannelID, Number: r.Number, ProgrammeID: r.ProgrammeID, SeriesKey: r.SeriesKey, StartAt: r.Start.Unix(), EndAt: r.End.Unix(), Priority: r.Priority, State: r.State, Section: section(r.State), Path: path, MediaFileID: r.MediaFileID, Data: string(data), CreatedAt: r.CreatedAt, UpdatedAt: now})
+	return q.PutDVRRecording(ctx, db.PutDVRRecordingParams{ID: r.ID, RuleID: ruleID, UserID: r.UserID, SourceID: r.SourceID, ChannelID: r.ChannelID, Number: r.Number, ProgrammeID: r.ProgrammeID, SeriesKey: r.SeriesKey, StartAt: r.Start.Unix(), EndAt: r.End.Unix(), Priority: r.Priority, State: r.State, Section: section(r.State), Path: path, MediaFileID: r.MediaFileID, Data: string(data), CreatedAt: r.CreatedAt, UpdatedAt: now, Bytes: r.Bytes})
 }
 func readRule(row db.LiveTvRecordingRule) (rule, error) {
 	var r rule
@@ -169,11 +170,20 @@ func (s *Service) publish() {
 func (s *Service) view(r record, a Actor) Recording {
 	v := r.Recording
 	v.CanCancel = owner(r.UserID, a)
+	v.ProgrammeKind, v.Year = r.Kind, airYear(r.AirDate)
 	return v
 }
 func (s *Service) Get(ctx context.Context, id string, a Actor) (Recording, error) {
 	r, err := s.get(ctx, id)
 	return s.view(r, a), err
+}
+
+// WithFacts adds to one recording what a page of them carries for the
+// person: their progress, and a repeat's next airing.
+func (s *Service) WithFacts(ctx context.Context, r Recording, a Actor) (Recording, error) {
+	v := []Recording{r}
+	err := s.viewerFacts(ctx, a.UserID, v)
+	return v[0], err
 }
 func (s *Service) List(ctx context.Context, a Actor, sect, cursor string) (Recordings, error) {
 	out := Recordings{Items: []Recording{}}
@@ -240,6 +250,9 @@ func (s *Service) List(ctx context.Context, a Actor, sect, cursor string) (Recor
 		}
 		out.Items = append(out.Items, s.view(r, a))
 	}
+	if err := s.viewerFacts(ctx, a.UserID, out.Items); err != nil {
+		return out, err
+	}
 	if cursor == "" {
 		sources, _ := s.live.Sources(ctx)
 		for _, src := range sources {
@@ -252,8 +265,19 @@ func (s *Service) List(ctx context.Context, a Actor, sect, cursor string) (Recor
 			free, e := s.opts.FreeBytes(v.TVPath)
 			if e == nil {
 				out.FreeBytes = int64(min(free, uint64(1<<63-1)))
+				out.ReserveBytes = v.MinFreeBytes
+			}
+			if s.opts.TotalBytes != nil {
+				if total, e := s.opts.TotalBytes(v.TVPath); e == nil {
+					out.TotalBytes = int64(min(total, uint64(1<<63-1)))
+				}
 			}
 		}
+		counts, err := s.sectionCounts(ctx)
+		if err != nil {
+			return out, err
+		}
+		out.Counts = counts
 	}
 	return out, nil
 }
