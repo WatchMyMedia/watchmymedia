@@ -894,12 +894,13 @@ type WatchRevision struct {
 }
 
 type WatchState struct {
-	UserID      int64  `json:"user_id"`
-	ItemType    string `json:"item_type"`
-	ItemID      int64  `json:"item_id"`
-	MediaFileID *int64 `json:"media_file_id"`
-	PositionMs  int64  `json:"position_ms"`
-	DurationMs  int64  `json:"duration_ms"`
-	Completed   int64  `json:"completed"`
-	UpdatedAt   string `json:"updated_at"`
+	UserID      int64   `json:"user_id"`
+	ItemType    string  `json:"item_type"`
+	ItemID      int64   `json:"item_id"`
+	MediaFileID *int64  `json:"media_file_id"`
+	PositionMs  int64   `json:"position_ms"`
+	DurationMs  int64   `json:"duration_ms"`
+	Completed   int64   `json:"completed"`
+	UpdatedAt   string  `json:"updated_at"`
+	HiddenAt    *string `json:"hidden_at"`
 }

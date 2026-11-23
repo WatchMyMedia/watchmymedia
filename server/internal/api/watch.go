@@ -91,6 +91,9 @@ type ContinueItem struct {
 	PositionMs    int64     `json:"positionMs"`
 	DurationMs    int64     `json:"durationMs"`
 	UpdatedAt     time.Time `json:"updatedAt"`
+	// ContentRating and Overview are from API level 34.
+	ContentRating string `json:"contentRating,omitempty" required:"false" example:"TV-14" doc:"The movie's or the show's US certification from TMDB; absent when it has none."`
+	Overview      string `json:"overview,omitempty" required:"false" doc:"The episode's summary, or the movie's; absent when TMDB has none."`
 }
 
 type ContinueList struct {
@@ -357,6 +360,38 @@ func registerWatch(h huma.API, deps Deps) {
 	})
 
 	huma.Register(h, huma.Operation{
+		OperationID:   "hideFromContinueWatching",
+		Method:        http.MethodPut,
+		Path:          Prefix + "/watch/{type}/{id}/hidden",
+		Summary:       "Take a movie or episode off Continue watching, keeping its place",
+		Description:   "The position and watched mark stay. Playing the item again brings it back. Nothing happens when the signed-in person has no progress on it. From API level 34.",
+		Tags:          []string{"watch"},
+		DefaultStatus: http.StatusNoContent,
+	}, func(ctx context.Context, in *WatchItemInput) (*struct{}, error) {
+		user, err := currentUser(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return nil, deps.Watch.Hide(ctx, user.ID, in.Type, in.ID)
+	})
+
+	huma.Register(h, huma.Operation{
+		OperationID:   "showInContinueWatching",
+		Method:        http.MethodDelete,
+		Path:          Prefix + "/watch/{type}/{id}/hidden",
+		Summary:       "Put a movie or episode taken off Continue watching back on it",
+		Description:   "Undoes hideFromContinueWatching. From API level 34.",
+		Tags:          []string{"watch"},
+		DefaultStatus: http.StatusNoContent,
+	}, func(ctx context.Context, in *WatchItemInput) (*struct{}, error) {
+		user, err := currentUser(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return nil, deps.Watch.Unhide(ctx, user.ID, in.Type, in.ID)
+	})
+
+	huma.Register(h, huma.Operation{
 		OperationID: "listContinueWatching",
 		Method:      http.MethodGet,
 		Path:        Prefix + "/watch/continue",
@@ -435,6 +470,7 @@ func continueWatching(ctx context.Context, deps Deps, user auth.User, limit int)
 			id := w.ItemID
 			item.Kind, item.Title, item.MovieID = "movie", deref(w.MovieTitle), &id
 			item.PosterPath, item.BackdropPath = deref(w.MoviePosterPath), deref(w.MovieBackdropPath)
+			item.ContentRating, item.Overview = deref(w.MovieContentRating), deref(w.MovieOverview)
 			if w.MovieYear != nil {
 				item.Subtitle = strconv.FormatInt(*w.MovieYear, 10)
 			}
@@ -444,6 +480,7 @@ func continueWatching(ctx context.Context, deps Deps, user auth.User, limit int)
 			item.SeasonNumber, item.EpisodeNumber = deref(w.SeasonNumber), deref(w.EpisodeNumber)
 			item.Subtitle = seCode(item.SeasonNumber, item.EpisodeNumber) + " " + deref(w.EpisodeTitle)
 			item.PosterPath, item.BackdropPath, item.StillPath = deref(w.ShowPosterPath), deref(w.ShowBackdropPath), deref(w.EpisodeStillPath)
+			item.ContentRating, item.Overview = deref(w.ShowContentRating), deref(w.EpisodeOverview)
 		}
 		out = append(out, item)
 	}
