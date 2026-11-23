@@ -18,6 +18,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -151,7 +152,8 @@ class TvTrailerScreenTest {
         compose.waitForIdle()
     }
 
-    private fun shows(text: String) = compose.onAllNodes(hasText(text)).fetchSemanticsNodes().isNotEmpty()
+    /** Words on our screen, in any case: the kicker over every state of ours is upper case. */
+    private fun shows(text: String) = compose.onAllNodes(hasText(text, substring = true, ignoreCase = true)).fetchSemanticsNodes().isNotEmpty()
 
     /** Any text of ours on the screen. */
     private fun anyText() = compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.Text)).fetchSemanticsNodes().isNotEmpty()
@@ -176,6 +178,8 @@ class TvTrailerScreenTest {
         assertTrue(shows("Official Trailer"))
         assertTrue(shows("Dead Reckoning Bay"))
         assertTrue(shows(TrailerText.PLAYS_FROM_YOUTUBE))
+        assertTrue(shows("Getting it from YouTube"))
+        compose.onNodeWithText(TrailerText.BACK_TO_MOVIE).assertIsFocused()
         assertEquals(View.INVISIBLE, player.visibility)
         assertFalse("nothing of the player's takes focus", player.isFocusable)
         // WRAP_CONTENT, which AndroidView gives a view without its own, lays the page out 0 px high: sound, no picture.
@@ -227,9 +231,11 @@ class TvTrailerScreenTest {
         assertEquals("YouTube's player isn't on screen while paused", View.INVISIBLE, player.visibility)
         assertTrue(shows("Official Trailer"))
         assertTrue(shows("Dead Reckoning Bay"))
-        assertTrue(shows("Paused · 0:13 / 7:45"))
-        assertTrue("the keys, as the board's hint", shows("Select to play · ◀ ▶ 10 s · Back to the movie"))
-        assertFalse(shows(TrailerText.PLAYS_FROM_YOUTUBE))
+        assertTrue(shows("Paused at 0:13 · 7:31 left"))
+        compose.onNode(hasText("Play") and hasClickAction()).assertIsFocused()
+        assertTrue("the movie's other trailers", shows("More trailers for Dead Reckoning Bay"))
+        assertTrue("the teaser among them", compose.onAllNodes(hasText("Teaser") and hasClickAction()).fetchSemanticsNodes().size == 1)
+        assertFalse(shows("Getting it from YouTube"))
         assertFalse("the TV may sleep while paused", anyKeepsScreenOn(compose.activity.window.decorView))
     }
 
@@ -264,28 +270,52 @@ class TvTrailerScreenTest {
         press(KeyEvent.KEYCODE_DPAD_LEFT)
         assertEquals(listOf("seekBy(-10)"), player.scripts)
         reply("seekBy(-10)", "[3.2,465.04]")
-        assertTrue(shows("Paused · 0:03 / 7:45"))
+        assertTrue(shows("Paused at 0:03 · 7:41 left"))
         press(KeyEvent.KEYCODE_DPAD_RIGHT)
         reply("seekBy(10)", "[13.2,465.04]")
-        assertTrue(shows("Paused · 0:13 / 7:45"))
+        assertTrue(shows("Paused at 0:13 · 7:31 left"))
         press(KeyEvent.KEYCODE_MEDIA_FAST_FORWARD)
         reply("seekBy(10)", "[23.2,465.04]")
-        assertTrue(shows("Paused · 0:23 / 7:45"))
+        assertTrue(shows("Paused at 0:23 · 7:21 left"))
         press(KeyEvent.KEYCODE_MEDIA_REWIND)
         reply("seekBy(-10)", "[13.2,465.04]")
-        assertTrue(shows("Paused · 0:13 / 7:45"))
+        assertTrue(shows("Paused at 0:13 · 7:31 left"))
         // YouTube may buffer while it seeks; the trailer stays paused, out of sight.
         post(TrailerEvent.STATE, official.key, TrailerState.BUFFERING)
         post(TrailerEvent.STATE, official.key, TrailerState.PAUSED)
 
         player.scripts.clear()
         for (code in listOf(KeyEvent.KEYCODE_MEDIA_PAUSE, KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN)) press(code)
-        assertEquals("Pause, Up and Down do nothing", emptyList<String>(), player.scripts)
+        assertEquals("Pause, Up and Down say nothing to the player", emptyList<String>(), player.scripts)
         assertEquals(View.INVISIBLE, player.visibility)
-        assertTrue(shows("Paused · 0:13 / 7:45"))
+        assertTrue(shows("Paused at 0:13 · 7:31 left"))
 
         press(KeyEvent.KEYCODE_BACK)
         assertEquals("Back leaves for the movie page", 1, backs)
+    }
+
+    @Test
+    fun `paused, Down reaches the movie's other trailers, where OK plays that one`() {
+        paused()
+        press(KeyEvent.KEYCODE_DPAD_DOWN)
+        val card = compose.onNode(hasText("Teaser") and hasClickAction())
+        card.assertIsFocused()
+        // Along the row ◀ ▶ move focus, not the trailer; Rewind still moves the trailer.
+        player.scripts.clear()
+        press(KeyEvent.KEYCODE_DPAD_RIGHT)
+        assertEquals(emptyList<String>(), player.scripts)
+        card.assertIsFocused()
+        // Up goes back to Play.
+        press(KeyEvent.KEYCODE_DPAD_UP)
+        compose.onNode(hasText("Play") and hasClickAction()).assertIsFocused()
+        press(KeyEvent.KEYCODE_DPAD_DOWN)
+
+        press(KeyEvent.KEYCODE_DPAD_CENTER)
+        assertTrue("the teaser loads, out of sight", shadowOf(player).lastLoadDataWithBaseURL.data.contains("var KEY = \"UXqq0ZvbOnk\";"))
+        assertEquals(View.INVISIBLE, player.visibility)
+        post(TrailerEvent.READY, teaser.key)
+        assertEquals("shown, then asked to play", View.VISIBLE, player.visibility)
+        assertEquals(true, player.shownAt["playTrailer()"])
     }
 
     @Test
@@ -308,8 +338,8 @@ class TvTrailerScreenTest {
 
         post(TrailerEvent.ERROR, teaser.key, 101)
         assertTrue(shows(TrailerText.REFUSED_TITLE))
-        assertTrue(shows(TrailerText.REFUSED_BODY))
-        assertTrue("the best one's name, with the movie", shows("Official Trailer"))
+        assertTrue(shows("doesn’t let it play inside other apps"))
+        assertTrue("the movie it is for", shows("Trailer for Dead Reckoning Bay"))
         assertEquals(View.INVISIBLE, player.visibility)
         assertEquals("nothing plays behind it", "about:blank", shadowOf(player).lastLoadedUrl)
         compose.onNodeWithText(TrailerText.OPEN_IN_YOUTUBE).assertIsFocused()
@@ -339,14 +369,14 @@ class TvTrailerScreenTest {
         open()
         post(TrailerEvent.UNREACHABLE, official.key)
         assertTrue(shows(TrailerText.UNREACHABLE_TITLE))
-        assertTrue(shows(TrailerText.UNREACHABLE_BODY))
+        assertTrue(shows("This TV may be off the internet"))
         assertEquals(View.INVISIBLE, player.visibility)
         compose.onNodeWithText("Try again").assertIsFocused()
         compose.onNodeWithText(TrailerText.BACK_TO_MOVIE).assertExists()
 
         compose.onNodeWithText("Try again").performClick()
         compose.waitForIdle()
-        assertTrue("loading again", shows(TrailerText.PLAYS_FROM_YOUTUBE))
+        assertTrue("loading again", shows("Getting it from YouTube"))
         assertTrue(shadowOf(player).lastLoadDataWithBaseURL.data.contains("var KEY = \"WhWc3b3KhnY\";"))
     }
 
