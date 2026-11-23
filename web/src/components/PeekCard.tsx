@@ -124,9 +124,11 @@ function PeekCard({ item, anchor, onEnter, onLeave, onClose }: { item: BrowseIte
       style={{ left: place.left, top: place.top, width: WIDTH }}
       className="fixed z-50 overflow-hidden rounded-[14px] border border-line-3 bg-surface-2 shadow-[0_24px_48px_rgba(0,0,0,.6)]"
     >
-      <div className="relative h-[150px] bg-surface">
-        {picture ? <img src={picture} alt="" className="size-full object-cover" /> : <span className="absolute inset-x-4 bottom-3 text-xl font-bold">{item.title}</span>}
-      </div>
+      {picture && (
+        <div className="h-[150px] bg-surface">
+          <img src={picture} alt="" className="size-full object-cover" />
+        </div>
+      )}
       <div className="flex flex-col gap-2.5 px-4 pb-4 pt-3.5">
         <p className="text-[15px] font-semibold">{item.title}</p>
         {facts.length > 0 && (
