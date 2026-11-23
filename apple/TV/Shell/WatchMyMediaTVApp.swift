@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import WMMData
 import WMMFeatures
 import WMMModel
@@ -35,6 +36,15 @@ struct WatchMyMediaTVApp: App {
         _recordings = State(initialValue: LiveRecordingsStore(repository: services.liveTV))
         _follows = State(initialValue: FollowsStore(repository: services.follows))
         _watchlists = State(initialValue: WatchlistStore(repository: services.watchlists, confirms: false))
+        Self.markSelectedTab()
+    }
+
+    /// The selected tab's title in gold, so the tab that is chosen never looks
+    /// like the one with focus (which the system draws white, with dark words).
+    private static func markSelectedTab() {
+        let item = UITabBarItem.appearance()
+        item.setTitleTextAttributes([.foregroundColor: UIColor(Palette.gold)], for: .selected)
+        item.setTitleTextAttributes([.foregroundColor: UIColor(Palette.ground)], for: .focused)
     }
 
     /// How long a reminder's banner stays: ten seconds, or, in a debug build,
