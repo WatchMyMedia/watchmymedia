@@ -222,7 +222,13 @@ final class FakeMediaPlayer: MediaPlayer {
 
     func describe(_ details: ItemDetails) { described.append(details) }
 
-    func stop() { change { phase = .idle } }
+    /// As AVMediaPlayer's, which lets the item go: where it was goes with it.
+    func stop() {
+        change {
+            phase = .idle
+            anchorPos = 0
+        }
+    }
 
     func release() { released = true }
 

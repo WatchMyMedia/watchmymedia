@@ -823,6 +823,25 @@ checks the real AVPlayer starts on its Spanish track:
 swift test --filter AudioLanguageAVPlayerIntegrationTests` in `apple/Kit`. It
 signs in as the fixture's viewer and saves their audio languages.
 
+## A player that stops moving
+
+AVPlayer can sit waiting with no error, which the error recovery never hears
+of. Two cases are handled in the Kit:
+
+- The Apple TV's transport bar seeks the AVPlayer itself. A skip or scrub
+  while a load's start seek is out (a resume, or a reload partway in) cuts
+  that seek short, and `AVMediaPlayer` takes the start as over: the play goes
+  on from where the viewer went. Waiting on the cut-short seek left the player
+  buffering at the start, with Play doing nothing, until the viewer left.
+  `AVMediaPlayerTests` cut a real AVPlayer's start seek the same way.
+- A player that sits buffering for 10 s with 10 s or more loaded ahead, and
+  doesn't move, is stuck: the controller seeks where it is, then loads the
+  stream again there, then stops with "Playback stopped and didn’t start
+  again.", which Play retries (`stuck` and `unstick` in
+  `RealPlaybackController`, logged under the Playback category). A minute of
+  playing starts the steps over. Over AirPlay it doesn't count, since the
+  other screen fetches the stream.
+
 ## Automatic quality recovery
 
 With a server at API level 24 or newer, Automatic file playback can recover

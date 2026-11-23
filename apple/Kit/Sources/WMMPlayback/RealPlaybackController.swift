@@ -329,9 +329,18 @@ public final class RealPlaybackController: PlaybackController {
         var searchedOnline = false
         /// A decision is being fetched.
         var loading = false
-        /// While loading: the file position it will start at (the scrubber shows it meanwhile).
+        /// While loading, or stopped because the player stuck: the file
+        /// position it will start at (the scrubber shows it meanwhile).
         var pendingPositionMs: Int?
         var everReady = false
+        /// The load playing has been ready at least once: buffering from here on is a stall, not its start.
+        var loadReady = false
+        /// How long the player has sat buffering with plenty in hand, at `stuckAtMs` (player time), and not moved.
+        var stuckForMs = 0
+        var stuckAtMs = 0
+        /// Steps taken to get a stuck player going (``unstick(_:_:)``) since it last played on for a while.
+        var unsticks = 0
+        var unstuckAt = 0
         var seekedInto = Set<Segment>()
         var creditsDismissed = false
         var askStill = false
@@ -646,6 +655,8 @@ public final class RealPlaybackController: PlaybackController {
         v.loading = false
         v.pendingPositionMs = nil
         v.error = nil
+        v.loadReady = false
+        v.stuckForMs = 0
         // The token goes on the server's own address, which the LAN one then replaces.
         let tokened = tokens.apply(to: d.url)
         let local = localRoute?.apply(to: tokened)
@@ -759,7 +770,8 @@ public final class RealPlaybackController: PlaybackController {
     func seekWithin(_ v: Viewing, _ target: Int) {
         guard let p = media else { return }
         v.seekLanded = true
-        if v.loading {
+        if v.loading || v.pendingPositionMs != nil {
+            // Loading, or stopped stuck: the load (Play's, then) starts there.
             v.pendingPositionMs = target
         } else if v.streamClock.canSeekLocally(target, bufferedPlayerMs: p.bufferedPositionMs) {
             v.measure.excuse(at: clock.elapsedMs)
@@ -831,6 +843,50 @@ public final class RealPlaybackController: PlaybackController {
         return codec
     }
 
+    /// Whether the player has sat buffering for ``stuckMs`` with at least
+    /// ``stuckBufferMs`` in hand and its position not moving: waiting on
+    /// nothing it is fetching, so it won't get going by itself, and no error
+    /// comes to retry on. A load that hasn't been ready yet is starting, and a
+    /// slow decoder still moves. Over AirPlay the other screen fetches the
+    /// stream, so what this device has in hand says nothing.
+    func stuck(_ v: Viewing, _ p: any MediaPlayer, _ status: PlayerStatus, _ dtMs: Int) -> Bool {
+        let pos = p.positionMs
+        let waiting = status == .buffering && !v.loading && v.loadReady && p.playWhenReady && !p.externalPlaybackActive &&
+            p.phase == .buffering && p.bufferedPositionMs - pos >= stuckBufferMs
+        guard waiting, pos == v.stuckAtMs else {
+            v.stuckForMs = 0
+            v.stuckAtMs = pos
+            return false
+        }
+        v.stuckForMs += dtMs
+        return v.stuckForMs >= stuckMs
+    }
+
+    /// Gets a stuck player going: a seek where it is, then a new load there,
+    /// then an error that Play retries.
+    func unstick(_ v: Viewing, _ p: any MediaPlayer) {
+        v.stuckForMs = 0
+        v.unsticks += 1
+        v.unstuckAt = clock.elapsedMs
+        switch v.unsticks {
+        case 1:
+            log.warning("The player has buffered \(p.bufferedPositionMs - p.positionMs, privacy: .public) ms ahead and not moved for \(stuckMs, privacy: .public) ms; seeking where it is")
+            p.seek(toMs: p.positionMs)
+            refresh(0)
+        case 2:
+            log.warning("The player is stuck again; loading the stream again")
+            reload(v, at: position(v))
+        default:
+            log.warning("The player is still stuck after a new load; giving up")
+            // Stopped, so it can't start by itself behind the message. A
+            // stopped player forgets where it was: Play's new load starts here.
+            v.pendingPositionMs = position(v)
+            p.stop()
+            v.error = stuckMessage
+            refresh(0)
+        }
+    }
+
     // MARK: - The tick
 
     func startTicker() {
@@ -863,6 +919,7 @@ public final class RealPlaybackController: PlaybackController {
         let phase = p.phase
         if !v.loading && phase == .ready {
             v.everReady = true
+            v.loadReady = true
             v.codecFailure = nil
         }
         if v.everReady && !v.searchedOnline { searchOnline(v) }
@@ -885,6 +942,8 @@ public final class RealPlaybackController: PlaybackController {
         // stopped early: Recording and Go to now go, and the length is where it ended.
         if ended, d.growing != nil, v.grownMs == nil { v.grownMs = pos }
         if status == .playing && v.recoveries > 0 && now - v.recoveredAt >= recoveryResetMs { v.recoveries = 0 }
+        if status == .playing && v.unsticks > 0 && now - v.unstuckAt >= recoveryResetMs { v.unsticks = 0 }
+        let stuck = self.stuck(v, p, status, dtMs)
 
         var forceBeat = false
         if !v.watched && d.watchedAtMs > 0 && pos >= d.watchedAtMs {
@@ -948,7 +1007,9 @@ public final class RealPlaybackController: PlaybackController {
         heartbeat(v, v.loading ? waiting : status, pos, buffered, force: forceBeat)
 
         // Actions last: each may start a new load or a new viewing.
-        if ended && !nextOffered {
+        if stuck {
+            unstick(v, p)
+        } else if ended && !nextOffered {
             v.finished = true
             v.watched = true
             exit(v)
