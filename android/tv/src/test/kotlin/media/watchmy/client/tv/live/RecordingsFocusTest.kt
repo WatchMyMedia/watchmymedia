@@ -9,8 +9,11 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import media.watchmy.client.fake.fakeLatencyMs
@@ -57,8 +60,11 @@ class RecordingsFocusTest {
         compose.waitForIdle()
     }
 
+    /** A remote key, to the panel when one has focus (it has a window of its own), else the screen. */
     private fun press(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
+        val inDialog = compose.onAllNodes(isFocused() and hasAnyAncestor(isDialog())).fetchSemanticsNodes().isNotEmpty()
+        val target = if (inDialog) compose.onNode(isFocused() and hasAnyAncestor(isDialog())) else compose.onAllNodes(isRoot()).onFirst()
+        target.performKeyInput { pressKey(key) }
         compose.waitForIdle()
     }
 

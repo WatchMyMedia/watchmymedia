@@ -274,8 +274,9 @@ fun LiveRecordingsScreenTv(onNavigate: (Any) -> Unit, onPlay: (PlayRequest) -> U
             }
             clash?.let { c ->
                 ClashNotice(
-                    c, now, format, onChoose = { model.chooseClash(c) }, Modifier.padding(top = 26.dp, end = TvSafeEnd), button = clashButton,
+                    c, now, format, onChoose = { model.chooseClash(c) }, button = clashButton,
                     onUp = { subTabs.getValue(tab).tryFocus() }, onDown = { firstItem.tryFocus() },
+                    modifier = Modifier.padding(top = 26.dp, end = TvSafeEnd),
                 )
             }
             state.error?.let { Text(it, style = TvType.Second, color = WmmColors.Warn, modifier = Modifier.padding(top = 16.dp)) }
@@ -436,10 +437,10 @@ private fun ClashNotice(
     now: Long,
     format: LiveClockFormat,
     onChoose: () -> Unit,
-    modifier: Modifier = Modifier,
     button: FocusRequester,
     onUp: () -> Boolean,
     onDown: () -> Boolean,
+    modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(18.dp)
     Row(

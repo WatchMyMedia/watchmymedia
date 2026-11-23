@@ -51,23 +51,26 @@ class RemoteKeysTest {
         compose.onNodeWithText("Go to channel").assertExists()
     }
 
-    @Test fun `Back in the live player hides its controls first, then leaves for the guide`() {
+    @Test fun `The live player opens on its banner, OK shows the controls, and Back hides them before leaving for the guide`() {
         compose.onRoot().performKeyInput { pressKey(Key.Guide) }
         compose.waitForIdle()
-        compose.onNodeWithText("Favourites").assertExists()
-        // OK on the guide's programme watches its channel.
+        compose.onNodeWithText("Go to channel").assertExists()
+        // OK on the guide's programme watches its channel: the banner, and nothing focused.
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.waitForIdle()
+        compose.onNodeWithText("Go to channel").assertDoesNotExist()
+        compose.onNode(hasText("Pause") and hasClickAction()).assertDoesNotExist()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.waitForIdle()
         compose.onNode(hasText("Pause") and hasClickAction()).assertExists()
-        compose.onNodeWithText("Favourites").assertDoesNotExist()
 
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         compose.waitForIdle()
         compose.onNode(hasText("Pause") and hasClickAction()).assertDoesNotExist()
-        compose.onNodeWithText("Favourites").assertDoesNotExist()
+        compose.onNodeWithText("Go to channel").assertDoesNotExist()
 
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         compose.waitForIdle()
-        compose.onNodeWithText("Favourites").assertExists()
+        compose.onNodeWithText("Go to channel").assertExists()
     }
 }

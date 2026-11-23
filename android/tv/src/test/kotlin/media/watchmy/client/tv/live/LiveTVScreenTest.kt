@@ -11,6 +11,12 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.activity.ComponentDialog
+import org.robolectric.shadows.ShadowDialog
+import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -152,7 +158,7 @@ class LiveTVScreenTest {
             compose.onNode(isFocused() and hasText("Remind me")).assertExists()
             press(Key.DirectionCenter)
             compose.onNode(isFocused() and hasText("Reminder set")).assertExists()
-            press(Key.Back)
+            backInDialog()
             compose.onNodeWithText("Reminder set").assertDoesNotExist()
             assertEquals(programme, focusedSpoken().removeSuffix(", reminder set"))
         } finally { fakeLatencyMs = previous }
@@ -373,8 +379,18 @@ class LiveTVScreenTest {
     private fun focusedSpoken(): String =
         compose.onNode(isFocused()).fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription)?.firstOrNull() ?: error("The focused element says nothing")
 
+    /** A remote key, to the panel when one has focus (it has a window of its own), else the screen. */
     private fun press(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
+        val inDialog = compose.onAllNodes(isFocused() and hasAnyAncestor(isDialog())).fetchSemanticsNodes().isNotEmpty()
+        val target = if (inDialog) compose.onNode(isFocused() and hasAnyAncestor(isDialog())) else compose.onAllNodes(isRoot()).onFirst()
+        target.performKeyInput { pressKey(key) }
+        compose.waitForIdle()
+    }
+
+    /** Back in the open panel, which has a window of its own. */
+    private fun backInDialog() {
+        val dialog = ShadowDialog.getLatestDialog() as ComponentDialog
+        compose.runOnUiThread { dialog.onBackPressedDispatcher.onBackPressed() }
         compose.waitForIdle()
     }
     private fun native(code: Int) {
