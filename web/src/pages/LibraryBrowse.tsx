@@ -1,7 +1,7 @@
 import { useRef, useState, type KeyboardEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { itemsQuery, librariesQuery, rowsQuery, useLibraryByType } from '../api/queries'
+import { itemsQuery, librariesQuery, libraryCollectionsQuery, rowsQuery, useLibraryByType } from '../api/queries'
 import { BrowseGenres, BrowseGrid } from '../components/BrowseGrid'
 import { EditRows, EditRowsBar } from '../components/rows/EditRowsBar'
 import { ScreenRows } from '../components/rows/ScreenRows'
@@ -9,7 +9,8 @@ import { UnmatchedView } from '../components/UnmatchedView'
 import { useBrowsePrefs } from '../components/useBrowsePrefs'
 import { ArrowLeftIcon } from '../components/icons'
 import { useAuth } from '../authContext'
-import { libraryCountsLine, needsMatchWords, type BrowseTab } from '../lib/browsePrefs'
+import { chipCounts, libraryCountsLine, needsMatchWords, type BrowseTab } from '../lib/browsePrefs'
+import { BrowseCollections } from '../components/BrowseCollections'
 import type { BrowseSearch } from '../lib/routeSearch'
 import { libraryRows, libraryScreen } from '../lib/screenRows'
 
@@ -17,7 +18,8 @@ const TAB_PAGE = 120
 
 /**
  * The TV Shows and Movies screens: what the library holds in words, then
- * Overview (the rows, then every title), every title, or the genres. The tab,
+ * Overview (the rows, then every title), every title, the genres, or a movie
+ * library's collections. The tab,
  * filters, sort and view are remembered on this browser for each library; a
  * row's See all opens every title with the row's sort and filter.
  */
@@ -54,30 +56,31 @@ function LibraryPage({ library, type, search, admin }: { library: Library; type:
   const navigate = useNavigate()
   const to = type === 'tv' ? '/tv' : '/movies'
   // A See all names its view; otherwise the tab last chosen here.
-  const [tab, setTab] = useState<BrowseTab>(() => (search.view === 'all' ? 'all' : prefs.tab ?? 'overview'))
-  // The header's counts: every title, and those left to watch. The first is the grid's own first page when nothing is filtered.
+  const [tab, setTab] = useState<BrowseTab>(() => (search.view === 'all' ? 'all' : search.view === 'collections' ? 'collections' : prefs.tab ?? 'overview'))
+  // The header's and the chips' counts, from the library's totals: the grid's own first page when nothing is filtered.
   const everything = useQuery(itemsQuery(library.id, { sort: 'title', filter: '', limit: TAB_PAGE, offset: 0 }))
-  const unwatched = useQuery(itemsQuery(library.id, { sort: 'title', filter: 'unwatched', limit: TAB_PAGE, offset: 0 }))
+  const collections = useQuery({ ...libraryCollectionsQuery(library.id), enabled: type === 'movie' })
   const totals = everything.data?.totals
   const genres = everything.data?.facets.genres.length ?? 0
-  const counts = {
-    unwatched: unwatched.data?.total,
-    continuing: totals?.continuing,
-    ended: totals && type === 'tv' ? Math.max(0, totals.items - totals.continuing) : undefined,
-  }
+  const counts = chipCounts(type, totals)
+  const collectionCount = collections.data?.items.length ?? 0
   const needs = admin ? needsMatchWords(library) : undefined
   const title = type === 'tv' ? 'TV Shows' : 'Movies'
   const all = type === 'tv' ? 'All shows' : 'All movies'
   const unmatchedView = admin && search.view === 'unmatched' && !q
-  const shown: BrowseTab = q ? 'all' : tab
+  // Collections is for movie libraries that have one; a remembered tab another library lacks falls back to Overview.
+  const shown: BrowseTab = q ? 'all' : tab === 'collections' && (type !== 'movie' || (collections.isSuccess && !collectionCount)) ? 'overview' : tab
   const choose = (t: BrowseTab) => {
     setTab(t)
     save({ tab: t })
+    // Another tab leaves the collection that was open.
+    if (search.collection) void navigate({ to, search: { library: search.library }, replace: true })
   }
   const tabs: { id: BrowseTab; label: string; n?: number }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'all', label: all },
     { id: 'genres', label: 'Genres', n: genres || undefined },
+    ...(collectionCount ? [{ id: 'collections' as const, label: 'Collections', n: collectionCount }] : []),
   ]
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
   const onTabKey = (e: KeyboardEvent, i: number) => {
@@ -94,7 +97,7 @@ function LibraryPage({ library, type, search, admin }: { library: Library; type:
       <header className="flex flex-wrap items-end gap-x-5 gap-y-2.5 pt-1.5">
         <div className="min-w-0">
           <h1 className="text-[26px] font-bold tracking-[-.02em] md:text-[30px]">{library.name && library.name !== title ? library.name : title}</h1>
-          {totals && <p className="mt-1 text-sm text-neutral-300">{libraryCountsLine(type, totals, counts.unwatched)}</p>}
+          {totals && <p className="mt-1 text-sm text-neutral-300">{libraryCountsLine(type, totals)}</p>}
         </div>
         {needs && !unmatchedView && (
           <Link to={to} search={{ library: search.library, view: 'unmatched' }} className="pill pill-warn min-h-8 px-3 text-[13px] md:ml-auto">
@@ -164,6 +167,14 @@ function LibraryPage({ library, type, search, admin }: { library: Library; type:
                   counts={counts}
                 />
               </section>
+            )}
+            {shown === 'collections' && (
+              <BrowseCollections
+                libraryId={library.id}
+                open={search.collection}
+                onOpen={(collection) => void navigate({ to, search: { library: search.library, view: 'collections', collection } })}
+                onBack={() => void navigate({ to, search: { library: search.library, view: 'collections' } })}
+              />
             )}
             {shown === 'genres' && (
               <BrowseGenres

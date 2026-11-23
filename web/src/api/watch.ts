@@ -67,7 +67,7 @@ export async function reportProgress(fileId: number, positionMs: number, duratio
   }
 }
 
-const watchKeys = new Set(['home', 'items', 'rows', 'lists', 'movie', 'show', 'related', 'search', 'person'])
+const watchKeys = new Set(['home', 'items', 'rows', 'lists', 'movie', 'show', 'related', 'search', 'person', 'collection'])
 
 /** Refetches what shows progress and watched marks: rows, lists, detail pages and their related rows. */
 export function invalidateWatch(qc: QueryClient) {

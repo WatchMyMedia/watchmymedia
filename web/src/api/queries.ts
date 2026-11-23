@@ -2,7 +2,7 @@ import { infiniteQueryOptions, queryOptions, useMutation, useQuery, useQueryClie
 import { ApiError, api, unwrap } from './client'
 import type { components } from './schema'
 import { authScope } from '../lib/authScope'
-import type { ItemFilter, ItemSort } from '../lib/browseOptions'
+import type { ItemFilter, ItemFilterValue, ItemSort } from '../lib/browseOptions'
 
 export const healthQuery = queryOptions({
   queryKey: ['health'],
@@ -50,7 +50,27 @@ export const rowsQuery = (id: number) =>
 
 export type { ItemFilter, ItemSort } from '../lib/browseOptions'
 
-export const itemsQuery = (id: number, p: { sort: ItemSort; filter: ItemFilter; genre?: string; decade?: number; q?: string; limit: number; offset: number }) =>
+/**
+ * A page of a library's titles. filters, contentRating, order and collection
+ * are from API level 34: filters combine with filter (an item meets them
+ * all), contentRating keeps one rating, collection one TMDB collection.
+ */
+export const itemsQuery = (
+  id: number,
+  p: {
+    sort: ItemSort
+    filter: ItemFilter
+    genre?: string
+    decade?: number
+    q?: string
+    limit: number
+    offset: number
+    filters?: readonly ItemFilterValue[]
+    contentRating?: string
+    order?: 'asc' | 'desc'
+    collection?: number
+  },
+) =>
   queryOptions({
     queryKey: ['items', id, p],
     queryFn: async () =>
@@ -58,11 +78,38 @@ export const itemsQuery = (id: number, p: { sort: ItemSort; filter: ItemFilter; 
         await api.GET('/api/libraries/{id}/items', {
           params: {
             path: { id },
-            query: { sort: p.sort, filter: p.filter || undefined, genre: p.genre || undefined, decade: p.decade || undefined, q: p.q || undefined, limit: p.limit, offset: p.offset },
+            query: {
+              sort: p.sort,
+              filter: p.filter || undefined,
+              genre: p.genre || undefined,
+              decade: p.decade || undefined,
+              q: p.q || undefined,
+              limit: p.limit,
+              offset: p.offset,
+              // The server reads these comma separated, as one value.
+              filters: p.filters?.length ? [p.filters.join(',') as ItemFilterValue] : undefined,
+              contentRating: p.contentRating ? [p.contentRating] : undefined,
+              order: p.order,
+              collection: p.collection || undefined,
+            },
           },
         }),
       ),
     placeholderData: (prev) => prev,
+  })
+
+/** A movie library's TMDB collections it has two films of or more (API level 34). */
+export const libraryCollectionsQuery = (id: number) =>
+  queryOptions({
+    queryKey: ['collection', id, 'all'],
+    queryFn: async () => unwrap(await api.GET('/api/libraries/{id}/collections', { params: { path: { id } } })),
+  })
+
+/** One collection: the library's films of it, and those it lacks, to request. */
+export const libraryCollectionQuery = (id: number, collectionId: number) =>
+  queryOptions({
+    queryKey: ['collection', id, collectionId],
+    queryFn: async () => unwrap(await api.GET('/api/libraries/{id}/collections/{collectionId}', { params: { path: { id, collectionId } } })),
   })
 
 export type FileStatus = 'present' | 'missing' | undefined
