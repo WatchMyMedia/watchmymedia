@@ -51,7 +51,8 @@ viewer still has a separate session, output buffer and access check. A
 recording needing another channel warns every viewer in the newest viewer's
 source group and releases that group before tuning. Other applications may
 also occupy the tuner's slots. The web player offers fixed quality choices up
-to 1080p, channel switching, a mini guide and Go live. It converts the broadcast
+to 1080p, channel switching, a mini guide, now and next, Record, volume, picture in
+picture and Go live, with how far behind live it is. It converts the broadcast
 to progressive H.264 with stereo AAC. It keeps about a minute in a rolling
 buffer, releases the tuner after five minutes paused, and asks whether you are
 still watching after four hours without input. Closing the player releases the
@@ -107,8 +108,9 @@ Recordings keep the original MPEG-TS broadcast without converting it, about
 3–7 GB per HD hour. Defaults are one minute early, two minutes late, 50 GB kept
 free, and no tuners reserved for watching. A recording has priority over a live
 viewer: the newest viewer is warned two minutes before its tuner is needed.
-Conflicting recordings are shown when scheduled; **Record this instead** changes
-which upcoming one wins. Back-to-back recordings on the same channel share their
+Conflicting recordings are shown when scheduled: as an alert at the top of Recordings, and
+with an orange edge where they fall in the guide. **Record it instead of…** (or **Record this
+instead** on the scheduled one) changes which upcoming one wins. Back-to-back recordings on the same channel share their
 overlapping padding, and live viewers share a recording's tuner without retuning
 when it finishes.
 

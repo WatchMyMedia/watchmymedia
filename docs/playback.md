@@ -209,7 +209,8 @@ until a viewer picks another quality; the apps from their next releases.
 ## Skip Intro and Next Episode
 
 The player offers Skip Intro, Skip Recap and Skip Credits,
-and a Next Episode card at the end credits. Segments come from chapter names in the file
+and a Next Episode card at the end credits. The web player also marks the intro, recap
+and credits on its seek bar by name. Segments come from chapter names in the file
 ("Intro", "Opening", "Recap", "Credits", "ED" and so on) and, for episodes without them,
 from matching audio across each season in the background: a few minutes after a scan
 finishes, the server compares the first and last minutes of each episode with its
