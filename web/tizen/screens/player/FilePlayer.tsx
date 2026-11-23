@@ -247,7 +247,8 @@ export function FilePlayer({ play, request, player }: { play: PlayRequest; reque
 
   const actions: ChromeActions = {
     back: leave,
-    step: (direction) => playback.seekBy(direction * 10_000),
+    // A press and release, as ◀ ▶ are: quick presses add up to one seek.
+    step: (direction) => { playback.beginScrub(direction); playback.commitScrub() },
     togglePause: () => playback.togglePause(),
     goToNow: () => { playback.goToNow(); wanted.current = SCRUBBER_ID },
     open: (opener: Opener) => setPanel(opener),

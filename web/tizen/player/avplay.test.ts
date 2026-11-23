@@ -102,6 +102,19 @@ describe('AVPlay lifecycle', () => {
     expect(f.player.position()).toBe(50_000)
   })
 
+  it('drops a seek still waiting behind another when a newer one comes, so only the newest goes', async () => {
+    const f = fixture()
+    await opened(f)
+    const first = f.player.seek(50_000)
+    await flush()
+    const second = f.player.seek(40_000)
+    const third = f.player.seek(30_000)
+    f.sought(); await first
+    await flush(); f.sought(); await second; await third
+    expect(vi.mocked(f.api.seekTo).mock.calls.map(([ms]) => ms)).toEqual([50_000, 30_000])
+    expect(f.player.position()).toBe(30_000)
+  })
+
   it('clamps seeks away from the exact end and redacts error payloads', async () => {
     const f = fixture()
     await opened(f)

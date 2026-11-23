@@ -11,7 +11,8 @@ import { systemClock, type Clock } from './clock'
 import type { Cue } from './vtt'
 import { audioWords, automaticStepNote, episodeWords, onlineWords, SLOW_CONNECTION_NOTE, STOPPED_BY_ADMIN, streamPill, SUBTITLE_FAILED_NOTE, AUTOMATIC_SUBTITLE_FAILED, subtitleWords, type OptionWords } from './labels'
 import { fallbackProfile, samsungProfile, uhd } from './profile'
-import { Scrub, seekStepLabel } from './seek'
+import { Scrub, SEND_AFTER_MS, seekStepLabel } from './seek'
+import { STUCK_MESSAGE, StuckWatch } from './stuck'
 import { burnsIn, CueTracks, fetchCueText, trackKey, type SubtitleSize } from './subtitles'
 import { Thumbnails, type Thumbnail } from './thumbnails'
 import { MediaTokenClock } from './tokens'
@@ -184,6 +185,12 @@ class Viewing {
   seekLanded = false
   recoveries = 0
   recoveredAt = 0
+  /** Seeks sent: a failed one counts only while no later one is on its way. */
+  seeks = 0
+  readonly stuck = new StuckWatch()
+  /** Steps taken to get a stuck play going (StuckWatch): a seek in place, a reload, then the message. */
+  unsticks = 0
+  unstuckAt = 0
   fellBack = false
   starting = false
   stepNote?: string
@@ -224,6 +231,7 @@ export class FilePlayback {
   private readonly clock: Clock
   private readonly tokens: MediaTokenClock
   private readonly scrub = new Scrub()
+  private sendTimer?: unknown
   private readonly cues: CueTracks
   private ticker?: unknown
   private lastTick = 0
@@ -268,7 +276,7 @@ export class FilePlayback {
     const v = this.active()
     if (!v) return
     // Play after an error tries again from where it stopped.
-    if (v.error && !v.loading) { v.error = undefined; this.reload(v); return }
+    if (v.error && !v.loading) { v.error = undefined; v.unsticks = 0; this.reload(v); return }
     v.paused = false
     v.meter.excuse()
     if (v.parkedAtMs !== undefined) { this.unpark(v); return }
@@ -296,16 +304,17 @@ export class FilePlayback {
   /** The key is held: the step grows to 30 s, 1 min, then 2 min. */
   scrubStep(direction: 1 | -1) { this.scrubPress(direction, true) }
 
-  /** The key came up: seek to the target. */
+  /** The key came up: the seek goes to the target once the remote has been quiet SEND_AFTER_MS. */
   commitScrub() {
-    const target = this.scrub.release(this.clock.now())
-    const v = this.active()
-    if (target !== undefined && v?.decision) this.seekWithin(v, target, true)
+    if (this.scrub.release(this.clock.now())) {
+      this.stopSend()
+      this.sendTimer = this.clock.setTimeout(() => this.sendScrub(), SEND_AFTER_MS)
+    }
     this.refresh(0)
   }
 
   /** Back while scrubbing: the target goes, nothing seeks. */
-  cancelScrub() { this.scrub.clear(); this.refresh(0) }
+  cancelScrub() { this.stopSend(); this.scrub.clear(); this.refresh(0) }
 
   /** Skips the segment the Skip button offers. */
   skip() {
@@ -496,6 +505,7 @@ export class FilePlayback {
     const v: Viewing = new Viewing(request, ++this.generation, quality, (playId, cancel) => this.automaticSubtitle(v, playId, cancel))
     this.viewing = v
     this.tokens.forget()
+    this.stopSend()
     this.scrub.clear()
     this.note = undefined
     this.unlisten?.()
@@ -709,6 +719,7 @@ export class FilePlayback {
     this.unlisten?.(); this.unlisten = undefined
     void this.ctx.player.stop().catch(() => undefined)
     this.stopTicker()
+    this.stopSend()
     this.clock.clearTimeout(v.cueTimer)
     const d = v.decision
     if (d && !v.adminStopped) {
@@ -768,9 +779,21 @@ export class FilePlayback {
     // An event session plays on what it has produced; outside it, a new session there, in the same play.
     const produced = Math.max(this.ctx.player.position(), v.playerDurationMs)
     if (whole || (local >= 0 && local <= produced + EVENT_SEEK_SLACK_MS)) {
-      void this.ctx.player.seek(local).then(() => v.meter.settled(), () => undefined)
+      const seek = ++v.seeks
+      void this.ctx.player.seek(local).then(() => v.meter.settled(), (error: unknown) => this.seekFailed(v, seek, target, error))
       this.refresh(0)
     } else this.reload(v, { seekMs: target })
+  }
+
+  /**
+   * A seek the player refused, or never answered: the stream again at its
+   * target, as for a dropped stream. Left alone, the play stays where it was
+   * or waits for good. A later seek on its way settles it instead.
+   */
+  private seekFailed(v: Viewing, seek: number, targetMs: number, error: unknown) {
+    if (this.viewing !== v || v.stopped || v.adminStopped || v.loading || seek !== v.seeks) return
+    const failure: PlayerFailure = error instanceof PlaybackFailure ? error.failure : { code: 'SEEK_FAILED', kind: 'other' }
+    this.onFailure(v, failure, error, targetMs)
   }
 
   // ------------------------------------------------------------ the player's updates
@@ -841,7 +864,7 @@ export class FilePlayback {
     return call((signal) => this.ctx.api.POST('/api/files/{id}/subtitles/automatic', { params: { path: { id: r.fileId } }, body: { playId, cancel }, signal }), 30_000)
   }
 
-  private onFailure(v: Viewing, failure: PlayerFailure, cause?: unknown) {
+  private onFailure(v: Viewing, failure: PlayerFailure, cause?: unknown, atMs?: number) {
     const d = v.decision
     if (!d || v.loading) return
     // A format this TV turned down that the profile claimed: once a viewing, ask with the plain one.
@@ -849,7 +872,7 @@ export class FilePlayback {
     if (failure.kind !== 'format' && v.recoveries < MAX_RECOVERIES) {
       v.recoveries++
       v.recoveredAt = this.clock.now()
-      this.reload(v, { newToken: failure.kind === 'auth' })
+      this.reload(v, { newToken: failure.kind === 'auth', seekMs: atMs })
       return
     }
     v.error = cause instanceof PlayerError ? cause.message : `The TV couldn’t play this (${failure.code}). Try again, or choose a lower quality.`
@@ -1014,6 +1037,10 @@ export class FilePlayback {
     const phase: FilePhase = v.error ? 'error' : replacing ? waiting : ps === 'ended' ? 'ended' : v.paused || ps === 'paused' ? 'paused' : ps === 'buffering' ? waiting : ps === 'playing' ? 'playing' : waiting
     const ended = phase === 'ended'
     if (phase === 'playing' && v.recoveries > 0 && now - v.recoveredAt >= RECOVERY_RESET_MS) v.recoveries = 0
+    if (phase === 'playing' && v.unsticks > 0 && now - v.unstuckAt >= RECOVERY_RESET_MS) v.unsticks = 0
+    // Should be moving: the viewer wants it playing, it has played, and nothing is loading or has failed.
+    const moving = (phase === 'playing' || phase === 'buffering') && !v.loading && !v.paused && v.pendingMs === undefined
+    const stuck = v.stuck.note(moving, pos, v.bufferedMs, dt)
 
     let force = false
     if (!v.watched && d.watchedAtMs > 0 && pos >= d.watchedAtMs) { v.watched = true; force = true }
@@ -1066,7 +1093,8 @@ export class FilePlayback {
     this.heartbeat(v, phase, pos, force)
 
     // Actions last: each may start a new load or a new play.
-    if (ended && (!nextOffered || v.request.kind !== 'file')) this.exit(v)
+    if (stuck) this.unstick(v, pos)
+    else if (ended && (!nextOffered || v.request.kind !== 'file')) this.exit(v)
     else if (plan.autoNow && segment && v.autoSkipped !== segment.id) { v.autoSkipped = segment.id; this.skipSegment(v, segment) }
     else if (plan.autoAfterMs !== undefined && segment && v.fillMs >= plan.autoAfterMs) { v.fillMs = 0; this.skipSegment(v, segment) }
     else if (v.countdownMs === 0) this.autoAdvance(v)
@@ -1108,12 +1136,42 @@ export class FilePlayback {
     })
   }
 
+  /** A stuck play (StuckWatch): a seek where it is, then the stream again there, then a message that Play retries. */
+  private unstick(v: Viewing, pos: number) {
+    v.stuck.reset()
+    v.unsticks++
+    v.unstuckAt = this.clock.now()
+    if (v.unsticks === 1) this.seekWithin(v, pos, false)
+    else if (v.unsticks === 2) this.reload(v, { seekMs: pos })
+    else {
+      v.error = STUCK_MESSAGE
+      v.failure = { kind: 'other' }
+      void this.ctx.player.stop().catch(() => undefined)
+      this.refresh(0)
+    }
+  }
+
   // ------------------------------------------------------------ the store
+
+  /** The remote has been quiet since the key came up: the seek goes. */
+  private sendScrub() {
+    this.sendTimer = undefined
+    const target = this.scrub.send(this.clock.now())
+    const v = this.active()
+    if (target !== undefined && v?.decision) this.seekWithin(v, target, true)
+    this.refresh(0)
+  }
+
+  private stopSend() {
+    if (this.sendTimer !== undefined) this.clock.clearTimeout(this.sendTimer)
+    this.sendTimer = undefined
+  }
 
   private scrubPress(direction: 1 | -1, repeat: boolean) {
     this.noteInput()
     const v = this.active()
     if (!v?.decision) return
+    this.stopSend()
     const started = !this.scrub.view()
     this.scrub.press(direction, this.position(v), this.duration(v), this.clock.now(), repeat)
     const target = this.scrub.view()?.targetMs
