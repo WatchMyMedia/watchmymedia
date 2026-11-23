@@ -130,9 +130,27 @@ Two optional changes:
 
   then on the **Docker** tab click **Add Container** and choose WatchMyMedia
   from the **Template** list.
-- **The container won't start, and the error names `/dev/dri`**: the server
-  has no Intel or AMD GPU. Edit the container, remove the **Intel or AMD GPU**
-  entry, and apply.
+- **The container won't start**: the **Docker** tab says only **Execution
+  error** and **Server error**, and the container's log is empty. Docker could
+  not start the container, so WatchMyMedia never ran, and Unraid doesn't show
+  Docker's reason. To see it, run this in the Unraid terminal:
+
+  ```
+  docker start WatchMyMedia
+  ```
+
+  - **The message names `/dev/dri`**: there is no Intel or AMD GPU device to
+    give the container. Either the server has no such GPU, or the device has
+    gone since the container last started. Edit the container, remove the
+    **Intel or AMD GPU** entry, and apply. The server starts and converts on
+    the CPU; your library and settings stay as they are. To use the GPU
+    again, wait until `ls /dev/dri` lists `renderD128`, then edit the
+    container, click **Add another Path, Port, Variable, Label or Device**,
+    choose **Device**, give it the value `/dev/dri`, and apply.
+  - **The message names the `nvidia` runtime**: Docker can't find what the
+    **Nvidia Driver** plugin provides. The plugin's page under **Settings**
+    should show your card; if it doesn't, restart the server. To run without
+    the card meanwhile, take `--runtime=nvidia` out of **Extra Parameters**.
 - **An Intel or AMD GPU isn't used**: in the Unraid terminal, run
   `ls /dev/dri`. If it lists nothing, turn the GPU on in the BIOS (many boards
   turn the built-in one off when a graphics card is fitted) and reboot. If it
