@@ -40,7 +40,13 @@ and QN90D steps still to do.
   branches for older servers. A feature from a later level turns on by the
   server's `apiLevel` and asks an older server nothing: watchlists, from 33
   (`useWatchlistsOn()` in `screens/watchlists/`), so the screens that use
-  them call no watchlist query below it.
+  them call no watchlist query below it; and level 34's (`session/features.ts`,
+  `useLevel34()`): a cast member's titles (the `person` route), Remove from
+  Continue watching (a card's Hold OK), the libraries' counts, combined
+  filters and Rated (`gridQuery` sends one filter and no rating below it),
+  and recordings' New, watched and time left. The level 34 queries the web
+  doesn't use yet are files of their own in `../src/api/` (`people.ts`,
+  `continueWatching.ts`, `libraryItems.ts`), not additions to `queries.ts`.
 - **The store identity** in `public/config.xml` is permanent: the widget id,
   package id `cPFf0iV3Li` and application id `cPFf0iV3Li.WatchMyMedia` never
   change, and every update is signed with the same Samsung author certificate.

@@ -102,7 +102,10 @@ without access, and `?fakes=notuner` one whose channels can't play; `?fakes=save
 settings, `?fakes=nosettings` doesn't answer for them, and `?fakes=seerr`
 carries requests out through Seerr. Sam has three watchlists (Watchlist,
 Halloween and With the kids); `?fakes=nowatchlists` is a server too old to
-keep them, where the app offers none. Nothing on the network is asked: every
+keep them, where the app offers none. The fake server answers API level 34
+(cast members' titles, Remove from Continue watching, the libraries' counts
+and combined filters, recordings' New and watched); `?fakes=level33` is one
+from before it, where those screens behave as they did. Nothing on the network is asked: every
 other address fails as an unreachable server would. There is no media to play,
 so the player shows its screens over a simulated stream.
 
