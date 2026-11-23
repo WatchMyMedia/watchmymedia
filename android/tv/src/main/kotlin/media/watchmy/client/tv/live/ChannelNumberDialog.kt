@@ -47,7 +47,7 @@ import media.watchmy.client.tv.components.inter
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.onBack
 
-/** The TV boards' Go to channel keypad, also opened by a remote's first numeric key. */
+/** Go to channel's keypad, also opened by a remote's first numeric key. */
 @Composable
 internal fun ChannelNumberDialog(
     channels: List<LiveChannel>,

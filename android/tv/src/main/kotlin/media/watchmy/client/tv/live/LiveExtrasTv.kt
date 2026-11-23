@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -25,6 +26,12 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.layout.onSizeChanged
+import media.watchmy.client.tv.components.ContentStart
+import media.watchmy.client.tv.components.PanelRow
+import media.watchmy.client.tv.components.SafeY
+import media.watchmy.client.tv.components.TvPalette
+import media.watchmy.client.tv.components.TvSidePanel
+import media.watchmy.client.tv.components.TvType
 import media.watchmy.client.tv.components.bringWholeIntoView
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -85,6 +92,7 @@ import media.watchmy.client.tv.components.TvButtonSize
 import media.watchmy.client.tv.components.TvDialog
 import media.watchmy.client.tv.components.TvScaffold
 import media.watchmy.client.tv.components.inter
+import media.watchmy.client.tv.components.tryFocus
 import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.ChannelLogo
@@ -104,27 +112,32 @@ import media.watchmy.client.ui.components.rememberLiveNow
 @Immutable
 internal class TvMenuItem(val label: String, val icon: ImageVector, val enabled: Boolean = true, val onClick: () -> Unit)
 
-/** A Hold OK menu: what it is for, its rows (the first focused) and a note. Back closes it. */
+/**
+ * A thing's choices (a recording's, a search card's): a panel from the
+ * right with what it is for, its rows (the first focused) and a note. Back
+ * closes it and focus goes back to what opened it. [first] picks the row
+ * focus opens on: the one that changes nothing, where a row can't be undone.
+ */
 @Composable
-internal fun TvLiveMenu(title: String, subtitle: String, logo: LiveChannel?, items: List<TvMenuItem>, onDismiss: () -> Unit, note: String? = null) {
-    val first = remember { FocusRequester() }
+internal fun TvLiveMenu(title: String, subtitle: String, logo: LiveChannel?, items: List<TvMenuItem>, onDismiss: () -> Unit, note: String? = null, first: Int = 0) {
+    val focus = remember { FocusRequester() }
     TvDialog(onDismiss) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .55f)), contentAlignment = Alignment.Center) {
-            Column(Modifier.width(560.dp).background(WmmColors.Surface, RoundedCornerShape(22.dp)).border(1.dp, WmmColors.Line2, RoundedCornerShape(22.dp)).padding(28.dp).focusGroup(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (logo?.logo != null) ChannelLogo(logo, Modifier.width(56.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(title, style = inter(26.sp, FontWeight.Bold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(subtitle, style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 1)
-                    }
+        TvSidePanel(title = null, modifier = Modifier.focusGroup()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (logo?.logo != null) ChannelLogo(logo, Modifier.width(64.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(title, style = TvType.Heading, color = WmmColors.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    if (subtitle.isNotBlank()) Text(subtitle, style = TvType.Second, color = TvPalette.Muted, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
-                items.forEachIndexed { index, item ->
-                    TvButton(item.label, item.onClick, if (index == 0) Modifier.focusRequester(first) else Modifier, icon = item.icon, size = TvButtonSize.Medium, enabled = item.enabled)
-                }
-                note?.let { Text(it, style = inter(22.sp), color = WmmColors.TextMuted) }
             }
+            Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                items.forEachIndexed { index, item ->
+                    PanelRow(item.label, item.onClick, if (index == first.coerceIn(0, items.lastIndex)) Modifier.focusRequester(focus) else Modifier, icon = item.icon, enabled = item.enabled)
+                }
+            }
+            note?.let { Text(it, style = TvType.Second, color = TvPalette.Muted) }
         }
-        InitialFocus(first)
+        InitialFocus(focus)
     }
 }
 
@@ -140,24 +153,28 @@ fun LiveRemindersScreenTv(channels: List<LiveChannel>, onNavigate: (Any) -> Unit
     val format = rememberLiveClockFormat()
     val now = rememberLiveNow()
     val first = remember { FocusRequester() }
+    val tab = remember { FocusRequester() }
+    val recorder by rememberTvRecordingActions().state.collectAsStateWithLifecycle()
     TvScaffold(RailSection.LiveTV, onNavigate, modifier) {
-        Column(Modifier.fillMaxSize().padding(start = 150.dp, end = 58.dp, top = 48.dp)) {
-            Text("Live TV › Reminders", style = inter(22.sp), color = WmmColors.TextMuted)
-            Text("Reminders", style = inter(64.sp, FontWeight.ExtraBold), color = WmmColors.Text, modifier = Modifier.padding(top = 6.dp))
-            Text(liveRemindersCountTv(state.items.size, state.leadMinutes), style = inter(22.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(top = 6.dp, bottom = 28.dp))
-            if (state.items.isEmpty() && !state.loading) Text(LIVE_REMINDERS_EMPTY_TV, style = inter(22.sp), color = WmmColors.TextSoft)
-            LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-                items(state.items, key = { it.id }) { reminder ->
-                    TvReminderRow(
-                        reminder, channels.firstOrNull { it.id == reminder.channelId } ?: LiveChannel(reminder.channelId.orEmpty(), "", reminder.number, reminder.channelName.orEmpty()),
-                        now, format, onRemove = { model.remove(reminder) },
-                        modifier = if (reminder == state.items.first()) Modifier.focusRequester(first) else Modifier,
-                    )
+        Column(Modifier.fillMaxSize().padding(start = ContentStart, top = SafeY)) {
+            LiveTabsHeader(LiveTab.Reminders, liveTabs(recordings = recorder.canRecord, reminders = true), onNavigate, first = tab, onShowing = { first.tryFocus() })
+            Column(Modifier.weight(1f).padding(top = 28.dp, end = TvSafeEnd)) {
+                Text(liveRemindersCountTv(state.items.size, state.leadMinutes), style = TvType.Second, color = TvPalette.Muted, modifier = Modifier.padding(bottom = 24.dp))
+                if (state.items.isEmpty() && !state.loading) Text(LIVE_REMINDERS_EMPTY_TV, style = TvType.Body, color = WmmColors.TextSoft, modifier = Modifier.widthIn(max = 900.dp))
+                LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp)) {
+                    items(state.items, key = { it.id }) { reminder ->
+                        TvReminderRow(
+                            reminder, channels.firstOrNull { it.id == reminder.channelId } ?: LiveChannel(reminder.channelId.orEmpty(), "", reminder.number, reminder.channelName.orEmpty()),
+                            now, format, onRemove = { model.remove(reminder) },
+                            modifier = if (reminder == state.items.first()) Modifier.focusRequester(first) else Modifier,
+                        )
+                    }
                 }
+                Text(LIVE_REMINDERS_NOTE_TV, style = TvType.Second, color = TvPalette.Muted, modifier = Modifier.padding(top = 12.dp, bottom = SafeY).widthIn(max = 1200.dp))
             }
-            Text(LIVE_REMINDERS_NOTE_TV, style = inter(22.sp, lineHeight = 32.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(bottom = 40.dp))
         }
-        if (state.items.isNotEmpty()) InitialFocus(first)
+        // With nothing to list, the tab keeps focus, so the remote always has somewhere to be.
+        if (state.items.isNotEmpty()) InitialFocus(first) else if (!state.loading) InitialFocus(tab)
     }
 }
 
@@ -165,24 +182,21 @@ fun LiveRemindersScreenTv(channels: List<LiveChannel>, onNavigate: (Any) -> Unit
 private fun TvReminderRow(reminder: LiveReminder, channel: LiveChannel, now: Long, format: LiveClockFormat, onRemove: () -> Unit, modifier: Modifier = Modifier) {
     val gone = reminder.state == LiveReminderState.Gone
     val moved = reminder.state == LiveReminderState.Moved
-    Row(Modifier.fillMaxWidth().background(WmmColors.Surface, RoundedCornerShape(16.dp)).padding(16.dp), horizontalArrangement = Arrangement.spacedBy(22.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.width(200.dp).clip(RoundedCornerShape(10.dp))) {
+    Row(Modifier.fillMaxWidth().background(WmmColors.Surface, RoundedCornerShape(18.dp)).padding(18.dp), horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.width(240.dp).clip(RoundedCornerShape(12.dp))) {
             ProgrammePicture(null, channel, Modifier.fillMaxWidth())
-            Row(Modifier.align(Alignment.TopStart).padding(8.dp).background(Color.Black.copy(alpha = .72f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (channel.logo != null) ChannelLogo(channel, Modifier.width(30.dp))
-                Text(channel.number, style = inter(22.sp, FontWeight.Bold), color = WmmColors.Text)
-            }
+            PictureFlag(channel.number, Modifier.align(Alignment.TopStart).padding(8.dp))
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(reminder.title, style = inter(26.sp, FontWeight.Bold), color = if (gone) WmmColors.TextMuted else WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(reminder.tvLine(), style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(reminder.title, style = TvType.CardTitle, color = if (gone) TvPalette.Muted else WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(reminder.tvLine(), style = TvType.Second, color = TvPalette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Column(Modifier.width(320.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(if (gone) WmmIcons.BellOff else if (moved) WmmIcons.Moved else WmmIcons.Bell, contentDescription = null, tint = if (gone) WmmColors.TextMuted else if (moved) WmmColors.Accent else WmmColors.TextSoft, modifier = Modifier.size(22.dp))
-                Text(reminder.tvStatus(now, format), style = inter(22.sp, FontWeight.SemiBold), color = if (gone) WmmColors.TextMuted else if (moved) WmmColors.Accent else WmmColors.Text)
+        Column(Modifier.width(380.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(if (gone) WmmIcons.BellOff else if (moved) WmmIcons.Moved else WmmIcons.Bell, contentDescription = null, tint = if (gone) TvPalette.Muted else if (moved) WmmColors.Accent else WmmColors.TextSoft, modifier = Modifier.size(26.dp))
+                Text(reminder.tvStatus(now, format), style = TvType.Second.copy(fontWeight = FontWeight.SemiBold), color = if (gone) TvPalette.Muted else if (moved) WmmColors.Accent else WmmColors.Text)
             }
-            Text(reminder.tvWhen(format), style = inter(22.sp), color = WmmColors.TextMuted)
+            Text(reminder.tvWhen(format), style = TvType.Caption, color = TvPalette.Muted)
         }
         TvButton("Remove", onRemove, modifier.semantics { contentDescription = reminder.tvRemoveLabel(format) }, size = TvButtonSize.Medium)
     }
@@ -368,10 +382,8 @@ private fun TvLiveSearchCard(hit: LiveSearchHit, now: Long, format: LiveClockFor
                     if (hit.channel.logo != null) ChannelLogo(hit.channel, Modifier.width(34.dp))
                     Text(hit.channel.number, style = inter(22.sp, FontWeight.Bold), color = WmmColors.Text)
                 }
-                if (airing) Row(Modifier.align(Alignment.TopEnd).padding(10.dp).background(Color(0xFFB42318), RoundedCornerShape(5.dp)).padding(horizontal = 8.dp, vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(7.dp).background(Color.White, RoundedCornerShape(4.dp)))
-                    Text("LIVE", style = inter(22.sp, FontWeight.Bold), color = Color.White)
-                } else if (reminded) Box(Modifier.align(Alignment.TopEnd).padding(10.dp).background(Color.Black.copy(alpha = .72f), RoundedCornerShape(16.dp)).padding(6.dp)) {
+                if (airing) PictureFlag("LIVE", Modifier.align(Alignment.TopEnd).padding(10.dp), rec = true)
+                else if (reminded) Box(Modifier.align(Alignment.TopEnd).padding(10.dp).background(Color.Black.copy(alpha = .72f), RoundedCornerShape(16.dp)).padding(6.dp)) {
                     Icon(WmmIcons.BellFilled, contentDescription = null, tint = WmmColors.Accent, modifier = Modifier.size(18.dp))
                 }
                 if (airing) LiveProgress(p.progressAt(now), Modifier.align(Alignment.BottomStart).fillMaxWidth(), height = 5.dp, track = Color.Transparent)
@@ -379,6 +391,6 @@ private fun TvLiveSearchCard(hit: LiveSearchHit, now: Long, format: LiveClockFor
         }
         Text(p.title, style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(p.episodeLine() ?: p.categories.firstOrNull().orEmpty(), style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(hit.whenLineTv(now, format, reminded), style = inter(22.sp), color = when { airing -> Color(0xFFFCA5A5); reminded -> WmmColors.Accent; else -> WmmColors.TextMuted }, maxLines = 1)
+        Text(hit.whenLineTv(now, format, reminded), style = inter(22.sp), color = when { airing -> WmmColors.Text; reminded -> WmmColors.Accent; else -> WmmColors.TextMuted }, maxLines = 1)
     }
 }
