@@ -86,6 +86,11 @@ public final class MovieModel {
     /// button, as on servers before API level 20, which list none.
     public var trailer: MovieTrailer? { movie?.trailer }
 
+    /// Every trailer the server lists, best first: with two or more Apple
+    /// TV's Trailer opens a list of them, each named, with what it is and
+    /// where it plays.
+    public var trailers: [MovieTrailer] { movie?.trailers ?? [] }
+
     /// The rows at the end of the page, in order; none from a download, with no server.
     public var relatedRows: [ScreenRow] { offline ? [] : related.rows }
 
@@ -193,8 +198,8 @@ public final class MovieModel {
     /// (`trailerPlayer`) on iPhone and iPad. On Apple TV, which passes
     /// `openApp`, it goes to the YouTube app when `openApp` opens its link,
     /// else to a code to scan (`trailerCode`).
-    public func playTrailer(openApp: ((URL) -> Bool)? = nil) {
-        guard let movie, let trailer = movie.trailer else { return }
+    public func playTrailer(_ chosen: MovieTrailer? = nil, openApp: ((URL) -> Bool)? = nil) {
+        guard let movie, let trailer = chosen ?? movie.trailer else { return }
         switch trailer.source {
         case .file(let fileID):
             navigator.play(movie.trailerRequest(fileID: fileID, name: trailer.name))

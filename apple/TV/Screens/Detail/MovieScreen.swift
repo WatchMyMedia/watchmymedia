@@ -39,7 +39,7 @@ private enum MovieFocus: Hashable {
 
 /// More's panels: More itself, and what its rows open.
 enum TitlePanel: Hashable {
-    case more, files, version, sound, subtitles
+    case more, files, version, sound, subtitles, trailers
 }
 
 private struct MovieView: View {
@@ -62,7 +62,7 @@ private struct MovieView: View {
                     // While a panel is up, the page under it takes no focus.
                     .disabled(panel != nil)
                 if let panel {
-                    MoviePanels(panel: panel, model: model, movie: movie, canReport: services.requests.options.problems) { next in
+                    MoviePanels(panel: panel, model: model, movie: movie, canReport: services.requests.options.problems, openApp: openYouTubeApp) { next in
                         self.panel = next
                     } report: {
                         self.panel = nil
@@ -89,11 +89,12 @@ private struct MovieView: View {
         }
         .task(id: model.movie != nil) { await focusPlay() }
         .onChange(of: panel) { old, new in
-            // The panel closed: focus goes back to More, which opened it, once the page takes focus again.
-            guard old != nil, new == nil else { return }
+            // The panel closed: focus goes back to the button that opened it (More, or Trailers), once the page takes focus again.
+            guard let old, new == nil else { return }
+            let back: MovieFocus = old == .trailers ? .trailer : .more
             Task { @MainActor in
-                for _ in 0..<6 where focus != .more {
-                    focus = .more
+                for _ in 0..<6 where focus != back {
+                    focus = back
                     try? await Task.sleep(for: .milliseconds(80))
                 }
             }
@@ -210,7 +211,10 @@ private struct MovieView: View {
                 }
             }
             if model.trailer != nil {
-                Button { model.playTrailer(openApp: openYouTubeApp) } label: { Text("\(Image(systemName: "film")) Trailer") }
+                // With two or more, Trailer lists them all.
+                Button { if model.trailers.count > 1 { panel = .trailers } else { model.playTrailer(openApp: openYouTubeApp) } } label: {
+                    Text("\(Image(systemName: "film")) \(model.trailers.count > 1 ? "Trailers" : "Trailer")")
+                }
                     .buttonStyle(TVButtonStyle())
                     .focused($focus, equals: .trailer)
                     .accessibilityLabel("Trailer")
@@ -355,6 +359,8 @@ private struct MoviePanels: View {
     let model: MovieModel
     let movie: MovieDetail
     let canReport: Bool
+    /// Opens a YouTube trailer in the YouTube app; false without it.
+    let openApp: (URL) -> Bool
     let go: (TitlePanel?) -> Void
     let report: () -> Void
     @FocusState private var firstFocused: Bool
@@ -363,6 +369,19 @@ private struct MoviePanels: View {
         let version = model.selectedVersion
         TVSidePanel {
             switch panel {
+            case .trailers:
+                PanelRows(title: "Trailers") {
+                    ForEach(Array(movie.trailers.enumerated()), id: \.element.choiceID) { index, trailer in
+                        Button {
+                            go(nil)
+                            model.playTrailer(trailer, openApp: openApp)
+                        } label: { TVRowLabel(title: trailer.name, line: trailer.choiceLine) }
+                        .buttonStyle(TVListRowStyle())
+                        .panelFirst(index == 0, $firstFocused)
+                        .accessibilityIdentifier("movie-trailer-\(index)")
+                    }
+                }
+                .onExitCommand { go(nil) }
             case .more:
                 PanelRows(title: movie.title) {
                     ForEach(Array(moreRows(version).enumerated()), id: \.element) { index, row in

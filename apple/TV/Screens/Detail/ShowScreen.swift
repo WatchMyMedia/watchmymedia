@@ -828,7 +828,7 @@ private struct ShowPanels: View {
                 facts: episode.versions.prefix(3).map { $0.fileFacts(plan: model.plans[$0.fileID], isDefault: $0.id == first?.id, several: episode.versions.count > 1) }
             ) { go(.episode(.more)) }
             .task { await model.loadPlans() }
-        case .version:
+        case .version, .trailers:
             EmptyView()
         }
     }

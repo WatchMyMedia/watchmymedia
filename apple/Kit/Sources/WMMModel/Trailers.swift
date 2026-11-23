@@ -54,6 +54,23 @@ public struct MovieTrailer: Hashable, Sendable {
         if case .youTube(let trailer) = source { return trailer }
         return nil
     }
+
+    /// Apple TV's list of trailers: its name, and under it what it is and
+    /// where it plays ("Teaser · 2 min · plays here", "Trailer · on YouTube").
+    public var choiceLine: String {
+        var parts = [teaser ? "Teaser" : "Trailer"]
+        if let durationMs, durationMs > 0 { parts.append(formatDuration(ms: durationMs)) }
+        parts.append(youTube == nil ? "plays here" : "on YouTube")
+        return parts.joined(separator: " · ")
+    }
+
+    /// A stable name for the list: the file or the video.
+    public var choiceID: String {
+        switch source {
+        case .file(let id): "file-\(id)"
+        case .youTube(let trailer): "youtube-\(trailer.key)"
+        }
+    }
 }
 
 /// A trailer on YouTube: shown in YouTube's player inside the app on iPhone
