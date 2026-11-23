@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -137,6 +136,9 @@ internal fun SeasonTabs(
     val number = bar.number
     val nav = remember(memory, episodeFocus) { Modifier.focusProperties { this.down = episodeFocus() } }
     Row(modifier.upTo(memory) { listOf(lastButton(), "play") }.fillMaxWidth().padding(start = ContentStart - 10.dp, end = ContentEnd, top = 28.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        // The tabs and the summary take what the buttons leave; a Spacer with a weight of its own beside the tabs'
+        // weight split that space in two and cut the tabs off at half ("Season 3 · 4 le").
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
         if (bar.oneSeason) {
             Text(seasonName(number), style = TvType.CardTitle, color = WmmColors.Text, modifier = Modifier.padding(start = 10.dp, end = 8.dp))
         } else {
@@ -159,7 +161,7 @@ internal fun SeasonTabs(
             }
         }
         if (bar.summary != null) Text(bar.summary, style = TvType.Second, color = TvPalette.Muted, maxLines = 1, modifier = Modifier.padding(horizontal = 12.dp))
-        Spacer(Modifier.weight(1f))
+        }
         if (bar.canMark) {
             TvButton(markSeasonButtonLabel(bar.watched), { vm.setSeasonWatched(!bar.watched) }, nav.focusMemory(memory, "mark-season"), size = TvButtonSize.Small, enabled = !bar.acting)
         }
