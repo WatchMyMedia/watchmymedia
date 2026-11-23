@@ -320,8 +320,10 @@ function Bars({ items, byTime, person }: { items: StatItem[]; byTime: boolean; p
         return (
           <li key={`${it.userId ?? ''}-${it.deviceId ?? ''}-${i}`} className="flex min-h-[38px] items-center gap-3 text-sm">
             <span className="min-w-0 flex-[0_0_118px] sm:flex-[0_0_150px]">{name}</span>
-            <i aria-hidden="true" className="block h-2 shrink-0 rounded-r bg-accent" style={{ width: `${Math.max(2, Math.round((v / top) * 58))}%` }} />
-            <span className="whitespace-nowrap text-[13px] text-neutral-300">{amount(it, byTime)}</span>
+            <span className="flex min-w-0 flex-1 items-center gap-3">
+              <i aria-hidden="true" className="block h-2 shrink-0 rounded-r bg-accent" style={{ width: `${Math.max(2, Math.round((v / top) * 80))}%` }} />
+              <span className="whitespace-nowrap text-[13px] text-neutral-300">{amount(it, byTime)}</span>
+            </span>
           </li>
         )
       })}

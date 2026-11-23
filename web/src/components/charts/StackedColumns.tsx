@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AXIS, GRID, MUTED } from './palette'
 import { compact } from './format'
 
@@ -39,16 +39,19 @@ export function StackedColumns({
   /** Name for screen readers. */
   label: string
 }) {
-  const box = useRef<HTMLDivElement>(null)
+  // The box is measured once it exists, and again whenever it changes size:
+  // drawn at a guess first, the chart would otherwise keep that width.
+  const [box, setBox] = useState<HTMLDivElement | null>(null)
   const [width, setWidth] = useState(640)
   const [active, setActive] = useState<number | null>(null)
   useEffect(() => {
-    const el = box.current
-    if (!el) return
-    const ro = new ResizeObserver(([e]) => setWidth(Math.max(200, Math.floor(e.contentRect.width))))
-    ro.observe(el)
+    if (!box) return
+    const measure = (w: number) => setWidth(Math.max(200, Math.floor(w)))
+    measure(box.clientWidth)
+    const ro = new ResizeObserver(([e]) => measure(e.contentRect.width))
+    ro.observe(box)
     return () => ro.disconnect()
-  }, [])
+  }, [box])
 
   const n = buckets.length
   const totals = buckets.map((_, i) => series.reduce((s, x) => s + (x.values[i] ?? 0), 0))
@@ -84,7 +87,7 @@ export function StackedColumns({
         </ul>
       )}
       <div
-        ref={box}
+        ref={setBox}
         className="relative outline-none focus-visible:ring-2 focus-visible:ring-accent"
         tabIndex={0}
         role="group"
