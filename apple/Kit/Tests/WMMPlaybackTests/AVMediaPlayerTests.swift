@@ -84,6 +84,45 @@ import Testing
         p.release()
     }
 
+    @Test func aSeekMadeElsewhereWhileTheStartSeekIsOutStillStartsThePlay() async throws {
+        let movie = try await Self.movie()
+        let p = AVMediaPlayer()
+        var cut = false
+        p.setListener(MediaPlayerListener(changed: {
+            // As the start seek goes out, the Apple TV's transport bar seeks the AVPlayer itself.
+            guard !cut, p.startSeeks == 1 else { return }
+            cut = true
+            p.player.seek(to: CMTime(value: 2_000, timescale: 1_000), toleranceBefore: .zero, toleranceAfter: .zero)
+        }, failed: { _ in }, time: {}))
+        p.load(PlayerSource(url: movie, mimeType: "video/mp4", hls: false, live: false, startPositionMs: 1_000, playWhenReady: true, title: "Test"))
+        try await until { p.phase == .ready }
+        #expect(cut)
+        // Where the viewer took it, not the start, and playing from there.
+        #expect(p.positionMs >= 1_900)
+        try await until { p.positionMs >= 2_300 }
+        #expect(p.playWhenReady)
+        #expect(p.startSeeks == 1)
+        p.release()
+    }
+
+    @Test func aSeekOfOursWhileTheStartSeekIsOutStartsThereInstead() async throws {
+        let movie = try await Self.movie()
+        let p = AVMediaPlayer()
+        var moved = false
+        p.setListener(MediaPlayerListener(changed: {
+            guard !moved, p.startSeeks == 1 else { return }
+            moved = true
+            p.seek(toMs: 2_000)
+        }, failed: { _ in }, time: {}))
+        p.load(PlayerSource(url: movie, mimeType: "video/mp4", hls: false, live: false, startPositionMs: 1_000, playWhenReady: false, title: "Test"))
+        try await until { p.phase == .ready }
+        #expect(moved)
+        #expect(p.startSeeks == 2)
+        #expect(abs(p.positionMs - 2_000) <= 100)
+        #expect(!p.playWhenReady)
+        p.release()
+    }
+
     @Test func aFileThatIsNotThereFails() async throws {
         let p = AVMediaPlayer()
         var failures: [PlayerFailure] = []

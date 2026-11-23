@@ -99,6 +99,29 @@ import WMMModel
         #expect(h.gateway.decisions.last?.startMs == 1_000_000)
     }
 
+    @Test func aTransportBarSeekWhileASeekIsFetchedIsWhereTheNewStreamStarts() async {
+        // An event session: a seek past what it has produced fetches a new one there.
+        var hold: CheckedContinuation<Void, Never>?
+        await h.start(PlayRequest(fileID: 1, startMs: 0, title: "Lighthouse")) { r in
+            decision(sessionID: r.playID == nil ? "e1" : "e2", vod: false, startMs: r.startMs ?? 0)
+        }
+        await h.advance(10_000)
+        h.gateway.deciding = { _ in await withCheckedContinuation { hold = $0 } }
+        h.controller.seek(toMs: 20 * minute)
+        for _ in 0..<100 where hold == nil { await Task.yield() }
+        #expect(hold != nil)
+        // The old stream still shows: the transport bar seeks it, on its own clock.
+        h.controller.noteSeek(playerMs: 5_000)
+        h.player.jump(toMs: 5_000)
+        #expect(h.state.positionMs == 5_000)
+        h.gateway.deciding = nil
+        hold?.resume()
+        await h.run()
+        // The session fetched for the first place doesn't start near the second: one there.
+        #expect(h.gateway.decisions.last?.startMs == 5_000)
+        #expect(h.state.positionMs == 5_000)
+    }
+
     @Test func vodSeeksNeverReRequest() async {
         await h.start(PlayRequest(fileID: 1, startMs: 0, title: "Lighthouse"), decision())
         h.controller.seek(toMs: 40 * minute)

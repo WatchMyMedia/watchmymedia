@@ -35,9 +35,11 @@ import WMMModel
         await h.advance(250)
         #expect(Array(h.states.suffix(2)) == [.paused, .paused])
 
-        // Buffering: at once, then every 30 s.
+        // Buffering: at once, then every 30 s. Waiting on the network, with nothing in hand:
+        // 30 s still with a full buffer would be a stuck player (StuckPlayerTests).
         h.controller.play()
         await h.run()
+        h.player.bufferAheadMs = 0
         h.player.buffer()
         await h.run()
         #expect(Array(h.states.suffix(2)) == [.playing, .buffering])

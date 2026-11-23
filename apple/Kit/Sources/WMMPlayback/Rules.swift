@@ -53,6 +53,15 @@ let tickMs = 250
 let maxRecoveries = 2
 let recoveryResetMs = 60_000
 
+/// Buffering this long without moving, with at least ``stuckBufferMs`` in
+/// hand, is a stuck player: with that much loaded ahead and nothing moving
+/// for so long, it is not waiting on the network.
+let stuckMs = 10_000
+let stuckBufferMs = 10_000
+
+/// What a player that stayed stuck after a new load says; Play tries again.
+let stuckMessage = "Playback stopped and didn’t start again."
+
 /// How the player's clock maps onto the file. VOD playlists and direct play
 /// start at 0, so file position = player time; an event playlist starts at
 /// the decision's `startMs`.
