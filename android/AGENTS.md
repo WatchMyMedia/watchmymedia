@@ -262,6 +262,22 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   row with an `enter` card (`CardRow`) takes the remembered card as its way
   in when it is composed again
   (`tv/src/main/kotlin/media/watchmy/client/tv/detail/RelatedRows.kt`).
+- **TV sizes and focus.** Text on the TV uses `TvType`'s seven sizes and
+  nothing under 22 outside Settings; focus is `FocusableBox`'s one treatment
+  and "chosen" is a gold tick or underline (README, "TV focus" and "TV
+  sizes"). Keep text and controls inside `SafeX` and `SafeY`.
+- **A way across that can be missing.** `focusProperties { up = r }` (or
+  `right`) with a requester whose element isn't composed cancels the move:
+  focus stays put. Where the target can be absent (a button that leaves the
+  page once watched, results not in yet), catch the key in
+  `onPreviewKeyEvent` and try targets in turn with `tryFocus()`, as `upTo`
+  in `tv/src/main/kotlin/media/watchmy/client/tv/detail/DetailParts.kt` and
+  Search's microphone do.
+- **Tests with a panel open.** A `TvDialog` is a window of its own, so while
+  one is open there are two semantics roots and two focused nodes.
+  `onRoot().performKeyInput` fails: send keys to the focused node that has
+  a dialog ancestor, and Back through `ShadowDialog.getLatestDialog()`'s
+  dispatcher, as `SettingsFocusTest` and `LibraryFocusTest` do.
 - **Cleared semantics and focus.** A card or cell that `clearAndSetSemantics`
   to read as one thing clears its own focus state with its parts', so it
   must set `focused` itself (as `TvOnNowCard` does). Without it TalkBack is
