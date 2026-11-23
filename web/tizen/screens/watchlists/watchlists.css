@@ -66,16 +66,16 @@
 
 /* A watchlist's page: its buttons, then the type chips and the sort, over its titles. */
 .wl-page-head { top: 3.5rem; }
-.wl-actions { position: absolute; left: var(--content-left); right: var(--gutter); top: 11.875rem; display: flex; align-items: center; gap: 1.375rem; }
+.wl-actions { position: absolute; left: var(--content-left); right: var(--gutter); top: 13.25rem; display: flex; align-items: center; gap: 1.375rem; }
 .wl-actions__note { max-width: 38.75rem; margin-left: .25rem; font-size: var(--t-small); line-height: 1.4; color: var(--muted); }
-.wl-filters { position: absolute; left: var(--content-left); right: var(--gutter); top: 15.875rem; display: flex; align-items: center; justify-content: space-between; }
+.wl-filters { position: absolute; left: var(--content-left); right: var(--gutter); top: 19rem; display: flex; align-items: center; justify-content: space-between; }
 .wl-filters__sort { display: flex; align-items: center; gap: 1rem; font-size: var(--t-small); color: var(--muted); }
 .wl-filters .tv-chip svg { width: 1.25rem; height: 1.25rem; }
-.list-grid.wl-grid { top: 20.375rem; }
-.wl-empty { position: absolute; left: var(--content-left); right: var(--gutter); top: 16.5rem; display: flex; flex-direction: column; gap: .75rem; }
+.list-grid.wl-grid { top: 24.5rem; }
+.wl-empty { position: absolute; left: var(--content-left); right: var(--gutter); top: 24.5rem; display: flex; flex-direction: column; gap: .75rem; }
 .wl-empty h2 { font-size: 1.75rem; font-weight: 700; }
 .wl-empty p { font-size: var(--t-small); color: var(--muted); }
-.wl-hint { position: absolute; right: var(--gutter); bottom: 2.25rem; }
+.wl-hint { position: absolute; right: var(--gutter); bottom: var(--safe-y); }
 
 /* The title pages' button once the title is on a watchlist: gold, bookmark and words. */
 .wl-on .tv-btn { color: var(--accent); }

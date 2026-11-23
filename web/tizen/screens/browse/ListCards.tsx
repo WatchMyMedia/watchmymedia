@@ -62,7 +62,7 @@ export function EntryView({ id, entry, ranked = true, watchlist = false, menu = 
     const actions = itemActions(item)
     return <span className="browse-card" data-hint={card.hint} data-hold={card.hold}>
       <Card id={id} variant="poster" title={item.title} subtitle={gridLine(item)} image={media.imageUrl(item.posterPath, 'w342')} progress={item.progress}
-        badges={[...(ranked ? [{ label: String(entry.rank) }] : []), ...(item.watched ? [{ label: '✓', tone: 'gold' as const }] : [])]} label={entryLabel(entry, card, ranked)}
+        badges={ranked ? [{ label: String(entry.rank) }] : undefined} done={!!item.watched} label={entryLabel(entry, card, ranked)}
         onPress={actions.press && (() => run(actions.press))} onHold={actionsPanel ?? (actions.hold && (() => run(actions.hold)))}/>
     </span>
   }
