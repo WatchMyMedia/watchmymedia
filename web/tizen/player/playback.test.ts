@@ -3,9 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { paths } from '../../src/api/schema'
 import { StillWatchingSession } from '../../src/lib/stillWatching'
 import { PlayerError, type Decision, type Progress, type SubtitleSearch, type SubtitleTrack } from './api'
+import { PlaybackFailure } from './avplay'
 import type { Clock } from './clock'
 import { FakePlayer } from './fake-player'
 import { DEFAULT_SETTINGS, failureOf, FilePlayback, playbackSettings, type FileRequest, type PlaybackSettings } from './playback'
+import { SEND_AFTER_MS } from './seek'
+import { STUCK_MESSAGE, STUCK_MS, STUCK_UNSEEN_MS } from './stuck'
 
 const HOUR = 3_600_000
 type Sent = { method: string; path: string; body?: Record<string, unknown> }
@@ -78,6 +81,8 @@ async function started(h: ReturnType<typeof harness>, request: FileRequest = { k
   await h.c.play(request)
   await h.settle()
 }
+
+const seeks = (h: ReturnType<typeof harness>) => h.player.calls.filter((c) => c.startsWith('seek'))
 
 afterEach(() => vi.useRealTimers())
 
@@ -263,7 +268,9 @@ describe('seeking with the remote', () => {
     expect(h.c.snapshot().scrub?.step).toBe('+30 s')
     expect(h.images).toEqual(['https://tv.example/api/files/1/trickplay/v1/0.jpg?access_token=media-1'])
     h.c.commitScrub()
-    expect(h.player.calls.filter((c) => c.startsWith('seek'))).toEqual([`seek:${target}`])
+    expect(seeks(h)).toEqual([])
+    await vi.advanceTimersByTimeAsync(SEND_AFTER_MS)
+    expect(seeks(h)).toEqual([`seek:${target}`])
     await h.run(250)
     expect(h.c.snapshot().scrub).toBeUndefined()
     expect(h.c.snapshot().positionMs).toBe(target + 250)
@@ -274,10 +281,46 @@ describe('seeking with the remote', () => {
     await started(h)
     await h.run(20_000)
     h.c.beginScrub(-1); h.c.commitScrub()
+    await vi.advanceTimersByTimeAsync(SEND_AFTER_MS)
     expect(h.player.calls.at(-1)).toBe('seek:10000')
     h.c.beginScrub(1); h.c.cancelScrub()
+    await vi.advanceTimersByTimeAsync(SEND_AFTER_MS)
     expect(h.c.snapshot().scrub).toBeUndefined()
     expect(h.player.calls.at(-1)).toBe('seek:10000')
+  })
+
+  it('makes a run of quick presses one seek, to where they add up, once the remote is quiet', async () => {
+    const h = harness()
+    await started(h)
+    await h.run(60_000)
+    for (let n = 0; n < 3; n++) { h.c.beginScrub(-1); h.c.commitScrub(); await vi.advanceTimersByTimeAsync(150) }
+    expect(seeks(h)).toEqual([])
+    expect(h.c.snapshot().scrub?.targetMs).toBe(30_000)
+    await vi.advanceTimersByTimeAsync(SEND_AFTER_MS)
+    expect(seeks(h)).toEqual(['seek:30000'])
+    // Presses further apart than that are a seek each.
+    h.c.beginScrub(1); h.c.commitScrub(); await vi.advanceTimersByTimeAsync(SEND_AFTER_MS)
+    h.c.beginScrub(1); h.c.commitScrub(); await vi.advanceTimersByTimeAsync(SEND_AFTER_MS)
+    expect(seeks(h)).toEqual(['seek:30000', 'seek:40000', 'seek:50000'])
+  })
+
+  it('loads the stream again at a seek’s target when the TV refuses or never finishes it, unless a later seek is on its way', async () => {
+    const h = harness({ decide: () => hls() })
+    await started(h)
+    await h.run(20_000)
+    const answers: ((error?: unknown) => void)[] = []
+    const seek = h.player.seek.bind(h.player)
+    h.player.seek = (ms) => new Promise<void>((resolve, reject) => { answers.push((error) => { if (error) reject(error); else void seek(ms).then(resolve) }) })
+    const unanswered = new PlaybackFailure('The TV’s player didn’t answer. Stop and try again.', { code: 'TIMEOUT', kind: 'network' })
+    h.c.seekTo(300_000)
+    h.c.seekTo(200_000)
+    answers[0](unanswered); await h.settle()
+    expect(h.decisions()).toHaveLength(1)
+    answers[1](unanswered); await h.settle()
+    expect(h.decisions()).toHaveLength(2)
+    expect(h.decisions().at(-1)?.body).toMatchObject({ startMs: 200_000, playId: 'aaaaaaaaaaaaaaaa' })
+    await h.run(1000)
+    expect(h.c.snapshot()).toMatchObject({ phase: 'playing', positionMs: 201_000 })
   })
 
   it('seeks an event session within what it produced, and asks for a new one outside it', async () => {
@@ -499,6 +542,70 @@ describe('subtitles', () => {
     await started(h); await h.settle()
     expect(h.decisions().at(-1)?.body).toMatchObject({ subtitleId: 'd5', subtitleMode: 'auto' })
     expect(h.c.snapshot().subtitles).toMatchObject({ selected: 'd5', automatic: true })
+  })
+})
+
+describe('a stuck play', () => {
+  it('is got going: a seek where it is, then the stream again there, then a message that Play retries', async () => {
+    const h = harness({ decide: () => hls() })
+    await started(h)
+    await h.run(60_000)
+    // Waiting with no end and no error: AVPlay doesn't say what it holds.
+    h.player.emit({ state: 'buffering' })
+    await vi.advanceTimersByTimeAsync(STUCK_UNSEEN_MS - 1_000)
+    expect(seeks(h)).toEqual([])
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(seeks(h)).toEqual(['seek:60000'])
+    expect(h.decisions()).toHaveLength(1)
+
+    await vi.advanceTimersByTimeAsync(STUCK_UNSEEN_MS)
+    expect(h.decisions()).toHaveLength(2)
+    expect(h.decisions().at(-1)?.body).toMatchObject({ startMs: 60_000, playId: 'aaaaaaaaaaaaaaaa' })
+
+    h.player.emit({ state: 'buffering' })
+    await vi.advanceTimersByTimeAsync(STUCK_UNSEEN_MS)
+    expect(h.c.snapshot()).toMatchObject({ phase: 'error', error: STUCK_MESSAGE, failure: { kind: 'other' } })
+    expect(h.player.calls.at(-1)).toBe('stop')
+    expect(h.decisions()).toHaveLength(2)
+
+    h.c.resume(); await h.settle()
+    expect(h.decisions()).toHaveLength(3)
+    await h.run(1000)
+    expect(h.c.snapshot()).toMatchObject({ phase: 'playing', positionMs: 61_000 })
+  })
+
+  it('acts after 10 s when the player says it holds plenty, and never while it waits on the network or is paused', async () => {
+    const h = harness()
+    await started(h)
+    await h.run(60_000)
+    h.player.emit({ state: 'buffering', bufferedMs: 2_000 })
+    await vi.advanceTimersByTimeAsync(2 * STUCK_UNSEEN_MS)
+    expect(seeks(h)).toEqual([])
+    h.c.pause()
+    h.player.emit({ bufferedMs: 30_000 })
+    await vi.advanceTimersByTimeAsync(2 * STUCK_UNSEEN_MS)
+    expect(seeks(h)).toEqual([])
+    h.c.resume()
+    h.player.emit({ state: 'buffering' })
+    await vi.advanceTimersByTimeAsync(STUCK_MS - 1_000)
+    expect(seeks(h)).toEqual([])
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(seeks(h)).toEqual(['seek:60000'])
+  })
+
+  it('starts again from a seek in place after a minute of playing', async () => {
+    const h = harness()
+    await started(h)
+    await h.run(60_000)
+    h.player.emit({ state: 'buffering' })
+    await vi.advanceTimersByTimeAsync(STUCK_UNSEEN_MS)
+    expect(seeks(h)).toEqual(['seek:60000'])
+    h.player.emit({ state: 'playing' })
+    await h.run(61_000)
+    h.player.emit({ state: 'buffering' })
+    await vi.advanceTimersByTimeAsync(STUCK_UNSEEN_MS)
+    expect(seeks(h)).toEqual(['seek:60000', 'seek:121000'])
+    expect(h.decisions()).toHaveLength(1)
   })
 })
 

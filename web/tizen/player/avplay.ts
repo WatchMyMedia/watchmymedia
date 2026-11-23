@@ -196,11 +196,15 @@ export function readTracks(tracks: AVTrack[]): PlayerTrack[] {
 /**
  * AVPlay is one stateful native player. Operations run one at a time; each
  * open starts a generation, and a callback or event from an older one is
- * dropped, so a late prepare can't restart a stopped play.
+ * dropped, so a late prepare can't restart a stopped play. A seek still
+ * waiting its turn when a newer one is asked for is dropped too: only the
+ * newest one's place matters, and each seek waits on AVPlay's answer.
  */
 export class AVPlayPlayer implements Player {
   readonly name = 'Samsung AVPlay'
   private generation = 0
+  /** Seeks asked for: one still waiting when a newer one comes is dropped. */
+  private seeks = 0
   private queue: Promise<void> = Promise.resolve()
   private paused = false
   private started = false
@@ -314,8 +318,9 @@ export class AVPlayPlayer implements Player {
 
   seek(ms: number): Promise<void> {
     const generation = this.generation
+    const seek = ++this.seeks
     return this.serial(async () => {
-      if (generation !== this.generation || !this.started) return
+      if (generation !== this.generation || !this.started || seek !== this.seeks) return
       let landedMs = Math.round(Math.max(0, ms))
       if (this.live) await this.callback((ok, fail) => this.api.seekTo(landedMs, ok, fail))
       else landedMs = await this.land(generation, ms)
@@ -325,10 +330,12 @@ export class AVPlayPlayer implements Player {
 
   /** Seeks a file to `ms`, or a keyframe before it, landing no later than `latestMs`; resolves with where it landed. */
   private async land(generation: number, ms: number, latestMs = ms + LANDING_SLACK_MS): Promise<number> {
+    const seeks = this.seeks
     let target = this.target(ms)
     let landed = await this.seekOnce(target)
     for (const earlier of [() => landed - KEYFRAME_GAP_MS, () => ms - FAR_BACK_MS]) {
-      if (generation !== this.generation || landed <= latestMs || target <= 1) break
+      // A newer seek is waiting: it lands instead.
+      if (generation !== this.generation || seeks !== this.seeks || landed <= latestMs || target <= 1) break
       const next = this.target(earlier())
       if (next >= target) continue
       target = next

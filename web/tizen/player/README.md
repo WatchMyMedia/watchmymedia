@@ -76,12 +76,22 @@ files.play({ kind: 'trailer', fileId, title })             // from 0, and leaves
 
 Commands: `pause`, `resume`, `togglePause`, `seekTo`, `seekBy`,
 `beginScrub(±1)` on a seek key's first press, `scrubStep(±1)` on its repeats,
-`commitScrub` when it comes up, `cancelScrub` on Back; `skip`, `playNext`,
+`commitScrub` when it comes up (the seek goes once the remote has been quiet
+400 ms, so a run of quick presses, or of the ±10 s buttons, is one seek),
+`cancelScrub` on Back; `skip`, `playNext`,
 `watchCredits`, `keepWatching` (No is `stop`), `goToNow`; `selectAudio(index)`,
 `selectSubtitle(id | undefined)`, `downloadSubtitle(resultId)`,
 `setQuality(id)`; `noteInput()` for any other key; `suspend` and `restore`
 when the app is hidden and shown; `stop` (resolves once the last report and
 the session's end have gone) and `release`.
+
+A play left waiting with no error is got going again (`stuck.ts`): standing
+still 10 s with 10 s in hand, or 30 s when the player can't say what it holds
+(AVPlay never does), it seeks where it is, then loads the stream again
+there, then stops with a message that Play retries; a minute of playing
+starts the steps again. A seek AVPlay refuses or never answers loads the
+stream again at its target, as a dropped stream does, and a seek still
+waiting its turn when a newer one comes is dropped.
 
 ## Live TV
 
@@ -109,4 +119,4 @@ playlists, seeking near the end, `getTotalTrackInfo` and `setSelectTrack`,
 `setSilentSubtitle`, `GET_LIVE_DURATION`, `suspend` and `restore`, the HTTP
 status event, 4K mode and HDR10 all wait for the QN90D session,
 as does how often AVPlay reports the time, which the cue
-timing rides on.
+timing rides on, and how a stuck AVPlay looks (buffering or playing, still).

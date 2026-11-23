@@ -2,8 +2,9 @@
  * Seeking with the remote, as Android TV does it (tv/player/Seeking.kt): a
  * press moves the target 10 s; held, the key repeats and the step grows to
  * 30 s, 1 min and then 2 min, at most one step every 200 ms. The seek is
- * sent once, when the key comes up, and the target stays on screen until the
- * position reaches it.
+ * sent once the key has come up and the remote has been quiet SEND_AFTER_MS,
+ * so a run of quick presses is one seek to where they add up, and the target
+ * stays on screen until the position reaches it.
  */
 export const PRESS_MS = 10_000
 export const REPEAT_INTERVAL_MS = 200
@@ -12,8 +13,14 @@ export const MAX_STEP_MS = 120_000
 const TIERS: readonly (readonly [number, number])[] = [[2_000, 10_000], [4_000, 30_000], [7_000, 60_000]]
 /** The target is reached within this. */
 export const LANDED_WITHIN_MS = 1_500
-/** After release the target shows at most this long while the seek lands. */
+/** After the seek goes, the target shows at most this long while it lands. */
 export const SETTLE_TIMEOUT_MS = 2_500
+/**
+ * How long after a key comes up the seek waits for another press. Every seek
+ * flushes the player and, on a stream the server makes, can start its
+ * encoder again: three quick presses back are one seek 30 s back, not three.
+ */
+export const SEND_AFTER_MS = 400
 
 export class SeekAccelerator {
   private heldSince?: number
@@ -42,6 +49,8 @@ export class Scrub {
   private target?: number
   private step = 0
   private holding = false
+  /** Released, and not sent yet. */
+  private unsent = false
   private releasedAt = 0
   private readonly accelerator = new SeekAccelerator()
 
@@ -53,20 +62,30 @@ export class Scrub {
     const max = durationMs > 0 ? durationMs : Number.MAX_SAFE_INTEGER
     this.target = Math.min(Math.max(from + step * direction, 0), max)
     this.holding = true
+    this.unsent = false
   }
 
-  /** The key came up: where to seek, or undefined when nothing was pressed. */
-  release(now: number): number | undefined {
+  /** The key came up: true when there is a target to send once the remote has been quiet SEND_AFTER_MS. */
+  release(now: number): boolean {
     this.accelerator.release()
-    if (!this.holding) return undefined
+    if (!this.holding) return false
     this.holding = false
+    this.unsent = true
+    this.releasedAt = now
+    return true
+  }
+
+  /** The remote has been quiet: where to seek, once; undefined while a key is down or with nothing to send. */
+  send(now: number): number | undefined {
+    if (this.holding || !this.unsent) return undefined
+    this.unsent = false
     this.releasedAt = now
     return this.target
   }
 
   /** The position reached the target, or the seek had long enough: the scrubber follows the position again. */
   settle(positionMs: number, now: number) {
-    if (this.holding || this.target === undefined) return
+    if (this.holding || this.unsent || this.target === undefined) return
     if (Math.abs(positionMs - this.target) <= LANDED_WITHIN_MS || now - this.releasedAt >= SETTLE_TIMEOUT_MS) this.clear()
   }
 
@@ -74,6 +93,7 @@ export class Scrub {
     this.accelerator.release()
     this.target = undefined
     this.holding = false
+    this.unsent = false
     this.step = 0
   }
 
