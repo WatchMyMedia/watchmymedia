@@ -20,6 +20,7 @@ import (
 	"watchmymedia/server/internal/db"
 	"watchmymedia/server/internal/library"
 	"watchmymedia/server/internal/metadata"
+	"watchmymedia/server/internal/people"
 )
 
 // newWindow is how long after its newest file arrived an item can carry the
@@ -1193,10 +1194,10 @@ func unmatchedItems(ctx context.Context, deps Deps, lib db.Library, withEpisodes
 }
 
 // credits decodes the stored cast list.
-func credits(raw string) []metadata.Credit {
-	var out []metadata.Credit
+func credits(raw string) []people.Credit {
+	var out []people.Credit
 	if err := json.Unmarshal([]byte(raw), &out); err != nil || out == nil {
-		return []metadata.Credit{}
+		return []people.Credit{}
 	}
 	return out
 }

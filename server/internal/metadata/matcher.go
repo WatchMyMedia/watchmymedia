@@ -21,6 +21,7 @@ import (
 	"watchmymedia/server/internal/library"
 	"watchmymedia/server/internal/memo"
 	"watchmymedia/server/internal/parser"
+	"watchmymedia/server/internal/people"
 	"watchmymedia/server/internal/related"
 	"watchmymedia/server/internal/scanner"
 	"watchmymedia/server/internal/tmdb"
@@ -803,7 +804,7 @@ func (m *Matcher) storeMovie(ctx context.Context, lib db.Library, tmdbID int) (i
 			Rating:        floatPtrNonZero(mv.VoteAverage),
 			PosterPath:    nilIfEmpty(mv.PosterPath),
 			BackdropPath:  nilIfEmpty(mv.BackdropPath),
-			Credits:       creditsJSON(mv.Credits),
+			Credits:       people.CreditsJSON(mv.Credits),
 			ContentRating: new(mv.ReleaseDates.Certification(RatingCountry)),
 			// The videos came with the details, so the trailers are checked
 			// now too.
@@ -814,31 +815,16 @@ func (m *Matcher) storeMovie(ctx context.Context, lib db.Library, tmdbID int) (i
 			return err
 		}
 		id = row.ID
+		// The cast with its person IDs, and the crew, are the title's too.
+		if err := people.StoreMovie(ctx, q, row.ID, mv, time.Now()); err != nil {
+			return err
+		}
 		return related.StoreMovie(ctx, q, row.ID, mv, time.Now())
 	})
 	if err != nil {
 		return 0, err
 	}
 	return id, nil
-}
-
-// Credit is a top-billed cast member kept with a movie or show.
-type Credit struct {
-	Name        string `json:"name"`
-	Character   string `json:"character,omitempty"`
-	ProfilePath string `json:"profilePath,omitempty"`
-}
-
-func creditsJSON(c tmdb.Credits) string {
-	out := make([]Credit, 0, 12)
-	for _, m := range c.Cast {
-		if len(out) == 12 {
-			break
-		}
-		out = append(out, Credit{Name: m.Name, Character: m.Character, ProfilePath: m.ProfilePath})
-	}
-	b, _ := json.Marshal(out)
-	return string(b)
 }
 
 // --- shows and episodes ---------------------------------------------------
@@ -1009,14 +995,18 @@ func (m *Matcher) storeShow(ctx context.Context, lib db.Library, tmdbID int) (db
 			BackdropPath:  nilIfEmpty(tv.BackdropPath),
 			LastAirDate:   nilIfEmpty(tv.LastAirDate),
 			NextAirDate:   nextAirDate(tv.NextEpisode),
-			Credits:       creditsJSON(tv.Credits),
+			Credits:       people.CreditsJSON(tv.Credits),
 			ContentRating: new(tv.ContentRatings.Certification(RatingCountry)),
 		})
 		if err != nil {
 			return err
 		}
-		// The details came with what related titles need too.
+		// The details came with what related titles need too, and the
+		// cast with its person IDs.
 		if err := related.StoreShow(ctx, q, show.ID, tv, time.Now()); err != nil {
+			return err
+		}
+		if err := people.StoreShow(ctx, q, show.ID, tv, time.Now()); err != nil {
 			return err
 		}
 		for i, s := range tv.Seasons {

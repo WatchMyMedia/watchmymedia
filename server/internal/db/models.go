@@ -425,6 +425,17 @@ type Movie struct {
 	CollectionID      *int64   `json:"collection_id"`
 	CollectionName    *string  `json:"collection_name"`
 	RelatedCheckedAt  *string  `json:"related_checked_at"`
+	Crew              string   `json:"crew"`
+	CastCheckedAt     *string  `json:"cast_checked_at"`
+}
+
+type MovieCast struct {
+	MovieID     int64   `json:"movie_id"`
+	Billing     int64   `json:"billing"`
+	PersonID    int64   `json:"person_id"`
+	Name        string  `json:"name"`
+	Character   string  `json:"character"`
+	ProfilePath *string `json:"profile_path"`
 }
 
 type MovieTag struct {
@@ -786,6 +797,17 @@ type Show struct {
 	PosterTmdb       *string  `json:"poster_tmdb"`
 	PosterSource     string   `json:"poster_source"`
 	RelatedCheckedAt *string  `json:"related_checked_at"`
+	Crew             string   `json:"crew"`
+	CastCheckedAt    *string  `json:"cast_checked_at"`
+}
+
+type ShowCast struct {
+	ShowID      int64   `json:"show_id"`
+	Billing     int64   `json:"billing"`
+	PersonID    int64   `json:"person_id"`
+	Name        string  `json:"name"`
+	Character   string  `json:"character"`
+	ProfilePath *string `json:"profile_path"`
 }
 
 type ShowFollow struct {

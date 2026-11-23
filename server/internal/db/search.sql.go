@@ -11,7 +11,7 @@ import (
 )
 
 const listMoviesByIDs = `-- name: ListMoviesByIDs :many
-SELECT id, library_id, tmdb_id, imdb_id, title, original_title, year, release_date, overview, tagline, runtime_min, genres, rating, poster_path, backdrop_path, created_at, updated_at, credits, content_rating, trailers, trailers_checked_at, poster_tmdb, poster_source, collection_id, collection_name, related_checked_at FROM movies WHERE id IN (/*SLICE:ids*/?)
+SELECT id, library_id, tmdb_id, imdb_id, title, original_title, year, release_date, overview, tagline, runtime_min, genres, rating, poster_path, backdrop_path, created_at, updated_at, credits, content_rating, trailers, trailers_checked_at, poster_tmdb, poster_source, collection_id, collection_name, related_checked_at, crew, cast_checked_at FROM movies WHERE id IN (/*SLICE:ids*/?)
 `
 
 func (q *Queries) ListMoviesByIDs(ctx context.Context, ids []int64) ([]Movie, error) {
@@ -60,6 +60,8 @@ func (q *Queries) ListMoviesByIDs(ctx context.Context, ids []int64) ([]Movie, er
 			&i.CollectionID,
 			&i.CollectionName,
 			&i.RelatedCheckedAt,
+			&i.Crew,
+			&i.CastCheckedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -155,7 +157,7 @@ func (q *Queries) ListSearchEpisodesByIDs(ctx context.Context, ids []int64) ([]L
 }
 
 const listShowsByIDs = `-- name: ListShowsByIDs :many
-SELECT id, library_id, tmdb_id, title, original_title, year, first_air_date, overview, status, genres, rating, poster_path, backdrop_path, created_at, updated_at, last_air_date, next_air_date, credits, content_rating, poster_tmdb, poster_source, related_checked_at FROM shows WHERE id IN (/*SLICE:ids*/?)
+SELECT id, library_id, tmdb_id, title, original_title, year, first_air_date, overview, status, genres, rating, poster_path, backdrop_path, created_at, updated_at, last_air_date, next_air_date, credits, content_rating, poster_tmdb, poster_source, related_checked_at, crew, cast_checked_at FROM shows WHERE id IN (/*SLICE:ids*/?)
 `
 
 func (q *Queries) ListShowsByIDs(ctx context.Context, ids []int64) ([]Show, error) {
@@ -200,6 +202,8 @@ func (q *Queries) ListShowsByIDs(ctx context.Context, ids []int64) ([]Show, erro
 			&i.PosterTmdb,
 			&i.PosterSource,
 			&i.RelatedCheckedAt,
+			&i.Crew,
+			&i.CastCheckedAt,
 		); err != nil {
 			return nil, err
 		}

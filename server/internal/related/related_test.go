@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -255,6 +257,10 @@ func TestRefresher(t *testing.T) {
 	show := e.show(3, 13, "A show", 2010)
 	old := e.movie(1, 14, "Old data", 2010)
 	e.exec(`UPDATE movies SET related_checked_at = ? WHERE id = ?`, db.FormatTime(now.Add(-200*24*time.Hour)), old)
+	// Their cast is stored with person IDs already: this is about related
+	// data alone (TestRefresherFillsInCast is about the cast).
+	e.exec(`UPDATE movies SET cast_checked_at = ?`, db.FormatTime(now))
+	e.exec(`UPDATE shows SET cast_checked_at = ?`, db.FormatTime(now))
 	fake.JSON("/movie/11", map[string]any{"id": 11, "belongs_to_collection": map[string]any{"id": 5, "name": "Five"},
 		"keywords": map[string]any{"keywords": []any{map[string]any{"id": 1}}}, "recommendations": map[string]any{"results": []any{map[string]any{"id": 14}}}})
 	fake.JSON("/tv/13", map[string]any{"id": 13, "keywords": map[string]any{"results": []any{map[string]any{"id": 2}}}})
@@ -315,5 +321,107 @@ func TestRefresher(t *testing.T) {
 	none.Want("movie", fresh)
 	if more, err := none.RunOnce(context.Background()); more || err != nil || fake.Total() != before {
 		t.Errorf("unconfigured: more %v err %v requests %d", more, err, fake.Total()-before)
+	}
+}
+
+// TestRefresherFillsInCast: titles matched before person IDs were kept get
+// their credits fetched again, once each, a batch at a time; a run stopped
+// partway leaves the rest for the next; a title TMDB no longer has is
+// marked so it isn't asked for again, keeping the cast it has.
+func TestRefresherFillsInCast(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	ctx := t.Context()
+	fake := tmdbtest.New(t)
+	a := e.movie(1, 21, "First", 2001)
+	b := e.movie(1, 22, "Second", 2002)
+	gone := e.movie(1, 23, "Gone from TMDB", 2003)
+	show := e.show(3, 24, "A show", 2004)
+	e.exec(`UPDATE movies SET related_checked_at = ?, credits = '[{"name":"Old Name"}]'`, db.FormatTime(now))
+	e.exec(`UPDATE shows SET related_checked_at = ?`, db.FormatTime(now))
+	cast := func(people ...map[string]any) map[string]any {
+		list := make([]any, 0, len(people))
+		for _, p := range people {
+			list = append(list, p)
+		}
+		return map[string]any{"cast": list, "crew": []any{map[string]any{"id": 900, "name": "Dana Reel", "job": "Director"}}}
+	}
+	fake.JSON("/movie/21", map[string]any{"id": 21, "credits": cast(map[string]any{"id": 501, "name": "Ada Vale", "character": "Io"})})
+	fake.JSON("/movie/22", map[string]any{"id": 22, "credits": cast(map[string]any{"id": 501, "name": "Ada Vale", "character": "Maren"},
+		map[string]any{"id": 502, "name": "Ben Lark", "character": "Pilot"})})
+	fake.JSON("/tv/24", map[string]any{"id": 24, "credits": cast(map[string]any{"id": 501, "name": "Ada Vale", "character": "Holt"}),
+		"created_by": []any{map[string]any{"id": 901, "name": "Cy Maker"}}})
+
+	r := New(e.q, fake.Client(), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	r.Now = func() time.Time { return now }
+	r.Batch = 2
+	if more, err := r.RunOnce(ctx); err != nil || !more {
+		t.Fatalf("first run: more %v, err %v", more, err)
+	}
+	if fake.Count("/movie/21") != 1 || fake.Count("/movie/22") != 1 || fake.Count("/movie/23") != 0 {
+		t.Fatalf("first run fetched %d %d %d", fake.Count("/movie/21"), fake.Count("/movie/22"), fake.Count("/movie/23"))
+	}
+	if more, err := r.RunOnce(ctx); err != nil || !more {
+		t.Fatalf("second run: more %v, err %v", more, err)
+	}
+	if more, err := r.RunOnce(ctx); err != nil || more {
+		t.Fatalf("third run: more %v, err %v", more, err)
+	}
+	// Each title once, and nothing more however often it runs.
+	before := fake.Total()
+	if more, err := r.RunOnce(ctx); err != nil || more || fake.Total() != before {
+		t.Fatalf("a run with nothing left: more %v, err %v, requests %d", more, err, fake.Total()-before)
+	}
+	for _, path := range []string{"/movie/21", "/movie/22", "/movie/23", "/tv/24"} {
+		if n := fake.Count(path); n != 1 {
+			t.Errorf("%s fetched %d times", path, n)
+		}
+	}
+	for _, id := range []int64{a, b, gone} {
+		var checked *string
+		if err := e.conn.QueryRowContext(ctx, `SELECT cast_checked_at FROM movies WHERE id = ?`, id).Scan(&checked); err != nil || checked == nil {
+			t.Errorf("movie %d not marked checked: %v", id, err)
+		}
+	}
+	var credits, crew string
+	if err := e.conn.QueryRowContext(ctx, `SELECT credits, crew FROM movies WHERE id = ?`, b).Scan(&credits, &crew); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(credits, `"personId":502`) || !strings.Contains(crew, `"job":"Director"`) {
+		t.Errorf("credits %s, crew %s", credits, crew)
+	}
+	if err := e.conn.QueryRowContext(ctx, `SELECT credits FROM movies WHERE id = ?`, gone).Scan(&credits); err != nil || credits != `[{"name":"Old Name"}]` {
+		t.Errorf("a movie TMDB lacks lost its cast: %s, %v", credits, err)
+	}
+	var n int
+	if err := e.conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM movie_cast WHERE person_id = 501`).Scan(&n); err != nil || n != 2 {
+		t.Errorf("person 501 in %d movies, want 2 (%v)", n, err)
+	}
+	if err := e.conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM show_cast WHERE person_id = 501 AND show_id = ?`, show).Scan(&n); err != nil || n != 1 {
+		t.Errorf("person 501 in the show %d times (%v)", n, err)
+	}
+	if err := e.conn.QueryRowContext(ctx, `SELECT crew FROM shows WHERE id = ?`, show).Scan(&crew); err != nil || !strings.Contains(crew, `"job":"Creator"`) {
+		t.Errorf("show crew %s, %v", crew, err)
+	}
+}
+
+// TestRefresherCastFailureLeavesTheRest: TMDB failing ends the run with the
+// titles still unchecked, for the next run.
+func TestRefresherCastFailureLeavesTheRest(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	ctx := t.Context()
+	fake := tmdbtest.New(t)
+	id := e.movie(1, 31, "Unlucky", 2001)
+	e.exec(`UPDATE movies SET related_checked_at = ?`, db.FormatTime(now))
+	fake.Handle("/movie/31", func(*http.Request) any { return tmdbtest.Reply{Status: http.StatusUnauthorized, Body: `{"status_code":7}`} })
+	r := New(e.q, fake.Client(), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	r.Now = func() time.Time { return now }
+	if _, err := r.RunOnce(ctx); err == nil {
+		t.Fatal("a refused key did not end the run")
+	}
+	var checked *string
+	if err := e.conn.QueryRowContext(ctx, `SELECT cast_checked_at FROM movies WHERE id = ?`, id).Scan(&checked); err != nil || checked != nil {
+		t.Errorf("checked %v after a failure (%v)", checked, err)
 	}
 }

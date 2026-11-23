@@ -47,6 +47,12 @@ func fakeTMDB(t *testing.T) *tmdbtest.Server {
 		"genres":       []any{map[string]any{"id": 28, "name": "Action"}, map[string]any{"id": 878, "name": "Science Fiction"}},
 		"vote_average": 8.2, "poster_path": "/matrix.jpg", "backdrop_path": "/matrix-bd.jpg",
 		"release_dates": matrixReleases,
+		"credits": map[string]any{
+			"cast": []any{map[string]any{"id": 7001, "name": "Arlo Fenwick", "character": "Neo", "profile_path": "/arlo.jpg"},
+				map[string]any{"id": 7002, "name": "Bea Corran", "character": "Trinity"}},
+			"crew": []any{map[string]any{"id": 7101, "name": "Cass Ordway", "job": "Director"},
+				map[string]any{"id": 7101, "name": "Cass Ordway", "job": "Screenplay"},
+				map[string]any{"id": 7102, "name": "Dov Hale", "job": "Gaffer"}}},
 		"videos": map[string]any{"results": []any{
 			map[string]any{"key": "teaserKey01", "name": "Teaser", "site": "YouTube", "type": "Teaser", "official": true, "iso_639_1": "en", "size": 1080},
 			map[string]any{"key": "makingOf001", "name": "Making of", "site": "YouTube", "type": "Featurette", "official": true, "iso_639_1": "en", "size": 1080},
@@ -189,6 +195,14 @@ func TestMatchMovies(t *testing.T) {
 	// Its trailers came with its details, best first, and count as checked.
 	if want := `[{"key":"trailerKey1","name":"Official Trailer","type":"Trailer"},{"key":"teaserKey01","name":"Teaser","type":"Teaser"}]`; matrix.Movie.Trailers != want || matrix.Movie.TrailersCheckedAt == nil {
 		t.Errorf("matrix trailers = %s, checked %v", matrix.Movie.Trailers, matrix.Movie.TrailersCheckedAt)
+	}
+	// Its cast came with its person IDs, and the crew with it.
+	if !strings.Contains(matrix.Movie.Credits, `"personId":7001`) || matrix.Movie.CastCheckedAt == nil ||
+		matrix.Movie.Crew != `[{"personId":7101,"name":"Cass Ordway","job":"Director"},{"personId":7101,"name":"Cass Ordway","job":"Screenplay"}]` {
+		t.Errorf("matrix credits %s, crew %s, checked %v", matrix.Movie.Credits, matrix.Movie.Crew, matrix.Movie.CastCheckedAt)
+	}
+	if parts, err := e.q.ListPersonMovieCast(e.ctx, 7002); err != nil || len(parts) != 1 || parts[0].Character != "Trinity" || parts[0].MovieID != matrix.Movie.ID {
+		t.Errorf("person 7002's parts = %+v, %v", parts, err)
 	}
 	if heat := movies[0].Movie; heat.Trailers != "[]" || heat.TrailersCheckedAt == nil {
 		t.Errorf("heat trailers = %s, checked %v", heat.Trailers, heat.TrailersCheckedAt)
