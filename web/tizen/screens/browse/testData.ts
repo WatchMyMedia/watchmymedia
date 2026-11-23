@@ -15,7 +15,7 @@ export const item = (over: Partial<BrowseItem> = {}): BrowseItem => ({
 })
 
 export const resume = (over: Partial<ContinueItem> = {}): ContinueItem => ({
-  kind: 'episode', title: 'Saltmarsh', subtitle: 'S01 E09 · 8 min left', fileId: 9, showId: 5, positionMs: 40 * 60_000, durationMs: 48 * 60_000,
+  kind: 'episode', title: 'Saltmarsh', subtitle: 'S01E09 Low Water', seasonNumber: 1, episodeNumber: 9, fileId: 9, showId: 5, positionMs: 40 * 60_000, durationMs: 48 * 60_000,
   updatedAt: new Date().toISOString(), ...over,
 })
 

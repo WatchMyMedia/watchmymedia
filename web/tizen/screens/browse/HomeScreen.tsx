@@ -111,7 +111,7 @@ function ResumeHero({ item }: { item: ContinueItem }) {
   const left = Math.max(0, item.durationMs - item.positionMs)
   const fraction = item.durationMs ? Math.min(1, item.positionMs / item.durationMs) : 0
   const picture = item.backdropPath ?? item.stillPath
-  const request = { kind: 'file' as const, fileId: item.fileId, title: item.title, subtitle: item.subtitle, backdropPath: picture }
+  const request = { kind: 'file' as const, fileId: item.fileId, title: item.title, subtitle: line || undefined, backdropPath: picture }
   const open = item.showId ? { label: 'Episodes', route: { name: 'show' as const, id: item.showId, episodeId: item.episodeId } }
     : item.movieId ? { label: 'More info', route: { name: 'movie' as const, id: item.movieId } } : undefined
   return <>

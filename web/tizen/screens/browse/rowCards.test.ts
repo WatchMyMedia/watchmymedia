@@ -43,7 +43,7 @@ describe('a row’s cards', () => {
 
   it('resumes Continue watching at once, and opens its page on Hold OK', () => {
     const [card] = rowCards(row({ id: 'continue', style: 'continue', items: undefined, continue: [resume()] }), ctx())
-    expect(card.press).toEqual({ kind: 'play', request: { kind: 'file', fileId: 9, startMs: 40 * 60_000, title: 'Saltmarsh', subtitle: 'S01 E09 · 8 min left', backdropPath: undefined } })
+    expect(card.press).toEqual({ kind: 'play', request: { kind: 'file', fileId: 9, startMs: 40 * 60_000, title: 'Saltmarsh', subtitle: 'Season 1 · Episode 9 · Low Water', backdropPath: undefined } })
     expect(card.hold).toEqual({ kind: 'open', route: { name: 'show', id: 5 } })
     expect(card.progress).toBeCloseTo(40 / 48)
   })
@@ -145,7 +145,7 @@ describe('the panel over a row screen', () => {
     const aired = row({ id: 'recentlyAired', style: 'episode', title: 'Recently aired · Episodes', episodes: [episode({ isNew: true, airDate: yesterday })] })
     expect(cardPanel(aired, rowCards(aired, ctx()), 0, ctx())).toMatchObject({ kicker: 'New episode · aired yesterday', title: 'The Long Dark', facts: ['Harbor Lights', 'S03 E07'] })
     const cw = row({ id: 'continue', style: 'continue', continue: [resume()] })
-    expect(cardPanel(cw, rowCards(cw, ctx()), 0, ctx())).toMatchObject({ kicker: 'Continue watching · 8 min left', target: 'resume', facts: ['S01 E09 · 8 min left', '48 min'] })
+    expect(cardPanel(cw, rowCards(cw, ctx()), 0, ctx())).toMatchObject({ kicker: 'Continue watching · 8 min left', target: 'resume', facts: ['Season 1 · Episode 9 · Low Water', '48 min'] })
   })
 
   it('says when an episode aired by the calendar, never by the hour', () => {

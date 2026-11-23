@@ -5,6 +5,7 @@ import { posterLinks, type CardTarget } from '../../../src/lib/cardLinks'
 import { formatDate, formatRuntime, seCode } from '../../../src/lib/format'
 import type { ImageSize } from '../../../src/lib/images'
 import { nowAndNext, progress, timeRange } from '../../../src/lib/liveGuide'
+import { resumeLine } from './homePages'
 import { attribution, isListRow, posterSubtitle, seeAllTarget, seeAllWords, titleParts, type ScreenRow, type SeeAllTarget } from '../../../src/lib/screenRows'
 import { watchlistTitle } from '../../../src/lib/watchlists'
 import type { PlayRequest, Route } from '../../app/routes'
@@ -176,7 +177,7 @@ export function continueCard(c: ContinueItem): RowCard {
     image: path ? { path, size: 'w780' } : undefined,
     progress: c.durationMs ? c.positionMs / c.durationMs : 0,
     label: spoken(c.title, subtitle),
-    press: { kind: 'play', request: { kind: 'file', fileId: c.fileId, startMs: c.positionMs, title: c.title, subtitle: c.subtitle, backdropPath: c.backdropPath ?? c.stillPath } },
+    press: { kind: 'play', request: { kind: 'file', fileId: c.fileId, startMs: c.positionMs, title: c.title, subtitle: resumeLine(c) || undefined, backdropPath: c.backdropPath ?? c.stillPath } },
     hold: page ? { kind: 'open', route: page } : undefined,
   }
 }
