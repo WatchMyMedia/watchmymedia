@@ -62,6 +62,17 @@ internal const val EVENT_START_TOLERANCE_MS = 15_000L
 internal const val SEEK_BEAT_GAP_MS = 1_000L
 
 /**
+ * Buffering this long without moving, with at least [STUCK_BUFFER_MS] in
+ * hand, is a stuck player. Media3 goes back to ready from a rebuffer at 5 s
+ * in hand, so twice that and still waiting is not waiting on the network.
+ */
+internal const val STUCK_MS = 10_000L
+internal const val STUCK_BUFFER_MS = 10_000L
+
+/** What a player that stayed stuck after a new load says; Play tries again. */
+internal const val STUCK_MESSAGE = "Playback stopped and didn’t start again."
+
+/**
  * Whether an event decision already starts at [fileMs], on the keyframe up
  * to [EVENT_START_TOLERANCE_MS] before it. A newer server
  * starts an event play that asked for no start where it resumes; an older
