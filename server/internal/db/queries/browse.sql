@@ -159,7 +159,7 @@ LIMIT ?;
 -- which holds enough episodes in a library with running shows, and widen
 -- it when not. The newest are picked before their files are looked up, so
 -- the lookups run for those only.
-SELECT e.*, top.season_number, top.show_title, s.poster_path AS show_poster_path, s.backdrop_path AS show_backdrop_path,
+SELECT e.*, top.season_number, top.show_title, s.poster_path AS show_poster_path, s.backdrop_path AS show_backdrop_path, s.tmdb_id AS show_tmdb_id,
     COALESCE((SELECT f.id FROM episode_files ef JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
        WHERE ef.episode_id = e.id ORDER BY f.height DESC LIMIT 1), 0) AS file_id,
     COALESCE((SELECT MAX(f.added_at) FROM episode_files ef JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
@@ -213,3 +213,19 @@ SELECT COUNT(DISTINCT f.id) FROM episode_files ef
 JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
 JOIN episodes e ON e.id = ef.episode_id
 WHERE e.show_id = ?;
+
+-- name: ListMoviesByTMDB :many
+-- Every library's copy of a movie with a present file, first library
+-- first, for an app that shows one card for a title on several servers.
+SELECT m.* FROM movies m INDEXED BY movies_tmdb_idx
+WHERE m.tmdb_id = ? AND EXISTS (SELECT 1 FROM media_files f WHERE f.movie_id = m.id AND f.status = 'present')
+ORDER BY m.library_id, m.id;
+
+-- name: ListShowsByTMDB :many
+-- Every library's copy of a show with a present episode file.
+SELECT s.* FROM shows s INDEXED BY shows_tmdb_idx
+WHERE s.tmdb_id = ? AND EXISTS (SELECT 1 FROM episodes e
+    CROSS JOIN episode_files ef ON ef.episode_id = e.id
+    CROSS JOIN media_files f ON f.id = ef.media_file_id
+    WHERE e.show_id = s.id AND f.status = 'present')
+ORDER BY s.library_id, s.id;

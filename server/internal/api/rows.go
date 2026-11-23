@@ -110,8 +110,9 @@ type EpisodeCard struct {
 	AddedAt          *time.Time `json:"addedAt,omitempty"`
 	IsNew            bool       `json:"isNew" doc:"A present file arrived within the last 7 days and the signed-in user has not watched the episode."`
 	Watched          bool       `json:"watched" required:"false" doc:"The signed-in user has watched it."`
-	// RuntimeMin is from API level 34.
+	// RuntimeMin and ShowTMDBID are from API level 34.
 	RuntimeMin int64 `json:"runtimeMin,omitempty" required:"false" doc:"The episode's length in minutes, as TMDB lists it."`
+	ShowTMDBID int64 `json:"showTmdbId,omitempty" required:"false" doc:"The show's TMDB id, so an app signed in to several servers shows one card for an episode on more than one."`
 }
 
 type LibraryRows struct {
@@ -1004,7 +1005,7 @@ func recentlyAired(ctx context.Context, deps Deps, lib db.Library, limit int) ([
 		c := EpisodeCard{
 			EpisodeID: r.ID, ShowID: r.ShowID, ShowTitle: r.ShowTitle, SeasonNumber: r.SeasonNumber, EpisodeNumber: r.Number,
 			Title: r.Title, Overview: r.Overview, AirDate: deref(r.AirDate), StillPath: deref(r.StillPath),
-			ShowPosterPath: deref(r.ShowPosterPath), ShowBackdropPath: deref(r.ShowBackdropPath), Watched: watched[r.ID],
+			ShowPosterPath: deref(r.ShowPosterPath), ShowBackdropPath: deref(r.ShowBackdropPath), Watched: watched[r.ID], ShowTMDBID: r.ShowTmdbID,
 			RuntimeMin: deref(r.RuntimeMin),
 		}
 		if id := toInt64(r.FileID); id > 0 {

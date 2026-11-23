@@ -77,7 +77,7 @@ func (q *Queries) ListMoviesByIDs(ctx context.Context, ids []int64) ([]Movie, er
 }
 
 const listSearchEpisodesByIDs = `-- name: ListSearchEpisodesByIDs :many
-SELECT e.id, e.season_id, e.show_id, e.number, e.title, e.overview, e.air_date, e.still_path, e.runtime_min, e.rating, e.file_named, se.number AS season_number, s.title AS show_title, s.poster_path AS show_poster_path,
+SELECT e.id, e.season_id, e.show_id, e.number, e.title, e.overview, e.air_date, e.still_path, e.runtime_min, e.rating, e.file_named, se.number AS season_number, s.title AS show_title, s.poster_path AS show_poster_path, s.tmdb_id AS show_tmdb_id,
        CAST(COALESCE((SELECT MAX(f.id) FROM episode_files ef
                       CROSS JOIN media_files f ON f.id = ef.media_file_id
                       WHERE ef.episode_id = e.id AND f.status = 'present'), 0) AS INTEGER) AS file_id
@@ -102,6 +102,7 @@ type ListSearchEpisodesByIDsRow struct {
 	SeasonNumber   int64    `json:"season_number"`
 	ShowTitle      string   `json:"show_title"`
 	ShowPosterPath *string  `json:"show_poster_path"`
+	ShowTmdbID     int64    `json:"show_tmdb_id"`
 	FileID         int64    `json:"file_id"`
 }
 
@@ -141,6 +142,7 @@ func (q *Queries) ListSearchEpisodesByIDs(ctx context.Context, ids []int64) ([]L
 			&i.SeasonNumber,
 			&i.ShowTitle,
 			&i.ShowPosterPath,
+			&i.ShowTmdbID,
 			&i.FileID,
 		); err != nil {
 			return nil, err

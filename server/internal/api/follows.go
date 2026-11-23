@@ -367,7 +367,7 @@ func followedEpisodes(ctx context.Context, q *db.Queries, userID int64, now time
 			EpisodeID: r.EpisodeID, ShowID: r.ShowID, ShowTitle: r.ShowTitle, SeasonNumber: r.SeasonNumber, EpisodeNumber: r.EpisodeNumber,
 			Title: r.Title, Overview: r.Overview, AirDate: deref(r.AirDate), StillPath: deref(r.StillPath),
 			ShowPosterPath: deref(r.ShowPosterPath), ShowBackdropPath: deref(r.ShowBackdropPath),
-			AddedAt: &arrived, IsNew: true, RuntimeMin: deref(r.RuntimeMin),
+			AddedAt: &arrived, IsNew: true, RuntimeMin: deref(r.RuntimeMin), ShowTMDBID: r.TmdbID,
 		}
 		if r.FileID > 0 {
 			id := r.FileID

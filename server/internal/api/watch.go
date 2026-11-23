@@ -94,6 +94,8 @@ type ContinueItem struct {
 	// ContentRating and Overview are from API level 34.
 	ContentRating string `json:"contentRating,omitempty" required:"false" example:"TV-14" doc:"The movie's or the show's US certification from TMDB; absent when it has none."`
 	Overview      string `json:"overview,omitempty" required:"false" doc:"The episode's summary, or the movie's; absent when TMDB has none."`
+	// TMDBID is from API level 34.
+	TMDBID int64 `json:"tmdbId,omitempty" required:"false" doc:"The movie's TMDB id, or for an episode its show's, so an app signed in to several servers shows one card for a title on more than one."`
 }
 
 type ContinueList struct {
@@ -471,12 +473,14 @@ func continueWatching(ctx context.Context, deps Deps, user auth.User, limit int)
 			item.Kind, item.Title, item.MovieID = "movie", deref(w.MovieTitle), &id
 			item.PosterPath, item.BackdropPath = deref(w.MoviePosterPath), deref(w.MovieBackdropPath)
 			item.ContentRating, item.Overview = deref(w.MovieContentRating), deref(w.MovieOverview)
+			item.TMDBID = deref(w.MovieTmdbID)
 			if w.MovieYear != nil {
 				item.Subtitle = strconv.FormatInt(*w.MovieYear, 10)
 			}
 		case "episode":
 			epID := w.ItemID
 			item.Kind, item.Title, item.ShowID, item.EpisodeID = "episode", deref(w.ShowTitle), w.ShowID, &epID
+			item.TMDBID = deref(w.ShowTmdbID)
 			item.SeasonNumber, item.EpisodeNumber = deref(w.SeasonNumber), deref(w.EpisodeNumber)
 			item.Subtitle = seCode(item.SeasonNumber, item.EpisodeNumber) + " " + deref(w.EpisodeTitle)
 			item.PosterPath, item.BackdropPath, item.StillPath = deref(w.ShowPosterPath), deref(w.ShowBackdropPath), deref(w.EpisodeStillPath)

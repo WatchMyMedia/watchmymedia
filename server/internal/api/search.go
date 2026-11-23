@@ -29,8 +29,9 @@ type SearchEpisode struct {
 	AirDate        string `json:"airDate,omitempty"`
 	FileID         int64  `json:"fileId"`
 	Watched        bool   `json:"watched" required:"false" doc:"The signed-in user has watched it."`
-	// RuntimeMin and Progress are from API level 34.
+	// RuntimeMin, Progress and ShowTMDBID are from API level 34.
 	RuntimeMin int64   `json:"runtimeMin,omitempty" required:"false" doc:"Its length in minutes, as TMDB lists it."`
+	ShowTMDBID int64   `json:"showTmdbId,omitempty" required:"false" doc:"The show's TMDB id, so an app searching several servers shows one row for an episode on more than one."`
 	Progress   float64 `json:"progress,omitempty" required:"false" doc:"The fraction the signed-in person has watched (0-1) when partway through."`
 }
 
@@ -114,7 +115,7 @@ func searchLibrary(ctx context.Context, deps Deps, typed string, limit int64) (*
 		out.Episodes = append(out.Episodes, SearchEpisode{
 			ID: e.ID, ShowID: e.ShowID, ShowTitle: e.ShowTitle, ShowPosterPath: deref(e.ShowPosterPath), SeasonNumber: e.SeasonNumber,
 			Number: e.Number, Title: e.Title, StillPath: deref(e.StillPath), AirDate: deref(e.AirDate), FileID: e.FileID,
-			Watched: watched[e.ID], RuntimeMin: deref(e.RuntimeMin),
+			Watched: watched[e.ID], RuntimeMin: deref(e.RuntimeMin), ShowTMDBID: e.ShowTmdbID,
 		})
 	}
 	if err := markSearch(ctx, deps, out); err != nil {

@@ -2466,6 +2466,11 @@
           "title": {
             "type": "string"
           },
+          "tmdbId": {
+            "description": "The movie's TMDB id, or for an episode its show's, so an app signed in to several servers shows one card for a title on more than one.",
+            "format": "int64",
+            "type": "integer"
+          },
           "updatedAt": {
             "format": "date-time",
             "type": "string"
@@ -3441,6 +3446,11 @@
           },
           "showTitle": {
             "type": "string"
+          },
+          "showTmdbId": {
+            "description": "The show's TMDB id, so an app signed in to several servers shows one card for an episode on more than one.",
+            "format": "int64",
+            "type": "integer"
           },
           "stillPath": {
             "type": "string"
@@ -8547,7 +8557,7 @@
             "type": "string"
           },
           "progress": {
-            "description": "Search results: the fraction watched (0-1) when partway through.",
+            "description": "Search results and findMoviesByTMDB: the fraction watched (0-1) when partway through.",
             "format": "double",
             "type": "number"
           },
@@ -8574,7 +8584,7 @@
             "type": "integer"
           },
           "watched": {
-            "description": "Search results: the signed-in person finished it. Absent elsewhere; a movie's page has watch.",
+            "description": "Search results and findMoviesByTMDB: the signed-in person finished it. Absent elsewhere; a movie's page has watch.",
             "type": "boolean"
           },
           "year": {
@@ -8625,6 +8635,22 @@
           "id",
           "name",
           "have"
+        ],
+        "type": "object"
+      },
+      "MovieCopies": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "description": "Every library's copy with a present file, the first library's first, marked for the signed-in person as search's are (watched, progress). Empty when the library has none.",
+            "items": {
+              "$ref": "#/components/schemas/Movie"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
         ],
         "type": "object"
       },
@@ -8720,7 +8746,7 @@
             "type": "string"
           },
           "progress": {
-            "description": "Search results: the fraction watched (0-1) when partway through.",
+            "description": "Search results and findMoviesByTMDB: the fraction watched (0-1) when partway through.",
             "format": "double",
             "type": "number"
           },
@@ -8772,7 +8798,7 @@
             "description": "The signed-in user's progress."
           },
           "watched": {
-            "description": "Search results: the signed-in person finished it. Absent elsewhere; a movie's page has watch.",
+            "description": "Search results and findMoviesByTMDB: the signed-in person finished it. Absent elsewhere; a movie's page has watch.",
             "type": "boolean"
           },
           "watchlists": {
@@ -13106,6 +13132,11 @@
           "showTitle": {
             "type": "string"
           },
+          "showTmdbId": {
+            "description": "The show's TMDB id, so an app searching several servers shows one row for an episode on more than one.",
+            "format": "int64",
+            "type": "integer"
+          },
           "stillPath": {
             "type": "string"
           },
@@ -14090,7 +14121,7 @@
             "type": "number"
           },
           "seasonCount": {
-            "description": "Search results: seasons with a present episode, specials left out, as on cards.",
+            "description": "Search results and findShowsByTMDB: seasons with a present episode, specials left out, as on cards.",
             "format": "int64",
             "type": "integer"
           },
@@ -14108,12 +14139,12 @@
             "type": "integer"
           },
           "unwatchedCount": {
-            "description": "Search results: episodes with a present file they haven't finished, as on cards.",
+            "description": "Search results and findShowsByTMDB: episodes with a present file they haven't finished, as on cards.",
             "format": "int64",
             "type": "integer"
           },
           "watched": {
-            "description": "Search results: the signed-in person has watched every episode with a present file.",
+            "description": "Search results and findShowsByTMDB: the signed-in person has watched every episode with a present file.",
             "type": "boolean"
           },
           "year": {
@@ -14130,6 +14161,22 @@
           "genres",
           "episodeCount",
           "credits"
+        ],
+        "type": "object"
+      },
+      "ShowCopies": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "description": "Every library's copy with a present episode file, the first library's first, marked for the signed-in person as search's are (watched, unwatchedCount, seasonCount). Empty when the library has none.",
+            "items": {
+              "$ref": "#/components/schemas/Show"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
         ],
         "type": "object"
       },
@@ -14242,7 +14289,7 @@
             "type": "number"
           },
           "seasonCount": {
-            "description": "Search results: seasons with a present episode, specials left out, as on cards.",
+            "description": "Search results and findShowsByTMDB: seasons with a present episode, specials left out, as on cards.",
             "format": "int64",
             "type": "integer"
           },
@@ -14279,12 +14326,12 @@
             "description": "The sound and subtitles the signed-in person picked for the show (setShowTracks), which its episodes start with. Absent when they have none, and on older servers."
           },
           "unwatchedCount": {
-            "description": "Search results: episodes with a present file they haven't finished, as on cards.",
+            "description": "Search results and findShowsByTMDB: episodes with a present file they haven't finished, as on cards.",
             "format": "int64",
             "type": "integer"
           },
           "watched": {
-            "description": "Search results: the signed-in person has watched every episode with a present file.",
+            "description": "Search results and findShowsByTMDB: the signed-in person has watched every episode with a present file.",
             "type": "boolean"
           },
           "watchlists": {
@@ -24528,6 +24575,53 @@
         ]
       }
     },
+    "/api/movies": {
+      "get": {
+        "description": "For an app signed in to several servers, which shows a title on more than one as one card and offers each server's copy when it plays. Answers with an empty list, never an error, when the library doesn't have it. From API level 34.",
+        "operationId": "findMoviesByTMDB",
+        "parameters": [
+          {
+            "description": "The movie's or show's TMDB id, as cards and search carry it (tmdbId, showTmdbId).",
+            "explode": false,
+            "in": "query",
+            "name": "tmdbId",
+            "required": true,
+            "schema": {
+              "description": "The movie's or show's TMDB id, as cards and search carry it (tmdbId, showTmdbId).",
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MovieCopies"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "The library's copies of a movie, by its TMDB id",
+        "tags": [
+          "browse"
+        ]
+      }
+    },
     "/api/movies/{id}": {
       "get": {
         "operationId": "getMovie",
@@ -27447,6 +27541,53 @@
         "summary": "Create the first admin account and sign in",
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/shows": {
+      "get": {
+        "description": "For an app signed in to several servers, which shows a title on more than one as one card and offers each server's copy when it plays. Answers with an empty list, never an error, when the library doesn't have it. From API level 34.",
+        "operationId": "findShowsByTMDB",
+        "parameters": [
+          {
+            "description": "The movie's or show's TMDB id, as cards and search carry it (tmdbId, showTmdbId).",
+            "explode": false,
+            "in": "query",
+            "name": "tmdbId",
+            "required": true,
+            "schema": {
+              "description": "The movie's or show's TMDB id, as cards and search carry it (tmdbId, showTmdbId).",
+              "format": "int64",
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShowCopies"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "The library's copies of a show, by its TMDB id",
+        "tags": [
+          "browse"
         ]
       }
     },

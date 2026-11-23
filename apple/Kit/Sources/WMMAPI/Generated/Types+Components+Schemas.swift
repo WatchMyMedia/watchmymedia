@@ -1719,6 +1719,10 @@ extension Components {
             public var subtitle: Swift.String?
             /// - Remark: Generated from `#/components/schemas/ContinueItem/title`.
             public var title: Swift.String
+            /// The movie's TMDB id, or for an episode its show's, so an app signed in to several servers shows one card for a title on more than one.
+            ///
+            /// - Remark: Generated from `#/components/schemas/ContinueItem/tmdbId`.
+            public var tmdbId: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/ContinueItem/updatedAt`.
             public var updatedAt: Foundation.Date
             /// Creates a new `ContinueItem`.
@@ -1740,6 +1744,7 @@ extension Components {
             ///   - stillPath:
             ///   - subtitle:
             ///   - title:
+            ///   - tmdbId: The movie's TMDB id, or for an episode its show's, so an app signed in to several servers shows one card for a title on more than one.
             ///   - updatedAt:
             public init(
                 backdropPath: Swift.String? = nil,
@@ -1758,6 +1763,7 @@ extension Components {
                 stillPath: Swift.String? = nil,
                 subtitle: Swift.String? = nil,
                 title: Swift.String,
+                tmdbId: Swift.Int64? = nil,
                 updatedAt: Foundation.Date
             ) {
                 self.backdropPath = backdropPath
@@ -1776,6 +1782,7 @@ extension Components {
                 self.stillPath = stillPath
                 self.subtitle = subtitle
                 self.title = title
+                self.tmdbId = tmdbId
                 self.updatedAt = updatedAt
             }
             public enum CodingKeys: String, CodingKey {
@@ -1795,6 +1802,7 @@ extension Components {
                 case stillPath
                 case subtitle
                 case title
+                case tmdbId
                 case updatedAt
             }
         }
@@ -2992,6 +3000,10 @@ extension Components {
             public var showPosterPath: Swift.String?
             /// - Remark: Generated from `#/components/schemas/EpisodeCard/showTitle`.
             public var showTitle: Swift.String
+            /// The show's TMDB id, so an app signed in to several servers shows one card for an episode on more than one.
+            ///
+            /// - Remark: Generated from `#/components/schemas/EpisodeCard/showTmdbId`.
+            public var showTmdbId: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/EpisodeCard/stillPath`.
             public var stillPath: Swift.String?
             /// - Remark: Generated from `#/components/schemas/EpisodeCard/title`.
@@ -3017,6 +3029,7 @@ extension Components {
             ///   - showId:
             ///   - showPosterPath:
             ///   - showTitle:
+            ///   - showTmdbId: The show's TMDB id, so an app signed in to several servers shows one card for an episode on more than one.
             ///   - stillPath:
             ///   - title:
             ///   - watched: The signed-in user has watched it.
@@ -3035,6 +3048,7 @@ extension Components {
                 showId: Swift.Int64,
                 showPosterPath: Swift.String? = nil,
                 showTitle: Swift.String,
+                showTmdbId: Swift.Int64? = nil,
                 stillPath: Swift.String? = nil,
                 title: Swift.String,
                 watched: Swift.Bool? = nil
@@ -3053,6 +3067,7 @@ extension Components {
                 self.showId = showId
                 self.showPosterPath = showPosterPath
                 self.showTitle = showTitle
+                self.showTmdbId = showTmdbId
                 self.stillPath = stillPath
                 self.title = title
                 self.watched = watched
@@ -3072,6 +3087,7 @@ extension Components {
                 case showId
                 case showPosterPath
                 case showTitle
+                case showTmdbId
                 case stillPath
                 case title
                 case watched
@@ -8341,7 +8357,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/Movie/posterSource`.
             public var posterSource: Components.Schemas.Movie.PosterSourcePayload?
-            /// Search results: the fraction watched (0-1) when partway through.
+            /// Search results and findMoviesByTMDB: the fraction watched (0-1) when partway through.
             ///
             /// - Remark: Generated from `#/components/schemas/Movie/progress`.
             public var progress: Swift.Double?
@@ -8359,7 +8375,7 @@ extension Components {
             public var title: Swift.String
             /// - Remark: Generated from `#/components/schemas/Movie/tmdbId`.
             public var tmdbId: Swift.Int64
-            /// Search results: the signed-in person finished it. Absent elsewhere; a movie's page has watch.
+            /// Search results and findMoviesByTMDB: the signed-in person finished it. Absent elsewhere; a movie's page has watch.
             ///
             /// - Remark: Generated from `#/components/schemas/Movie/watched`.
             public var watched: Swift.Bool?
@@ -8380,14 +8396,14 @@ extension Components {
             ///   - overview:
             ///   - posterPath: Image path; fetch via /api/images/{size}{posterPath}. TMDB's, or a picture an admin chose.
             ///   - posterSource: Set when an admin chose the poster: another of TMDB's, an upload or a link. Absent for the match's own poster.
-            ///   - progress: Search results: the fraction watched (0-1) when partway through.
+            ///   - progress: Search results and findMoviesByTMDB: the fraction watched (0-1) when partway through.
             ///   - rating: TMDB vote average, 0-10.
             ///   - releaseDate:
             ///   - runtimeMin:
             ///   - tagline:
             ///   - title:
             ///   - tmdbId:
-            ///   - watched: Search results: the signed-in person finished it. Absent elsewhere; a movie's page has watch.
+            ///   - watched: Search results and findMoviesByTMDB: the signed-in person finished it. Absent elsewhere; a movie's page has watch.
             ///   - year:
             public init(
                 backdropPath: Swift.String? = nil,
@@ -8604,7 +8620,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/MovieDetail/posterSource`.
             public var posterSource: Components.Schemas.MovieDetail.PosterSourcePayload?
-            /// Search results: the fraction watched (0-1) when partway through.
+            /// Search results and findMoviesByTMDB: the fraction watched (0-1) when partway through.
             ///
             /// - Remark: Generated from `#/components/schemas/MovieDetail/progress`.
             public var progress: Swift.Double?
@@ -8681,7 +8697,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/MovieDetail/watch`.
             public var watch: Components.Schemas.WatchState?
-            /// Search results: the signed-in person finished it. Absent elsewhere; a movie's page has watch.
+            /// Search results and findMoviesByTMDB: the signed-in person finished it. Absent elsewhere; a movie's page has watch.
             ///
             /// - Remark: Generated from `#/components/schemas/MovieDetail/watched`.
             public var watched: Swift.Bool?
@@ -8713,7 +8729,7 @@ extension Components {
             ///   - overview:
             ///   - posterPath: Image path; fetch via /api/images/{size}{posterPath}. TMDB's, or a picture an admin chose.
             ///   - posterSource: Set when an admin chose the poster: another of TMDB's, an upload or a link. Absent for the match's own poster.
-            ///   - progress: Search results: the fraction watched (0-1) when partway through.
+            ///   - progress: Search results and findMoviesByTMDB: the fraction watched (0-1) when partway through.
             ///   - quality:
             ///   - rating: TMDB vote average, 0-10.
             ///   - releaseDate:
@@ -8724,7 +8740,7 @@ extension Components {
             ///   - totalSize:
             ///   - trailers: The movie's trailers, best first: trailer files in the library, then YouTube trailers while they are on. Apps play the first one whose source they know. Absent when it has none, and on older servers.
             ///   - watch: The signed-in user's progress.
-            ///   - watched: Search results: the signed-in person finished it. Absent elsewhere; a movie's page has watch.
+            ///   - watched: Search results and findMoviesByTMDB: the signed-in person finished it. Absent elsewhere; a movie's page has watch.
             ///   - watchlists: The signed-in person's watchlists that hold the movie (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33.
             ///   - year:
             public init(
@@ -12217,6 +12233,10 @@ extension Components {
             public var showPosterPath: Swift.String?
             /// - Remark: Generated from `#/components/schemas/SearchEpisode/showTitle`.
             public var showTitle: Swift.String
+            /// The show's TMDB id, so an app searching several servers shows one row for an episode on more than one.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SearchEpisode/showTmdbId`.
+            public var showTmdbId: Swift.Int64?
             /// - Remark: Generated from `#/components/schemas/SearchEpisode/stillPath`.
             public var stillPath: Swift.String?
             /// - Remark: Generated from `#/components/schemas/SearchEpisode/title`.
@@ -12238,6 +12258,7 @@ extension Components {
             ///   - showId:
             ///   - showPosterPath:
             ///   - showTitle:
+            ///   - showTmdbId: The show's TMDB id, so an app searching several servers shows one row for an episode on more than one.
             ///   - stillPath:
             ///   - title:
             ///   - watched: The signed-in user has watched it.
@@ -12252,6 +12273,7 @@ extension Components {
                 showId: Swift.Int64,
                 showPosterPath: Swift.String? = nil,
                 showTitle: Swift.String,
+                showTmdbId: Swift.Int64? = nil,
                 stillPath: Swift.String? = nil,
                 title: Swift.String,
                 watched: Swift.Bool? = nil
@@ -12266,6 +12288,7 @@ extension Components {
                 self.showId = showId
                 self.showPosterPath = showPosterPath
                 self.showTitle = showTitle
+                self.showTmdbId = showTmdbId
                 self.stillPath = stillPath
                 self.title = title
                 self.watched = watched
@@ -12281,6 +12304,7 @@ extension Components {
                 case showId
                 case showPosterPath
                 case showTitle
+                case showTmdbId
                 case stillPath
                 case title
                 case watched
@@ -13165,7 +13189,7 @@ extension Components {
             public var posterSource: Components.Schemas.Show.PosterSourcePayload?
             /// - Remark: Generated from `#/components/schemas/Show/rating`.
             public var rating: Swift.Double?
-            /// Search results: seasons with a present episode, specials left out, as on cards.
+            /// Search results and findShowsByTMDB: seasons with a present episode, specials left out, as on cards.
             ///
             /// - Remark: Generated from `#/components/schemas/Show/seasonCount`.
             public var seasonCount: Swift.Int64?
@@ -13175,11 +13199,11 @@ extension Components {
             public var title: Swift.String
             /// - Remark: Generated from `#/components/schemas/Show/tmdbId`.
             public var tmdbId: Swift.Int64
-            /// Search results: episodes with a present file they haven't finished, as on cards.
+            /// Search results and findShowsByTMDB: episodes with a present file they haven't finished, as on cards.
             ///
             /// - Remark: Generated from `#/components/schemas/Show/unwatchedCount`.
             public var unwatchedCount: Swift.Int64?
-            /// Search results: the signed-in person has watched every episode with a present file.
+            /// Search results and findShowsByTMDB: the signed-in person has watched every episode with a present file.
             ///
             /// - Remark: Generated from `#/components/schemas/Show/watched`.
             public var watched: Swift.Bool?
@@ -13203,12 +13227,12 @@ extension Components {
             ///   - posterPath:
             ///   - posterSource: Set when an admin chose the poster; absent for the match's own.
             ///   - rating:
-            ///   - seasonCount: Search results: seasons with a present episode, specials left out, as on cards.
+            ///   - seasonCount: Search results and findShowsByTMDB: seasons with a present episode, specials left out, as on cards.
             ///   - status:
             ///   - title:
             ///   - tmdbId:
-            ///   - unwatchedCount: Search results: episodes with a present file they haven't finished, as on cards.
-            ///   - watched: Search results: the signed-in person has watched every episode with a present file.
+            ///   - unwatchedCount: Search results and findShowsByTMDB: episodes with a present file they haven't finished, as on cards.
+            ///   - watched: Search results and findShowsByTMDB: the signed-in person has watched every episode with a present file.
             ///   - year:
             public init(
                 backdropPath: Swift.String? = nil,
@@ -13432,7 +13456,7 @@ extension Components {
             public var quality: Components.Schemas.ShowDetail.QualityPayload?
             /// - Remark: Generated from `#/components/schemas/ShowDetail/rating`.
             public var rating: Swift.Double?
-            /// Search results: seasons with a present episode, specials left out, as on cards.
+            /// Search results and findShowsByTMDB: seasons with a present episode, specials left out, as on cards.
             ///
             /// - Remark: Generated from `#/components/schemas/ShowDetail/seasonCount`.
             public var seasonCount: Swift.Int64?
@@ -13454,11 +13478,11 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/ShowDetail/tracks`.
             public var tracks: Components.Schemas.ShowTracks?
-            /// Search results: episodes with a present file they haven't finished, as on cards.
+            /// Search results and findShowsByTMDB: episodes with a present file they haven't finished, as on cards.
             ///
             /// - Remark: Generated from `#/components/schemas/ShowDetail/unwatchedCount`.
             public var unwatchedCount: Swift.Int64?
-            /// Search results: the signed-in person has watched every episode with a present file.
+            /// Search results and findShowsByTMDB: the signed-in person has watched every episode with a present file.
             ///
             /// - Remark: Generated from `#/components/schemas/ShowDetail/watched`.
             public var watched: Swift.Bool?
@@ -13494,7 +13518,7 @@ extension Components {
             ///   - posterSource: Set when an admin chose the poster; absent for the match's own.
             ///   - quality:
             ///   - rating:
-            ///   - seasonCount: Search results: seasons with a present episode, specials left out, as on cards.
+            ///   - seasonCount: Search results and findShowsByTMDB: seasons with a present episode, specials left out, as on cards.
             ///   - seasons:
             ///   - status:
             ///   - title:
@@ -13502,8 +13526,8 @@ extension Components {
             ///   - totalEpisodes: Episodes across all seasons, as the seasons' episodeCount counts them.
             ///   - totalSize:
             ///   - tracks: The sound and subtitles the signed-in person picked for the show (setShowTracks), which its episodes start with. Absent when they have none, and on older servers.
-            ///   - unwatchedCount: Search results: episodes with a present file they haven't finished, as on cards.
-            ///   - watched: Search results: the signed-in person has watched every episode with a present file.
+            ///   - unwatchedCount: Search results and findShowsByTMDB: episodes with a present file they haven't finished, as on cards.
+            ///   - watched: Search results and findShowsByTMDB: the signed-in person has watched every episode with a present file.
             ///   - watchlists: The signed-in person's watchlists that hold the show (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33.
             ///   - year:
             public init(

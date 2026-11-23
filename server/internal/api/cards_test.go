@@ -284,3 +284,73 @@ func TestHomeAcrossLibrariesAndSearchMarks(t *testing.T) {
 		t.Errorf("search marks = %v", marks)
 	}
 }
+
+// An app signed in to several servers finds a title's copies by TMDB id,
+// and Continue watching, episode cards and search's episodes carry the id
+// to match them.
+func TestTitlesByTMDBAndTheirIDs(t *testing.T) {
+	t.Parallel()
+	e := newCardsEnv(t)
+	films := e.exec(`INSERT INTO libraries (type, name, path) VALUES ('movie', 'Lookup films', '/lookup-films')`)
+	fourK := e.exec(`INSERT INTO libraries (type, name, path) VALUES ('movie', 'Lookup 4K', '/lookup-4k')`)
+	movie := func(lib int64, file bool) int64 {
+		id := e.exec(`INSERT INTO movies (library_id, tmdb_id, title, year, genres) VALUES (?, 4401, 'Tidewater', 2012, '[]')`, lib)
+		if file {
+			e.exec(`INSERT INTO media_files (library_id, movie_id, path, size, mtime, status, parsed, height, added_at, match_status)
+				VALUES (?, ?, ?, 100, '2020-01-01T00:00:00.000Z', 'present', '{"kind":"movie"}', 1080, '2020-01-01T00:00:00.000Z', 'matched')`,
+				lib, id, fmt.Sprintf("/lookup/%d.mkv", lib))
+		}
+		return id
+	}
+	first := movie(films, true)
+	second := movie(fourK, true)
+	e.exec(`INSERT INTO watch_state (user_id, item_type, item_id, media_file_id, position_ms, duration_ms, updated_at)
+		VALUES (1, 'movie', ?, (SELECT id FROM media_files WHERE movie_id = ?), 30000, 120000, '2026-01-01T00:00:00.000Z')`, second, second)
+	var copies MovieCopies
+	if r := doJSON(t, e.client, http.MethodGet, e.URL+"/api/movies?tmdbId=4401", "", &copies); r.StatusCode != http.StatusOK {
+		t.Fatalf("movies by TMDB: %d %s", r.StatusCode, r.Body)
+	}
+	if len(copies.Items) != 2 || copies.Items[0].ID != first || copies.Items[1].ID != second || copies.Items[1].Progress != 0.25 {
+		t.Errorf("copies = %+v", copies.Items)
+	}
+	// None is an empty list, not an error.
+	if r := doJSON(t, e.client, http.MethodGet, e.URL+"/api/movies?tmdbId=999999", "", &copies); r.StatusCode != http.StatusOK || len(copies.Items) != 0 {
+		t.Errorf("no copies: %d %+v", r.StatusCode, copies.Items)
+	}
+
+	tv := e.exec(`INSERT INTO libraries (type, name, path) VALUES ('tv', 'Lookup TV', '/cards-tv')`)
+	show := e.exec(`INSERT INTO shows (library_id, tmdb_id, title, year, genres) VALUES (?, 5501, 'Breakwater', 2015, '[]')`, tv)
+	season := e.exec(`INSERT INTO seasons (show_id, number, episode_count) VALUES (?, 1, 1)`, show)
+	ep := e.episode(tv, show, season, 1, time.Now())
+	e.exec(`UPDATE episodes SET air_date = ? WHERE id = ?`, time.Now().Format(time.DateOnly), ep)
+	e.exec(`INSERT INTO watch_state (user_id, item_type, item_id, media_file_id, position_ms, duration_ms, updated_at)
+		VALUES (1, 'episode', ?, (SELECT media_file_id FROM episode_files WHERE episode_id = ?), 1000, 100000, '2026-02-01T00:00:00.000Z')`, ep, ep)
+	var shows ShowCopies
+	if r := doJSON(t, e.client, http.MethodGet, e.URL+"/api/shows?tmdbId=5501", "", &shows); r.StatusCode != http.StatusOK ||
+		len(shows.Items) != 1 || shows.Items[0].ID != show || shows.Items[0].UnwatchedCount == nil || *shows.Items[0].UnwatchedCount != 1 {
+		t.Errorf("shows by TMDB: %d %+v", r.StatusCode, shows.Items)
+	}
+	if r := doJSON(t, e.client, http.MethodGet, e.URL+"/api/movies", "", nil); r.StatusCode != http.StatusUnprocessableEntity {
+		t.Errorf("no tmdbId: %d, want 422", r.StatusCode)
+	}
+
+	var cont ContinueList
+	doJSON(t, e.client, http.MethodGet, e.URL+"/api/watch/continue", "", &cont)
+	ids := map[string]int64{}
+	for _, it := range cont.Items {
+		ids[it.Kind] = it.TMDBID
+	}
+	if ids["movie"] != 4401 || ids["episode"] != 5501 {
+		t.Errorf("continue watching's TMDB ids = %v", ids)
+	}
+	var res SearchResults
+	doJSON(t, e.client, http.MethodGet, e.URL+"/api/search?q=part%201", "", &res)
+	if len(res.Episodes) != 1 || res.Episodes[0].ShowTMDBID != 5501 {
+		t.Errorf("search's episodes = %+v", res.Episodes)
+	}
+	var rows LibraryRows
+	doJSON(t, e.client, http.MethodGet, fmt.Sprintf("%s/api/libraries/%d/rows", e.URL, tv), "", &rows)
+	if len(rows.RecentlyAired) != 1 || rows.RecentlyAired[0].ShowTMDBID != 5501 {
+		t.Errorf("recently aired = %+v", rows.RecentlyAired)
+	}
+}

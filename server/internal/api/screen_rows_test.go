@@ -82,7 +82,8 @@ var unarrangedGolden embed.FS
 // writes them to testdata/ for the next build to embed), and written again
 // only for optional fields added to cards since (tmdbId; and from API level
 // 34 a show card's unwatchedCount, seasonCount and, on recently added
-// shows, added).
+// shows, added; Continue watching's tmdbId and an episode card's
+// showTmdbId).
 func TestUnarrangedRepliesUnchanged(t *testing.T) {
 	t.Parallel()
 	srv := newTestServer(t)

@@ -2281,6 +2281,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/movies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The library's copies of a movie, by its TMDB id
+         * @description For an app signed in to several servers, which shows a title on more than one as one card and offers each server's copy when it plays. Answers with an empty list, never an error, when the library doesn't have it. From API level 34.
+         */
+        get: operations["findMoviesByTMDB"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/movies/{id}": {
         parameters: {
             query?: never;
@@ -3340,6 +3360,26 @@ export interface paths {
          * @description Only while no account exists, and only from an admin network. Needs turnstileToken while Turnstile is on.
          */
         post: operations["setup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/shows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The library's copies of a show, by its TMDB id
+         * @description For an app signed in to several servers, which shows a title on more than one as one card and offers each server's copy when it plays. Answers with an empty list, never an error, when the library doesn't have it. From API level 34.
+         */
+        get: operations["findShowsByTMDB"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4777,6 +4817,11 @@ export interface components {
             stillPath?: string;
             subtitle?: string;
             title: string;
+            /**
+             * Format: int64
+             * @description The movie's TMDB id, or for an episode its show's, so an app signed in to several servers shows one card for a title on more than one.
+             */
+            tmdbId?: number;
             /** Format: date-time */
             updatedAt: string;
         };
@@ -5151,6 +5196,11 @@ export interface components {
             showId: number;
             showPosterPath?: string;
             showTitle: string;
+            /**
+             * Format: int64
+             * @description The show's TMDB id, so an app signed in to several servers shows one card for an episode on more than one.
+             */
+            showTmdbId?: number;
             stillPath?: string;
             title: string;
             /** @description The signed-in user has watched it. */
@@ -7137,7 +7187,7 @@ export interface components {
             posterSource?: "tmdb" | "upload" | "url";
             /**
              * Format: double
-             * @description Search results: the fraction watched (0-1) when partway through.
+             * @description Search results and findMoviesByTMDB: the fraction watched (0-1) when partway through.
              */
             progress?: number;
             /**
@@ -7152,7 +7202,7 @@ export interface components {
             title: string;
             /** Format: int64 */
             tmdbId: number;
-            /** @description Search results: the signed-in person finished it. Absent elsewhere; a movie's page has watch. */
+            /** @description Search results and findMoviesByTMDB: the signed-in person finished it. Absent elsewhere; a movie's page has watch. */
             watched?: boolean;
             /** Format: int64 */
             year?: number;
@@ -7179,6 +7229,10 @@ export interface components {
              * @description The films TMDB lists in it; absent until fetched.
              */
             total?: number;
+        };
+        MovieCopies: {
+            /** @description Every library's copy with a present file, the first library's first, marked for the signed-in person as search's are (watched, progress). Empty when the library has none. */
+            items: components["schemas"]["Movie"][];
         };
         MovieDetail: {
             /** Format: date-time */
@@ -7219,7 +7273,7 @@ export interface components {
             posterSource?: "tmdb" | "upload" | "url";
             /**
              * Format: double
-             * @description Search results: the fraction watched (0-1) when partway through.
+             * @description Search results and findMoviesByTMDB: the fraction watched (0-1) when partway through.
              */
             progress?: number;
             /** @enum {string} */
@@ -7242,7 +7296,7 @@ export interface components {
             trailers?: components["schemas"]["MovieTrailer"][];
             /** @description The signed-in user's progress. */
             watch?: components["schemas"]["WatchState"];
-            /** @description Search results: the signed-in person finished it. Absent elsewhere; a movie's page has watch. */
+            /** @description Search results and findMoviesByTMDB: the signed-in person finished it. Absent elsewhere; a movie's page has watch. */
             watched?: boolean;
             /** @description The signed-in person's watchlists that hold the movie (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33. */
             watchlists?: number[];
@@ -8943,6 +8997,11 @@ export interface components {
             showId: number;
             showPosterPath?: string;
             showTitle: string;
+            /**
+             * Format: int64
+             * @description The show's TMDB id, so an app searching several servers shows one row for an episode on more than one.
+             */
+            showTmdbId?: number;
             stillPath?: string;
             title: string;
             /** @description The signed-in user has watched it. */
@@ -9330,7 +9389,7 @@ export interface components {
             rating?: number;
             /**
              * Format: int64
-             * @description Search results: seasons with a present episode, specials left out, as on cards.
+             * @description Search results and findShowsByTMDB: seasons with a present episode, specials left out, as on cards.
              */
             seasonCount?: number;
             /** @example Ended */
@@ -9340,13 +9399,17 @@ export interface components {
             tmdbId: number;
             /**
              * Format: int64
-             * @description Search results: episodes with a present file they haven't finished, as on cards.
+             * @description Search results and findShowsByTMDB: episodes with a present file they haven't finished, as on cards.
              */
             unwatchedCount?: number;
-            /** @description Search results: the signed-in person has watched every episode with a present file. */
+            /** @description Search results and findShowsByTMDB: the signed-in person has watched every episode with a present file. */
             watched?: boolean;
             /** Format: int64 */
             year?: number;
+        };
+        ShowCopies: {
+            /** @description Every library's copy with a present episode file, the first library's first, marked for the signed-in person as search's are (watched, unwatchedCount, seasonCount). Empty when the library has none. */
+            items: components["schemas"]["Show"][];
         };
         ShowDetail: {
             /** Format: date-time */
@@ -9395,7 +9458,7 @@ export interface components {
             rating?: number;
             /**
              * Format: int64
-             * @description Search results: seasons with a present episode, specials left out, as on cards.
+             * @description Search results and findShowsByTMDB: seasons with a present episode, specials left out, as on cards.
              */
             seasonCount?: number;
             seasons: components["schemas"]["Season"][];
@@ -9415,10 +9478,10 @@ export interface components {
             tracks?: components["schemas"]["ShowTracks"];
             /**
              * Format: int64
-             * @description Search results: episodes with a present file they haven't finished, as on cards.
+             * @description Search results and findShowsByTMDB: episodes with a present file they haven't finished, as on cards.
              */
             unwatchedCount?: number;
-            /** @description Search results: the signed-in person has watched every episode with a present file. */
+            /** @description Search results and findShowsByTMDB: the signed-in person has watched every episode with a present file. */
             watched?: boolean;
             /** @description The signed-in person's watchlists that hold the show (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33. */
             watchlists?: number[];
@@ -15449,6 +15512,38 @@ export interface operations {
             };
         };
     };
+    findMoviesByTMDB: {
+        parameters: {
+            query: {
+                /** @description The movie's or show's TMDB id, as cards and search carry it (tmdbId, showTmdbId). */
+                tmdbId: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MovieCopies"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
     getMovie: {
         parameters: {
             query?: never;
@@ -17658,6 +17753,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SignIn"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    findShowsByTMDB: {
+        parameters: {
+            query: {
+                /** @description The movie's or show's TMDB id, as cards and search carry it (tmdbId, showTmdbId). */
+                tmdbId: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShowCopies"];
                 };
             };
             /** @description Error */

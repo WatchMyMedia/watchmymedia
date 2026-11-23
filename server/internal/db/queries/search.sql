@@ -105,7 +105,7 @@ WHERE ((x.words LIKE sqlc.arg(word1) AND x.words LIKE sqlc.arg(word2) AND x.word
 -- name: ListSearchEpisodesByIDs :many
 -- The episodes search shows, each with its newest present file (0 when it
 -- has none any more).
-SELECT e.*, se.number AS season_number, s.title AS show_title, s.poster_path AS show_poster_path,
+SELECT e.*, se.number AS season_number, s.title AS show_title, s.poster_path AS show_poster_path, s.tmdb_id AS show_tmdb_id,
        CAST(COALESCE((SELECT MAX(f.id) FROM episode_files ef
                       CROSS JOIN media_files f ON f.id = ef.media_file_id
                       WHERE ef.episode_id = e.id AND f.status = 'present'), 0) AS INTEGER) AS file_id

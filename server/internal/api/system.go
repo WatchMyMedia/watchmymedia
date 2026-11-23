@@ -177,6 +177,10 @@ type HealthOutput struct {
 // ActivityUserDetail.firstPlayAt, ActivityDeviceSummary.network,
 // OfflineTransfer.ip, and listLibraryFiles' q and probe=failed with
 // MediaFileList.unreadable and MediaFile.title, .year and .episode.
+// Titles on several servers, for apps that show one card for a title more
+// than one server has: GET /movies?tmdbId= and /shows?tmdbId=
+// (findMoviesByTMDB, findShowsByTMDB), ContinueItem.tmdbId,
+// EpisodeCard.showTmdbId and SearchEpisode.showTmdbId.
 const APILevel = 34
 
 // ServerInfo identifies the server to apps before anyone signs in.

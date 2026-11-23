@@ -168,11 +168,11 @@ LIMIT 1;
 -- from the row, with what a card shows.
 SELECT w.item_type, w.item_id, w.media_file_id, w.position_ms, w.duration_ms, w.updated_at,
     m.title AS movie_title, m.year AS movie_year, m.poster_path AS movie_poster_path, m.backdrop_path AS movie_backdrop_path,
-    m.content_rating AS movie_content_rating, m.overview AS movie_overview,
+    m.content_rating AS movie_content_rating, m.overview AS movie_overview, m.tmdb_id AS movie_tmdb_id,
     e.number AS episode_number, e.title AS episode_title, e.still_path AS episode_still_path, e.overview AS episode_overview,
     se.number AS season_number,
     s.id AS show_id, s.title AS show_title, s.poster_path AS show_poster_path, s.backdrop_path AS show_backdrop_path,
-    s.content_rating AS show_content_rating
+    s.content_rating AS show_content_rating, s.tmdb_id AS show_tmdb_id
 FROM watch_state w INDEXED BY watch_state_user_updated_idx
 CROSS JOIN media_files f ON f.id = w.media_file_id
 LEFT JOIN movies m ON w.item_type = 'movie' AND m.id = w.item_id

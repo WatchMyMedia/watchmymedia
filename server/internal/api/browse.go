@@ -40,8 +40,8 @@ type Movie struct {
 	FileCount     int64           `json:"fileCount"`
 	Credits       []people.Credit `json:"credits" nullable:"false"`
 	// Watched and Progress are from API level 34, on search's results.
-	Watched  *bool   `json:"watched,omitempty" required:"false" doc:"Search results: the signed-in person finished it. Absent elsewhere; a movie's page has watch."`
-	Progress float64 `json:"progress,omitempty" required:"false" doc:"Search results: the fraction watched (0-1) when partway through."`
+	Watched  *bool   `json:"watched,omitempty" required:"false" doc:"Search results and findMoviesByTMDB: the signed-in person finished it. Absent elsewhere; a movie's page has watch."`
+	Progress float64 `json:"progress,omitempty" required:"false" doc:"Search results and findMoviesByTMDB: the fraction watched (0-1) when partway through."`
 }
 
 type MovieList struct {
@@ -98,9 +98,9 @@ type Show struct {
 	Credits       []people.Credit `json:"credits" nullable:"false"`
 	// Watched, UnwatchedCount and SeasonCount are from API level 34, on
 	// search's results.
-	Watched        *bool  `json:"watched,omitempty" required:"false" doc:"Search results: the signed-in person has watched every episode with a present file."`
-	UnwatchedCount *int64 `json:"unwatchedCount,omitempty" required:"false" doc:"Search results: episodes with a present file they haven't finished, as on cards."`
-	SeasonCount    int64  `json:"seasonCount,omitempty" required:"false" doc:"Search results: seasons with a present episode, specials left out, as on cards."`
+	Watched        *bool  `json:"watched,omitempty" required:"false" doc:"Search results and findShowsByTMDB: the signed-in person has watched every episode with a present file."`
+	UnwatchedCount *int64 `json:"unwatchedCount,omitempty" required:"false" doc:"Search results and findShowsByTMDB: episodes with a present file they haven't finished, as on cards."`
+	SeasonCount    int64  `json:"seasonCount,omitempty" required:"false" doc:"Search results and findShowsByTMDB: seasons with a present episode, specials left out, as on cards."`
 }
 
 type ShowList struct {

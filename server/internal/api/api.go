@@ -264,6 +264,7 @@ func New(deps Deps) (*chi.Mux, huma.API) {
 	registerRelated(h, deps)
 	registerPeople(h, deps)
 	registerCollections(h, deps)
+	registerTitlesByTMDB(h, deps)
 	registerMediaLists(h, deps)
 	registerWatchlists(h, deps)
 	registerPlayback(h, r, deps)
