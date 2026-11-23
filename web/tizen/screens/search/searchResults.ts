@@ -2,12 +2,13 @@ import type { components } from '../../../src/api/schema'
 import { formatRuntime, plural } from '../../../src/lib/format'
 import { duration, episodeLine, isOn } from '../../../src/lib/liveGuide'
 import { searchWhen } from '../../../src/lib/liveReminders'
-import { suggestions } from '../../../src/lib/searchSuggestions'
+import { homeRows } from '../../../src/lib/screenRows'
+import { leftWords } from '../../ui/timeWords'
 import type { IconName } from '../../ui/Icon'
 
-// Search's results on the TV: the suggestions under
-// the box, each section's cards and their lines, On Live TV's times and
-// what OK does there, and Not in your library.
+// Search's results on the TV: the best match with your place in it, each
+// group's cards and their lines, On live TV's times and what OK does there,
+// and Not in your library, set apart at the end.
 
 type SearchResults = components['schemas']['SearchResults']
 type Movie = components['schemas']['Movie']
@@ -15,49 +16,68 @@ type Show = components['schemas']['Show']
 type SearchEpisode = components['schemas']['SearchEpisode']
 type Requestable = components['schemas']['Requestable']
 type LiveHit = components['schemas']['LiveTVSearchHit']
-
-/** A suggestion under the box: a title, with the part typed in bold. */
-export type Chip = { key: string; title: string; parts: [string, string, string] }
-
-/** Where `typed` is in `title`, ignoring case, for the bold part: at the start, else at a word's start, else anywhere; none when it isn't. */
-export function highlight(title: string, typed: string): [string, string, string] {
-  const q = typed.trim().toLowerCase()
-  const t = title.toLowerCase()
-  if (!q || t.length !== title.length) return [title, '', '']
-  let at = t.startsWith(q) ? 0 : -1
-  for (let i = t.indexOf(q); at < 0 && i >= 0; i = t.indexOf(q, i + 1)) if (!/[\p{L}\p{N}]/u.test(t[i - 1] ?? ' ')) at = i
-  if (at < 0) at = t.indexOf(q)
-  return at < 0 ? [title, '', ''] : [title.slice(0, at), title.slice(at, at + q.length), title.slice(at + q.length)]
-}
-
-/** Up to three titles that complete what is typed, best first (the web's suggestions, without episodes). */
-export function suggestionChips(results: SearchResults | undefined, typed: string, max = 3): Chip[] {
-  if (!results) return []
-  const seen = new Set<string>()
-  return suggestions(results, typed).filter((s) => s.kind !== 'episode').filter((s) => {
-    const key = s.title.toLowerCase()
-    if (seen.has(key) || key === typed.trim().toLowerCase()) return false
-    seen.add(key)
-    return true
-  }).slice(0, max).map((s) => ({ key: `${s.kind}-${s.id}`, title: s.title, parts: highlight(s.title, typed) }))
-}
+type HomeData = components['schemas']['HomeData']
+type ContinueItem = components['schemas']['ContinueItem']
 
 /** Names in a sentence: "Cabin server", "Cabin server and Den server", "A, B and C". */
 function named(names: readonly string[]): string {
   return names.length <= 1 ? names[0] ?? '' : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
 }
 
-/** Before anything is typed. With two or more servers to look in, it says Search looks in all of them. */
-export function emptyWords(servers: number, liveTV: boolean): { title: string; body: string } {
-  if (servers > 1) return { title: 'Search your servers', body: `Find a show, a movie or an episode on any of your ${servers} servers.` }
-  return { title: 'Find anything in your library', body: `Type part of a title. Shows, movies and episodes appear here as you type${liveTV ? ', with what’s on Live TV' : ''}.` }
+/** Before anything is typed: what Search looks in. With two or more servers, it says it looks in all of them. */
+export function emptyWords(server: string, servers: number, liveTV: boolean): { title: string; body: string } {
+  const where = servers > 1 ? `your ${servers} servers` : server
+  return { title: 'Search', body: `Movies, shows and episodes on ${where}${liveTV ? ', and what is on live TV' : ''}.` }
 }
 
-/** Nothing found, once every server asked has answered: `answered` counts those that did. */
-export function noMatchWords(q: string, answered: number): { title: string; body: string } {
-  if (answered > 1) return { title: `No matches on your ${answered} servers`, body: `Nothing is called “${q}” on any of them. Check the spelling, or try fewer words.` }
-  return { title: 'Nothing matches', body: `No titles in your library match “${q}”.` }
+/** Nothing found, once every server asked has answered: `answered` counts those that did; the second line says live TV had nothing either, when it was asked. */
+export function noMatchWords(q: string, answered: number, liveTV: boolean): { title: string; body?: string } {
+  const title = answered > 1 ? `Nothing on your ${answered} servers matches “${q}”` : `Nothing in your library matches “${q}”`
+  return { title, body: liveTV ? 'Nothing on live TV either.' : undefined }
 }
+
+/** The library's best match for what was typed: the same title, then one starting with it, then one with a word starting with it, then the first found; shows before movies on a tie. Only this server's titles are a best match. */
+export function bestMatch<S extends { id: number; title: string }, M extends { id: number; title: string }>(
+  shows: readonly { item: S; server?: unknown }[], movies: readonly { item: M; server?: unknown }[], q: string,
+): { kind: 'show'; item: S } | { kind: 'movie'; item: M } | undefined {
+  const typed = q.trim().toLowerCase()
+  const rank = (title: string) => {
+    const t = title.toLowerCase()
+    if (t === typed) return 0
+    if (t.startsWith(typed)) return 1
+    if (t.split(/[^\p{L}\p{N}]+/u).some((w) => w.startsWith(typed))) return 2
+    return 3
+  }
+  let best: { kind: 'show'; item: S } | { kind: 'movie'; item: M } | undefined
+  let score = Infinity
+  for (const t of shows) if (!t.server && rank(t.item.title) < score) { best = { kind: 'show', item: t.item }; score = rank(t.item.title) }
+  for (const t of movies) if (!t.server && rank(t.item.title) < score) { best = { kind: 'movie', item: t.item }; score = rank(t.item.title) }
+  return best
+}
+
+/** Continue watching's titles, from Home's reply. */
+export function continueItems(home: HomeData | undefined): ContinueItem[] {
+  if (!home) return []
+  return homeRows(home).find((r) => r.style === 'continue')?.continue ?? []
+}
+
+/** Where you are in the best match, from Continue watching: its item and the line under the title ("You are on S3 E7 · 29 min left"). */
+export function placeIn(match: { kind: 'show' | 'movie'; item: { id: number } } | undefined, items: readonly ContinueItem[]): { item: ContinueItem; line: string } | undefined {
+  if (!match) return undefined
+  const item = items.find((c) => match.kind === 'movie' ? c.kind === 'movie' && c.movieId === match.item.id : c.kind === 'episode' && c.showId === match.item.id)
+  if (!item) return undefined
+  const left = leftWords(Math.max(0, item.durationMs - item.positionMs))
+  const at = item.kind === 'episode' && item.seasonNumber !== undefined && item.episodeNumber !== undefined ? `S${item.seasonNumber} E${item.episodeNumber}` : undefined
+  return { item, line: at ? `You are on ${at} · ${left}` : `You are partway through · ${left}` }
+}
+
+/** A title's kind and a fact, under its name: "Movie · 2018", "TV show · 24 episodes". */
+export function kindLine(kind: 'show' | 'movie', t: { year?: number; episodeCount?: number }): string {
+  return kind === 'movie' ? ['Movie', t.year].filter(Boolean).join(' · ') : ['TV show', t.episodeCount ? plural(t.episodeCount, 'episode') : t.year].filter(Boolean).join(' · ')
+}
+
+/** Under Not in your library's title, when the library had nothing: why asking helps. */
+export const ASK_LINE = 'Asking sends a request to whoever looks after this server.'
 
 /** At the end of the results while a server is still out after a second. */
 export const stillAsking = (names: readonly string[]) => `Still asking ${named(names)}…`
@@ -89,14 +109,6 @@ export function episodeSub(e: Pick<SearchEpisode, 'seasonNumber' | 'number' | 't
   return [`S${e.seasonNumber} E${e.number}`, e.title].filter(Boolean).join(' · ')
 }
 
-/**
- * Shows and movies side by side when they fit one line of the results (as
- * the board draws a few), else a row each.
- */
-export function libraryBand(shows: number, movies: number, fit = 4): 'band' | 'rows' {
-  return shows + movies <= fit ? 'band' : 'rows'
-}
-
 /** Not in your library: what search found on TMDB (or Seerr) that isn't among the library's results. */
 export function notInLibrary(items: readonly Requestable[] | undefined, results: Pick<SearchResults, 'movies' | 'shows'> | undefined): Requestable[] {
   if (!items) return []
@@ -111,7 +123,17 @@ export function requestBadge(state: Requestable['state']): { label: string; icon
     case 'requested': return { label: 'Requested', icon: 'clock', gold: false }
     case 'downloading': return { label: 'Downloading', icon: 'down', gold: true }
     case 'available': return { label: 'In your library', icon: 'check', gold: true }
-    default: return { label: 'Request', gold: false }
+    default: return { label: 'Ask for it', gold: false }
+  }
+}
+
+/** The button beside a title the library lacks: Ask for it, Open once it is in the library, or why there is nothing to press. */
+export function askButton(r: Pick<Requestable, 'state' | 'showId' | 'movieId'>): { label: string; why?: string } {
+  switch (r.state) {
+    case 'requestable': return { label: 'Ask for it' }
+    case 'available': return { label: 'Open' }
+    case 'downloading': return { label: 'On its way', why: 'It’s downloading. It appears in your library when it’s done.' }
+    default: return { label: 'Asked for', why: 'It’s been asked for. It appears in your library once it’s added.' }
   }
 }
 

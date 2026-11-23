@@ -1,18 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useEffectEvent, useRef, useState, type ReactNode } from 'react'
 import { clock } from '../../../src/lib/clock'
-import { useApp } from '../../app/hooks'
+import { useApp, useBack, useFocus, useKeys } from '../../app/hooks'
 import { displayAddress } from '../../session/address'
-import { formatCode } from '../../session/pairing'
+import { formatCode, type PairingCode } from '../../session/pairing'
 import type { StartState } from '../../session/session'
-import { Button, KeyHints } from '../../ui/Button'
-import { Brand, Icon } from '../../ui/Icon'
+import { Button } from '../../ui/Button'
+import { Icon } from '../../ui/Icon'
 import { QrCode } from '../../ui/QrCode'
 import { TextField } from '../../ui/TextField'
 import { problemWords, signInWords } from '../../ui/problemWords'
+import { StartTop } from './ServerScreen'
+import { SIGN_IN_WHY } from './startWords'
 
 type SignIn = Extract<StartState, { screen: 'signIn' }>
 
-/** Seconds left until `at`, ticking once a second while shown. */
+/** Milliseconds left until `at`, ticking once a second while shown. */
 function useRemaining(at: number | undefined) {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -23,94 +25,126 @@ function useRemaining(at: number | undefined) {
   return at === undefined ? 0 : Math.max(0, at - now)
 }
 
+/** One of the two numbered steps. */
+function Step({ n, children }: { n: number; children: ReactNode }) {
+  return <li className="signin-step"><span className="signin-step__n" aria-hidden="true">{n}</span><span className="signin-step__text">{children}</span></li>
+}
+
+/**
+ * Signing in with a phone: two numbered steps, the QR code, and the code in
+ * large tiles. Focus opens on Use a password instead, so an OK pressed out
+ * of habit never throws away the code someone is typing on their phone; a
+ * new code is offered only once the old one has run out, and then takes
+ * focus. Where the server wants a browser check first, only the code works.
+ */
 function CodeView({ state }: { state: SignIn }) {
   const app = useApp()
   const { pairing, server } = state
-  const code = pairing.state === 'waiting' ? pairing.code : undefined
-  const remaining = useRemaining(code?.expiresAt)
-  const stopped = pairing.state === 'expired' || pairing.state === 'failed'
-  const chars = formatCode(code?.code ?? '      ').split('-')
+  const live = pairing.state === 'waiting' ? pairing.code : undefined
+  // The code just used stays on screen, dimmed, once it has run out.
+  const [last, setLast] = useState<PairingCode>()
+  if (live && live !== last) setLast(live)
+  const code = live ?? last
+  const remaining = useRemaining(live?.expiresAt)
+  const ranOut = pairing.state === 'expired' || (pairing.state === 'waiting' && remaining === 0)
   const failed = pairing.state === 'failed' ? problemWords(pairing.error) : undefined
-  const link = `${displayAddress(server.baseUrl)}/link`
+  const old = ranOut || !!failed
+  const chars = formatCode(code?.code ?? '      ').split('-')
+  const password = !state.info.turnstile
+  // Once the code runs out, Get a new code takes focus; once a new one is showing, focus goes back to Use a password instead.
+  const focus = useFocus()
+  const was = useRef(old)
+  const move = useEffectEvent((ranOutNow: boolean) => {
+    if (was.current === ranOutNow) return
+    was.current = ranOutNow
+    focus.focusId(ranOutNow ? 'new-code' : password ? 'use-password' : 'cancel')
+  })
+  useEffect(() => { move(old) }, [old])
   return <>
-    <div className="start-main start-main--signin">
-      <p className="tv-kicker">Sign in</p>
-      <h1 className="tv-h1">Link this TV to<br/>{server.name}</h1>
-      <p className="signin-lede">Scan the code with your phone, or on your phone or computer open <b>{link}</b> and enter this code.</p>
-      <div className="signin-code" role="group" aria-label={code ? `Code ${code.code}` : 'Getting a code'}>
+    <section className="start-main start-main--signin" aria-label="Sign in with your phone">
+      <p className="tv-kicker">{server.name}</p>
+      <h1 className="tv-title start-title">Sign in with your phone</h1>
+      <ol className="signin-steps">
+        <Step n={1}>Point your phone’s camera at the square code.</Step>
+        <Step n={2}>Or open <b>{displayAddress(server.baseUrl)}/link</b> on a phone or computer and type this code:</Step>
+      </ol>
+      <div className={`signin-code${old ? ' signin-code--old' : ''}`} role="group" aria-label={code ? `Code ${code.code.split('').join(' ')}` : 'Getting a code'}>
         {chars.map((part, i) => <span key={i} className="signin-code__part">
           {i > 0 && <span className="signin-code__dash" aria-hidden="true"/>}
-          {part.split('').map((c, j) => <span key={j} className={`signin-code__tile${stopped ? ' signin-code__tile--old' : ''}`}>{c.trim()}</span>)}
+          {part.split('').map((c, j) => <span key={j} className="signin-code__tile">{c.trim()}</span>)}
         </span>)}
       </div>
-      {pairing.state === 'waiting' && <p role="status" className="start-status start-status--muted"><span className="signin-dot" aria-hidden="true"/>Waiting for the code · expires in {clock(remaining)} · this TV signs in by itself once it is entered</p>}
-      {pairing.state === 'starting' && <p role="status" className="start-status start-status--muted"><span className="tv-spinner" aria-hidden="true"/>Getting a code…</p>}
-      {pairing.state === 'approved' && <p role="status" className="start-status" style={{ color: 'var(--accent)' }}><Icon name="check"/>Code accepted. Signing in…</p>}
-      {pairing.state === 'expired' && <p role="alert" className="start-status tv-warn-text"><Icon name="clock"/>This code expired. Get a new one to sign in.</p>}
-      {failed && <p role="alert" className="tv-error"><Icon name="alert"/>{failed.title}. {failed.body}</p>}
-      <div className="tv-actions start-actions">
-        <Button id="new-code" variant={stopped ? 'primary' : 'ghost'} autoFocus onPress={() => app.newCode()}>{failed ? 'Try again' : 'New code'}</Button>
-        {!state.info.turnstile && <Button id="use-password" onPress={() => app.usePassword()}>Sign in with a password instead</Button>}
-        <Button id="cancel" onPress={() => app.cancel()}>Cancel</Button>
+      <div className="signin-under">
+        {pairing.state === 'starting' && <p role="status" className="start-status"><span className="tv-spinner tv-spinner--big" aria-hidden="true"/>Getting a code…</p>}
+        {pairing.state === 'waiting' && !ranOut && <>
+          <p role="status" className="start-status"><span className="tv-spinner tv-spinner--big" aria-hidden="true"/>Waiting for your phone. This TV signs in by itself.</p>
+          <p className="signin-left">The code works for another {clock(remaining)}.</p>
+        </>}
+        {pairing.state === 'approved' && <p role="status" className="start-status start-status--done"><Icon name="check"/>Code accepted. Signing in to {server.name}…</p>}
+        {ranOut && <p role="alert" className="tv-notice tv-notice--warn signin-note"><b>That code ran out.</b><span className="tv-muted">Get a new one to sign in.</span></p>}
+        {failed && <p role="alert" className="tv-notice tv-notice--bad signin-note"><b>{failed.title}.</b><span className="tv-muted">{failed.body}</span></p>}
+        <div className="tv-actions start-actions" data-row>
+          {old && <Button id="new-code" variant="primary" autoFocus onPress={() => app.newCode()}>{failed ? 'Try again' : 'Get a new code'}</Button>}
+          {password && <Button id="use-password" autoFocus={!old} onPress={() => app.usePassword()}>Use a password instead</Button>}
+          <Button id="cancel" autoFocus={!old && !password} onPress={() => app.cancel()}>Choose another server</Button>
+        </div>
       </div>
-    </div>
+    </section>
     <div className="signin-qr">
       <div className="signin-qr__card">
-        {code ? <QrCode text={code.linkUrl} label="QR code that opens the link page with the code filled in"/> : <QrCode text={`${server.baseUrl}/link`} label="QR code for the link page" faded/>}
-        {stopped && <span className="signin-qr__expired"><span>Expired</span></span>}
+        {code ? <QrCode text={code.linkUrl} label="A code for your phone’s camera: it opens the link page with the code filled in" faded={old}/>
+          : <QrCode text={`${server.baseUrl}/link`} label="A code for your phone’s camera: it opens the link page" faded/>}
       </div>
-      <p className="tv-note" style={{ textAlign: 'center' }}>Scan with your phone’s camera. It opens the link page with the code filled in.</p>
+      <p className="signin-qr__line">Opens the link page with the code filled in.</p>
     </div>
   </>
 }
 
+/**
+ * Signing in with a name and password typed with the TV's keyboard, with a
+ * note that a code is quicker. Sign in is dimmed until both are typed and
+ * says what is missing. Return goes back to the code.
+ */
 function PasswordView({ state }: { state: SignIn }) {
   const app = useApp()
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const { busy, error } = state.password
-  const submit = () => { if (name.trim() && password) void app.signInWithPassword(name, password) }
+  const ready = !!name.trim() && !!password
+  const submit = () => { if (ready) void app.signInWithPassword(name, password) }
+  const focus = useFocus()
+  useBack(() => { if (busy) return false; app.useCode(); return true })
+  // ▼ from the password goes to Sign in, the first button, wherever the field's middle is.
+  useKeys((i) => i.action === 'down' && (document.activeElement as HTMLElement | null)?.dataset.focus === 'password' ? focus.focusId('sign-in') : false)
   return <>
-    <div className="start-main start-main--password">
-      <p className="tv-kicker">Sign in</p>
-      <h1 className="tv-h1">Sign in to<br/>{state.server.name}</h1>
+    <section className="start-main start-main--password" aria-label="Sign in with a password">
+      <p className="tv-kicker">{state.server.name}</p>
+      <h1 className="tv-title start-title">Sign in with a password</h1>
       <div className="signin-form">
-        <span className="tv-label">Username</span>
-        <TextField id="name" label="Username" value={name} onChange={setName} placeholder="Username" autoFocus autoComplete="username"/>
+        <span className="tv-label">Name</span>
+        <TextField id="name" label="Name" value={name} onChange={setName} placeholder="Not typed yet" autoFocus autoComplete="username"/>
         <span className="tv-label">Password</span>
-        <TextField id="password" label="Password" type="password" value={password} onChange={setPassword} placeholder="Password" autoComplete="current-password" onSubmit={submit}/>
+        <TextField id="password" label="Password" type="password" value={password} onChange={setPassword} placeholder="Not typed yet" autoComplete="current-password" onSubmit={submit}/>
       </div>
-      {error ? <p role="alert" className="tv-error"><Icon name="alert"/>{signInWords(error)}</p>
-        : <p className="start-status"><span className="tv-kbd">OK</span>Press OK on a field to type with the TV’s keyboard</p>}
-      <div className="tv-actions start-actions">
-        <Button id="sign-in" variant="primary" busy={busy} onPress={submit}>{busy ? 'Signing in…' : 'Sign in'}</Button>
+      {error ? <p role="alert" className="tv-notice tv-notice--bad signin-note"><Icon name="alert"/>{signInWords(error)}</p>
+        : <p className="start-hint">OK on a box opens the TV’s keyboard.</p>}
+      <div className="tv-actions start-actions" data-row>
+        <Button id="sign-in" variant="primary" busy={busy} disabled={!ready && !busy} why={SIGN_IN_WHY} onPress={submit}>{busy ? 'Signing in…' : 'Sign in'}</Button>
         <Button id="use-code" onPress={() => app.useCode()}>Use a code instead</Button>
-        <Button id="cancel" onPress={() => app.cancel()}>Cancel</Button>
       </div>
-    </div>
+    </section>
     <aside className="signin-aside">
-      <span className="signin-aside__icon"><Icon name="phone"/></span>
-      <h2 className="signin-aside__title">A code is quicker</h2>
-      <p className="tv-body" style={{ color: 'var(--text-3)' }}>Typing with the remote is slow. With a code, your phone does the typing and this TV signs in by itself.</p>
-      <p className="tv-faint" style={{ lineHeight: 1.5 }}>This choice is hidden while the server’s sign-in protection is on; the code works then.</p>
+      <p className="signin-aside__title">Typing on a TV is slow.</p>
+      <p className="tv-lede tv-muted">A code from your phone signs this TV in without a password.</p>
     </aside>
   </>
 }
 
-/**
- * Signing in: a six-character code with a
- * QR code of the link page, a countdown and a new code as each runs out;
- * or a name and password typed with the TV's keyboard, unless the server
- * wants a browser check first (Turnstile), when only the code works.
- */
+/** Signing in to a server: by a code from a phone, or by a name and password. */
 export function SignInScreen({ state }: { state: SignIn }) {
-  const password = state.mode === 'password'
-  return <div className="tv-page">
-    <div className="tv-glow tv-glow--top"/>
-    <div className="start-brand"><Brand/></div>
-    {password ? <PasswordView state={state}/> : <CodeView state={state}/>}
-    <KeyHints hints={password ? [{ key: 'OK', label: 'Type' }, { key: '▲ ▼', label: 'Move' }, { key: 'Return', label: 'Back' }]
-      : [{ key: '◀ ▶', label: 'Move' }, { key: 'OK', label: 'Choose' }, { key: 'Return', label: 'Cancel' }]}
-      right={`${state.server.name} · ${displayAddress(state.server.baseUrl)} · This device: Samsung TV`}/>
+  return <div className="tv-page start">
+    <div className="tv-glow"/>
+    <StartTop/>
+    {state.mode === 'password' ? <PasswordView state={state}/> : <CodeView state={state}/>}
   </div>
 }

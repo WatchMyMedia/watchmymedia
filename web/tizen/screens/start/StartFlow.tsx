@@ -33,8 +33,8 @@ export function StartFlow({ state, exit }: { state: Start; exit(): void }) {
 
   useLayoutEffect(() => {
     input.focus.setMemory(memory)
-    // A typed address that failed keeps focus by the field; anything else starts on the screen's first item.
-    input.focus.restore(failed ? ['connect', 'address'] : [], 'content', 4000, 0)
+    // A typed address that failed keeps focus on the field, to fix it; anything else starts on the screen's first item.
+    input.focus.restore(failed ? ['address'] : [], 'content', 4000, 0)
   }, [input, memory, key, failed])
 
   const onBack = useEffectEvent(() => {

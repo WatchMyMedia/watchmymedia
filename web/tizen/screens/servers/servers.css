@@ -1,5 +1,15 @@
-/* Servers: the panel beside the rail, the same rows on Settings' Servers page and a server's page, and the note after a switch. */
-.servers-panel { position: fixed; left: var(--rail-w); top: 0; bottom: 0; width: 40rem; z-index: 21; padding: 4rem 2.75rem 3.375rem; display: flex; flex-direction: column; gap: 1.25rem; background: var(--surface); border-right: 1px solid var(--line); box-shadow: 1.875rem 0 5rem rgba(0, 0, 0, .5); }
+/* Servers: the panel from the left that the menu's account row opens, the rows on Settings' Servers page and a server's page there, and the note after a switch. */
+.srv-panel { padding-left: var(--safe-x); }
+.srv-body { gap: .625rem; }
+.srv-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .625rem; }
+.srv-row { text-align: left; color: var(--text); }
+.srv-row--action { min-height: 5.25rem; }
+.tv-option__label.srv-name { font-weight: 600; }
+.srv-who { display: grid; place-items: center; width: 4rem; height: 4rem; border-radius: 50%; background: var(--brand); border: 2px solid var(--brand-line); color: var(--text); font-size: var(--t-button); font-weight: 700; flex: none; }
+.srv-who svg { width: 1.875rem; height: 1.875rem; }
+.srv-glyph { display: grid; place-items: center; width: 4rem; height: 4rem; flex: none; color: var(--text); }
+.srv-glyph svg { width: 2.125rem; height: 2.125rem; }
+.srv-hint { display: flex; align-items: center; gap: .75rem; margin-top: auto; font-size: var(--t-small); color: var(--muted); }
 .tv-panel.servers-side { width: 43.75rem; }
 .servers-title { font-size: 2.125rem; font-weight: 800; letter-spacing: -.015em; }
 .servers-kicker { display: block; margin-bottom: .25rem; font-size: var(--t-small); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
@@ -31,14 +41,14 @@
 .servers-current { padding: .25rem .625rem; border-radius: var(--radius-s); font-size: var(--t-small); font-weight: 700; letter-spacing: .05em; text-transform: uppercase; background: var(--accent); color: var(--on-accent); flex: none; }
 .servers-facts { display: flex; flex-direction: column; gap: .125rem; }
 
-/* A switch that didn't happen, above the list. */
-.servers-alert { display: flex; flex-direction: column; align-items: flex-start; gap: .5rem; padding: 1.25rem 1.375rem 1.5rem; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--warn); }
-.servers-alert__title { font-size: 1.375rem; font-weight: 700; }
-.servers-alert__body { font-size: var(--t-small); line-height: 1.45; color: var(--text-3); }
-.servers-alert .tv-btn { height: 3.5rem; margin: .625rem 0 0 .375rem; padding: 0 1.5rem; border-radius: var(--radius); font-size: var(--t-small); }
+/* A switch that didn't happen, above the list: a warning, with Try again. */
+.servers-alert { display: flex; flex-direction: column; align-items: flex-start; gap: .5rem; padding: 1.25rem 1.5rem 1.5rem; border-radius: var(--radius-m); background: var(--warn-ground); border: 2px solid var(--warn); flex: none; }
+.servers-alert__title { font-size: var(--t-button); font-weight: 700; }
+.servers-alert__body { font-size: var(--t-small); line-height: 1.4; color: var(--text-2); }
+.servers-alert .tv-btn { margin: .75rem 0 0 .375rem; }
 
 /* "Now on …", at the top right for a moment. It takes no focus. */
-.servers-now { position: fixed; right: var(--gutter); top: 2.5rem; z-index: 15; display: flex; align-items: center; gap: 1.125rem; padding: 1.125rem 1.875rem 1.125rem 1.125rem; border-radius: 1.25rem; border: 1px solid var(--ghost-line); background: rgba(12, 12, 13, .94); box-shadow: 0 1.5rem 3.75rem rgba(0, 0, 0, .6); pointer-events: none; }
-.servers-now__icon { display: grid; place-items: center; width: 3.5rem; height: 3.5rem; border-radius: var(--radius-m); background: var(--brand); color: var(--text); flex: none; }
+.servers-now { position: fixed; right: var(--safe-x); top: var(--safe-y); z-index: 15; display: flex; align-items: center; gap: 1.125rem; padding: 1rem 1.875rem 1rem 1rem; border-radius: var(--radius-m); border: 2px solid var(--line-3); background: var(--raised); box-shadow: 0 1.5rem 3.75rem rgba(0, 0, 0, .6); pointer-events: none; }
+.servers-now__icon { display: grid; place-items: center; width: 3.5rem; height: 3.5rem; border-radius: 50%; background: var(--brand); border: 2px solid var(--brand-line); color: var(--text); flex: none; }
 .servers-now__icon svg { width: 1.875rem; height: 1.875rem; }
 .servers-now__text { font-size: 1.625rem; font-weight: 700; white-space: nowrap; }
