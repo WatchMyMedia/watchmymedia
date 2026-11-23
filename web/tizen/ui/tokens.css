@@ -57,6 +57,8 @@
   --ghost-line: rgba(255, 255, 255, .14);
   --ghost-focus: rgba(255, 255, 255, .16);
   --track: rgba(255, 255, 255, .26);
+  --scroll-track: #232327;
+  --scroll-thumb: #8e8e96;
   --scrim: rgba(0, 0, 0, .66);
 
   /* The safe area: text and anything focusable stays inside it. */

@@ -36,13 +36,14 @@ export const SHOW_ITEMS: BrowseItem[] = SHOWS.map((title, i) => ({
   episodeCount: 8 + i * 2, status: i % 3 === 0 ? 'Ended' : 'Returning Series', tmdbId: 60_201 + i,
 }))
 
+// As the server words them: an episode's code and title, a movie's year.
 export const CONTINUE: ContinueItem[] = [
-  { kind: 'episode', title: 'The Quiet Meridian', subtitle: 'S02 E04 · 23 min left', fileId: 3104, showId: 204, seasonNumber: 2, episodeNumber: 4, positionMs: 28 * 60_000, durationMs: 51 * 60_000, updatedAt: at(0) },
-  { kind: 'movie', title: 'Dead Reckoning Bay', subtitle: '1 h 12 min left', fileId: 1102, movieId: 102, positionMs: 32 * 60_000, durationMs: 104 * 60_000, updatedAt: at(1) },
-  { kind: 'episode', title: 'Saltmarsh', subtitle: 'S01 E09 · 8 min left', fileId: 3509, showId: 205, seasonNumber: 1, episodeNumber: 9, positionMs: 40 * 60_000, durationMs: 48 * 60_000, updatedAt: at(2) },
-  { kind: 'episode', title: 'Copperline', subtitle: 'S04 E01 · 41 min left', fileId: 3201, showId: 202, seasonNumber: 4, episodeNumber: 1, positionMs: 6 * 60_000, durationMs: 47 * 60_000, updatedAt: at(3) },
-  { kind: 'movie', title: 'The Paper Kite', subtitle: '34 min left', fileId: 1101, movieId: 101, positionMs: 66 * 60_000, durationMs: 100 * 60_000, updatedAt: at(4) },
-  { kind: 'episode', title: 'Northfield Precinct', subtitle: 'S01 E02 · 50 min left', fileId: 3302, showId: 203, seasonNumber: 1, episodeNumber: 2, positionMs: 3 * 60_000, durationMs: 53 * 60_000, updatedAt: at(5) },
+  { kind: 'episode', title: 'The Quiet Meridian', subtitle: 'S02E04 The Undertow', fileId: 3104, showId: 204, seasonNumber: 2, episodeNumber: 4, positionMs: 28 * 60_000, durationMs: 51 * 60_000, updatedAt: at(0) },
+  { kind: 'movie', title: 'Dead Reckoning Bay', subtitle: '2026', fileId: 1102, movieId: 102, positionMs: 32 * 60_000, durationMs: 104 * 60_000, updatedAt: at(1) },
+  { kind: 'episode', title: 'Saltmarsh', subtitle: 'S01E09 Low Water', fileId: 3509, showId: 205, seasonNumber: 1, episodeNumber: 9, positionMs: 40 * 60_000, durationMs: 48 * 60_000, updatedAt: at(2) },
+  { kind: 'episode', title: 'Copperline', subtitle: 'S04E01 Night Shift', fileId: 3201, showId: 202, seasonNumber: 4, episodeNumber: 1, positionMs: 6 * 60_000, durationMs: 47 * 60_000, updatedAt: at(3) },
+  { kind: 'movie', title: 'The Paper Kite', subtitle: '2024', fileId: 1101, movieId: 101, positionMs: 66 * 60_000, durationMs: 100 * 60_000, updatedAt: at(4) },
+  { kind: 'episode', title: 'Northfield Precinct', subtitle: 'S01E02 Old Roads', fileId: 3302, showId: 203, seasonNumber: 1, episodeNumber: 2, positionMs: 3 * 60_000, durationMs: 53 * 60_000, updatedAt: at(5) },
 ]
 
 export const AIRED: EpisodeCard[] = SHOWS.slice(0, 6).map((showTitle, i) => ({

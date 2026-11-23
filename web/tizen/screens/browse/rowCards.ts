@@ -40,6 +40,8 @@ export type RowCard = {
   image?: { path: string; size: ImageSize }
   progress?: number
   badges?: CardBadge[]
+  /** Watched all the way: the white tick. */
+  done?: boolean
   live?: { number: string; name: string; now?: string }
   /** Names the whole card for a screen reader. */
   label?: string
@@ -117,10 +119,10 @@ export function posterLine(row: Pick<ScreenRow, 'id' | 'style'>, item: BrowseIte
 }
 
 const NEW: CardBadge = { label: 'New', tone: 'gold' }
-const WATCHED: CardBadge = { label: '✓', tone: 'gold' }
 
-function badges(isNew: boolean | undefined, watched: boolean | undefined, extra?: CardBadge): CardBadge[] | undefined {
-  const out = [isNew ? NEW : undefined, extra, watched ? WATCHED : undefined].filter((b): b is CardBadge => !!b)
+/** The words on a card's picture: New, and what it lacks. Watched is the white tick in the corner (`done`), not a badge. */
+function badges(isNew: boolean | undefined, extra?: CardBadge): CardBadge[] | undefined {
+  const out = [isNew ? NEW : undefined, extra].filter((b): b is CardBadge => !!b)
   return out.length ? out : undefined
 }
 
@@ -153,14 +155,17 @@ export function itemCard(row: Pick<ScreenRow, 'id' | 'style'>, item: BrowseItem,
     subtitle,
     image: path ? { path, size: wide ? 'w780' : 'w342' } : undefined,
     progress: item.progress,
-    badges: badges(item.isNew, item.watched),
+    badges: badges(item.isNew),
+    done: !!item.watched && !item.progress,
     label: spoken(item.title, subtitle, item.watched && 'watched'),
     ...itemActions(item, menu),
   }
 }
 
 export function continueCard(c: ContinueItem): RowCard {
-  const subtitle = c.subtitle || timeLeft(c.durationMs - c.positionMs)
+  // "S02 E04 · 23 min left", "1 h 12 min left": where you are and what is left, whatever the server's own line says.
+  const code = c.kind === 'episode' && c.seasonNumber && c.episodeNumber ? episodeCode(c.seasonNumber, c.episodeNumber) : ''
+  const subtitle = c.durationMs ? [code, timeLeft(c.durationMs - c.positionMs)].filter(Boolean).join(' · ') : c.subtitle || code
   const path = c.stillPath ?? c.backdropPath
   const page: Route | undefined = c.showId ? { name: 'show', id: c.showId } : c.movieId ? { name: 'movie', id: c.movieId } : undefined
   return {
@@ -187,7 +192,8 @@ export function episodeCard(e: EpisodeCard): RowCard {
     title: e.showTitle,
     subtitle,
     image: path ? { path, size: 'w780' } : undefined,
-    badges: badges(e.isNew, e.watched, e.hasFile ? undefined : { label: 'Not in library' }),
+    badges: badges(e.isNew, e.hasFile ? undefined : { label: 'Not in library' }),
+    done: !!e.watched,
     label: spoken(e.showTitle, `season ${e.seasonNumber} episode ${e.episodeNumber}`, e.title, e.watched && 'watched'),
     // OK opens the episode on its show, focused on Play; holding OK plays it at once.
     press: open,
@@ -196,14 +202,15 @@ export function episodeCard(e: EpisodeCard): RowCard {
 }
 
 export function channelCard(channel: LiveChannel, listings: boolean, now: number): RowCard {
-  const on = listings ? nowAndNext(channel, now).now : undefined
+  const { now: on, next } = listings ? nowAndNext(channel, now) : { now: undefined, next: undefined }
   const start = on ? Date.parse(on.start) : 0
   const end = on ? Date.parse(on.end) : 0
   return {
     key: `ch${channel.id}`,
     variant: 'live',
     title: on?.title ?? channel.name,
-    subtitle: on ? `${timeRange(start, end)} · ${timeLeft(end - now)}` : listings ? 'No listings' : undefined,
+    // "48 min left · then Station 9": how long it has, and what comes after.
+    subtitle: on ? [timeLeft(end - now), next ? `then ${next.title}` : ''].filter(Boolean).join(' · ') : listings ? 'No listings' : undefined,
     live: { number: channel.number, name: channel.name, now: on?.title ?? (listings ? channel.name : 'Watch live') },
     progress: on ? progress(on, now) / 100 : undefined,
     label: spoken(`Channel ${channel.number}`, channel.name, on && `${on.title}, until ${timeRange(start, end).split('–')[1]}`),

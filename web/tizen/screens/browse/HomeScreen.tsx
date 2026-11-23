@@ -13,20 +13,25 @@ import { Icon } from '../../ui/Icon'
 import { ProblemScreen, Skeleton, SkeletonRow, SkeletonText } from '../../ui/States'
 import { problemWords } from '../../ui/problemWords'
 import { CardActions } from './CardActions'
-import { cardPanel, panelHint } from './cardPanel'
+import { cardPanel } from './cardPanel'
 import { homeEmpty } from './emptyHome'
 import { useEntryState } from './entryState'
 import {
-  END_EDIT, END_TOP, HERO_OPEN, HERO_PLAY, homeIsEmpty, homePages, homeScreenRows, pageOfFocus, pageStep, peekLine, rowCounter, rowGroup, totalsLine,
+  END_EDIT, END_TOP, HERO_OPEN, HERO_PLAY, HERO_RESTART, endKicker, homeIsEmpty, homePages, homeScreenRows, pageOfFocus, pageStep, peekLine, resumeHero, resumeLine, rowCounter, rowGroup, totalsLine,
   type HomeData, type HomePage,
 } from './homePages'
 import { episodeCode, seeAllRoute, type RowCard, type RowContext } from './rowCards'
 import { toneStyle, useFocusOnArrival, useRowCards } from './browseHooks'
 import { Glyph, RowView } from './RowView'
 import { useWatchlistsOn } from '../watchlists/useWatchlistsOn'
+import { useApp } from '../../app/hooks'
+import { Clock } from '../../ui/Clock'
+import { endsAtWords, leftWords } from '../../ui/timeWords'
+import { useNow } from '../live/clock'
 import './browse.css'
 
 type Hero = components['schemas']['HomeHero']
+type ContinueItem = components['schemas']['ContinueItem']
 
 /** Live TV for Home's row: the channels that can be watched, and whether the server has listings. */
 function useLive() {
@@ -51,13 +56,13 @@ function Backdrop({ url, seed, short }: { url?: string; seed: string; short?: bo
   </div>
 }
 
-/** "S03 E07 · The Long Dark · 52 min · [4K] [HDR] · TV-14". */
-function Facts({ facts, tags, rating, big }: { facts: string[]; tags: string[]; rating?: string; big?: boolean }) {
+/** "2026 · 1 season · TV-14 · Drama", with a row screen's tags in words ("4K", "HDR"). */
+function Facts({ facts, tags, rating }: { facts: string[]; tags: string[]; rating?: string }) {
   const parts: ReactNode[] = []
   if (facts.length) parts.push(<span key="f" className="home-facts__text">{facts.join(' · ')}</span>)
-  if (tags.length) parts.push(<span key="t" className="home-facts__tags">{tags.map((t) => <span key={t} className="home-tag">{t}</span>)}</span>)
+  if (tags.length) parts.push(<span key="t" className="home-facts__tags">{tags.map((t) => <span key={t} className="tv-tag">{t}</span>)}</span>)
   if (rating) parts.push(<span key="r">{rating}</span>)
-  return <p className={`home-facts${big ? ' home-facts--big' : ''}`}>
+  return <p className="home-facts">
     {parts.flatMap((p, i) => (i ? [<span key={`s${i}`} className="home-facts__sep">·</span>, p] : [p]))}
   </p>
 }
@@ -70,23 +75,59 @@ function heroPlay(hero: Hero, rows: readonly ScreenRow[]) {
   return { kind: 'file' as const, fileId: hero.fileId, title: hero.title, subtitle, backdropPath: hero.backdropPath }
 }
 
-function HeroSection({ hero, rows }: { hero: Hero; rows: readonly ScreenRow[] }) {
+/** The server's pick, when nothing is in progress: a kicker, the title, its facts, two lines and Play. */
+function PickHero({ hero, rows }: { hero: Hero; rows: readonly ScreenRow[] }) {
   const nav = useNav()
   const media = useMediaUrls()
   const play = heroPlay(hero, rows)
-  const open = hero.kind === 'episode' && hero.showId && hero.episodeId ? { label: 'Go to episode', route: { name: 'show' as const, id: hero.showId, episodeId: hero.episodeId } }
-    : hero.showId ? { label: 'Go to show', route: { name: 'show' as const, id: hero.showId } }
+  const open = hero.kind === 'episode' && hero.showId && hero.episodeId ? { label: 'Episodes', route: { name: 'show' as const, id: hero.showId, episodeId: hero.episodeId } }
+    : hero.showId ? { label: 'Episodes', route: { name: 'show' as const, id: hero.showId } }
       : hero.movieId ? { label: 'More info', route: { name: 'movie' as const, id: hero.movieId } } : undefined
   return <>
     <Backdrop url={media.imageUrl(hero.backdropPath, 'w1280')} seed={hero.title}/>
     <section className="home-hero" aria-label={hero.kicker || hero.title}>
-      {hero.kicker && <p className="tv-kicker home-kicker">{hero.kicker}</p>}
+      {hero.kicker && <p className="tv-kicker">{hero.kicker}</p>}
       <h1 className="home-hero__title">{hero.title}</h1>
-      <Facts facts={[hero.facts].filter(Boolean)} tags={[hero.quality || '', hero.hdr ? 'HDR' : ''].filter(Boolean)} rating={hero.contentRating} big/>
+      <Facts facts={[hero.facts, hero.contentRating ?? ''].filter(Boolean)} tags={[]}/>
       {hero.overview && <p className="home-hero__overview">{hero.overview}</p>}
-      <div className="tv-actions home-hero__actions">
+      <div className="tv-actions home-hero__actions" data-group="home/hero">
         {play && <Button id={HERO_PLAY} variant="primary" icon="play" autoFocus onPress={() => nav.play(play)}>Play</Button>}
-        {open && <Button id={HERO_OPEN} variant={play ? 'ghost' : 'primary'} autoFocus={!play} onPress={() => nav.push(open.route)}>{open.label}</Button>}
+        {open && <Button id={HERO_OPEN} variant={play ? 'glass' : 'primary'} autoFocus={!play} onPress={() => nav.push(open.route)}>{open.label}</Button>}
+      </div>
+    </section>
+  </>
+}
+
+/**
+ * What you were watching, when something is in progress: where you are,
+ * how much is left and when it would end, with Resume focused, Start over,
+ * and the show's episodes or the movie's page.
+ */
+function ResumeHero({ item }: { item: ContinueItem }) {
+  const nav = useNav()
+  const media = useMediaUrls()
+  const now = useNow()
+  const line = resumeLine(item)
+  const left = Math.max(0, item.durationMs - item.positionMs)
+  const fraction = item.durationMs ? Math.min(1, item.positionMs / item.durationMs) : 0
+  const picture = item.backdropPath ?? item.stillPath
+  const request = { kind: 'file' as const, fileId: item.fileId, title: item.title, subtitle: item.subtitle, backdropPath: picture }
+  const open = item.showId ? { label: 'Episodes', route: { name: 'show' as const, id: item.showId, episodeId: item.episodeId } }
+    : item.movieId ? { label: 'More info', route: { name: 'movie' as const, id: item.movieId } } : undefined
+  return <>
+    <Backdrop url={media.imageUrl(picture, 'w1280')} seed={item.title}/>
+    <section className="home-hero" aria-label="Pick up where you left off">
+      <p className="tv-kicker">Continue watching</p>
+      <h1 className="home-hero__title">{item.title}</h1>
+      {line && <p className="home-hero__line">{line}</p>}
+      {item.durationMs > 0 && <div className="home-hero__progress">
+        <span className="tv-bar home-hero__bar" role="img" aria-label={`${Math.round(item.positionMs / 60_000)} of ${Math.round(item.durationMs / 60_000)} minutes watched`}><i style={{ width: `${Math.round(fraction * 100)}%` }}/></span>
+        <b>{leftWords(left)}</b><span className="tv-muted">{endsAtWords(now, left)}</span>
+      </div>}
+      <div className="tv-actions home-hero__actions" data-group="home/hero">
+        <Button id={HERO_PLAY} variant="primary" icon="play" autoFocus onPress={() => nav.play({ ...request, startMs: item.positionMs })}>Resume</Button>
+        <Button id={HERO_RESTART} variant="glass" onPress={() => nav.play({ ...request, startMs: 0 })}>Start over</Button>
+        {open && <Button id={HERO_OPEN} variant="glass" onPress={() => nav.push(open.route)}>{open.label}</Button>}
       </div>
     </section>
   </>
@@ -121,10 +162,9 @@ function RowPage({ row, rows, base, autoFocus }: { row: ScreenRow; rows: readonl
       <h1 className="home-panel__title">{panel.title}</h1>
       {(panel.facts.length > 0 || panel.tags.length > 0 || panel.rating) && <Facts facts={panel.facts} tags={panel.tags} rating={panel.rating}/>}
       {panel.overview && <p className="home-panel__overview">{panel.overview}</p>}
-      <p className="home-panel__hint"><span className="home-okkey">OK</span><span>{panelHint(panel.target, cards[at], at === 0)}</span></p>
     </section>}
     <div className="home-page-row" data-autofocus={autoFocus || undefined}>
-      <RowView row={row} cards={cards} counter={rowCounter(rows, row)} listings={base.listings} onFocusIndex={setFocused}/>
+      <RowView row={row} cards={cards} counter={rowCounter(rows, row)} listings={base.listings} onFocusIndex={setFocused} dimPast/>
     </div>
   </>
 }
@@ -144,16 +184,18 @@ function StartRow({ row, rows, base }: { row: ScreenRow; rows: readonly ScreenRo
   return <div className="home-start-row"><RowView row={row} cards={cards} counter={rowCounter(rows, row)} listings={base.listings}/></div>
 }
 
-function EndPage({ home, onTop }: { home: HomeData; onTop(): void }) {
+/** The last screen: Back to the top focused, Edit rows, and what the library holds in titles. */
+function EndPage({ home, rows, onTop }: { home: HomeData; rows: readonly ScreenRow[]; onTop(): void }) {
   const nav = useNav()
+  const totals = totalsLine(home)
   return <section className="home-end">
+    {rows.length > 0 && <p className="tv-kicker">{endKicker(rows)}</p>}
     <h1 className="home-end__title">That’s everything on Home</h1>
-    <p className="home-end__body">Move, hide and add rows. Your order follows you to every device.</p>
+    {totals && <p className="home-end__body">{totals}</p>}
     <div className="tv-actions">
-      <Button id={END_EDIT} onPress={() => nav.push({ name: 'settings', group: 'homeRows', rowsScreen: 'home' })}><Glyph name="sliders"/>Edit rows</Button>
-      <Button id={END_TOP} onPress={onTop}><Glyph name="up"/>Back to the top</Button>
+      <Button id={END_TOP} variant="primary" autoFocus onPress={onTop}><Glyph name="up"/>Back to the top</Button>
+      <Button id={END_EDIT} onPress={() => nav.push({ name: 'settings', group: 'homeRows', rowsScreen: 'home' })}>Edit rows</Button>
     </div>
-    <p className="home-end__totals">{totalsLine(home)}</p>
   </section>
 }
 
@@ -168,11 +210,11 @@ const PAGE_MS = 320
  * only the one showing takes focus. Return from a row page goes to the
  * first page, and from there to the shell's Leave WatchMyMedia?.
  */
-function HomePager({ home, rows, base }: { home: HomeData; rows: readonly ScreenRow[]; base: Omit<RowContext, 'now'> }) {
+function HomePager({ home, resume, rows, base }: { home: HomeData; resume?: ContinueItem; rows: readonly ScreenRow[]; base: Omit<RowContext, 'now'> }) {
   const entry = useEntry()
   const focus = useFocus()
   const root = useRef<HTMLDivElement>(null)
-  const pages = useMemo(() => homePages(!!home.hero, rows), [home.hero, rows])
+  const pages = useMemo(() => homePages(!!(resume || home.hero), rows), [resume, home.hero, rows])
   const [pageKey, setPageKey] = useEntryState<string>('home-page', () => pageOfFocus(pages, entry?.memory.last) ?? pages[0].key)
   const index = Math.max(0, pages.findIndex((p) => p.key === pageKey))
   const [jump, setJump] = useState(false)
@@ -207,7 +249,14 @@ function HomePager({ home, rows, base }: { home: HomeData; rows: readonly Screen
     const page = pages[at]
     const inRow = !!active?.closest('[data-home-row]')
     // The first page's hero and row are one screen: ▲ from the row and ▼ from the hero move within it.
-    if (page?.kind === 'start' && ((input.action === 'up' && inRow) || (input.action === 'down' && !inRow && page.row))) return false
+    // ▼ from the hero: the row's card it last had, else its first (not the card nearest the button).
+    if (page?.kind === 'start' && input.action === 'down' && !inRow && page.row) {
+      const row = active?.closest('[data-home-page]')?.querySelector<HTMLElement>('[data-home-row]')
+      const remembered = entry?.memory.groups[rowGroup(page.row)]
+      if (row && ((remembered && focus.focusId(remembered, row)) || focus.focusFirst(row))) return true
+      return false
+    }
+    if (page?.kind === 'start' && input.action === 'up' && inRow) return false
     if (page?.kind === 'start' && input.action === 'up') return true
     const next = pageStep(pages.length, at, input.action)
     if (next !== undefined && !input.repeat) goTo(next)
@@ -232,7 +281,7 @@ function HomePager({ home, rows, base }: { home: HomeData; rows: readonly Screen
       {drawn.map(({ page, i }) => {
         const peek = peekLine(pages, i, listings)
         return <section key={page.key} className="home__page" data-home-page={i} inert={i !== index} style={{ top: `calc(${i} * 67.5rem)` }}>
-          <Page page={page} home={home} rows={rows} base={base} first={i === 0} onTop={() => goTo(0)}/>
+          <Page page={page} home={home} resume={resume} rows={rows} base={base} first={i === 0} onTop={() => goTo(0)}/>
           <Peek text={peek.text} up={peek.up}/>
         </section>
       })}
@@ -240,39 +289,44 @@ function HomePager({ home, rows, base }: { home: HomeData; rows: readonly Screen
   </div>
 }
 
-function Page({ page, home, rows, base, first, onTop }: { page: HomePage; home: HomeData; rows: readonly ScreenRow[]; base: Omit<RowContext, 'now'>; first: boolean; onTop(): void }) {
+function Page({ page, home, resume, rows, base, first, onTop }: { page: HomePage; home: HomeData; resume?: ContinueItem; rows: readonly ScreenRow[]; base: Omit<RowContext, 'now'>; first: boolean; onTop(): void }) {
   switch (page.kind) {
     case 'start': return <>
-      {home.hero && <HeroSection hero={home.hero} rows={rows}/>}
+      {resume ? <ResumeHero item={resume}/> : home.hero && <PickHero hero={home.hero} rows={rows}/>}
       {page.row && <StartRow row={page.row} rows={rows} base={base}/>}
     </>
     case 'row': return <RowPage row={page.row} rows={rows} base={base} autoFocus={first}/>
-    case 'end': return <EndPage home={home} onTop={onTop}/>
+    case 'end': return <EndPage home={home} rows={rows} onTop={onTop}/>
   }
 }
 
-/** The board's loading state: the hero's lines and buttons, a row of wide cards and one of posters. */
+/** Loading: the hero's lines and buttons, a row of wide cards, and who it is waiting for. Focus waits on the menu meanwhile. */
 function HomeSkeleton() {
+  const session = useSession()
   return <div className="home home-skeleton" aria-busy="true">
-    <span className="tv-sr" role="status">Loading Home</span>
-    <div className="home-hero" aria-hidden="true">
-      <SkeletonText width="21.25rem"/>
-      <Skeleton width="33.75rem" height="4rem"/>
-      <SkeletonText width="29.375rem"/>
-      <SkeletonText width="47.5rem"/>
-      <SkeletonText width="37.5rem"/>
-      <div className="tv-actions home-hero__actions"><Skeleton width="9.375rem" height="4rem" radius="var(--radius-m)"/><Skeleton width="13.125rem" height="4rem" radius="var(--radius-m)"/></div>
+    <div className="home-hero">
+      <SkeletonText width="16.25rem"/>
+      <Skeleton width="40rem" height="4.5rem"/>
+      <Skeleton width="32.5rem" height="2rem" radius="1rem"/>
+      <div className="tv-actions home-hero__actions" aria-hidden="true"><Skeleton width="13.125rem" height="var(--button-h)" radius="2.375rem"/><Skeleton width="11.875rem" height="var(--button-h)" radius="2.375rem"/></div>
+      <p className="home-skeleton__wait" role="status"><span className="tv-spinner tv-spinner--big" aria-hidden="true"/>Getting Home from {session.server.name}…</p>
     </div>
-    <div className="home-skeleton__rows" aria-hidden="true"><SkeletonRow variant="continue"/><SkeletonRow variant="poster"/></div>
+    <div className="home-skeleton__rows" aria-hidden="true"><SkeletonRow variant="continue"/></div>
   </div>
 }
 
-function EmptyHome({ libraries, onRetry }: { libraries: components['schemas']['Library'][] | undefined; onRetry(): void }) {
+/** Nothing to watch yet: why, Check again focused, Live TV when there is some, and Choose another server. */
+function EmptyHome({ libraries, liveTV, onRetry }: { libraries: components['schemas']['Library'][] | undefined; liveTV: boolean; onRetry(): void }) {
   const session = useSession()
+  const app = useApp()
+  const nav = useNav()
   const words = homeEmpty(libraries, session.isAdmin)
   const address = session.isAdmin && words.setup ? session.baseUrl : undefined
-  return <ProblemScreen icon={words.kind === 'scanning' ? 'clock' : words.kind === 'scanFailed' ? 'alert' : 'setup'} title={words.title}
-    actions={[{ id: 'home/retry', label: 'Check again', onPress: onRetry }]} extra={address && <p className="home-address">{address}</p>}>
+  return <ProblemScreen title={words.title} extra={address && <p className="home-address">{address}</p>} actions={[
+    { id: 'home/retry', label: 'Check again', onPress: onRetry },
+    ...(liveTV ? [{ id: 'home/live', label: 'Live TV', onPress: () => nav.openSection({ name: 'live' }) }] : []),
+    ...(app.store.list().length > 1 ? [] : [{ id: 'home/servers', label: 'Choose another server', onPress: () => app.addServer() }]),
+  ]}>
     {words.body}
   </ProblemScreen>
 }
@@ -298,11 +352,15 @@ export function HomeScreen() {
   }, [libs, live.channels, live.listings, menu])
   const rows = useMemo(() => (home.data ? homeScreenRows(home.data, live.channels.length > 0) : []), [home.data, live.channels.length])
 
-  if (home.isPending || libraries.isPending || live.pending) return <HomeSkeleton/>
-  if (home.isError) {
-    const words = problemWords(home.error)
-    return <ProblemScreen icon="offline" title={`Couldn’t load Home. ${words.title}`} actions={[{ id: 'home/retry', label: 'Try again', onPress: () => void home.refetch() }]}>{words.body}</ProblemScreen>
-  }
-  if (homeIsEmpty(home.data, rows)) return <EmptyHome libraries={libs} onRetry={() => { void home.refetch(); void libraries.refetch() }}/>
-  return <CardActions><HomePager home={home.data} rows={rows} base={base}/></CardActions>
+  const resume = useMemo(() => resumeHero(rows), [rows])
+  const body = (() => {
+    if (home.isPending || libraries.isPending || live.pending) return <HomeSkeleton/>
+    if (home.isError) {
+      const words = problemWords(home.error)
+      return <ProblemScreen title={`Couldn’t load Home. ${words.title}`} actions={[{ id: 'home/retry', label: 'Try again', onPress: () => void home.refetch() }]}>{words.body}</ProblemScreen>
+    }
+    if (homeIsEmpty(home.data, rows)) return <EmptyHome libraries={libs} liveTV={live.channels.length > 0} onRetry={() => { void home.refetch(); void libraries.refetch() }}/>
+    return <CardActions><HomePager home={home.data} resume={resume?.item} rows={resume?.rows ?? rows} base={base}/></CardActions>
+  })()
+  return <>{body}<Clock/></>
 }

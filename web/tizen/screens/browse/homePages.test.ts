@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { END_EDIT, HERO_PLAY, headingLine, homeDrawable, homeIsEmpty, homePages, homeScreenRows, pageOfFocus, pageStep, peekLine, rowCounter, rowGroup, totalsLine } from './homePages'
+import { END_EDIT, HERO_PLAY, endKicker, episodeTitleOf, headingLine, resumeHero, resumeLine, homeDrawable, homeIsEmpty, homePages, homeScreenRows, pageOfFocus, pageStep, peekLine, rowCounter, rowGroup, totalsLine } from './homePages'
 import { home, item, row } from './testData'
 
 const continueRow = row({ id: 'continue', style: 'continue', title: 'Continue watching', items: undefined, continue: [{ kind: 'movie', title: 'A', fileId: 1, positionMs: 1, durationMs: 2, updatedAt: '' }] })
@@ -55,7 +55,30 @@ describe('Home’s screens', () => {
     expect(pageStep(3, 0, 'up')).toBeUndefined()
     expect(pageStep(3, 0, 'down')).toBe(1)
     expect(pageStep(3, 2, 'down')).toBeUndefined()
-    const line = totalsLine({ totals: { movies: 1, shows: 2, episodes: 3418, files: 0, totalSize: 2 * 1024 ** 4 }, lastScannedAt: new Date(Date.now() - 12 * 60_000).toISOString() })
-    expect(line).toBe('1 movie · 2 shows · 3,418 episodes · 2.0 TB · last scan 12 min ago')
+    const line = totalsLine({ totals: { movies: 214, shows: 142, episodes: 3418, files: 0, totalSize: 2 * 1024 ** 4 } })
+    expect(line).toBe('214 movies, 142 shows and 3,418 episodes are in Movies and TV Shows.')
+    expect(totalsLine({ totals: { movies: 1, shows: 0, episodes: 0, files: 0, totalSize: 0 } })).toBe('1 movie is in Movies.')
+    expect(totalsLine({ totals: { movies: 0, shows: 0, episodes: 0, files: 0, totalSize: 0 } })).toBe('')
+    expect(endKicker([continueRow, shows])).toBe('Row 2 of 2 was the last')
+  })
+
+  it('opens on what you were watching, keeping the rest of Continue watching in its place', () => {
+    const second = { ...continueRow.continue![0], fileId: 99, title: 'Saltmarsh' }
+    const both = { ...continueRow, continue: [continueRow.continue![0], second] }
+    const r = resumeHero([shows, both])!
+    expect(r.item).toBe(continueRow.continue![0])
+    expect(r.rows.map((x) => x.id)).toEqual([shows.id, both.id])
+    expect(r.rows[1].continue).toEqual([second])
+    // Its only title: the row goes.
+    expect(resumeHero([continueRow, shows])!.rows.map((x) => x.id)).toEqual([shows.id])
+    expect(resumeHero([shows])).toBeUndefined()
+  })
+
+  it('words the resume hero from what Continue watching carries', () => {
+    expect(resumeLine({ kind: 'episode', seasonNumber: 3, episodeNumber: 7, subtitle: 'S03E07 The Long Dark' })).toBe('Season 3 · Episode 7 · The Long Dark')
+    expect(resumeLine({ kind: 'episode', seasonNumber: 2, episodeNumber: 4, subtitle: 'S02 E04 · 23 min left' })).toBe('Season 2 · Episode 4')
+    expect(resumeLine({ kind: 'movie', subtitle: '2026' })).toBe('2026')
+    expect(resumeLine({ kind: 'movie', subtitle: '1 h 12 min left' })).toBe('')
+    expect(episodeTitleOf('S1E2 Pilot')).toBe('Pilot')
   })
 })
