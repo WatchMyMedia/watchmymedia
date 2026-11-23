@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Recording, RecordingRule } from '../../../src/api/recordings'
 import { formatBytes } from '../../../src/lib/format'
-import { clashAlert, clashCount, episodeWords, lengthWords, recordedDay, recordedShows, recordingNowWords, roomWords, scheduledDays } from './recordingsModel'
+import { clashAlert, clashCount, episodeWords, isNewRecording, lengthWords, recordedDay, recordedShows, recordingNowWords, roomWords, scheduledDays } from './recordingsModel'
 
 // Monday 23 November 2026, 8:12 PM local.
 const at = (h: number, m = 0, day = 0) => new Date(2026, 10, 23 + day, h, m).getTime()
@@ -85,5 +85,27 @@ describe('room left', () => {
     expect(roomWords(1_000_000_000, done, formatBytes)).toBe('Room for less than an hour more')
     expect(roomWords(412_000_000_000, [], formatBytes)).toBe('384 GB free')
     expect(roomWords(undefined, done, formatBytes)).toBeUndefined()
+  })
+})
+
+describe('a recording’s place for the person, from API level 34', () => {
+  const ep = (n: number, days: number, extra: Partial<Recording>) => rec('Coastline Rescue', at(21, 0, days), 60, { season: 2, episode: n, series: true, ...extra })
+
+  it('says New, the time left or watched on each episode', () => {
+    expect(episodeWords(ep(4, -1, { episodeTitle: 'The Low Tide', new: true }), NOW).line).toBe('Season 2 · Episode 4 · Yesterday · 1 hour')
+    expect(episodeWords(ep(3, -8, { episodeTitle: 'Night Crossing', progress: { positionMs: 38 * MIN, durationMs: 60 * MIN } }), NOW).line).toBe('Season 2 · Episode 3 · Last Sunday · 22 min left')
+    expect(episodeWords(ep(2, -3, { episodeTitle: 'The Bar', watched: true, progress: { positionMs: 60 * MIN, durationMs: 60 * MIN } }), NOW).line).toBe('Season 2 · Episode 2 · Friday · watched')
+    expect(isNewRecording({ new: true })).toBe(true)
+    expect(isNewRecording({ new: true, watched: true })).toBe(false)
+    expect(isNewRecording({})).toBe(false)
+  })
+
+  it('counts a show’s new episodes on its card', () => {
+    const [show] = recordedShows([ep(4, -1, { new: true }), ep(3, -8, { new: true, watched: true }), ep(2, -15, {})], NOW)
+    expect(show.line).toBe('3 episodes · 1 new')
+    expect(show.fresh).toBe(1)
+    const [older] = recordedShows([ep(3, -8, {}), ep(2, -15, {})], NOW)
+    expect(older.line).toBe('2 episodes · newest last Sunday')
+    expect(older.fresh).toBe(0)
   })
 })

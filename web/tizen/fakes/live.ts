@@ -176,9 +176,10 @@ class LiveStore {
     })
     this.recordings = [
       recordingNow, clash, vaneRec, gameRec, weather,
-      done('Inspector Vane', '4.2', past(1, 21), 60, 'done', { season: 3, episode: 5, episodeTitle: 'Lantern Street', series: true, ruleId: vaneRule.id, mediaFileId: 7105 }),
-      done('Inspector Vane', '4.2', past(8, 21), 60, 'done', { season: 3, episode: 4, episodeTitle: 'The Night Ferry', series: true, ruleId: vaneRule.id, mediaFileId: 7108 }),
-      done('Inspector Vane', '4.2', past(15, 21), 60, 'done', { season: 3, episode: 3, episodeTitle: 'A Quiet Village', series: true, ruleId: vaneRule.id, mediaFileId: 7109 }),
+      // API level 34's facts for Sam: the newest is new and unseen, the next part watched, the oldest watched.
+      done('Inspector Vane', '4.2', past(1, 21), 60, 'done', { season: 3, episode: 5, episodeTitle: 'Lantern Street', series: true, ruleId: vaneRule.id, mediaFileId: 7105, new: true, kind: 'episode' }),
+      done('Inspector Vane', '4.2', past(8, 21), 60, 'done', { season: 3, episode: 4, episodeTitle: 'The Night Ferry', series: true, ruleId: vaneRule.id, mediaFileId: 7108, new: true, kind: 'episode', progress: { positionMs: 38 * MIN, durationMs: 60 * MIN } }),
+      done('Inspector Vane', '4.2', past(15, 21), 60, 'done', { season: 3, episode: 3, episodeTitle: 'A Quiet Village', series: true, ruleId: vaneRule.id, mediaFileId: 7109, repeat: true, kind: 'episode', watched: true, progress: { positionMs: 60 * MIN, durationMs: 60 * MIN } }),
       done('Conference Football', '4.1', past(1, 21), 90, 'partial', { userName: 'Sam', episodeTitle: 'Ridgeway at Lakeport', mediaFileId: 7106, gaps: [{ start: iso(past(1, 21) + 12 * MIN), end: iso(past(1, 21) + 14 * MIN), reason: 'signal_lost' }] }),
       done('Penvale Tonight', '9.1', past(1, 22), 30, 'failed', { reason: 'missed' }),
       done('Harbor Evening News', '2.1', past(2, 18), 60, 'done', { ruleId: newsRule.id, series: true, mediaFileId: 7107 }),
