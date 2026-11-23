@@ -91,6 +91,8 @@ private struct ShowPageView: View {
             }
             .animation(.easeOut(duration: 0.25), value: panel)
         }
+        // The panel runs the screen's height, over where the tab bar is.
+        .toolbar(panel == nil ? .automatic : .hidden, for: .tabBar)
         .task { await model.run() }
         .messagePill($model.message)
         .fullScreenCover(item: $model.dialog) { dialog in
