@@ -604,8 +604,17 @@ class RealPlaybackController(
                     v.loading = false
                     v.switch.failed(switchGeneration)
                     v.stepMessage = null
-                    showNote(v, stillPlayingNote(prior.autoStep ?: StreamQuality.Original))
-                    refresh(0)
+                    val seek = v.pendingPositionMs
+                    v.pendingPositionMs = null
+                    if (media?.phase == PlayerPhase.Idle) {
+                        // The stream it was to replace failed meanwhile, its error set aside for this load:
+                        // with nothing left playing, a load as before, where the viewer is.
+                        reload(v, seekMs = seek)
+                    } else {
+                        showNote(v, stillPlayingNote(prior.autoStep ?: StreamQuality.Original))
+                        // A seek made while the switch was out goes to the stream still playing.
+                        if (seek != null) seekWithin(v, seek) else refresh(0)
+                    }
                 } else fail(v, e)
             }
         }
