@@ -52,6 +52,9 @@ import {
 import { useShowMissing } from '../lib/showMissing'
 import { episodeRowFacts, episodeRowState, playChoices, seasonLine, seasonTabWords, showState } from '../lib/titlePage'
 import { watchlistTitle } from '../lib/watchlists'
+import { hasShowTracks, pickBody, rememberedChoice } from '../lib/showTracks'
+import { forgetShowTracks, setShowTracks } from '../api/showTracks'
+import { showToast } from '../lib/toast'
 import { WatchlistButton } from '../components/watchlists/WatchlistButton'
 
 type Episode = components['schemas']['Episode']
@@ -183,7 +186,18 @@ function EpisodeTop({ show: s, se, e, why, listed }: { show: ShowDetail; se: Sea
   const now = useNow()
   const plans = usePlans(best ? [best.id] : [])
   const [acting, setActing] = useState<'report' | 'replace' | 'segments' | 'delete' | 'request' | null>(null)
-  const [choice, setChoice] = useState<TrackChoice>({ audio: '', subtitle: '' })
+  // Sound and Subtitles start on what this person picked for the show, and a pick here keeps it for the show.
+  const qc = useQueryClient()
+  const remembered = rememberedChoice(s.tracks, file.data?.probe)
+  const [picked, setPicked] = useState<TrackChoice | null>(null)
+  const [keepError, setKeepError] = useState<string>()
+  const choice = picked ?? remembered
+  const choose = (next: TrackChoice) => {
+    setPicked(next)
+    setKeepError(undefined)
+    const body = pickBody(choice, next, file.data?.probe)
+    if (body) setShowTracks(qc, s.id, body).catch((err: Error) => setKeepError(err.message))
+  }
   const code = seCode(se.number, e.number)
   const title = e.title || `Episode ${e.number}`
   const line = episodeLine(s.title, se.number, e.number)
@@ -319,7 +333,9 @@ function EpisodeTop({ show: s, se, e, why, listed }: { show: ShowDetail; se: Sea
         {left ? <p className="text-[13.5px]">{left}</p> : primary.kind === 'play' && durationMs > 0 && <p className="text-[13.5px] text-neutral-300">Start now and it ends at {endsAt(durationMs, now)}.</p>}
         {best && (
           <div className="flex flex-wrap items-center gap-2">
-            <TrackChoices probe={file.data?.probe} choice={choice} onChange={setChoice} />
+            <TrackChoices probe={file.data?.probe} choice={choice} onChange={choose} />
+            {hasShowTracks(s.tracks) && !keepError && <span className="text-[13px] text-neutral-400 max-md:hidden">Remembered for this show.</span>}
+            {keepError && <span className="text-[13px] text-warn">Not kept for the show: {keepError}</span>}
           </div>
         )}
         {best && (
@@ -682,7 +698,16 @@ function AboutShow({ show: s, number, showMissing }: { show: ShowDetail; number?
   const open = s.seasons.find((x) => x.number === number)
   const state = showState(s)
 
+  const qc = useQueryClient()
   const items: MoreItem[] = []
+  if (hasShowTracks(s.tracks))
+    items.push({
+      label: 'Forget sound and subtitles',
+      onSelect: () =>
+        void forgetShowTracks(qc, s.id)
+          .then(() => showToast({ text: `${s.title} starts with your language settings again.` }))
+          .catch((err: Error) => showToast({ text: `Not forgotten: ${err.message}` })),
+    })
   if (admin) items.push({ label: 'Change poster…', icon: 'poster', onSelect: () => setActing('poster') })
   if (manage) {
     if (open) items.push({ label: `Delete ${seasonName(open.number)}…`, icon: 'delete', danger: true, divider: true, onSelect: () => setActing('deleteSeason') })

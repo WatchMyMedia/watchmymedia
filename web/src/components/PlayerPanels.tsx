@@ -88,6 +88,7 @@ export function TracksPanel({
   online,
   fetching,
   note,
+  remembered,
 }: {
   decision: Decision
   audioIndex: number
@@ -99,6 +100,8 @@ export function TracksPanel({
   online?: SubtitleSearch
   fetching: string | null
   note: string | null
+  /** The show an episode's picks are kept for, which the panel's foot names. */
+  remembered?: string
 }) {
   const own = decision.subtitles.filter((s) => s.source !== 'opensubtitles')
   const downloaded = decision.subtitles.filter((s) => s.source === 'opensubtitles')
@@ -163,6 +166,11 @@ export function TracksPanel({
       {note && (
         <p role="status" className="text-[13px] text-neutral-300">
           {note}
+        </p>
+      )}
+      {remembered && (
+        <p className="mt-auto border-t border-line-2 pt-3.5 text-[13px] text-neutral-400">
+          <b className="font-semibold text-neutral-100">Remembered for {remembered}.</b> The next episode starts with the same choices.
         </p>
       )}
     </>
