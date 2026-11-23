@@ -276,7 +276,10 @@ func startFilePlayback(ctx context.Context, deps Deps, in *PlaybackInput) (*Play
 		if err != nil {
 			return nil, err
 		}
-		preferences = p.tracks()
+		// An episode starts the way the person last picked for its show.
+		if preferences, err = withShowTracks(ctx, deps, user.ID, row.ID, p.tracks()); err != nil {
+			return nil, err
+		}
 	}
 	d, selectedRequest := decideTracks(ctx, deps, row, info, in.Body, sidecars, caps, preferences)
 	in.Body = selectedRequest

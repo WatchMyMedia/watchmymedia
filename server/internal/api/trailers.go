@@ -31,6 +31,9 @@ type MovieTrailer struct {
 	FileID     int64  `json:"fileId,omitempty" required:"false" doc:"The trailer file, for source \"file\"."`
 	DurationMs int64  `json:"durationMs,omitempty" required:"false" doc:"The trailer file's length; absent for YouTube trailers."`
 	Key        string `json:"key,omitempty" required:"false" doc:"The YouTube video id, for source \"youtube\"."`
+	// Kind is from API level 34. A plain string, as Source is, so a kind
+	// added later can't break decoding in an older app.
+	Kind string `json:"kind,omitempty" required:"false" example:"teaser" doc:"What TMDB calls it: trailer or teaser; trailer for a trailer file. Absent on older servers."`
 }
 
 // movieTrailers are a movie's YouTube trailers as getMovie lists them,
@@ -41,9 +44,24 @@ func movieTrailers(deps Deps, stored string) []MovieTrailer {
 	}
 	var out []MovieTrailer
 	for _, t := range trailers.Decode(stored) {
-		out = append(out, MovieTrailer{Source: TrailerYouTube, Name: t.Name, Key: t.Key})
+		out = append(out, MovieTrailer{Source: TrailerYouTube, Name: t.Name, Key: t.Key, Kind: trailerKind(t.Type)})
 	}
 	return out
+}
+
+// The kinds of trailer MovieTrailer.kind names.
+const (
+	trailerKindTrailer = "trailer"
+	trailerKindTeaser  = "teaser"
+)
+
+// trailerKind is MovieTrailer.kind for TMDB's video type: teaser for a
+// Teaser, trailer for anything else trailers.Choose keeps.
+func trailerKind(tmdbType string) string {
+	if strings.EqualFold(tmdbType, "Teaser") {
+		return trailerKindTeaser
+	}
+	return trailerKindTrailer
 }
 
 // fileTrailers are a movie's trailer files, as trailers: those next to the
@@ -69,7 +87,7 @@ func fileTrailers(ctx context.Context, deps Deps, movieID int64) ([]MovieTrailer
 		if inFolder(r.Path) {
 			name = cmp.Or(strings.TrimSpace(strings.TrimSuffix(filepath.Base(r.Path), filepath.Ext(r.Path))), name)
 		}
-		out = append(out, MovieTrailer{Source: TrailerFile, Name: name, FileID: r.ID, DurationMs: deref(r.DurationMs)})
+		out = append(out, MovieTrailer{Source: TrailerFile, Name: name, FileID: r.ID, DurationMs: deref(r.DurationMs), Kind: trailerKindTrailer})
 	}
 	return out, nil
 }

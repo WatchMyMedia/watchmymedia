@@ -260,6 +260,7 @@ func New(deps Deps) (*chi.Mux, huma.API) {
 	registerRows(h, deps)
 	registerScreenRows(h, deps)
 	registerFollows(h, deps)
+	registerShowTracks(h, deps)
 	registerRelated(h, deps)
 	registerPeople(h, deps)
 	registerCollections(h, deps)

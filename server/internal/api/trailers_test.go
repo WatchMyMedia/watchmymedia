@@ -51,7 +51,7 @@ func TestMovieTrailersFollowTheSetting(t *testing.T) {
 		return s.TrailersYouTube
 	}
 
-	want := []MovieTrailer{{Source: "youtube", Name: "Official Trailer", Key: "trailerKey1"}, {Source: "youtube", Name: "Teaser", Key: "teaserKey01"}}
+	want := []MovieTrailer{{Source: "youtube", Name: "Official Trailer", Key: "trailerKey1", Kind: "trailer"}, {Source: "youtube", Name: "Teaser", Key: "teaserKey01", Kind: "teaser"}}
 	if m, _ := get(movie.ID); !reflect.DeepEqual(m.Trailers, want) {
 		t.Errorf("trailers = %+v", m.Trailers)
 	}

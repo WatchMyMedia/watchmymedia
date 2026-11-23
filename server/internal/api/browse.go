@@ -145,6 +145,8 @@ type ShowDetail struct {
 	Watchlists []int64 `json:"watchlists" required:"false" nullable:"false" doc:"The signed-in person's watchlists that hold the show (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33."`
 	// Crew is from API level 34.
 	Crew []people.CrewMember `json:"crew" required:"false" nullable:"false" doc:"Its creators, job Creator; empty until the server has fetched the show's credits with person IDs. Absent on servers below API level 34."`
+	// Tracks is from API level 34.
+	Tracks *ShowTracks `json:"tracks,omitempty" required:"false" doc:"The sound and subtitles the signed-in person picked for the show (setShowTracks), which its episodes start with. Absent when they have none, and on older servers."`
 }
 
 type NextEpisode struct {
@@ -406,6 +408,9 @@ func registerBrowse(h huma.API, deps Deps) {
 				return nil, err
 			}
 			if out.Body.Watchlists, err = watchlistsHolding(ctx, deps, user.ID, "tv", row.TmdbID); err != nil {
+				return nil, err
+			}
+			if out.Body.Tracks, err = showTracks(ctx, deps, user.ID, row.TmdbID); err != nil {
 				return nil, err
 			}
 			n, err := deps.Queries.NextUnwatchedEpisode(ctx, db.NextUnwatchedEpisodeParams{UserID: user.ID, ShowID: row.ID})

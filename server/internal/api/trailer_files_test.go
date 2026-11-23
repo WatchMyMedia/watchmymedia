@@ -125,8 +125,8 @@ func TestTrailerFiles(t *testing.T) {
 		t.Fatalf("getMovie -> %d", code)
 	}
 	want := []MovieTrailer{
-		{Source: "file", Name: "Trailer", FileID: tl.trailer.ID, DurationMs: tl.trailerDuration},
-		{Source: "file", Name: "Teaser", FileID: tl.teaser.ID, DurationMs: 60_000},
+		{Source: "file", Name: "Trailer", FileID: tl.trailer.ID, DurationMs: tl.trailerDuration, Kind: "trailer"},
+		{Source: "file", Name: "Teaser", FileID: tl.teaser.ID, DurationMs: 60_000, Kind: "trailer"},
 	}
 	if fmt.Sprint(m.Trailers) != fmt.Sprint(want) {
 		t.Errorf("trailers = %+v, want %+v", m.Trailers, want)
@@ -200,8 +200,8 @@ func TestTrailerFilesBeforeYouTube(t *testing.T) {
 		t.Fatal(err)
 	}
 	files := []MovieTrailer{
-		{Source: TrailerFile, Name: "Trailer", FileID: tl.trailer.ID, DurationMs: tl.trailerDuration},
-		{Source: TrailerFile, Name: "Teaser", FileID: tl.teaser.ID, DurationMs: 60_000},
+		{Source: TrailerFile, Name: "Trailer", FileID: tl.trailer.ID, DurationMs: tl.trailerDuration, Kind: "trailer"},
+		{Source: TrailerFile, Name: "Teaser", FileID: tl.teaser.ID, DurationMs: 60_000, Kind: "trailer"},
 	}
 	get := func() []MovieTrailer {
 		t.Helper()
@@ -211,7 +211,7 @@ func TestTrailerFilesBeforeYouTube(t *testing.T) {
 		}
 		return m.Trailers
 	}
-	if got, want := get(), append(slices.Clone(files), MovieTrailer{Source: TrailerYouTube, Name: "Official Trailer", Key: "trailerKey1"}); !reflect.DeepEqual(got, want) {
+	if got, want := get(), append(slices.Clone(files), MovieTrailer{Source: TrailerYouTube, Name: "Official Trailer", Key: "trailerKey1", Kind: "trailer"}); !reflect.DeepEqual(got, want) {
 		t.Errorf("trailers = %+v, want %+v", got, want)
 	}
 	if code := doJSON(t, srv.client, http.MethodPut, srv.URL+"/api/settings", `{"trailersYouTube":false}`, nil).StatusCode; code != 200 {

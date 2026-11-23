@@ -42,6 +42,8 @@ type Preferences struct {
 	LiveTVReminderMinutes int                          `json:"liveTVReminderMinutes" required:"false" doc:"Minutes before a programme starts that a Live TV reminder comes: 0, 1, 5, 10 or 15 (API level 15)."`
 	Subtitles             playback.SubtitlePreferences `json:"subtitles" required:"false" doc:"The person's subtitle languages, starting mode and opt-in automatic download (API level 18)."`
 	Audio                 playback.AudioPreferences    `json:"audio" required:"false" doc:"The person's audio languages: a play that names no audioIndex starts on the best track in the first of them the file has (API level 21)."`
+	// HideSpoilers is from API level 34.
+	HideSpoilers bool `json:"hideSpoilers" required:"false" doc:"The person asked not to see what happens in episodes they haven't watched. The server hides nothing; each app hides what it draws for those episodes. Off by default (API level 34)."`
 }
 
 // DefaultPreferences: a button for intros, recaps and credits, nothing for
@@ -72,6 +74,7 @@ type UpdatePreferencesInput struct {
 		LiveTVReminderMinutes *int                       `json:"liveTVReminderMinutes,omitempty" required:"false" doc:"0, 1, 5, 10 or 15."`
 		Subtitles             *UpdateSubtitlePreferences `json:"subtitles,omitempty" required:"false" doc:"Subtitle fields to change; omitted fields keep their values (API level 18)."`
 		Audio                 *UpdateAudioPreferences    `json:"audio,omitempty" required:"false" doc:"Audio fields to change; omitted fields keep their values. From API level 21; older servers reject it."`
+		HideSpoilers          *bool                      `json:"hideSpoilers,omitempty" required:"false" doc:"From API level 34; older servers reject it."`
 	}
 }
 
@@ -145,6 +148,8 @@ func loadPreferences(ctx context.Context, deps Deps, userID int64) (Preferences,
 		switch {
 		case r.Key == "autoplayNext":
 			p.AutoplayNext = r.Value == "true"
+		case r.Key == "spoilers.hide":
+			p.HideSpoilers = r.Value == "true"
 		case r.Key == "liveTV.reminderMinutes":
 			if m, err := strconv.Atoi(r.Value); err == nil && slices.Contains(reminderMinutes, m) {
 				p.LiveTVReminderMinutes = m
@@ -248,6 +253,9 @@ func savePreferencePatch(ctx context.Context, deps Deps, userID int64, in *Updat
 	}
 	if enabled := in.Body.AutoplayNext; enabled != nil {
 		changes["autoplayNext"] = strconv.FormatBool(*enabled)
+	}
+	if hide := in.Body.HideSpoilers; hide != nil {
+		changes["spoilers.hide"] = strconv.FormatBool(*hide)
 	}
 	if minutes := in.Body.LiveTVReminderMinutes; minutes != nil {
 		changes["liveTV.reminderMinutes"] = strconv.Itoa(*minutes)

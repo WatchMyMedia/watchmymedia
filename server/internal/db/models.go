@@ -825,6 +825,15 @@ type ShowTag struct {
 	Rank   int64  `json:"rank"`
 }
 
+type ShowTrackChoice struct {
+	UserID           int64   `json:"user_id"`
+	TmdbID           int64   `json:"tmdb_id"`
+	AudioLanguage    *string `json:"audio_language"`
+	SubtitleLanguage *string `json:"subtitle_language"`
+	SubtitleOff      int64   `json:"subtitle_off"`
+	UpdatedAt        string  `json:"updated_at"`
+}
+
 type ShowsSearch struct {
 	Title         string `json:"title"`
 	OriginalTitle string `json:"original_title"`
