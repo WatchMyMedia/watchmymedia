@@ -46,8 +46,11 @@ func TestRecordingMigrationKeepsOwnershipWhenAccountsAndRulesGoAway(t *testing.T
 	if err = q.PutDVRRule(ctx, PutDVRRuleParams{ID: ruleID, UserID: &user.ID, Kind: "series", SeriesKey: "vane", Data: "{}", CreatedAt: 1}); err != nil {
 		t.Fatal(err)
 	}
+	// Raw SQL for the recording: today's queries name columns later
+	// migrations added to the table.
 	path := "/fictional-library/Inspector Vane.ts"
-	if err = q.PutDVRRecording(ctx, PutDVRRecordingParams{ID: "recording", RuleID: &ruleID, UserID: &user.ID, SourceID: "old-tuner", ChannelID: "old-channel", Number: "7.1", StartAt: 1, EndAt: 2, State: "done", Section: "recorded", Path: &path, Data: "{}", CreatedAt: 1, UpdatedAt: 2}); err != nil {
+	if _, err = q.db.ExecContext(ctx, `INSERT INTO live_tv_recordings (id, rule_id, user_id, source_id, channel_id, number, start_at, end_at, priority, state, section, path, data, created_at, updated_at)
+		VALUES ('recording', ?, ?, 'old-tuner', 'old-channel', '7.1', 1, 2, 0, 'done', 'recorded', ?, '{}', 1, 2)`, ruleID, user.ID, path); err != nil {
 		t.Fatal(err)
 	}
 	if err = q.DeleteUser(ctx, user.ID); err != nil {
@@ -56,9 +59,10 @@ func TestRecordingMigrationKeepsOwnershipWhenAccountsAndRulesGoAway(t *testing.T
 	if err = q.DeleteDVRRule(ctx, ruleID); err != nil {
 		t.Fatal(err)
 	}
-	row, err := q.GetDVRRecording(ctx, "recording")
-	if err != nil || row.UserID != nil || row.RuleID != nil || row.Path == nil || *row.Path != path {
-		t.Fatalf("ownership lost: %+v %v", row, err)
+	var userID, rule, kept *string
+	err = q.db.QueryRowContext(ctx, `SELECT user_id, rule_id, path FROM live_tv_recordings WHERE id = 'recording'`).Scan(&userID, &rule, &kept)
+	if err != nil || userID != nil || rule != nil || kept == nil || *kept != path {
+		t.Fatalf("ownership lost: user %v rule %v path %v, %v", userID, rule, kept, err)
 	}
 	if _, err := provider.DownTo(ctx, 35); err != nil {
 		t.Fatal(err)
