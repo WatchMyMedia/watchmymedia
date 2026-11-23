@@ -30,6 +30,7 @@ import { endsAt, leftAndEnds } from '../lib/endTime'
 import { formatDate, plural, seCode } from '../lib/format'
 import { canRequestSeason, missingStatus, toneDot, toneText } from '../lib/requests'
 import { scoreWords } from '../lib/cardFacts'
+import { crewLine } from '../lib/personPage'
 import {
   afterEpisodeDelete,
   afterSeasonDelete,
@@ -722,7 +723,7 @@ function AboutShow({ show: s, number, showMissing }: { show: ShowDetail; number?
             </div>
           </div>
         </div>
-        <PeopleRow people={s.credits} small />
+        <PeopleRow people={s.credits} note={crewLine(s.crew)} small />
       </div>
       <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
         <DetailsPanel

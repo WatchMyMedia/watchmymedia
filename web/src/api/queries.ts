@@ -1,5 +1,5 @@
 import { infiniteQueryOptions, queryOptions, useMutation, useQuery, useQueryClient, type MutateOptions, type QueryClient } from '@tanstack/react-query'
-import { api, unwrap } from './client'
+import { ApiError, api, unwrap } from './client'
 import type { components } from './schema'
 import { authScope } from '../lib/authScope'
 import type { ItemFilter, ItemSort } from '../lib/browseOptions'
@@ -107,6 +107,16 @@ export const showRelatedQuery = (id: number) =>
     queryKey: ['related', 'show', id],
     queryFn: async () => unwrap(await api.GET('/api/shows/{id}/related', { params: { path: { id } } })),
     staleTime: 5 * 60_000,
+  })
+
+/** A person's movies and shows in the library, from a credit's personId (API level 34); 404 when none has them. */
+export const personQuery = (personId: number) =>
+  queryOptions({
+    queryKey: ['person', personId],
+    queryFn: async () => unwrap(await api.GET('/api/people/{personId}', { params: { path: { personId } } })),
+    staleTime: 60_000,
+    // Nobody in the library has them: asking again finds no one either.
+    retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 2,
   })
 
 export const seasonQuery = (id: number, number: number) =>

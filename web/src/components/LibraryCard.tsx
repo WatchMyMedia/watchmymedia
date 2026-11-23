@@ -12,9 +12,10 @@ import { useNow } from './useNow'
  * A title in a library's grid: the poster with New, watched and progress
  * marks, the title, and for a movie its year and length; for a show how many
  * episodes the library has and where the show stands ("Next episode Dec 1",
- * "Ended"). Files not matched yet keep their own card.
+ * "Ended"). Files not matched yet keep their own card. role is a person's
+ * part in it, on their page.
  */
-export function LibraryCard({ item }: { item: BrowseItem }) {
+export function LibraryCard({ item, role }: { item: BrowseItem; role?: string }) {
   if (item.kind === 'unmatched') return <PosterCard item={item} />
   const show = item.kind === 'show'
   const first = show ? episodesWords(item.episodeCount) || (item.year ? String(item.year) : '') : movieLine(item)
@@ -31,6 +32,7 @@ export function LibraryCard({ item }: { item: BrowseItem }) {
       <CardTitle {...links.title} />
       <CardLine segments={links.line} className={show ? 'text-neutral-300' : 'text-neutral-400'} />
       {second && <CardLine segments={[{ text: second }]} />}
+      {role && <CardLine segments={[{ text: role }]} />}
     </div>
   )
 }
