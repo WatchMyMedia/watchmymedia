@@ -213,7 +213,7 @@ private struct TVMediaListView: View {
                             ForEach(ListSort.allCases, id: \.self) { Text(WatchlistWords.sortName($0)).tag($0) }
                         }
                     } label: {
-                        MenuChipLabel(title: WatchlistWords.sortName(model.sort))
+                        ChipMenuLabel(title: WatchlistWords.sortName(model.sort))
                     }
                     .buttonStyle(TVChipStyle(selected: false))
                     .accessibilityLabel("Sort")

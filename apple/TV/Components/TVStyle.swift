@@ -232,15 +232,16 @@ struct TVChipStyle: ButtonStyle {
     }
 }
 
-/// A chip with a menu under it ("Date added ⌄", "Decade ⌄").
+/// A chip's words with the chevron that says a menu opens from it ("Sort:
+/// Title ⌄", "Today ⌄"). The chevron is part of the text: as an `Image` of
+/// its own in a `Menu`'s label, tvOS drew it larger than the label was
+/// measured, and the words were cut short ("Sort: Date add…", "Gen…").
 struct ChipMenuLabel: View {
     let title: String
 
     var body: some View {
-        HStack(spacing: 12) {
-            Text(title)
-            Image(systemName: "chevron.down").font(.tv(.caption2, .bold))
-        }
+        Text("\(title)  \(Text(Image(systemName: "chevron.down")).font(.tv(.caption2, .bold)))")
+            .font(.tv(.body, .semibold))
     }
 }
 

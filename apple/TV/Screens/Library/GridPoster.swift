@@ -39,19 +39,6 @@ struct GridPoster: View {
     }
 }
 
-/// A chip's words with the chevron that says a menu opens from it ("Sort:
-/// Title ⌄"). The chevron is part of the text: as an `Image` of its own in a
-/// `Menu`'s label, tvOS drew it larger than the label was measured, and the
-/// words were cut short ("Sort: Date add…", "Gen…").
-struct MenuChipLabel: View {
-    let title: String
-
-    var body: some View {
-        Text("\(title)  \(Text(Image(systemName: "chevron.down")).font(.tv(.caption2, .bold)))")
-            .font(.tv(.body, .semibold))
-    }
-}
-
 /// "On Cabin server" on a poster from another server: the badge's look, on
 /// two lines where a long name needs them.
 private struct ServerTag: View {

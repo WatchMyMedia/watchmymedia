@@ -173,7 +173,7 @@ private struct LibraryView: View {
                 ForEach(model.sorts, id: \.self) { Text($0.label).tag($0) }
             }
         } label: {
-            MenuChipLabel(title: model.sortLabel)
+            ChipMenuLabel(title: model.sortLabel)
         }
         .buttonStyle(TVChipStyle(selected: false))
         .accessibilityLabel("Sort by")
@@ -193,7 +193,7 @@ private struct LibraryView: View {
                 ForEach(model.genres, id: \.self) { Text($0).tag(Optional($0)) }
             }
         } label: {
-            MenuChipLabel(title: model.genreChipLabel)
+            ChipMenuLabel(title: model.genreChipLabel)
         }
         .buttonStyle(TVChipStyle(selected: model.genre != nil))
         .accessibilityLabel(TVLibraryWords.genre)
