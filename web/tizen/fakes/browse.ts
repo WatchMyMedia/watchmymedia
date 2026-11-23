@@ -89,6 +89,28 @@ const SORTS: Record<string, (a: BrowseItem, b: BrowseItem) => number> = {
 const FILTERS: Record<string, (i: BrowseItem) => boolean> = {
   unwatched: (i) => !i.watched, '4k': (i) => i.quality === '4K', hdr: (i) => i.hdr,
   continuing: (i) => i.status !== 'Ended', ended: (i) => i.status === 'Ended',
+  // API level 34's: part watched or started, and shows Sam follows (every third, here).
+  inProgress: (i) => (i.kind === 'movie' ? !!i.progress : (i.unwatchedCount ?? 0) > 0 && (i.unwatchedCount ?? 0) < (i.episodeCount ?? 0)),
+  following: (i) => i.kind === 'show' && i.id % 3 === 0,
+}
+
+/** US certifications, as TMDB gives them, in the order the server lists them; some titles have none. */
+const RATINGS = { movie: ['G', 'PG', 'PG-13', 'R'], tv: ['TV-Y7', 'TV-PG', 'TV-14', 'TV-MA'] }
+const ratingOf = (i: BrowseItem) => (i.id % 7 === 0 ? undefined : RATINGS[i.kind === 'show' ? 'tv' : 'movie'][i.id % 4])
+
+/**
+ * API level 34's facts on a show's card: how many episodes are left (none,
+ * some, all of them), how many are new, and when the next one airs, so the
+ * TV Shows grid shows each of its lines.
+ */
+function withCounts(i: BrowseItem): BrowseItem {
+  const contentRating = ratingOf(i)
+  if (i.kind !== 'show') return { ...i, contentRating }
+  const n = i.episodeCount ?? 10
+  const k = i.id % 6
+  const unwatchedCount = k === 0 ? 0 : k === 1 ? n : k === 2 ? Math.max(1, Math.floor(n / 3)) : k === 3 ? 3 : k === 4 ? 6 : 1
+  const soon = k === 3 ? day(-3) : undefined
+  return { ...i, contentRating, unwatchedCount, watched: unwatchedCount === 0, newEpisodeCount: k === 5 ? 2 : undefined, isNew: i.isNew || k === 5, nextAirDate: soon ?? i.nextAirDate, progress: k === 3 ? .7 : i.progress }
 }
 
 /** The fake's watched marks, changed by Hold OK. */
@@ -96,19 +118,24 @@ const watched = new Set(MOVIES.filter((m) => m.watched).map((m) => m.id))
 const marked = (i: BrowseItem): BrowseItem => (i.kind === 'movie' ? { ...i, watched: watched.has(i.id), isNew: i.isNew && !watched.has(i.id) } : i)
 
 function libraryItems(id: number) {
-  return (id === 1 ? MOVIES : id === 2 ? SHOWS : []).map(marked)
+  return (id === 1 ? MOVIES : id === 2 ? SHOWS : []).map(marked).map(withCounts)
 }
 
 function itemsReply(id: number, p: URLSearchParams) {
   const all = libraryItems(id)
-  const filter = FILTERS[p.get('filter') ?? '']
+  // `filter` and API level 34's comma-separated `filters` must all hold; so must one of `contentRating`'s ratings.
+  const filters = [p.get('filter') ?? '', ...(p.get('filters') ?? '').split(',')].map((f) => FILTERS[f]).filter(Boolean)
+  const ratings = (p.get('contentRating') ?? '').split(',').filter(Boolean)
+  const rated = (i: BrowseItem) => !ratings.length || ratings.includes(i.contentRating ?? 'unrated')
   const decade = Number(p.get('decade') ?? 0)
   const q = (p.get('q') ?? '').toLowerCase()
   const genre = p.get('genre') ?? ''
-  const before = all.filter((i) => (!filter || filter(i)) && (!decade || (i.year ?? 0) - ((i.year ?? 0) % 10) === decade) && (!q || i.title.toLowerCase().includes(q)))
-  const genreCounts = Object.fromEntries(GENRES.map((g) => [g, before.filter((i) => i.genres.includes(g)).length]))
+  const before = all.filter((i) => filters.every((f) => f(i)) && (!decade || (i.year ?? 0) - ((i.year ?? 0) % 10) === decade) && (!q || i.title.toLowerCase().includes(q)))
+  const genreCounts = Object.fromEntries(GENRES.map((g) => [g, before.filter((i) => i.genres.includes(g) && rated(i)).length]))
+  const ratingSet = RATINGS[id === 2 ? 'tv' : 'movie']
+  const contentRatingCounts = Object.fromEntries([...ratingSet, 'unrated'].map((r) => [r, before.filter((i) => (!genre || i.genres.includes(genre)) && (i.contentRating ?? 'unrated') === r).length]))
   const sort = p.get('sort') ?? 'title'
-  const items = before.filter((i) => !genre || i.genres.includes(genre)).sort(SORTS[sort] ?? SORTS.title)
+  const items = before.filter((i) => (!genre || i.genres.includes(genre)) && rated(i)).sort(SORTS[sort] ?? SORTS.title)
   const letters: { letter: string; offset: number }[] = []
   if (sort === 'title') items.forEach((i, at) => { const l = letterOf(i.title); if (letters[letters.length - 1]?.letter !== l) letters.push({ letter: l, offset: at }) })
   const limit = Number(p.get('limit') ?? 100)
@@ -116,9 +143,12 @@ function itemsReply(id: number, p: URLSearchParams) {
   const decades = [...new Set(all.map((i) => (i.year ?? 0) - ((i.year ?? 0) % 10)))].filter(Boolean).sort()
   return {
     items: items.slice(offset, offset + limit), total: items.length, limit, offset,
-    facets: { genres: GENRES.filter((g) => all.some((i) => i.genres.includes(g))), decades },
-    genreCounts, letters: sort === 'title' ? letters : undefined,
-    totals: { items: all.length, episodes: id === 2 ? all.reduce((n, s) => n + (s.episodeCount ?? 0), 0) : 0, continuing: all.filter((i) => i.status && i.status !== 'Ended').length, unmatched: 0, totalSize: 3e11 },
+    facets: { genres: GENRES.filter((g) => all.some((i) => i.genres.includes(g))), decades, contentRatings: [...ratingSet, 'unrated'] },
+    genreCounts, contentRatingCounts, letters: sort === 'title' ? letters : undefined,
+    totals: {
+      items: all.length, episodes: id === 2 ? all.reduce((n, s) => n + (s.episodeCount ?? 0), 0) : 0, continuing: all.filter((i) => i.status && i.status !== 'Ended').length, unmatched: 0, totalSize: 3e11,
+      unwatched: all.filter((i) => !i.watched).length, inProgress: all.filter(FILTERS.inProgress).length,
+    },
   }
 }
 
