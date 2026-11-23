@@ -84,15 +84,25 @@ final class BusyFocusTests: XCTestCase {
         XCTAssertTrue(play.waitUntilExists(timeout: 15))
         XCTAssertTrue(focused(play))
         remote.press(.right)
+        let more = app.buttons["episode-more"]
+        XCTAssertTrue(focused(more), "More is beside Play")
+        remote.press(.select)
+        // Mark watched is a row of More's panel, which stays up while it works.
         let mark = app.buttons["episodeWatchToggle"]
-        XCTAssertTrue(focused(mark), "Mark watched is beside Play")
+        XCTAssertTrue(mark.waitUntilExists(timeout: 5), "More's panel is up")
+        for _ in 0..<6 where !mark.hasFocus {
+            remote.press(.down)
+            _ = focused(mark, timeout: 1)
+        }
+        XCTAssertTrue(focused(mark), "Mark watched is in More")
         XCTAssertTrue(mark.label.hasSuffix("Mark watched"), mark.label)
 
         remote.press(.select)
         XCTAssertTrue(label(mark, endsWith: "Mark unwatched"), "the episode is marked")
-        XCTAssertTrue(mark.hasFocus, "focus stays on the button while it works and after")
-        remote.press(.left)
-        XCTAssertTrue(focused(play), "and the remote moves on from there")
+        XCTAssertTrue(mark.hasFocus, "focus stays on the row while it works and after")
+        remote.press(.menu)
+        XCTAssertTrue(mark.waitUntilGone(timeout: 5), "Menu closes the panel")
+        XCTAssertTrue(focused(more), "and focus is back on More")
     }
 
     @MainActor

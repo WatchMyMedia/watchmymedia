@@ -14,7 +14,7 @@ final class TrailerTests: XCTestCase {
         let app = launch(movie: 500)
         let trailer = app.buttons["movie-trailer"]
         XCTAssertTrue(trailer.waitUntilExists(timeout: 20))
-        XCTAssertTrue(focus(trailer), "Right from Play reaches Trailer")
+        XCTAssertTrue(focus(trailer), "Right from Play, where the page opens, reaches Trailer")
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Shows a code to scan with your phone")).firstMatch.exists)
         shot("Trailer focused, no YouTube app")
         remote.press(.select)
@@ -38,8 +38,8 @@ final class TrailerTests: XCTestCase {
         let app = launch(movie: 501)
         let trailer = app.buttons["movie-trailer"]
         XCTAssertTrue(trailer.waitUntilExists(timeout: 20))
-        XCTAssertTrue(app.buttons["Play from start"].exists, "a movie partway through")
-        XCTAssertTrue(focus(trailer), "Right from Resume and Play from start reaches Trailer")
+        XCTAssertTrue(app.buttons["From the start"].exists, "a movie partway through")
+        XCTAssertTrue(focus(trailer), "Right from Resume and From the start reaches Trailer")
         XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "YouTube")).firstMatch.exists, "a file says nothing about YouTube")
         shot("Trailer focused, a trailer file")
         remote.press(.select)
@@ -55,13 +55,13 @@ final class TrailerTests: XCTestCase {
         return app
     }
 
-    /// Down from the tab bar into the button row (to the button under the
-    /// focused tab), then left or right along it until `element` has focus.
+    /// The page opens with focus on Play, in the button row; left or right
+    /// along it until `element` has focus.
     @MainActor
     private func focus(_ element: XCUIElement) -> Bool {
         let app = XCUIApplication()
-        remote.press(.down)
         let inRow = app.buttons.matching(NSPredicate(format: "hasFocus == true"))
+        _ = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Play' OR label BEGINSWITH 'Resume'")).firstMatch.waitForFocus(timeout: 15)
         for _ in 0..<6 where !element.hasFocus {
             guard let current = inRow.allElementsBoundByIndex.first else {
                 _ = focused(element, timeout: 1)

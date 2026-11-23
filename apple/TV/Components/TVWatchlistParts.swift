@@ -25,7 +25,7 @@ struct TVWatchlistButton: View {
         Button { Task { await watchlists.press(title, said: said, fromButton: true) } } label: {
             Text("\(Image(systemName: holding.isEmpty ? "bookmark" : "bookmark.fill"))  \(words)")
         }
-        .buttonStyle(TVButtonStyle(kind: holding.isEmpty ? .secondary : .goldText, height: 62, fontSize: 22))
+        .buttonStyle(TVButtonStyle(kind: holding.isEmpty ? .secondary : .goldText))
         .accessibilityLabel(WatchlistWords.buttonLabel(words, title: title.title))
         .accessibilityAddTraits(holding.isEmpty ? .isToggle : [.isToggle, .isSelected])
         .accessibilityIdentifier("watchlist-button")

@@ -155,6 +155,16 @@ card changes the page in place, so Back leaves the show. On Apple TV, focus
 moving along the row changes the episode on top, and Select on a card takes
 focus back up to Play.
 
+On Apple TV a movie's and an episode's More is a panel from the right
+(`MovieScreen.swift`, `ShowScreen.swift`): another version, the sound and
+subtitles to start with (`TrackChoice`, kept by `MovieModel` and
+`ShowPageModel` and put on the play request), Mark watched, File details
+and the page's other actions. File details is the one place on the page
+that names the file's formats, under a sentence saying how it plays here
+(`TitlePageWords.swift`); the show page asks for its files' plans only when
+it opens (`ShowPageModel.loadPlans()`). The pages say the picture and sound
+in words ("In 4K with Dolby Vision and 5.1 sound") and when it would end.
+
 Your requests remains available on API level 5 servers after requesting is
 disabled. With Seerr, the admin Inbox keeps earlier local requests alongside
 Seerr’s approval page; reports confirm whether Seerr accepted an issue or the
@@ -731,11 +741,12 @@ drawn with Home's poster rows and cards, without See all.
   end of the iPad's right-hand column, and after About the show. Both
   pages keep the tab bar on iPhone, as the boards draw them. A card opens
   its page over this one, and Back comes back to the row.
-- **Apple TV** (`RelatedShelves`): the movie page's first screen ends with
-  the shelves' names along its bottom edge (`PageFold` from `TabPage`)
-  and the shelves wait below it; Down from the versions reaches them. On a
-  show, Down from About the show reaches More like this. Up leaves them,
-  and Menu from a card's page comes back to the card.
+- **Apple TV**: on a movie the collection and More like this are one line
+  under the cast (`RelatedLine`), its names and the tops of its posters in
+  sight from the buttons; Down from the buttons reaches it, Right runs
+  through both, and Up or Menu goes back to the buttons. On a show
+  (`RelatedShelves`), Down from About the show reaches More like this and
+  Up leaves it. Menu from a card's page comes back to the card.
 
 `-fakesRelated` puts the fakes' server at level 30 (`FakeRelated`): Cold
 Harbour Road, Low Tide at Carrow and Dead Reckoning Bay (`movies/500`) are

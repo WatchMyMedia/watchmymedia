@@ -88,14 +88,20 @@ final class RemoteTests: XCTestCase {
         let resume = app.buttons["Resume from 21:00"]
         XCTAssertTrue(resume.waitUntilExists(timeout: 15), "the next episode is on top")
         XCTAssertTrue(focused(resume))
-        XCTAssertTrue(app.staticTexts["UP NEXT · RESUME"].exists || app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Up next · resume")).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["show-episode-kicker"].label.hasPrefix("UP NEXT · SEASON 3, EPISODE 5"), app.staticTexts["show-episode-kicker"].label)
         remote.press(.down)
         XCTAssertTrue(focused(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Season 3")).firstMatch), "Down reaches the tabs")
         remote.press(.down)
         XCTAssertTrue(focused(app.buttons["episode-card-100035"]), "then the row, on the episode on top")
         remote.press(.down)
-        let markShow = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Mark show")).firstMatch
-        XCTAssertTrue(focused(markShow), "Down from the row reaches About the show, on its first button")
+        // Without Notify me and watchlists (older servers), About the show's first button is its More.
+        let more = app.buttons["show-more"]
+        XCTAssertTrue(focused(more), "Down from the row reaches About the show, on its first button")
+        remote.press(.select)
+        let markShow = app.buttons["show-mark-watched"]
+        XCTAssertTrue(focused(markShow), "its More opens on Mark show watched")
+        remote.press(.menu)
+        XCTAssertTrue(focused(more), "Menu closes it, back on More")
     }
 
     @MainActor
@@ -104,12 +110,13 @@ final class RemoteTests: XCTestCase {
         let play = app.buttons["Play · 52 min"]
         XCTAssertTrue(play.waitUntilExists(timeout: 15))
         XCTAssertTrue(focused(play))
-        // More (a tvOS menu) is after Mark watched.
+        // More, beside Play, opens its panel.
         remote.press(.right)
-        remote.press(.right)
+        XCTAssertTrue(focused(app.buttons["episode-more"]))
         remote.press(.select)
-        let delete = app.descendants(matching: .any)["Delete episode…"]
+        let delete = app.buttons["episode-delete"]
         XCTAssertTrue(delete.waitUntilExists(timeout: 5), "More offers Delete episode…")
+        XCTAssertEqual(delete.label, "Delete episode…")
         // The show's group moved to About the show.
         XCTAssertFalse(app.descendants(matching: .any)["Mark Season 3 watched"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["Cast & details"].exists)
@@ -144,12 +151,12 @@ final class RemoteTests: XCTestCase {
     @MainActor
     func testMenuPopsThenGoesFromASectionToHome() {
         let app = launch(["-tab", "movies", "-open", "watchmymedia://movies/501"])
-        XCTAssertTrue(app.buttons["Play from start"].waitUntilExists(timeout: 15), "the movie page is open")
+        XCTAssertTrue(app.buttons["From the start"].waitUntilExists(timeout: 15), "the movie page is open")
         remote.press(.down)
         remote.press(.menu)
         let sort = app.buttons["Sort by"]
         // The grid stays laid out under the page: wait for the page to go.
-        XCTAssertTrue(app.buttons["Play from start"].waitUntilGone(timeout: 10), "Menu leaves the movie page")
+        XCTAssertTrue(app.buttons["From the start"].waitUntilGone(timeout: 10), "Menu leaves the movie page")
         XCTAssertTrue(sort.waitUntilExists(timeout: 10), "Menu goes back to the Movies grid")
         remote.press(.down)
         remote.press(.menu)

@@ -58,6 +58,14 @@ public final class ShowPageModel {
     public private(set) var offline = false
     /// The rows at the end of the page: More like this.
     public let related: RelatedRows
+    /// The sound and subtitles chosen before playing (Apple TV's More), and the episode they were chosen for.
+    private var chosen: ChosenTracks?
+    /// How each of the episode on top's files would play here, by file ID,
+    /// once File details asks (``loadPlans()``); empty until then, and when
+    /// the server cannot say.
+    public private(set) var plans: [Int: PlaybackPlan] = [:]
+    /// Asks the server how a file would play; nil where the page shows no File details (iPhone, iPad).
+    @ObservationIgnored public var playback: (any PlaybackControllerFactory)?
 
     @ObservationIgnored private let library: any LibraryRepository
     @ObservationIgnored private let requests: (any RequestsRepository)?
@@ -431,7 +439,40 @@ public final class ShowPageModel {
     /// The episode on top: resumes where the viewer left off, or plays from 0:00 with `fromStart`.
     public func play(fromStart: Bool = false) {
         guard let episode, let request = playRequest(episode, fromStart: fromStart) else { return }
-        navigator.play(request)
+        // The tracks chosen are the first version's, which Play plays.
+        navigator.play(tracks.applied(to: request))
+    }
+
+    /// The sound and subtitles chosen for the episode on top (Apple TV's
+    /// More); another episode on top starts with none chosen.
+    public var tracks: TrackChoice {
+        guard let chosen, chosen.episodeID == episodeID else { return TrackChoice() }
+        return chosen.tracks
+    }
+
+    /// The sound Play starts with, of the episode on top's first version; nil is the file's default.
+    public func chooseAudio(_ index: Int?) {
+        guard let episodeID else { return }
+        var tracks = self.tracks
+        tracks.audioIndex = index
+        chosen = ChosenTracks(episodeID: episodeID, tracks: tracks)
+    }
+
+    /// The subtitles Play starts with: off, a track, or nil for the person's languages.
+    public func chooseSubtitle(_ subtitle: TrackChoice.Subtitle?) {
+        guard let episodeID else { return }
+        var tracks = self.tracks
+        tracks.subtitle = subtitle
+        chosen = ChosenTracks(episodeID: episodeID, tracks: tracks)
+    }
+
+    /// Asks how the episode on top's files would play here, for File details.
+    public func loadPlans() async {
+        guard let playback, let episode, !episode.versions.isEmpty else { return }
+        let ids = episode.versions.map(\.fileID)
+        guard !ids.allSatisfy({ plans[$0] != nil }) else { return }
+        let found = await playback.plans(fileIDs: ids)
+        plans.merge(found) { _, new in new }
     }
 
     /// One version (file) of the episode on top, resuming: its ⋯ on Apple TV.
@@ -745,4 +786,10 @@ extension ShowDetail {
         Task { await sheet.loadOnce() }
         return sheet
     }
+}
+
+/// Tracks chosen on the show page, for one episode.
+private struct ChosenTracks: Hashable {
+    var episodeID: Int
+    var tracks: TrackChoice
 }

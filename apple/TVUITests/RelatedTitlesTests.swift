@@ -2,10 +2,11 @@ import XCTest
 
 /// Related titles at the end of movie and show pages on Apple TV, on the
 /// fakes at API level 30 (`-fakesRelated`), driven with the remote: Down
-/// from the movie's versions reaches its collection, then More like this,
-/// each shelf on its first card; Up leaves them; Select opens a card's page
-/// and Menu comes back to the card. On a show, Down from About the show
-/// reaches More like this and Up goes back. Runs in `make apple-tv-test-sim`.
+/// from the movie's buttons reaches its collection and More like this, one
+/// line that Right runs through; Up and Menu go back to the buttons; Select
+/// opens a card's page and Menu comes back to the card. On a show, Down from
+/// About the show reaches More like this and Up goes back. Runs in
+/// `make apple-tv-test-sim`.
 final class RelatedTitlesTests: XCTestCase {
     @MainActor private var remote: XCUIRemote { XCUIRemote.shared }
 
@@ -31,37 +32,40 @@ final class RelatedTitlesTests: XCTestCase {
     }
 
     @MainActor
-    func testDownFromAMoviesVersionsReachesItsShelvesAndUpLeavesThem() {
+    func testDownFromAMoviesButtonsReachesItsShelvesOnOneLine() {
         let app = launch("watchmymedia://movies/500")
         defer { app.terminate() }
         XCTAssertTrue(app.staticTexts["Dead Reckoning Bay"].firstMatch.waitUntilExists(timeout: 20))
-        XCTAssertTrue(app.waitForFocusedButton(timeout: 15) { _ in true }, "the page has focus")
-        // The shelves arrive below the first screen, named along its bottom edge.
+        XCTAssertTrue(app.waitForFocusedButton(timeout: 15) { $0.hasPrefix("Play") }, "the page opens on Play: \(app.focusedButton.label)")
+        // The shelves wait under the buttons, in sight.
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Cold Harbour Road,")).firstMatch.waitUntilExists(timeout: 10))
-        shot("The first screen, the shelves named below it")
+        shot("The first screen, the shelves under it")
 
-        XCTAssertTrue(press(.down, in: app, untilFocusOn: "Cold Harbour Road"), "Down from the versions reaches the collection, on its first film: \(app.focusedButton.label)")
+        XCTAssertTrue(press(.down, in: app, untilFocusOn: "Cold Harbour Road", times: 3), "Down from the buttons reaches the collection, on its first film: \(app.focusedButton.label)")
         shot("The collection's first card in focus")
-        app.press(.down, thenWaitForFocusToMove: 3)
-        XCTAssertTrue(app.waitForFocusedButton { $0.hasPrefix("Ninety Fathoms,") }, "Down again reaches More like this, on its first card: \(app.focusedButton.label)")
+        // The collection and More like this are one line: Right runs from one into the other.
+        XCTAssertTrue(press(.right, in: app, untilFocusOn: "Ninety Fathoms", times: 4), "Right runs on into More like this: \(app.focusedButton.label)")
         app.press(.right, thenWaitForFocusToMove: 3)
-        XCTAssertTrue(app.waitForFocusedButton { $0.hasPrefix("Signal to Noise,") }, "Right moves along it")
+        XCTAssertTrue(app.waitForFocusedButton { $0.hasPrefix("Signal to Noise,") }, "and along it")
         shot("More like this in focus")
 
         app.press(.up, thenWaitForFocusToMove: 3)
-        XCTAssertTrue(app.waitForFocusedButton { $0.hasPrefix("Cold Harbour Road,") }, "Up goes back to the collection's card: \(app.focusedButton.label)")
-        app.press(.up, thenWaitForFocusToMove: 3)
-        XCTAssertTrue(app.waitForFocusedButton { $0.hasPrefix("Play") }, "Up again leaves the shelves for the versions: \(app.focusedButton.label)")
+        // The button above the card: the cast between them takes no focus.
+        XCTAssertTrue(app.waitForFocusedButton { ["Play", "Trailer", "More"].contains($0) }, "Up leaves the shelves for the buttons: \(app.focusedButton.label)")
+        app.press(.down, thenWaitForFocusToMove: 3)
+        XCTAssertTrue(app.waitForFocusedButton { $0.hasPrefix("Signal to Noise,") }, "Down comes back to the card last focused: \(app.focusedButton.label)")
+        remote.press(.menu)
+        XCTAssertTrue(app.waitForFocusedButton(timeout: 10) { $0.hasPrefix("Play") }, "Menu on a shelf goes back to the buttons: \(app.focusedButton.label)")
 
         // Select opens the card's page over this one; Menu comes back to the card.
-        XCTAssertTrue(press(.down, in: app, untilFocusOn: "Cold Harbour Road", times: 3))
+        XCTAssertTrue(press(.down, in: app, untilFocusOn: "Signal to Noise", times: 3))
         remote.press(.select)
-        let breadcrumb = app.staticTexts.matching(NSPredicate(format: "label ENDSWITH %@", "› Cold Harbour Road")).firstMatch
-        XCTAssertTrue(breadcrumb.waitUntilExists(timeout: 10), "Cold Harbour Road's page opens")
+        let title = app.staticTexts.matching(NSPredicate(format: "identifier == %@ AND label == %@", "title-page-title", "Signal to Noise")).firstMatch
+        XCTAssertTrue(title.waitUntilExists(timeout: 10), "Signal to Noise's page opens")
         shot("A card's page")
         remote.press(.menu)
-        XCTAssertTrue(app.waitForFocusedButton(timeout: 10) { $0.hasPrefix("Cold Harbour Road,") }, "Menu comes back to the card: \(app.focusedButton.label)")
-        XCTAssertTrue(breadcrumb.waitUntilGone(timeout: 5))
+        XCTAssertTrue(app.waitForFocusedButton(timeout: 10) { $0.hasPrefix("Signal to Noise,") }, "Menu comes back to the card: \(app.focusedButton.label)")
+        XCTAssertTrue(title.waitUntilGone(timeout: 5))
     }
 
     @MainActor

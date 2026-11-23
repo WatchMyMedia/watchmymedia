@@ -16,6 +16,9 @@ public final class MovieModel {
     /// By file ID; empty until known, and when the server cannot say.
     public private(set) var plans: [Int: PlaybackPlan] = [:]
     public private(set) var selectedVersionID: Int?
+    /// The sound and subtitles chosen before playing (Apple TV's More), for
+    /// the selected version; choosing another version forgets them.
+    public private(set) var tracks = TrackChoice()
     /// A mark is on its way to the server.
     public private(set) var busy = false
     public var message: String?
@@ -159,13 +162,24 @@ public final class MovieModel {
 
     /// Shows a version's tracks, and makes it the one Play plays.
     public func select(_ version: MediaVersion) {
+        if version.id != selectedVersion?.id { tracks = TrackChoice() }
         selectedVersionID = version.id
     }
 
-    /// Plays the selected version: resumes, or plays from 0:00 with `fromStart`.
+    /// The sound Play starts with, of the selected version; nil is the file's default.
+    public func chooseAudio(_ index: Int?) {
+        tracks.audioIndex = index
+    }
+
+    /// The subtitles Play starts with: off, a track, or nil for the person's languages.
+    public func chooseSubtitle(_ subtitle: TrackChoice.Subtitle?) {
+        tracks.subtitle = subtitle
+    }
+
+    /// Plays the selected version, with the sound and subtitles chosen: resumes, or plays from 0:00 with `fromStart`.
     public func play(fromStart: Bool = false) {
         guard let request = movie?.playRequest(version: selectedVersion, fromStart: fromStart) else { return }
-        navigator.play(request)
+        navigator.play(tracks.applied(to: request))
     }
 
     /// A version's Play this: that file, resuming.
