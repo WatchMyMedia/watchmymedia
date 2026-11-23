@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasClickAction
@@ -38,6 +39,7 @@ import media.watchmy.client.presentation.live.LiveChannelsViewModel
 import media.watchmy.client.tv.TvTheme
 import media.watchmy.client.tv.TvApp
 import media.watchmy.client.tv.components.LocalLiveTVAvailable
+import media.watchmy.client.tv.quietTvFakes
 import media.watchmy.client.ui.LocalAppServices
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -72,7 +74,9 @@ class LiveTVScreenTest {
         val chosen = compose.onNodeWithContentDescription("2.2 Harbor Weather, Watch live")
         chosen.assertIsFocused().performClick()
         assertEquals(channels[1], watched?.channel)
-        compose.onNodeWithText("Go to channel").assertExists()
+        // Without listings the guide is a list of channels that all play, under the Guide tab.
+        compose.onNodeWithText("Channels").assertExists()
+        compose.onNode(hasText("Guide") and hasClickAction()).assertExists()
     }
 
     @Test fun `with listings the hero follows focus down the guide`() {
@@ -104,13 +108,53 @@ class LiveTVScreenTest {
             showGuide(personal = true)
             // The guide opens on what the chosen channel has on: a programme's cell.
             assertTrue("\"${focusedSpoken()}\" has focus, not 2.2's programme", focusedSpoken().endsWith("Weather Now"))
-            // Left of it, the channel's own cell.
-            press(Key.DirectionLeft)
-            assertTrue("\"${focusedSpoken()}\" has focus, not 2.2's own cell", focusedSpoken().startsWith("Watch 2.2 Harbor Weather"))
             // Down the rows to a channel without listings, which is one cell.
-            press(Key.DirectionRight)
             repeat(4) { press(Key.DirectionDown) }
             assertEquals("4.3 Coast Shop, No listings, Watch live", focusedSpoken())
+        } finally { fakeLatencyMs = previous }
+    }
+
+    /** The guide's map: ▲ from the first channel reaches the tabs, ▼ from them goes back to the programme, OK on what is on watches. */
+    @Test fun `the first channel goes up to the Guide tab, and down comes back to the programme`() {
+        val previous = fakeLatencyMs
+        fakeLatencyMs = 0
+        try {
+            var watched: LiveChannel? = null
+            showGuide(personal = true, onWatch = { watched = it })
+            press(Key.DirectionUp)
+            assertTrue("\"${focusedSpoken()}\" is 2.1's programme", focusedSpoken().isNotBlank())
+            press(Key.DirectionUp)
+            compose.onNode(isFocused()).assert(hasText("Guide"))
+            // Along the top: the other tabs, then Channels, Today and Go to channel.
+            press(Key.DirectionRight)
+            compose.onNode(isFocused()).assert(hasText("Reminders"))
+            press(Key.DirectionDown)
+            assertTrue("\"${focusedSpoken()}\" is back in the grid", focusedSpoken().isNotBlank())
+            // OK on what is on now watches the channel.
+            press(Key.DirectionCenter)
+            assertEquals("2.1", watched?.number)
+        } finally { fakeLatencyMs = previous }
+    }
+
+    /** OK on a later programme opens its choices, first one focused; a choice applies and the panel stays; Back closes it. */
+    @Test fun `OK on a later programme opens its choices, and Back returns to it`() {
+        val previous = fakeLatencyMs
+        fakeLatencyMs = 0
+        try {
+            var watched: LiveChannel? = null
+            showGuide(personal = true, onWatch = { watched = it }, quiet = true)
+            // Two along: far enough ahead for a reminder.
+            press(Key.DirectionRight)
+            press(Key.DirectionRight)
+            val programme = focusedSpoken()
+            press(Key.DirectionCenter)
+            assertEquals("OK on a later programme doesn't tune", null, watched)
+            compose.onNode(isFocused() and hasText("Remind me")).assertExists()
+            press(Key.DirectionCenter)
+            compose.onNode(isFocused() and hasText("Reminder set")).assertExists()
+            press(Key.Back)
+            compose.onNodeWithText("Reminder set").assertDoesNotExist()
+            assertEquals(programme, focusedSpoken().removeSuffix(", reminder set"))
         } finally { fakeLatencyMs = previous }
     }
 
@@ -126,10 +170,38 @@ class LiveTVScreenTest {
         assertEquals(channels.first(), watched?.channel)
     }
 
+    /**
+     * The live player's map: it opens on the banner with nothing focused, OK shows the controls on Pause,
+     * Go live stays focusable while dimmed, ◀ with the controls hidden opens On now on the channel playing,
+     * and ▶ closes it.
+     */
+    @Test fun `the player opens on the banner, OK shows the controls, and left opens On now`() {
+        val controller = RecordingController()
+        showPlayer(controller)
+        compose.onNode(hasText("Pause") and hasClickAction()).assertDoesNotExist()
+        compose.onNodeWithText("Change channel").assertExists()
+        press(Key.DirectionCenter)
+        compose.onNode(hasText("Pause") and hasClickAction()).assertIsFocused()
+        press(Key.DirectionRight)
+        compose.onNode(hasText("Go live") and hasClickAction()).assertIsFocused()
+        press(Key.Back)
+        compose.onNode(hasText("Pause") and hasClickAction()).assertDoesNotExist()
+        // ▶ does nothing with the controls hidden.
+        press(Key.DirectionRight)
+        compose.onNode(hasText("Pause") and hasClickAction()).assertDoesNotExist()
+        press(Key.DirectionLeft)
+        compose.onNodeWithText("Watching").assertExists()
+        compose.onNode(isFocused()).assert(hasText(channels.first().name))
+        press(Key.DirectionRight)
+        compose.onNodeWithText("Watching").assertDoesNotExist()
+        assertEquals(channels.first(), controller.state.value.target?.channel)
+    }
+
     @Test fun `Back hides controls before releasing the tuner and leaving`() {
         val controller = RecordingController()
         var exits = 0
         showPlayer(controller, exit = { exits++ })
+        press(Key.DirectionCenter)
         compose.onNode(hasText("Pause") and hasClickAction()).assertExists()
         press(Key.Back)
         compose.onNode(hasText("Pause") and hasClickAction()).assertDoesNotExist()
@@ -143,6 +215,7 @@ class LiveTVScreenTest {
         val controller = RecordingController()
         var exits = 0
         showPlayer(controller, exit = { exits++ })
+        press(Key.DirectionCenter)
         compose.onNode(hasText("Channels") and hasClickAction()).performClick()
         compose.onNodeWithText("Watching").assertExists()
         press(Key.Back)
@@ -179,7 +252,8 @@ class LiveTVScreenTest {
     @Test fun `live quality contains four fixed choices and no file playback controls`() {
         val controller = RecordingController()
         showPlayer(controller)
-        compose.onNode(hasText("Quality 1080p") and hasClickAction()).performClick()
+        press(Key.DirectionCenter)
+        compose.onNode(hasText("Quality · 1080p") and hasClickAction()).performClick()
         compose.onNodeWithText("Automatic").assertDoesNotExist()
         compose.onNodeWithText("Original quality").assertDoesNotExist()
         compose.onNodeWithText("360p · 1 Mbps").performClick()
@@ -193,7 +267,6 @@ class LiveTVScreenTest {
         val controller = RecordingController()
         var exits = 0
         showPlayer(controller, exit = { exits++ })
-        press(Key.Back)
         compose.runOnIdle { controller.state.value = controller.state.value.copy(status = PlayerStatus.Error, error = "All tuners are in use. Try again when a tuner is free.") }
         compose.onNodeWithText("Tune again").assertIsFocused().performClick()
         assertTrue(controller.retries > 0)
@@ -205,7 +278,6 @@ class LiveTVScreenTest {
     @Test fun `still watching after hidden controls can be answered with Back and controls regain focus`() {
         val controller = RecordingController()
         showPlayer(controller)
-        press(Key.Back)
         compose.runOnIdle { controller.state.value = controller.state.value.copy(askStillWatching = true) }
         compose.onNodeWithText("Keep watching").assertIsFocused()
         press(Key.Back)
@@ -217,7 +289,6 @@ class LiveTVScreenTest {
         val controller = RecordingController()
         var exits = 0
         showPlayer(controller, exit = { exits++ })
-        press(Key.Back)
         compose.runOnIdle { controller.state.value = controller.state.value.copy(askStillWatching = true) }
         compose.onNodeWithText("Keep watching").assertIsFocused()
         press(Key.DirectionRight)
@@ -231,6 +302,7 @@ class LiveTVScreenTest {
     @Test fun `unavailable channel dialog restores the scrolled row after current channel is offscreen`() {
         val many = (1..30).map { channels.first().copy(id = "channel-$it", number = "$it.1", name = "Channel $it", available = it != 13, reason = "offline") }
         showPlayer(RecordingController(), lineup = many)
+        press(Key.DirectionCenter)
         compose.onNode(hasText("Channels") and hasClickAction()).performClick()
         repeat(12) { press(Key.DirectionDown) }
         compose.onNodeWithText("Channel 13").assertIsFocused()
@@ -253,7 +325,7 @@ class LiveTVScreenTest {
             compose.setContent { CompositionLocalProvider(LocalAppServices provides services) { TvApp() } }
             compose.onNodeWithContentDescription("Live TV").performClick()
             compose.onNodeWithContentDescription("2.1 HRBR-HD, Watch live").performClick()
-            compose.onNode(hasText("Pause") and hasClickAction()).assertExists()
+            compose.onNodeWithText("No listings for this channel").assertExists()
             compose.runOnIdle { runBlocking { base.auth.signIn("Alex", "password") } }
             // Home again, with focus on its first row's card.
             compose.onNodeWithText("Row 1 of ", substring = true, useUnmergedTree = true).assertExists()
@@ -261,7 +333,7 @@ class LiveTVScreenTest {
             assertEquals(1, controllers.single().releases)
             compose.onNodeWithContentDescription("Live TV").performClick()
             compose.onNodeWithContentDescription("2.1 HRBR-HD, Watch live").performClick()
-            compose.onNode(hasText("Pause") and hasClickAction()).assertExists()
+            compose.onNodeWithText("No listings for this channel").assertExists()
             // Another server this TV is signed in to.
             compose.runOnIdle { runBlocking { base.servers.switchTo(Cabin.id) } }
             // Home again, with focus on its first row's card.
@@ -281,15 +353,15 @@ class LiveTVScreenTest {
         compose.waitForIdle()
     }
     /** The guide with listings, opened on 2.2; [personal] adds favourites and reminders, which make a channel's own cell a place focus goes. */
-    private fun showGuide(personal: Boolean = false) {
-        val services = FakeAppServices(tv = true)
+    private fun showGuide(personal: Boolean = false, onWatch: (LiveChannel) -> Unit = {}, quiet: Boolean = false) {
+        val services = if (quiet) quietTvFakes() else FakeAppServices(tv = true)
         val listed = runBlocking { services.live.channels() }
         compose.setContent {
             CompositionLocalProvider(LocalAppServices provides services, LocalLiveTVAvailable provides true) {
                 TvTheme {
                     LiveChannelsScreen(
                         LiveChannelsViewModel.State(supported = true, guideLevel = true, personalLevel = personal, capabilities = LiveCapabilities(true, true, true, guide = true), channels = listed, selectedId = "live-2-2"),
-                        onSelect = {}, onWatch = {}, onRefresh = {}, onNavigate = {},
+                        onSelect = {}, onWatch = onWatch, onRefresh = {}, onNavigate = {},
                     )
                 }
             }

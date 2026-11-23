@@ -52,7 +52,7 @@ import media.watchmy.client.ui.onBack
 import media.watchmy.client.ui.components.WmmIcons
 
 /**
- * A channel cast to this TV (Cast Connect, the LiveCastConnect board): the
+ * A channel cast to this TV (Cast Connect): the
  * TV's own live player, with the caster's channels and pictures, and none of
  * what the phone does (On now, Quality, Full guide). When the phone stops
  * casting the TV says so for [STOPPED_SHOWN_MS], then goes back.
@@ -171,7 +171,7 @@ internal fun castPausedNote(sender: LiveCastSender): String =
     if (sender.pausedThere) "Paused on ${sender.name}. After 5 minutes the tuner is given back." else "Paused. After 5 minutes the tuner is given back."
 
 /**
- * A cast channel's prompts, in the LiveCastConnect board's words: Still
+ * A cast channel's prompts: Still
  * watching (which counts down the minute before the tuner goes back), all
  * tuners busy, and any other stop, each with Stop casting.
  */
@@ -214,22 +214,21 @@ internal fun CastPrompt(
             pill = "Cast from $sender",
             channel = "${channel.number}  ${channel.name}",
             title = "All tuners are in use",
-            body = "$sender asked for ${channel.number}, but the HDHomeRun’s tuners are all busy. Try again when someone stops watching, or pick another channel on the phone.",
+            body = "$sender asked for ${channel.number}, but every tuner is in use. Try again when one comes free, or pick another channel on the phone.",
             focus = focus,
             modifier = modifier,
         ) {
             TvButton("Try again", onRetry, Modifier.focusRequester(focus), style = TvButtonStyle.Primary)
             TvButton("Stop casting", onStop)
         }
-        else -> LivePlayerPrompt(
-            title = state.error?.substringBefore('.')?.takeIf { it.isNotBlank() } ?: "Live TV stopped",
-            message = state.error ?: "The tuner was released. Tune again to watch live.",
-            action = "Tune again",
+        else -> LivePlayerProblem(
+            // The phone chooses what plays next, so the TV only tunes again or stops.
+            liveProblem(state, channel).let { it.copy(actionLabel = if (it.action == ProblemAction.Retry) it.actionLabel else "Tune again", leaveLabel = "Stop casting") },
+            channel,
             onAction = onRetry,
             onLeave = onStop,
             focus = focus,
             modifier = modifier,
-            leaveLabel = "Stop casting",
         )
     }
 }

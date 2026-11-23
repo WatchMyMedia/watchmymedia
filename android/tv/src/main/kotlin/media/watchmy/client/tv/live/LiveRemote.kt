@@ -17,7 +17,7 @@ internal fun liveNumberKey(code: Int): Char? = when (code) {
     else -> null
 }
 
-/** D-pad movement belongs to visible controls/panels; hidden controls use the boards' channel shortcuts. */
+/** D-pad movement belongs to visible controls/panels; hidden controls change channel, open On now and show the controls. */
 internal fun liveKeyAction(code: Int, panel: LivePanel?, controls: Boolean, terminal: Boolean, prompt: Boolean): LiveAction {
     val key = playerKey(code)
     if (key == PlayerKey.Stop) return LiveAction.Leave
@@ -47,7 +47,9 @@ internal fun liveKeyAction(code: Int, panel: LivePanel?, controls: Boolean, term
         key == PlayerKey.Up && !controls -> LiveAction.NextChannel
         key == PlayerKey.Down && !controls -> LiveAction.PreviousChannel
         key == PlayerKey.Left && !controls -> LiveAction.Channels
-        key in listOf(PlayerKey.Centre, PlayerKey.Right) && !controls -> LiveAction.Controls
+        key == PlayerKey.Centre && !controls -> LiveAction.Controls
+        // ▶ does nothing while the controls are hidden: ◀ opens On now, and there is nothing to its right.
+        key == PlayerKey.Right && !controls -> LiveAction.Swallow
         key in listOf(PlayerKey.Rewind, PlayerKey.FastForward, PlayerKey.Next, PlayerKey.Captions, PlayerKey.AudioTrack) -> LiveAction.Swallow
         else -> LiveAction.Pass
     }
