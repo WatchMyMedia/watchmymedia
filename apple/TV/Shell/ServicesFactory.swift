@@ -19,6 +19,9 @@ import WMMPlayback
 /// the server at API level 22, with arranged rows and lists.
 /// `-fakesFollows` puts it at API level 29: the bell on a show's page,
 /// Settings › Notifications' list and Home's New from shows you follow.
+/// `-fakesRedesign` puts it at API level 34: the cast as people who open
+/// their titles, a card's counts, the library's totals and rating filter,
+/// and Remove from Continue watching (`-fakesServers` does too).
 /// `-fakesRelated` puts it at API level 30: movie
 /// and show pages end in their collection and More like this.
 /// `-fakesServers` signs Sam in to three servers: Living room server (in
@@ -68,7 +71,8 @@ enum ServicesFactory {
             follows: arguments.contains("-fakesFollows"),
             related: arguments.contains("-fakesRelated"),
             watchlists: arguments.contains("-fakesWatchlists"),
-            several: arguments.contains("-fakesServers")
+            several: arguments.contains("-fakesServers"),
+            redesign: arguments.contains("-fakesRedesign") || arguments.contains("-fakesServers")
         )
         (services.library as? FakeLibraryRepository)?.firstRun = FakeFirstRunState.from(arguments)
         // The server in use doesn't answer at all: Home's Can't reach.

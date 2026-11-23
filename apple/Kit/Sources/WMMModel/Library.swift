@@ -67,8 +67,24 @@ public struct BrowseItem: Hashable, Sendable, Identifiable {
     public var tmdbID: Int?
     /// On one of the person's watchlists, as the server read it.
     public var watchlisted: Bool
+    /// The certification ("PG-13", "TV-14"); nil when it has none.
+    public var contentRating: String?
+    /// Shows: episodes on disk the person hasn't finished ("2 episodes left");
+    /// nil from servers below API level 34 and for movies.
+    public var unwatchedCount: Int?
+    /// Shows: episodes added in the last week the person hasn't finished ("2 new").
+    public var newEpisodeCount: Int?
+    /// Shows: seasons with an episode on disk, specials left out.
+    public var seasonCount: Int?
+    /// Shows: the next episode's air date (ISO, 2026-11-26), when one is known.
+    public var nextAirDate: String?
+    /// Shows: the last episode's air date (ISO), which Last aired sorts by.
+    public var lastAirDate: String?
+    /// When its newest file arrived, which Date added sorts by; nil from fakes that don't say.
+    public var addedAt: Date?
 
-    public init(kind: ItemKind, id: Int, libraryID: Int, title: String, year: Int? = nil, overview: String = "", genres: [String] = [], rating: Double? = nil, posterPath: String? = nil, backdropPath: String? = nil, quality: QualityLabel? = nil, hdr: Bool = false, isNew: Bool = false, subtitle: String? = nil, watched: Bool = false, progress: Double? = nil, episodeCount: Int? = nil, runtimeMin: Int? = nil, releaseDate: String? = nil, fileName: String? = nil, fileCount: Int? = nil, episodeID: Int? = nil, seasonNumber: Int? = nil, tmdbID: Int? = nil, watchlisted: Bool = false) {
+    public init(kind: ItemKind, id: Int, libraryID: Int, title: String, year: Int? = nil, overview: String = "", genres: [String] = [], rating: Double? = nil, posterPath: String? = nil, backdropPath: String? = nil, quality: QualityLabel? = nil, hdr: Bool = false, isNew: Bool = false, subtitle: String? = nil, watched: Bool = false, progress: Double? = nil, episodeCount: Int? = nil, runtimeMin: Int? = nil, releaseDate: String? = nil, fileName: String? = nil, fileCount: Int? = nil, episodeID: Int? = nil, seasonNumber: Int? = nil, tmdbID: Int? = nil, watchlisted: Bool = false,
+                contentRating: String? = nil, unwatchedCount: Int? = nil, newEpisodeCount: Int? = nil, seasonCount: Int? = nil, nextAirDate: String? = nil, lastAirDate: String? = nil, addedAt: Date? = nil) {
         self.kind = kind
         self.id = id
         self.libraryID = libraryID
@@ -94,6 +110,13 @@ public struct BrowseItem: Hashable, Sendable, Identifiable {
         self.seasonNumber = seasonNumber
         self.tmdbID = tmdbID
         self.watchlisted = watchlisted
+        self.contentRating = contentRating
+        self.unwatchedCount = unwatchedCount
+        self.newEpisodeCount = newEpisodeCount
+        self.seasonCount = seasonCount
+        self.nextAirDate = nextAirDate
+        self.lastAirDate = lastAirDate
+        self.addedAt = addedAt
     }
 }
 
@@ -325,8 +348,12 @@ public struct ItemQuery: Hashable, Sendable {
     public var text: String?
     public var offset: Int
     public var limit: Int
+    /// Only these content ratings ("PG-13", ``unratedContentRating`` for
+    /// none); empty for every rating. Sent from API level 34
+    /// (``ServerFeatures/ratingFilter``).
+    public var contentRatings: [String]
 
-    public init(libraryID: Int, sort: ItemSort = .title, filter: ItemFilter = .all, genre: String? = nil, decade: Int? = nil, text: String? = nil, offset: Int = 0, limit: Int = 100) {
+    public init(libraryID: Int, sort: ItemSort = .title, filter: ItemFilter = .all, genre: String? = nil, decade: Int? = nil, text: String? = nil, offset: Int = 0, limit: Int = 100, contentRatings: [String] = []) {
         self.libraryID = libraryID
         self.sort = sort
         self.filter = filter
@@ -335,8 +362,12 @@ public struct ItemQuery: Hashable, Sendable {
         self.text = text
         self.offset = offset
         self.limit = limit
+        self.contentRatings = contentRatings
     }
 }
+
+/// The content rating filter's value for titles with none.
+public let unratedContentRating = "unrated"
 
 /// An index supplied by the server for the entire filtered title-sorted list.
 public struct LetterOffset: Hashable, Sendable {
@@ -363,8 +394,14 @@ public struct ItemPage: Hashable, Sendable {
     public var letters: [LetterOffset]?
     /// Counts under the current status/quality, decade and text, before selecting a genre.
     public var genreCounts: [String: Int]?
+    /// The library's content ratings, in the order the US systems rank them,
+    /// unrated last; empty from servers below API level 34.
+    public var contentRatings: [String]
+    /// Titles per content rating after every other filter; nil from older servers.
+    public var contentRatingCounts: [String: Int]?
 
-    public init(items: [BrowseItem], total: Int, offset: Int, genres: [String], decades: [Int], summary: LibrarySummary? = nil, letters: [LetterOffset]? = nil, genreCounts: [String: Int]? = nil) {
+    public init(items: [BrowseItem], total: Int, offset: Int, genres: [String], decades: [Int], summary: LibrarySummary? = nil, letters: [LetterOffset]? = nil, genreCounts: [String: Int]? = nil,
+                contentRatings: [String] = [], contentRatingCounts: [String: Int]? = nil) {
         self.items = items
         self.total = total
         self.offset = offset
@@ -373,6 +410,8 @@ public struct ItemPage: Hashable, Sendable {
         self.summary = summary
         self.letters = letters
         self.genreCounts = genreCounts
+        self.contentRatings = contentRatings
+        self.contentRatingCounts = contentRatingCounts
     }
 }
 
@@ -383,25 +422,75 @@ public struct LibrarySummary: Hashable, Sendable {
     public var continuing: Int
     public var unmatched: Int
     public var totalSizeBytes: Int64
+    /// Titles the person hasn't finished; nil from servers below API level 34.
+    public var unwatched: Int?
+    /// Titles partway through.
+    public var inProgress: Int?
+    /// Shows with new episodes the person hasn't watched.
+    public var newEpisodes: Int?
+    /// Titles whose newest file arrived this calendar month.
+    public var addedThisMonth: Int?
 
-    public init(items: Int, episodes: Int, continuing: Int, unmatched: Int, totalSizeBytes: Int64) {
+    public init(items: Int, episodes: Int, continuing: Int, unmatched: Int, totalSizeBytes: Int64, unwatched: Int? = nil, inProgress: Int? = nil, newEpisodes: Int? = nil, addedThisMonth: Int? = nil) {
         self.items = items
         self.episodes = episodes
         self.continuing = continuing
         self.unmatched = unmatched
         self.totalSizeBytes = totalSizeBytes
+        self.unwatched = unwatched
+        self.inProgress = inProgress
+        self.newEpisodes = newEpisodes
+        self.addedThisMonth = addedThisMonth
     }
 }
 
 public struct Person: Hashable, Sendable {
     public var name: String
+    /// The part played ("Maren Holt"), or for the crew the job ("Director").
     public var role: String?
     public var profilePath: String?
+    /// TMDB's person ID, which opens their titles in the library
+    /// (``LibraryRepository/person(id:)``); nil for a credit stored before
+    /// the server kept it, and from servers below API level 34. Such a
+    /// person opens nothing.
+    public var personID: Int?
 
-    public init(name: String, role: String? = nil, profilePath: String? = nil) {
+    public init(name: String, role: String? = nil, profilePath: String? = nil, personID: Int? = nil) {
         self.name = name
         self.role = role
         self.profilePath = profilePath
+        self.personID = personID
+    }
+}
+
+/// A title a person is in, with the part they play ("Io Vance"; two parts
+/// are joined with " / ").
+public struct PersonTitle: Hashable, Sendable, Identifiable {
+    public var item: BrowseItem
+    public var character: String?
+
+    public init(item: BrowseItem, character: String? = nil) {
+        self.item = item
+        self.character = character
+    }
+
+    public var id: String { "\(item.kind.rawValue)-\(item.id)" }
+}
+
+/// A person's movies and shows in the library, newest first, one card a title.
+public struct PersonDetail: Hashable, Sendable {
+    public var personID: Int
+    public var name: String
+    public var profilePath: String?
+    public var movies: [PersonTitle]
+    public var shows: [PersonTitle]
+
+    public init(personID: Int, name: String, profilePath: String? = nil, movies: [PersonTitle], shows: [PersonTitle]) {
+        self.personID = personID
+        self.name = name
+        self.profilePath = profilePath
+        self.movies = movies
+        self.shows = shows
     }
 }
 
@@ -699,8 +788,11 @@ public struct MovieDetail: Hashable, Sendable, Identifiable {
     public var tmdbID: Int?
     /// The person's watchlists that hold the movie; nil from servers without watchlists.
     public var watchlists: [Int]?
+    /// Its directors, writers, composers and producers, in that order, each
+    /// with their job as ``Person/role``; empty from servers below API level 34.
+    public var crew: [Person]
 
-    public init(id: Int, libraryID: Int, title: String, year: Int?, tagline: String?, overview: String, releaseDate: String?, runtimeMin: Int?, genres: [String], rating: Double?, posterPath: String?, backdropPath: String?, quality: QualityLabel?, hdr: Bool, versions: [MediaVersion], cast: [Person], watch: WatchProgress?, contentRating: String? = nil, managedBy: String? = nil, download: QueueDownload? = nil, trailers: [MovieTrailer] = [], tmdbID: Int? = nil, watchlists: [Int]? = nil) {
+    public init(id: Int, libraryID: Int, title: String, year: Int?, tagline: String?, overview: String, releaseDate: String?, runtimeMin: Int?, genres: [String], rating: Double?, posterPath: String?, backdropPath: String?, quality: QualityLabel?, hdr: Bool, versions: [MediaVersion], cast: [Person], watch: WatchProgress?, contentRating: String? = nil, managedBy: String? = nil, download: QueueDownload? = nil, trailers: [MovieTrailer] = [], tmdbID: Int? = nil, watchlists: [Int]? = nil, crew: [Person] = []) {
         self.id = id
         self.libraryID = libraryID
         self.title = title
@@ -724,6 +816,7 @@ public struct MovieDetail: Hashable, Sendable, Identifiable {
         self.trailers = trailers
         self.tmdbID = tmdbID
         self.watchlists = watchlists
+        self.crew = crew
     }
 
     public var watched: Bool { watch?.completed ?? false }
@@ -764,6 +857,14 @@ extension LibraryRepository {
 
     /// A repository that can't ask has none.
     public func relatedRows(_ title: RelatedTitle) async throws -> [ScreenRow] { [] }
+
+    /// A repository that can't ask finds nobody.
+    public func person(id: Int) async throws -> PersonDetail { throw APIError(status: 404, message: "Nobody by that name is in the library.") }
+
+    /// A repository that can't ask hides nothing.
+    public func setHiddenFromContinueWatching(_ kind: WatchKind, id: Int, hidden: Bool) async throws {
+        throw APIError(status: nil, message: "This server can’t remove titles from Continue watching. Update it to the latest version.")
+    }
 
     /// A repository for one server alone has no other to ask.
     public func search(_ text: String, serverID: String) async throws -> SearchResults { throw SignedOutError() }
@@ -831,6 +932,17 @@ public protocol LibraryRepository: AnyObject {
     /// this (`similar`, best first), each with `items`. Empty when nothing
     /// qualifies, and below ``ServerFeatures/related``.
     func relatedRows(_ title: RelatedTitle) async throws -> [ScreenRow]
+
+    /// A person's movies and shows in the library, newest first (GET
+    /// /api/people/{personId}, from ``ServerFeatures/people``). Throws an
+    /// ``APIError`` with status 404 when no title in the library has them.
+    func person(id: Int) async throws -> PersonDetail
+
+    /// Takes a movie or an episode off Continue watching, keeping the place
+    /// (PUT /api/watch/{type}/{id}/hidden), or with `hidden` false puts it
+    /// back (the Undo, DELETE). From ``ServerFeatures/hideFromContinueWatching``;
+    /// playing it again brings it back too.
+    func setHiddenFromContinueWatching(_ kind: WatchKind, id: Int, hidden: Bool) async throws
 
     /// The full URL of a TMDB image path at `size`, or nil for no image. The
     /// image loader adds the sign-in, so the URL carries no token.

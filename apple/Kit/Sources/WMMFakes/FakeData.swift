@@ -58,7 +58,12 @@ public enum FakeData {
             overview: "A storm closes the harbour for the first time in forty years, and the town has one night to find out who moved the channel markers.",
             genres: s.genres, rating: 7.0 + Double(i % 20) / 10, backdropPath: FakeBackdrops.path(for: s.title), quality: s.q, hdr: s.hdr, isNew: s.isNew,
             subtitle: "\(s.year) · \(plural(s.seasons, "season"))", watched: s.watched, progress: s.pct,
-            episodeCount: s.seasons * 8, tmdbID: tmdbID(showID: 100 + i)
+            episodeCount: s.seasons * 8, tmdbID: tmdbID(showID: 100 + i),
+            contentRating: s.cert,
+            unwatchedCount: s.watched ? 0 : s.pct.map { Int(Double(s.seasons * 8) * (1 - $0)) } ?? s.seasons * 8,
+            newEpisodeCount: s.isNew ? 2 : 0, seasonCount: s.seasons,
+            nextAirDate: s.status == "Ended" ? nil : "2026-11-26",
+            addedAt: Date(timeIntervalSince1970: 1_795_000_000 - Double(i) * 86_400)
         )
     }
 
@@ -67,7 +72,8 @@ public enum FakeData {
             kind: .movie, id: 500 + i, libraryID: movieLibrary, title: m.title, year: m.year,
             overview: "A salvage crew finds a ship that sank twice, and only one of them remembers the first time.",
             genres: m.genres, rating: 6.5 + Double(i % 30) / 10, backdropPath: FakeBackdrops.path(for: m.title), quality: m.q, hdr: m.q == "4K", isNew: m.isNew,
-            watched: i == 6, progress: i == 1 ? 0.66 : nil, runtimeMin: m.runtime, releaseDate: m.released, tmdbID: tmdbID(movieID: 500 + i)
+            watched: i == 6, progress: i == 1 ? 0.66 : nil, runtimeMin: m.runtime, releaseDate: m.released, tmdbID: tmdbID(movieID: 500 + i),
+            contentRating: m.cert, addedAt: Date(timeIntervalSince1970: 1_795_000_000 - Double(i) * 86_400 - 3_600)
         )
     }
 
@@ -198,7 +204,7 @@ public enum FakeData {
             nextUp: s.watched ? nil : next.flatMap { episode in
                 episode.fileID.map { NextUp(episodeID: episode.id, season: episode.season, episode: episode.number, title: episode.title, fileID: $0) }
             },
-            cast: [Person(name: "Ines Varga", role: "Maren Holt"), Person(name: "Tomas Reyes", role: "Harbourmaster"), Person(name: "Adaeze Bell", role: "Wren")],
+            cast: FakePeople.showCast(showID: s.id),
             contentRating: row.cert,
             tmdbID: tmdbID(showID: s.id),
             managedBy: sonarrShows.contains(s.id) ? "Sonarr" : nil
@@ -337,12 +343,13 @@ public enum FakeData {
                     subtitles: [SubtitleOption(id: "s2", label: "English", language: "eng", format: "TX3G")]
                 ),
             ],
-            cast: [Person(name: "Hollis Kade", role: "Captain Ruth Abernathy"), Person(name: "Mira Okonjo", role: "Dov")],
+            cast: FakePeople.movieCast(movieID: m.id),
             watch: m.progress.map { WatchProgress(positionMs: Int($0 * Double(runtime * 60_000)), durationMs: runtime * 60_000, completed: false) }
                 ?? (m.watched ? WatchProgress(positionMs: 0, durationMs: runtime * 60_000, completed: true) : nil),
             contentRating: movieRows[index].cert,
             trailers: trailers(movieID: m.id),
-            tmdbID: tmdbID(movieID: m.id)
+            tmdbID: tmdbID(movieID: m.id),
+            crew: FakePeople.movieCrew(movieID: m.id)
         )
     }
 

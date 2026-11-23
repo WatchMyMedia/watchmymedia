@@ -434,8 +434,14 @@ extension LiveTVMapping {
               canCancel: r.canCancel, canDelete: r.canDelete ?? false, pictureURL: picture(r.pictureUrl, base: base),
               conflictsWith: (r.conflictsWith ?? []).map {
                   .init(id: $0.id, title: $0.title, number: $0.number, channelName: $0.channelName, start: $0.start, end: $0.end,
-                        userName: $0.userName, running: $0.running)
-              })
+                        userName: $0.userName, running: $0.running, isRepeat: $0._repeat, nextAiring: $0.nextAiring.map(airing))
+              },
+              watched: r.watched,
+              watchProgress: r.progress.flatMap { $0.durationMs > 0 ? min(max(Double($0.positionMs) / Double($0.durationMs), 0), 1) : nil },
+              isNew: r.new, isRepeat: r._repeat, nextAiring: r.nextAiring.map(airing))
+    }
+    static func airing(_ a: Components.Schemas.LiveTVAiring) -> LiveAiring {
+        .init(channelID: a.channelId, number: a.number, channelName: a.channelName, programmeID: a.programmeId, start: a.start)
     }
     static func recordingRule(_ r: Components.Schemas.LiveTVRecordingRule) -> LiveRecordingRule {
         .init(id: r.id, kind: r.kind, title: r.title, userName: r.userName, channelID: Mapping.nonBlank(r.channelId),

@@ -22,9 +22,9 @@ public enum FakeServers {
     /// With several servers (`-fakesServers`): a second one signed in to,
     /// with a small library of its own (``FakeCabin``). The addresses are
     /// documentation addresses, no real server's.
-    public static let cabin = Server(id: "srv-cabin", name: "Cabin server", baseURL: URL(string: "http://192.0.2.31:27587")!, version: "1.4.5", apiLevel: 6)
+    public static let cabin = Server(id: "srv-cabin", name: "Cabin server", baseURL: URL(string: "http://192.0.2.31:27587")!, version: "1.4.5", apiLevel: ServerFeatures.Level.redesign)
     /// With several servers: a third one signed in to, which doesn't answer.
-    public static let den = Server(id: "srv-den", name: "Den server", baseURL: URL(string: "http://192.0.2.52:27587")!, version: "1.3.2", apiLevel: 6)
+    public static let den = Server(id: "srv-den", name: "Den server", baseURL: URL(string: "http://192.0.2.52:27587")!, version: "1.3.2", apiLevel: ServerFeatures.Level.redesign)
 
     /// What a server that doesn't answer throws, as the real repositories word it.
     static let unreachable = APIError(status: nil, message: "Couldn’t reach the server. Check the connection and try again.")
@@ -426,6 +426,51 @@ public final class FakeLibraryRepository: LibraryRepository {
 
     public func imageURL(_ path: String?, size: ImageSize, serverID: String) -> URL? { FakeBackdrops.url(path, size: size) }
 
+    /// What the server in use offers: below API level 34 the fakes leave out
+    /// what such a server doesn't send (people's IDs, a card's counts, the
+    /// library's new totals and ratings).
+    private var features: ServerFeatures { ServerFeatures(apiLevel: servers?.current?.server.apiLevel ?? ServerFeatures.Level.redesign) }
+
+    /// Taken off Continue watching here (Remove from Continue watching), by file.
+    public private(set) var hiddenFromContinue: Set<WatchTarget> = []
+
+    public func person(id: Int) async throws -> PersonDetail {
+        await FakeLatency.wait()
+        try checkOnline()
+        guard features.people, !onCabin, var person = FakePeople.person(id: id) else { throw APIError(status: 404, message: "Nobody by that name is in the library.") }
+        person.movies = person.movies.map { PersonTitle(item: applied($0.item), character: $0.character) }
+        person.shows = person.shows.map { PersonTitle(item: applied($0.item), character: $0.character) }
+        return person
+    }
+
+    public func setHiddenFromContinueWatching(_ kind: WatchKind, id: Int, hidden: Bool) async throws {
+        await FakeLatency.wait()
+        try checkOnline()
+        guard features.hideFromContinueWatching else { throw APIError(status: 404, message: "Not found.") }
+        let target: WatchTarget = kind == .movie ? .movie(id: id) : .episode(id: id)
+        if hidden { hiddenFromContinue.insert(target) } else { hiddenFromContinue.remove(target) }
+        for listener in listeners.values { listener.yield() }
+        for listener in typedListeners.values { listener.yield(.watched(kind, ids: [id], watched: nil)) }
+    }
+
+    /// Continue watching without what was taken off it here.
+    private func shown(_ items: [ContinueItem]) -> [ContinueItem] {
+        items.filter { item in
+            let target: WatchTarget? = item.kind == .movie ? item.movieID.map { .movie(id: $0) } : item.episodeID.map { .episode(id: $0) }
+            return target.map { !hiddenFromContinue.contains($0) } ?? true
+        }
+    }
+
+    /// A card as a server below API level 34 sends it.
+    private func older(_ item: BrowseItem) -> BrowseItem {
+        guard !features.cardFacts else { return item }
+        var copy = item
+        copy.unwatchedCount = nil
+        copy.newEpisodeCount = nil
+        copy.seasonCount = nil
+        return copy
+    }
+
     public func home() async throws -> HomeData {
         await FakeLatency.wait()
         try checkOnline()
@@ -434,6 +479,8 @@ public final class FakeLibraryRepository: LibraryRepository {
             return HomeData(hero: nil, continueWatching: [], recentlyAddedShows: [], recentlyAired: [], recentlyAddedMovies: [], recentlyReleased: [], totals: LibraryTotals(movies: 0, shows: 0, episodes: 0, files: 0, totalSizeBytes: 0), lastScannedAt: nil, movieLibraryID: nil, tvLibraryID: nil)
         }
         var home = FakeData.home()
+        home.continueWatching = shown(home.continueWatching)
+        home.recentlyAddedShows = home.recentlyAddedShows.map(older)
         if let rows, rows.available {
             // As the server sends it with arranged=true: the rows, and the fixed arrays empty.
             home.rows = rows.screenRows(.home, home: home)
@@ -495,21 +542,42 @@ public final class FakeLibraryRepository: LibraryRepository {
                 letters.append(LetterOffset(letter: letter, offset: offset))
             }
         }
+        // Content ratings, as a server at API level 34 counts and filters them.
+        let ratings = features.ratingFilter ? Self.ratingOrder.filter { rating in all.contains { ($0.contentRating ?? unratedContentRating) == rating } } : []
+        var ratingCounts: [String: Int]? = features.ratingFilter ? Dictionary(uniqueKeysWithValues: ratings.map { ($0, 0) }) : nil
+        if ratingCounts != nil {
+            for item in list { ratingCounts?[item.contentRating ?? unratedContentRating, default: 0] += 1 }
+        }
+        if features.ratingFilter, !query.contentRatings.isEmpty {
+            list = list.filter { query.contentRatings.contains($0.contentRating ?? unratedContentRating) }
+        }
         return ItemPage(
-            items: Array(list.dropFirst(query.offset).prefix(query.limit)), total: list.count, offset: query.offset,
+            items: Array(list.dropFirst(query.offset).prefix(query.limit)).map(older), total: list.count, offset: query.offset,
             genres: Array(Set(all.flatMap(\.genres))).sorted(),
             decades: Array(Set(all.compactMap { $0.year.map { $0 / 10 * 10 } })).sorted(by: >),
             summary: summary(libraryID: query.libraryID),
             letters: query.sort == .title ? letters : nil,
-            genreCounts: genreCounts
+            genreCounts: genreCounts,
+            contentRatings: ratings,
+            contentRatingCounts: ratingCounts
         )
     }
+
+    /// The US systems' order, as the server ranks them, unrated last.
+    private static let ratingOrder = ["G", "PG", "PG-13", "R", "NC-17", "TV-Y", "TV-Y7", "TV-G", "TV-PG", "TV-14", "TV-MA", unratedContentRating]
 
     /// The library's counts, with the large library's in the Movies' when it holds them.
     private func summary(libraryID: Int) -> LibrarySummary {
         if onCabin { return FakeCabin.summary(libraryID: libraryID) }
         var summary = FakeData.summary(libraryID: libraryID)
         if largeLibrary, libraryID == FakeData.movieLibrary { summary.items = FakeData.largeMovies.count }
+        if features.libraryTotals {
+            let all = libraryID == FakeData.movieLibrary ? FakeData.movies : FakeData.shows
+            summary.unwatched = all.filter { !applied($0).watched }.count
+            summary.inProgress = all.filter { ($0.progress ?? 0) > 0 && !$0.watched }.count
+            summary.newEpisodes = libraryID == FakeData.movieLibrary ? nil : all.filter { ($0.newEpisodeCount ?? 0) > 0 }.count
+            summary.addedThisMonth = 3
+        }
         return summary
     }
 
@@ -530,6 +598,7 @@ public final class FakeLibraryRepository: LibraryRepository {
                 .filter { $0.hasFile && $0.watched }.count
             return copy
         }
+        if !features.people { show.cast = show.cast.map { Person(name: $0.name, role: $0.role, profilePath: $0.profilePath) } }
         if let follows, follows.available { show.following = follows.following(showID: id) }
         if let watchlists, watchlists.available, let key = show.watchlistTitle?.key { show.watchlists = watchlists.holding(key) }
         return show
@@ -590,6 +659,11 @@ public final class FakeLibraryRepository: LibraryRepository {
             movie.watch = mark ? WatchProgress(positionMs: 0, durationMs: (movie.runtimeMin ?? 100) * 60_000, completed: true) : nil
         }
         if let watchlists, watchlists.available, let key = movie.watchlistTitle?.key { movie.watchlists = watchlists.holding(key) }
+        if !features.people {
+            movie.cast = movie.cast.map { Person(name: $0.name, role: $0.role, profilePath: $0.profilePath) }
+            movie.crew = []
+        }
+        if !features.cardFacts { movie.trailers = movie.trailers.map { MovieTrailer(name: $0.name, source: $0.source, durationMs: $0.durationMs) } }
         return movie
     }
 

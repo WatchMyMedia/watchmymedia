@@ -288,12 +288,15 @@ extension AppServices {
     /// `downloads` gives the iPhone and iPad app its fake downloads; the Apple TV app has none.
     /// `related` puts the server at API level 30: movie and show pages end in ``FakeRelated``'s rows.
     /// `watchlists` puts it at API level 33, with ``FakeWatchlistsRepository``'s three watchlists.
-    public static func fake(signedIn: Bool = true, chosen: Bool = true, client: ClientInfo = .fakePhone, admin: Bool = true, seerr: Bool = false, seerrLinked: Bool = true, liveTV: Bool = false, liveGuide: FakeLiveGuide? = nil, downloads: Bool = false, apiLevel: Int? = nil, recordings: Bool = false, liveAutomatic: Bool = false, rows: Bool = false, follows: Bool = false, related: Bool = false, watchlists: Bool = false, several: Bool = false) -> AppServices {
+    /// `redesign` puts it at API level 34: the cast as people with their own
+    /// pages, a card's counts, the library's totals and rating filter, and
+    /// Remove from Continue watching.
+    public static func fake(signedIn: Bool = true, chosen: Bool = true, client: ClientInfo = .fakePhone, admin: Bool = true, seerr: Bool = false, seerrLinked: Bool = true, liveTV: Bool = false, liveGuide: FakeLiveGuide? = nil, downloads: Bool = false, apiLevel: Int? = nil, recordings: Bool = false, liveAutomatic: Bool = false, rows: Bool = false, follows: Bool = false, related: Bool = false, watchlists: Bool = false, several: Bool = false, redesign: Bool = false) -> AppServices {
         let liveTV = liveTV || liveGuide != nil || liveAutomatic
-        let level = watchlists ? ServerFeatures.Level.watchlists : related ? ServerFeatures.Level.related : follows ? ServerFeatures.Level.follows : rows ? ServerFeatures.Level.rows : nil
+        let level = redesign ? ServerFeatures.Level.redesign : watchlists ? ServerFeatures.Level.watchlists : related ? ServerFeatures.Level.related : follows ? ServerFeatures.Level.follows : rows ? ServerFeatures.Level.rows : nil
         let servers = FakeServerRepository(signedIn: signedIn, chosen: chosen, admin: admin, liveTV: liveTV, liveGuide: liveGuide != nil,
                                            liveExtras: liveGuide?.extras ?? false,
-                                           apiLevel: apiLevel ?? level, several: several)
+                                           apiLevel: redesign ? ServerFeatures.Level.redesign : apiLevel ?? level, several: several)
         let library = FakeLibraryRepository()
         library.servers = servers
         // Read here rather than passed, so both apps' fakes take it with no change to their factories.

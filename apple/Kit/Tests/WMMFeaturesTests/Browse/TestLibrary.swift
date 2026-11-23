@@ -83,6 +83,19 @@ final class TestLibrary: LibraryRepository {
         return try await fake.movie(id: id)
     }
 
+    func person(id: Int) async throws -> PersonDetail {
+        try check()
+        return try await fake.person(id: id)
+    }
+
+    private(set) var hiddenCalls: [String] = []
+
+    func setHiddenFromContinueWatching(_ kind: WatchKind, id: Int, hidden: Bool) async throws {
+        hiddenCalls.append("\(hidden ? "hide" : "show") \(kind.rawValue) \(id)")
+        try check()
+        try await fake.setHiddenFromContinueWatching(kind, id: id, hidden: hidden)
+    }
+
     func search(_ text: String) async throws -> SearchResults {
         try check()
         searches.append(text)

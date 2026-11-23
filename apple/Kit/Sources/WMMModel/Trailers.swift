@@ -16,25 +16,30 @@ public struct MovieTrailer: Hashable, Sendable {
     public var source: Source
     /// A trailer file's length; nil for YouTube.
     public var durationMs: Int?
+    /// A teaser rather than a trailer; false when the server doesn't say
+    /// (below API level 34).
+    public var teaser: Bool
 
-    public init(name: String, source: Source, durationMs: Int? = nil) {
+    public init(name: String, source: Source, durationMs: Int? = nil, teaser: Bool = false) {
         self.name = name
         self.source = source
         self.durationMs = durationMs
+        self.teaser = teaser
     }
 
     /// A trailer from the server's fields, or nil for one this app can't play:
     /// a source it doesn't know, a file without an id, or a key that isn't a
     /// YouTube id.
-    public init?(source: String, name: String, fileID: Int?, key: String?, durationMs: Int?) {
+    public init?(source: String, name: String, fileID: Int?, key: String?, durationMs: Int?, kind: String? = nil) {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Trailer" : name
+        let teaser = kind == "teaser"
         switch source {
         case "file":
             guard let fileID, fileID > 0 else { return nil }
-            self.init(name: name, source: .file(fileID: fileID), durationMs: durationMs.flatMap { $0 > 0 ? $0 : nil })
+            self.init(name: name, source: .file(fileID: fileID), durationMs: durationMs.flatMap { $0 > 0 ? $0 : nil }, teaser: teaser)
         case "youtube":
             guard let key, let trailer = YouTubeTrailer(name: name, key: key) else { return nil }
-            self.init(name: name, source: .youTube(trailer))
+            self.init(name: name, source: .youTube(trailer), teaser: teaser)
         default:
             return nil
         }

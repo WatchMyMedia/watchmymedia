@@ -109,7 +109,49 @@ extension Components.Schemas.BrowseItem {
             episodeID: Mapping.positive(episodeId),
             seasonNumber: episodeId == nil ? nil : seasonNumber.map(Int.init),
             tmdbID: Mapping.positive(tmdbId),
-            watchlisted: watchlisted ?? false
+            watchlisted: watchlisted ?? false,
+            contentRating: Mapping.nonBlank(contentRating),
+            unwatchedCount: unwatchedCount.map(Int.init),
+            newEpisodeCount: newEpisodeCount.map(Int.init),
+            seasonCount: seasonCount.map(Int.init),
+            nextAirDate: Mapping.nonBlank(nextAirDate),
+            lastAirDate: Mapping.nonBlank(lastAirDate),
+            addedAt: addedAt
+        )
+    }
+}
+
+extension Components.Schemas.PersonTitle {
+    private var itemKind: ItemKind? {
+        switch kind {
+        case .movie: .movie
+        case .show: .show
+        case .unmatched, .undocumented: nil
+        }
+    }
+
+    /// A person's title as a card, with the part they play.
+    var model: PersonTitle? {
+        guard let itemKind else { return nil }
+        let item = BrowseItem(
+            kind: itemKind, id: Int(id), libraryID: Int(libraryId), title: title, year: Mapping.positive(year),
+            overview: overview, genres: genres, rating: Mapping.positive(rating),
+            posterPath: Mapping.nonBlank(posterPath), backdropPath: Mapping.nonBlank(backdropPath),
+            quality: Mapping.quality(quality), hdr: hdr, isNew: isNew, watched: watched, progress: Mapping.positive(progress),
+            episodeCount: episodeCount.map(Int.init), runtimeMin: Mapping.positive(runtimeMin), releaseDate: Mapping.nonBlank(releaseDate),
+            fileCount: fileCount.map(Int.init), tmdbID: Mapping.positive(tmdbId), watchlisted: watchlisted ?? false,
+            contentRating: Mapping.nonBlank(contentRating), unwatchedCount: unwatchedCount.map(Int.init), newEpisodeCount: newEpisodeCount.map(Int.init),
+            seasonCount: seasonCount.map(Int.init), nextAirDate: Mapping.nonBlank(nextAirDate), lastAirDate: Mapping.nonBlank(lastAirDate), addedAt: addedAt
+        )
+        return PersonTitle(item: item, character: Mapping.nonBlank(character))
+    }
+}
+
+extension Components.Schemas.PersonDetail {
+    var model: PersonDetail {
+        PersonDetail(
+            personID: Int(personId), name: name, profilePath: Mapping.nonBlank(profilePath),
+            movies: movies.compactMap(\.model), shows: shows.compactMap(\.model)
         )
     }
 }
@@ -243,7 +285,9 @@ extension Components.Schemas.HomeData {
 
 extension Components.Schemas.ItemTotals {
     var model: LibrarySummary {
-        LibrarySummary(items: Int(items), episodes: Int(episodes), continuing: Int(continuing), unmatched: Int(unmatched), totalSizeBytes: totalSize)
+        LibrarySummary(items: Int(items), episodes: Int(episodes), continuing: Int(continuing), unmatched: Int(unmatched), totalSizeBytes: totalSize,
+                       unwatched: unwatched.map(Int.init), inProgress: inProgress.map(Int.init), newEpisodes: newEpisodes.map(Int.init),
+                       addedThisMonth: addedThisMonth.map(Int.init))
     }
 }
 
@@ -257,7 +301,9 @@ extension Components.Schemas.ItemList {
             decades: facets.decades.map(Int.init),
             summary: totals?.model,
             letters: letters?.map { LetterOffset(letter: $0.letter, offset: Int($0.offset)) },
-            genreCounts: genreCounts?.additionalProperties.mapValues(Int.init)
+            genreCounts: genreCounts?.additionalProperties.mapValues(Int.init),
+            contentRatings: facets.contentRatings ?? [],
+            contentRatingCounts: contentRatingCounts?.additionalProperties.mapValues(Int.init)
         )
     }
 }
@@ -270,7 +316,14 @@ extension Components.Schemas.Library {
 }
 
 extension Components.Schemas.Credit {
-    var model: Person { Person(name: name, role: Mapping.nonBlank(character), profilePath: Mapping.nonBlank(profilePath)) }
+    var model: Person {
+        Person(name: name, role: Mapping.nonBlank(character), profilePath: Mapping.nonBlank(profilePath), personID: Mapping.positive(personId))
+    }
+}
+
+extension Components.Schemas.CrewMember {
+    /// A crew member, with the job as their role ("Director").
+    var model: Person { Person(name: name, role: Mapping.nonBlank(job), personID: Mapping.positive(personId)) }
 }
 
 extension Components.Schemas.MediaToken {
@@ -421,7 +474,8 @@ extension Components.Schemas.MovieDetail {
             download: download.flatMap(\.model),
             trailers: (trailers ?? []).compactMap(\.model),
             tmdbID: Mapping.positive(tmdbId),
-            watchlists: watchlists?.map(Int.init)
+            watchlists: watchlists?.map(Int.init),
+            crew: (crew ?? []).map(\.model)
         )
     }
 }
@@ -429,7 +483,7 @@ extension Components.Schemas.MovieDetail {
 extension Components.Schemas.MovieTrailer {
     /// Nil for a source this app doesn't know, or one it can't play.
     var model: MovieTrailer? {
-        MovieTrailer(source: source, name: name, fileID: fileId.map(Int.init), key: key, durationMs: durationMs.map(Int.init))
+        MovieTrailer(source: source, name: name, fileID: fileId.map(Int.init), key: key, durationMs: durationMs.map(Int.init), kind: kind)
     }
 }
 

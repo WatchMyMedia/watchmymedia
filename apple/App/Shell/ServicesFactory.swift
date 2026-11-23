@@ -28,6 +28,9 @@ import WMMPlayback
 /// three shows followed and one that left the library, Home's New from shows
 /// you follow, and a second new-episode check that finds two shows' arrivals.
 /// `-fakesManyNewEpisodes` makes it seven shows.
+/// `-fakesRedesign` puts it at API level 34: the cast as people who open
+/// their titles, a card's counts, the library's totals and rating filter,
+/// and Remove from Continue watching (`-fakesServers` does too).
 /// `-fakesRelated` puts it at API level 30: movie and show pages end in their
 /// collection and More like this. `-fakesServers` signs Sam in on three
 /// servers: Living room server (in use), Cabin server, with a small library
@@ -84,7 +87,8 @@ enum ServicesFactory {
             follows: arguments.contains("-fakesFollows"),
             related: arguments.contains("-fakesRelated"),
             watchlists: arguments.contains("-fakesWatchlists"),
-            several: arguments.contains("-fakesServers")
+            several: arguments.contains("-fakesServers"),
+            redesign: arguments.contains("-fakesRedesign") || arguments.contains("-fakesServers")
         )
         if arguments.contains("-fakesSlowServer") { (services.library as? FakeLibraryRepository)?.otherServerDelay = .milliseconds(2500) }
         (services.library as? FakeLibraryRepository)?.firstRun = FakeFirstRunState.from(arguments)

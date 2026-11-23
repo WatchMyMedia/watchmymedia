@@ -47,6 +47,7 @@ final class RealLibraryRepository: LibraryRepository {
         let parameters = Operations.ListLibraryItems.Input.Query(
             sort: query.sort.api,
             filter: query.filter.api,
+            contentRating: query.contentRatings.isEmpty || !store.features.ratingFilter ? nil : query.contentRatings,
             genre: Mapping.nonBlank(query.genre),
             decade: query.decade.map(Int64.init),
             q: Mapping.nonBlank(query.text?.trimmingCharacters(in: .whitespacesAndNewlines)),
@@ -82,6 +83,30 @@ final class RealLibraryRepository: LibraryRepository {
             }
         }
         return reply.rows.compactMap(\.model)
+    }
+
+    /// GET /api/people/{personId}: their titles in this server's libraries.
+    func person(id: Int) async throws -> PersonDetail {
+        try await store.call { try await $0.getPerson(path: .init(personId: Int64(id))).ok.body.json }.model
+    }
+
+    /// PUT or DELETE /api/watch/{type}/{id}/hidden. Home hears it as a
+    /// change to the title, as it hears a mark, and the server's echo is dropped.
+    func setHiddenFromContinueWatching(_ kind: WatchKind, id: Int, hidden: Bool) async throws {
+        let echo = events.expect(.watched(kind, ids: [id]))
+        do {
+            if hidden {
+                let type: Operations.HideFromContinueWatching.Input.Path._TypePayload = kind == .movie ? .movie : .episode
+                _ = try await store.call { try await $0.hideFromContinueWatching(path: .init(_type: type, id: Int64(id))).noContent }
+            } else {
+                let type: Operations.ShowInContinueWatching.Input.Path._TypePayload = kind == .movie ? .movie : .episode
+                _ = try await store.call { try await $0.showInContinueWatching(path: .init(_type: type, id: Int64(id))).noContent }
+            }
+        } catch {
+            events.forget(echo)
+            throw error
+        }
+        events.notify(.watched(kind, ids: [id], watched: nil))
     }
 
     func search(_ text: String) async throws -> SearchResults {
