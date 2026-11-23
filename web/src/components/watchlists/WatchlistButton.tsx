@@ -8,8 +8,10 @@ import { useWatchlistToggle } from './useWatchlistToggle'
  * or more watchlists it opens Save to watchlist instead. tall matches a
  * row of 44px buttons, as the show page's are.
  */
-export function WatchlistButton({ target, title, holding, tall = false }: { target: WatchlistTarget; title: string; holding: readonly number[]; tall?: boolean }) {
+export function WatchlistButton({ target, title, holding, tall = false, look }: { target: WatchlistTarget; title: string; holding: readonly number[]; tall?: boolean; look?: 'hero' | 'small' }) {
   const w = useWatchlistToggle(target, { holding })
+  // hero sits on a title's picture with the page's large buttons; small among a section's small buttons.
+  const shape = look === 'hero' ? `btn btn-clear btn-lg ${w.saved ? 'text-accent' : ''}` : look === 'small' ? `btn btn-sm ${w.saved ? 'text-accent' : ''}` : `inline-flex ${tall ? 'min-h-11' : 'min-h-10'} items-center justify-center gap-2 whitespace-nowrap rounded-md border bg-surface px-4 text-sm font-medium hover:bg-surface-2`
   return (
     <WithPicker open={w.open} onClose={() => w.setOpen(false)} target={target} title={title} className="inline-flex">
       <button
@@ -18,7 +20,7 @@ export function WatchlistButton({ target, title, holding, tall = false }: { targ
         aria-haspopup={w.picker ? 'dialog' : undefined}
         aria-expanded={w.picker ? w.open : undefined}
         onClick={() => void w.press()}
-        className={`inline-flex ${tall ? 'min-h-11' : 'min-h-10'} items-center justify-center gap-2 whitespace-nowrap rounded-md border bg-surface px-4 text-sm font-medium hover:bg-surface-2 ${w.open ? 'border-accent bg-surface-2' : 'border-line-2'}`}
+        className={`${shape} ${w.open ? 'border-accent bg-surface-2' : look ? '' : 'border-line-2'}`}
       >
         <BookmarkIcon filled={w.saved} />
         {w.label}

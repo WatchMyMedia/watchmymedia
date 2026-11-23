@@ -13,14 +13,18 @@ const bellBase = 'inline-flex min-h-[44px] items-center justify-center gap-2 whi
  * bell in the accent colour with the accent outline, as Reminder set is. A
  * plain button whose name says what pressing does, not aria-pressed.
  */
-export function NotifyMeButton({ show, following, onPress }: { show: string; following: boolean; onPress: () => void }) {
+export function NotifyMeButton({ show, following, onPress, look }: { show: string; following: boolean; onPress: () => void; look?: 'clear' }) {
   const words = bellWords(following, show)
+  // clear sits on the show's picture, beside its name.
+  const shape = look === 'clear'
+    ? `btn btn-clear ${following ? 'border-accent/55 font-semibold text-accent' : ''}`
+    : following ? `${bellBase} border border-accent/55 bg-transparent font-semibold text-accent hover:bg-accent/5` : `${bellBase} border border-line-2 bg-surface font-medium hover:bg-surface-2`
   return (
     <button
       type="button"
       onClick={onPress}
       aria-label={words.name}
-      className={following ? `${bellBase} border border-accent/55 bg-transparent font-semibold text-accent hover:bg-accent/5` : `${bellBase} border border-line-2 bg-surface font-medium hover:bg-surface-2`}
+      className={shape}
     >
       <BellIcon filled={following} />
       {words.label}

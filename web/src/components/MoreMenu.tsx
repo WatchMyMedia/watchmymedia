@@ -2,7 +2,7 @@ import { Fragment, useEffect, useId, useRef, useState } from 'react'
 
 export type MoreItem = {
   label: string
-  icon?: 'replace' | 'delete' | 'flag' | 'check' | 'checks' | 'plus' | 'missing' | 'skip' | 'poster'
+  icon?: 'replace' | 'delete' | 'flag' | 'check' | 'checks' | 'plus' | 'missing' | 'skip' | 'poster' | 'file' | 'match'
   /** Shown in red: deletes something. */
   danger?: boolean
   /** A line above it, setting it apart from the items before. */
@@ -48,6 +48,18 @@ const icons = {
   replace: <path d="M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5" />,
   delete: <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />,
   skip: <path d="M5 4v16M19 4v16M9 12h6M12 9l3 3-3 3" />,
+  file: (
+    <>
+      <path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z" />
+      <path d="M14 3v5h5M8.5 13h7M8.5 17h5" />
+    </>
+  ),
+  match: (
+    <>
+      <circle cx="11" cy="11" r="6" />
+      <path d="m20 20-4.5-4.5M8.5 11h5M11 8.5v5" />
+    </>
+  ),
   poster: (
     <>
       <rect x="5" y="3" width="14" height="18" rx="2" />
@@ -66,12 +78,15 @@ export function MoreMenu({
   compact = false,
   tall = false,
   align = 'left',
+  look,
 }: {
   items: MoreItem[]
   label?: string
   compact?: boolean
   tall?: boolean
   align?: 'left' | 'right'
+  /** hero: a large clear button on a title's picture; small: among a section's small buttons. */
+  look?: 'hero' | 'small'
 }) {
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
@@ -102,7 +117,11 @@ export function MoreMenu({
     const i = all.indexOf(document.activeElement as HTMLButtonElement)
     all[(i + (e.key === 'ArrowDown' ? 1 : all.length - 1)) % all.length]?.focus()
   }
-  const button = compact
+  const button = look === 'hero'
+    ? `ib ib-lg border-white/15 bg-ground/55 ${open ? 'border-accent' : ''}`
+    : look === 'small'
+      ? `ib ib-sm ${open ? 'border-accent' : ''}`
+      : compact
     ? `grid h-9 w-9 place-items-center rounded-md text-neutral-400 hover:bg-surface-2 hover:text-neutral-100 ${open ? 'bg-surface-2 text-neutral-100' : ''}`
     : `grid ${tall ? 'h-[44px]' : 'h-[40px]'} w-[44px] place-items-center rounded-md border ${open ? 'border-accent bg-surface-2' : 'border-line-2 bg-surface hover:bg-surface-2'}`
   return (
@@ -120,7 +139,7 @@ export function MoreMenu({
           role="menu"
           aria-label={label}
           onKeyDown={onMenuKey}
-          className={`absolute top-[calc(100%+6px)] z-30 ${items.some((it) => it.group !== undefined) ? 'w-64' : 'w-60'} rounded-[10px] border border-line-2 bg-surface p-1.5 shadow-[0_18px_40px_rgba(0,0,0,.6)] ${align === 'right' ? 'right-0' : 'left-0'}`}
+          className={`menu absolute top-[calc(100%+6px)] ${items.some((it) => it.group !== undefined) ? 'w-64' : 'w-60'} ${align === 'right' ? 'right-0' : 'left-0'}`}
         >
           {blocks(items).map((b, i, all) => {
             const buttons = b.items.map((it) => (
@@ -132,7 +151,7 @@ export function MoreMenu({
                   setOpen(false)
                   it.onSelect()
                 }}
-                className={`flex min-h-10 w-full items-center gap-2.5 rounded-md px-2.5 text-left text-sm hover:bg-surface-2 focus:bg-surface-2 ${it.danger ? 'text-red-300' : 'text-neutral-200 hover:text-neutral-100'}`}
+                className={`menu-item focus:bg-raise ${it.danger ? 'text-red-300 hover:text-red-300' : ''}`}
               >
                 {it.icon && (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

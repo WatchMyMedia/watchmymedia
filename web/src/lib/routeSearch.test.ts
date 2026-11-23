@@ -54,6 +54,13 @@ describe('validatePlaySearch', () => {
       expect(validatePlaySearch({ back }).back).toBeUndefined()
     }
   })
+  it('keeps the sound and subtitles chosen before playing, and drops anything else', () => {
+    expect(validatePlaySearch({ audio: 2, subtitle: 's4' })).toMatchObject({ audio: 2, subtitle: 's4' })
+    expect(validatePlaySearch({ audio: '0', subtitle: 'off' })).toMatchObject({ audio: 0, subtitle: 'off' })
+    expect(validatePlaySearch({ subtitle: 'x1' }).subtitle).toBe('x1')
+    for (const audio of [-1, 1.5, 'one', '', null]) expect(validatePlaySearch({ audio }).audio).toBeUndefined()
+    for (const subtitle of ['', 'on', 's', 'https://x', 4]) expect(validatePlaySearch({ subtitle }).subtitle).toBeUndefined()
+  })
   it('marks a trailer only when asked', () => {
     expect(validatePlaySearch({ trailer: true }).trailer).toBe(true)
     expect(validatePlaySearch({ trailer: 'true' }).trailer).toBe(true)

@@ -30,15 +30,25 @@ export function episodeRedirect(params: { showId: string; number: string }, sear
  * beginning), its title and where Back goes. trailer marks a movie's trailer
  * file, which goes back when it ends.
  */
-export type PlaySearch = { start?: number; title?: string; back?: string; trailer?: true }
+/**
+ * The player's address. audio and subtitle carry what a title's page chose
+ * before playing: audio is the file's sound stream index (the probe's), as
+ * the player's own Audio choice sends it; subtitle is "off" or a track id as
+ * the server names it ("s4" for the file's stream 4). Left out, the server
+ * picks by the person's language settings, as before.
+ */
+export type PlaySearch = { start?: number; title?: string; back?: string; trailer?: true; audio?: number; subtitle?: string }
 
 export function validatePlaySearch(s: Record<string, unknown>): PlaySearch {
+  const audio = typeof s.audio === 'number' ? s.audio : typeof s.audio === 'string' && /^\d+$/.test(s.audio) ? Number(s.audio) : undefined
   return {
     start: typeof s.start === 'number' ? s.start : typeof s.start === 'string' && s.start ? Number(s.start) : undefined,
     title: typeof s.title === 'string' ? s.title : undefined,
     // A path on this site, query included: the player navigates to it as an href.
     back: typeof s.back === 'string' && /^\/(?![/\\])/.test(s.back) ? s.back : undefined,
     trailer: s.trailer === true || s.trailer === 'true' ? true : undefined,
+    audio: audio !== undefined && Number.isInteger(audio) && audio >= 0 ? audio : undefined,
+    subtitle: typeof s.subtitle === 'string' && /^(off|[a-z]\d{1,4})$/.test(s.subtitle) ? s.subtitle : undefined,
   }
 }
 

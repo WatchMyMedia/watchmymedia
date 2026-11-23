@@ -7,11 +7,8 @@ import { requestOptionsQuery, useMonitorEpisodes, useSearchMissing } from '../ap
 import type { components } from '../api/schema'
 import { useMarkSeasonWatched, useMarkShowWatched, useMarkWatched } from '../api/watch'
 import { useAuth } from '../authContext'
-import { HistoryCard } from '../components/activity/HistoryCard'
-import { Badge } from '../components/Badge'
 import { ChangePosterDialog } from '../components/ChangePosterDialog'
 import { DeleteDialog, ReplaceFileDialog } from '../components/DeleteDialog'
-import { CastRow, FileTags, SideCard } from '../components/DetailHeader'
 import { RecordingProvenance } from '../components/liveTV/RecordingProvenance'
 import { MoreMenu, type MoreItem } from '../components/MoreMenu'
 import { useNotifyMe } from '../components/newEpisodeHooks'
@@ -22,10 +19,17 @@ import { ReportProblemDialog } from '../components/ReportProblemDialog'
 import { RelatedRows } from '../components/rows/RelatedRows'
 import { RequestDialog } from '../components/RequestDialog'
 import { SegmentEditorDialog } from '../components/SegmentEditorDialog'
-import { episodeActions, episodeFacts, episodeLine, episodeMinutes, isPartlyWatched, pageEpisodes, rowCode, showYears, trackSummary } from '../lib/episode'
-import { formatBytes, formatDate, plural, relativeTime, seCode } from '../lib/format'
-import { img } from '../lib/images'
-import { canRequestSeason, missingStatus, seasonTabCount, toneDot, toneText } from '../lib/requests'
+import { BackLink, DetailsPanel, FactsLine, PeopleRow, TitleBand, WatchedHere } from '../components/TitleParts'
+import { usePlans } from '../components/usePlans'
+import { EpisodeFileDetails, TrackChoices, type TrackChoice } from '../components/TitleFiles'
+import { CheckIcon, PlayIcon } from '../components/icons'
+import { useEpisodesView } from '../components/useEpisodesView'
+import { useNow } from '../components/useNow'
+import { episodeActions, episodeFacts, episodeLine, episodeMinutes, isPartlyWatched, pageEpisodes, rowCode, showYears } from '../lib/episode'
+import { endsAt, leftAndEnds } from '../lib/endTime'
+import { formatDate, plural, seCode } from '../lib/format'
+import { canRequestSeason, missingStatus, toneDot, toneText } from '../lib/requests'
+import { scoreWords } from '../lib/cardFacts'
 import {
   afterEpisodeDelete,
   afterSeasonDelete,
@@ -40,12 +44,12 @@ import {
   seasonName,
   seasonRequested,
   seasonTabs,
-  seasonWatchLine,
   showMark,
   type Arrival,
   type OnTopReason,
 } from '../lib/showPage'
 import { useShowMissing } from '../lib/showMissing'
+import { episodeRowFacts, episodeRowState, playChoices, seasonLine, seasonTabWords, showState } from '../lib/titlePage'
 import { watchlistTitle } from '../lib/watchlists'
 import { WatchlistButton } from '../components/watchlists/WatchlistButton'
 
@@ -53,36 +57,18 @@ type Episode = components['schemas']['Episode']
 type SeasonDetail = components['schemas']['SeasonDetail']
 type ShowDetail = components['schemas']['ShowDetail']
 
-const btn = 'inline-flex min-h-[44px] items-center justify-center gap-2 rounded-md px-[18px] text-sm'
-const primaryBtn = `${btn} btn-primary font-semibold`
-const secondaryBtn = `${btn} border border-line-2 bg-surface font-medium hover:bg-surface-2 disabled:opacity-50 disabled:hover:bg-surface`
-// From the start and Mark watched share a row at phone width, so they keep to one line there.
-const pairBtn = 'inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-line-2 bg-surface px-3 text-sm font-medium hover:bg-surface-2 disabled:opacity-50 sm:flex-none sm:px-[18px]'
-const smallBtn = 'inline-flex min-h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-line-2 bg-surface px-3 text-[13px] font-medium hover:bg-surface-2 disabled:opacity-50'
-
-function Check({ size }: { size: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="m5 12 5 5 9-10" />
-    </svg>
-  )
-}
-
-function Chevron({ left = false }: { left?: boolean }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d={left ? 'm15 18-6-6 6-6' : 'm9 18 6-6-6-6'} />
-    </svg>
-  )
-}
-
 const watchedPct = (e: Episode) => (e.watch && isPartlyWatched(e) ? Math.round((e.watch.positionMs / Math.max(e.watch.durationMs || e.files[0]?.durationMs || 0, 1)) * 100) : 0)
 
+/** The file an episode plays: the version its saved place belongs to, else its best. */
+const playFile = (e: Episode) => (e.watch?.fileId ? e.files.find((f) => f.id === e.watch?.fileId) : undefined) ?? e.files[0]
+
 /**
- * The one show page: the show's, a season's and
- * an episode's addresses all draw it, and only the episode on top differs. Under the episode,
- * the season tabs and the season's episodes in a row; then About the show. Picking a tab or a card
- * replaces the address with the episode's, so Back leaves the show in one step.
+ * The one show page: the show's, a season's and an episode's addresses all
+ * draw it, and only the episode on top differs. The show's name, state and
+ * Following lead; the episode to watch next is under it; then the season
+ * tabs and the season's episodes, as a list or a strip; then About the show.
+ * Picking a tab or an episode replaces the address with the episode's, so
+ * Back leaves the show in one step.
  */
 export function ShowPage({ showId, season, episodeId }: { showId: number; season?: number; episodeId?: number }) {
   const show = useQuery(showQuery(showId))
@@ -96,68 +82,93 @@ function Loaded({ show: s, number, arrival }: { show: ShowDetail; number?: numbe
   const season = useQuery({ ...seasonQuery(s.id, number ?? 0), enabled: number !== undefined })
   const [showMissing, setShowMissing] = useShowMissing(s.id)
   const deleted = useRouterState({ select: (st) => st.location.state.deleted })
-  const backdrop = img(s.backdropPath, 'w1280')
 
-  let body: React.ReactNode
-  if (number === undefined) body = <p className="text-neutral-400">{s.title} has no seasons yet.</p>
-  else if (season.isPending) body = <p className="text-neutral-400">Loading…</p>
-  else if (season.isError) body = <p className="text-red-400">{season.error.message}</p>
+  let top: React.ReactNode
+  let below: React.ReactNode = null
+  if (number === undefined) top = <p className="mt-6 text-neutral-300">{s.title} has no seasons yet.</p>
+  else if (season.isPending) top = <p className="mt-6 text-neutral-400">Loading…</p>
+  else if (season.isError) top = <p className="mt-6 text-red-400">{season.error.message}</p>
   else {
     const se = season.data
-    const top = episodeOnTop(arrival, se.episodes, s)
-    const e = top.episode
+    const on = episodeOnTop(arrival, se.episodes, s)
+    const e = on.episode
     const listed = e ? pageEpisodes(se.episodes, e.id, showMissing) : se.episodes
-    body = (
+    top = (
       <>
-        {top.gone && (
-          <p role="status" className="mb-4 text-neutral-300">
+        {on.gone && (
+          <p role="status" className="mt-6 text-neutral-300">
             That episode isn&rsquo;t in {seasonName(se.number)} of {s.title} any more.
           </p>
         )}
         {e ? (
-          // Keyed by episode, so moving to another starts without the last one's menu, dialog or error.
-          <EpisodeTop key={e.id} show={s} se={se} e={e} why={arrival.kind === 'show' ? top.why : undefined} listed={listed} />
+          // Keyed by episode, so moving to another starts without the last one's menu, dialog, choices or error.
+          <EpisodeTop key={e.id} show={s} se={se} e={e} why={arrival.kind === 'show' ? on.why : undefined} listed={listed} />
         ) : (
-          <p className="text-neutral-400">{seasonName(se.number)} has no episodes yet.</p>
+          <p className="mt-6 text-neutral-300">{seasonName(se.number)} has no episodes yet.</p>
         )}
-        <SeasonSection
-          show={s}
-          se={se}
-          listed={listed}
-          current={e?.id}
-          showMissing={showMissing}
-          onShowMissing={setShowMissing}
-          deleted={deleted && deleted.season === se.number ? deletedLine(deleted.title, deleted.which) : undefined}
-        />
       </>
+    )
+    below = (
+      <SeasonSection
+        show={s}
+        se={se}
+        listed={listed}
+        current={e?.id}
+        showMissing={showMissing}
+        onShowMissing={setShowMissing}
+        deleted={deleted && deleted.season === se.number ? deletedLine(deleted.title, deleted.which) : undefined}
+      />
     )
   }
 
   return (
     <div>
-      <div className="relative -mx-4 h-56 overflow-hidden md:-mx-12 md:h-72">
-        {backdrop && <div className="absolute inset-0 bg-cover bg-center opacity-50" style={{ backgroundImage: `url(${backdrop})` }} />}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-black/40 to-ground" />
-        <nav aria-label="Breadcrumb" className="relative px-4 pt-4 text-sm text-neutral-300 md:px-12">
-          <Link to="/tv" className="hover:text-neutral-100">
-            TV Shows
-          </Link>
-          <span aria-hidden="true" className="mx-1.5 text-neutral-500">
-            ›
-          </span>
-          <span aria-current="page">{s.title}</span>
-        </nav>
-      </div>
-      <div className="relative -mt-24">{body}</div>
+      <TitleBand backdropPath={s.backdropPath}>
+        <BackLink link={{ to: '/tv' }} label="TV Shows" />
+        <ShowHeader show={s} />
+        {top}
+      </TitleBand>
+      {below}
       <AboutShow show={s} number={season.data?.number} showMissing={showMissing} />
-      <RelatedRows kind="show" id={s.id} />
+      <div className="mt-10">
+        <RelatedRows kind="show" id={s.id} />
+      </div>
     </div>
   )
 }
 
-/** The episode on top: its still, facts, file and actions; for a missing one, why it is missing and what can be done. */
+/** The show's name, facts and state, with Following (Notify me) beside them. */
+function ShowHeader({ show: s }: { show: ShowDetail }) {
+  // Notify me, on servers from API level 29.
+  const notify = useNotifyMe(s)
+  const state = showState(s)
+  // Seasons with something on disk, Specials not counted.
+  const onDisk = s.seasons.filter((x) => x.number > 0 && x.availableCount > 0).length
+  return (
+    <>
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-3">
+        <h1 className="text-[clamp(26px,2.8vw,38px)] font-bold leading-[1.1] tracking-[-.02em]">{s.title}</h1>
+        <FactsLine className="text-[14.5px] text-neutral-100" facts={[showYears(s), onDisk ? plural(onDisk, 'season') : '', s.genres.slice(0, 2).join(', '), scoreWords(s.rating)]} rating={s.contentRating} />
+        {state && <span className={`pill min-h-[26px] ${state.gold ? 'pill-gold' : ''}`}>{state.label}</span>}
+        {notify.able && (
+          <span className="md:ml-auto">
+            <NotifyMeButton show={s.title} following={notify.following} onPress={notify.press} look="clear" />
+          </span>
+        )}
+      </div>
+      {notify.failure && (
+        <div className="mt-2">
+          <NotifyMeFailure failure={notify.failure} show={s.title} />
+        </div>
+      )}
+      {notify.asking && <FollowExplainer show={s.title} onAnswer={notify.answer} />}
+    </>
+  )
+}
+
+/** The episode on top: its still, facts and synopsis, how much is left, the choices before playing and File details; for a missing one, why it is missing and what can be done. */
 function EpisodeTop({ show: s, se, e, why, listed }: { show: ShowDetail; se: SeasonDetail; e: Episode; why?: OnTopReason; listed: Episode[] }) {
-  const best = e.files[0]
+  const best = playFile(e)
   const file = useQuery({ ...fileQuery(best?.id ?? 0), enabled: !!best })
   const options = useQuery(requestOptionsQuery)
   const mark = useMarkWatched()
@@ -168,7 +179,10 @@ function EpisodeTop({ show: s, se, e, why, listed }: { show: ShowDetail; se: Sea
   const auth = useAuth()
   const admin = (auth.user?.isAdmin ?? false) && auth.adminAllowed
   const navigate = useNavigate()
+  const now = useNow()
+  const plans = usePlans(best ? [best.id] : [])
   const [acting, setActing] = useState<'report' | 'replace' | 'segments' | 'delete' | 'request' | null>(null)
+  const [choice, setChoice] = useState<TrackChoice>({ audio: '', subtitle: '' })
   const code = seCode(se.number, e.number)
   const title = e.title || `Episode ${e.number}`
   const line = episodeLine(s.title, se.number, e.number)
@@ -177,9 +191,12 @@ function EpisodeTop({ show: s, se, e, why, listed }: { show: ShowDetail; se: Sea
   const { primary, fromStart, mark: toggle } = episodeActions(e)
   const minutes = episodeMinutes(e)
   const pct = watchedPct(e)
-  const tracks = trackSummary(file.data?.probe)
   const status = !e.hasFile ? missingStatus(e) : null
   const today = new Date().toISOString().slice(0, 10)
+  const choices = playChoices({ audio: choice.audio === '' ? undefined : Number(choice.audio), subtitle: choice.subtitle || undefined })
+  const durationMs = e.watch?.durationMs || best?.durationMs || (minutes ? minutes * 60_000 : 0)
+  const left = isPartlyWatched(e) && e.watch ? leftAndEnds(e.watch.positionMs, durationMs, now) : undefined
+  const facts = episodeFacts(e).filter((f) => !f.endsWith(' left'))
   const gap = missingActions(e, {
     admin: !!options.data?.manage,
     canRequest: !!options.data?.shows,
@@ -187,161 +204,128 @@ function EpisodeTop({ show: s, se, e, why, listed }: { show: ShowDetail; se: Sea
     managed: !!s.managedBy,
     seasonUnmonitored: se.monitored === false,
   })
+  // "Up next" for the next or the one to resume; the chip's other reasons as they are.
+  const reason = why === 'next' || why === 'resume' ? 'Up next' : why ? onTopChip[why] : ''
+  const eyebrow = [reason, seasonName(se.number), `Episode ${e.number}`].filter(Boolean).join(' · ')
 
   const items: MoreItem[] = []
   if (e.hasFile) {
-    items.push({ label: 'Report a problem', icon: 'flag', onSelect: () => setActing('report') })
-    if (manage && s.managedBy && best) items.push({ label: 'Replace file', icon: 'replace', onSelect: () => setActing('replace') })
+    items.push({ label: 'Report a problem…', icon: 'flag', onSelect: () => setActing('report') })
+    if (manage && s.managedBy && best) items.push({ label: 'Replace file…', icon: 'replace', onSelect: () => setActing('replace') })
     if (admin && best) items.push({ label: 'Skip segments…', icon: 'skip', onSelect: () => setActing('segments') })
     if (canDelete) items.push({ label: 'Delete episode…', icon: 'delete', danger: true, divider: true, onSelect: () => setActing('delete') })
   }
+  const playLabel = primary.kind === 'play' ? (fromStart ? 'Resume' : 'Play') : ''
+
+  const still = (
+    <>
+      {status ? (
+        <span className="grid size-full place-items-center text-[15px] font-semibold text-neutral-400">{status.thumb}</span>
+      ) : (
+        <Poster path={e.stillPath ?? s.backdropPath} size="w780" alt="" ratio="aspect-video" className="rounded-none" />
+      )}
+      {e.isNew && !e.watch?.completed && <span className="absolute left-2.5 top-2.5 rounded-[5px] bg-accent px-[7px] py-0.5 text-[11px] font-bold text-ground">New</span>}
+      {e.watch?.completed && (
+        <span role="img" aria-label="Watched" className="absolute right-2.5 top-2.5 grid size-[22px] place-items-center rounded-full bg-ground/80 text-accent ring-1 ring-inset ring-accent/70">
+          <CheckIcon size={13} />
+        </span>
+      )}
+      {minutes > 0 && e.hasFile && <span className="absolute bottom-3.5 right-2.5 rounded-[5px] bg-ground/80 px-[7px] py-0.5 text-[11px] font-bold ring-1 ring-inset ring-white/15">{minutes} min</span>}
+      {(pct > 0 || status?.progress !== undefined) && (
+        <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[5px] bg-black/60">
+          <span className="block h-full bg-accent" style={{ width: `${status?.progress !== undefined ? Math.round(status.progress * 100) : pct}%` }} />
+        </span>
+      )}
+    </>
+  )
+  const stillBox = `relative block aspect-video w-full max-w-[520px] flex-[1_1_380px] self-start overflow-hidden rounded-xl bg-surface shadow-[0_22px_44px_rgba(0,0,0,.5)] ${status ? 'border border-dashed border-line-3' : 'ring-1 ring-white/10'}`
 
   return (
-    <section aria-label={`${seasonName(se.number)}, episode ${e.number}: ${title}`} className="relative grid gap-8 xl:grid-cols-[minmax(0,36rem)_minmax(0,1fr)]">
-      <div
-        className={`relative aspect-video w-full max-w-[36rem] self-start overflow-hidden rounded-lg bg-surface shadow-[0_20px_40px_rgba(0,0,0,.6)] ${status ? 'border border-dashed border-line-2' : 'ring-1 ring-line-2'}`}
-      >
-        {status ? (
-          <div className="grid h-full w-full place-items-center text-[15px] font-semibold text-neutral-400">{status.thumb}</div>
-        ) : (
-          <Poster path={e.stillPath ?? s.backdropPath} size="w780" alt={`${code} ${title}`} ratio="aspect-video" />
-        )}
-        {e.isNew && !e.watch?.completed && (
-          <Badge tone="accent" className="absolute left-2.5 top-2.5">
-            New
-          </Badge>
-        )}
-        {e.watch?.completed && (
-          <span className="absolute left-2.5 top-2.5 grid h-6 w-6 place-items-center rounded-full bg-accent text-black" title="Watched">
-            <Check size={13} />
-          </span>
-        )}
-        {minutes > 0 && e.hasFile && <span className="absolute bottom-3.5 right-2.5 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-bold tracking-wide">{minutes} min</span>}
-        {(pct > 0 || status?.progress !== undefined) && (
-          <div className="absolute inset-x-0 bottom-0 h-[5px] bg-black/60">
-            <div className="h-full bg-accent" style={{ width: `${status?.progress !== undefined ? Math.round(status.progress * 100) : pct}%` }} />
-          </div>
-        )}
-      </div>
+    <section aria-labelledby="up-next" className="mt-6 flex flex-wrap items-start gap-x-9 gap-y-5 md:mt-[26px]">
+      {primary.kind === 'play' ? (
+        <Link to="/play/$fileId" params={{ fileId: String(primary.fileId) }} search={{ start: primary.start, title: playTitle, back: here, ...choices }} tabIndex={-1} aria-hidden="true" className={`${stillBox} hover:ring-2 hover:ring-accent`}>
+          {still}
+        </Link>
+      ) : (
+        <div className={stillBox}>{still}</div>
+      )}
 
-      <div className="flex min-w-0 flex-col gap-2.5 xl:pt-20">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <p className="text-xs font-bold uppercase tracking-[.1em] text-accent">{line}</p>
-          {why && <span className="inline-flex min-h-6 items-center rounded-full border border-accent px-2.5 text-xs font-semibold text-accent">{onTopChip[why]}</span>}
-        </div>
-        <h1 className={`text-3xl font-bold leading-tight sm:text-4xl ${status ? 'text-neutral-300' : ''}`}>{title}</h1>
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-neutral-300">
-          {episodeFacts(e).map((f, i) => (
-            <span key={f} className="contents">
-              {i > 0 && (
-                <span aria-hidden="true" className="text-neutral-500">
-                  ·
-                </span>
-              )}
-              <span>{f}</span>
-            </span>
-          ))}
-          {e.watch?.completed && (
-            <>
-              <span aria-hidden="true" className="text-neutral-500">
-                ·
-              </span>
-              <span className="inline-flex items-center gap-1.5 font-semibold text-neutral-100">
-                <span aria-hidden="true" className="grid h-[18px] w-[18px] place-items-center rounded-full bg-accent text-black">
-                  <Check size={10} />
-                </span>
-                Watched
-              </span>
-            </>
-          )}
-        </p>
+      <div className="flex min-w-0 max-w-[760px] flex-[1_1_400px] flex-col gap-2.5">
+        <p className="eyebrow">{eyebrow}</p>
+        <h2 id="up-next" className={`text-[clamp(24px,2.6vw,34px)] font-bold leading-[1.1] tracking-[-.02em] ${status ? 'text-neutral-300' : ''}`}>
+          {title}
+        </h2>
+        {facts.length > 0 && <FactsLine facts={facts} />}
         <RecordingProvenance recording={best?.recording} />
-        {e.overview && <p className="mt-1.5 max-w-3xl text-[15px] leading-relaxed text-neutral-200">{e.overview}</p>}
-        {best && (
-          <>
-            <p className="flex flex-wrap items-center gap-1.5 text-xs text-neutral-400">
-              <FileTags file={best} />
-              {tracks.channels && <span className="rounded border border-line-2 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-neutral-300">{tracks.channels}</span>}
-              <span>{[tracks.subtitles, formatBytes(best.size)].filter(Boolean).join(' · ')}</span>
-            </p>
-            <details className="text-xs text-neutral-400">
-              <summary className="min-h-6 cursor-pointer">File</summary>
-              <p className="mt-1.5 break-all">{best.relativePath}</p>
-            </details>
-          </>
-        )}
+        {e.overview && <p className="max-w-[66ch] text-[15px] leading-[1.55] text-neutral-200">{e.overview}</p>}
         {why === 'again' && <p className="text-sm text-neutral-300">You&rsquo;ve watched every episode. Start again here, or pick any episode below.</p>}
         {status && (
-          <>
-            <p className={`mt-1 inline-flex items-center gap-2 text-[15px] font-semibold ${toneText[status.tone]}`}>
-              <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${toneDot[status.tone]}`} />
-              {status.label}
-            </p>
-          </>
+          <p className={`mt-1 inline-flex items-center gap-2 text-[15px] font-semibold ${toneText[status.tone]}`}>
+            <span aria-hidden="true" className={`size-2 shrink-0 rounded-full ${toneDot[status.tone]}`} />
+            {status.label}
+          </p>
         )}
 
-        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
           {primary.kind === 'play' && (
-            <Link to="/play/$fileId" params={{ fileId: String(primary.fileId) }} search={{ start: primary.start, title: playTitle, back: here }} className={`${primaryBtn} w-full sm:w-auto`}>
-              <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M8 5v14l11-7z" fill="currentColor" />
-              </svg>
-              {primary.label}
+            <Link to="/play/$fileId" params={{ fileId: String(primary.fileId) }} search={{ start: primary.start, title: playTitle, back: here, ...choices }} aria-label={`${playLabel} ${title}`} className="btn btn-primary btn-lg max-md:flex-1">
+              <PlayIcon />
+              {playLabel}
             </Link>
           )}
           {fromStart && (
-            <Link to="/play/$fileId" params={{ fileId: String(fromStart.fileId) }} search={{ start: fromStart.start, title: playTitle, back: here }} className={pairBtn}>
+            <Link to="/play/$fileId" params={{ fileId: String(fromStart.fileId) }} search={{ start: fromStart.start, title: playTitle, back: here, ...choices }} className="btn btn-clear btn-lg max-md:flex-1">
               {fromStart.label}
             </Link>
           )}
           {toggle && (
-            <button type="button" disabled={mark.isPending} onClick={() => mark.mutate({ type: 'episode', id: e.id, watched: toggle.watched })} className={pairBtn}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                {toggle.watched ? (
-                  <>
-                    <circle cx="12" cy="12" r="9" />
-                    <path d="m8 12 3 3 5-6" />
-                  </>
-                ) : (
-                  <>
-                    <path d="M9 14 4 9l5-5" />
-                    <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
-                  </>
-                )}
-              </svg>
-              {toggle.label}
+            <button
+              type="button"
+              aria-pressed={!toggle.watched}
+              disabled={mark.isPending}
+              onClick={() => mark.mutate({ type: 'episode', id: e.id, watched: toggle.watched })}
+              className={`btn btn-clear btn-lg ${toggle.watched ? '' : 'text-accent'}`}
+            >
+              <CheckIcon />
+              {toggle.watched ? 'Mark watched' : 'Watched'}
             </button>
           )}
-          <MoreMenu tall label="More for this episode" items={items} />
+          <MoreMenu look="hero" label={`More for this episode: ${title}`} items={items} />
           {gap.request && (
-            <button type="button" onClick={() => setActing('request')} className={primaryBtn}>
-              ＋ Request {seasonName(se.number).toLowerCase()}
+            <button type="button" onClick={() => setActing('request')} className="btn btn-primary btn-lg">
+              Request {seasonName(se.number).toLowerCase()}
             </button>
           )}
-          {gap.requested && (
-            <span className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line-2 px-3 text-[13px] text-neutral-300">
-              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-neutral-400" />
-              Requested
-            </span>
-          )}
+          {gap.requested && <span className="pill">Requested</span>}
           {gap.search && (
-            <button type="button" disabled={search.isPending} onClick={() => search.mutate({ season: se.number })} className={secondaryBtn}>
-              {search.isSuccess ? 'Sonarr is searching' : '⌕ Search now'}
+            <button type="button" disabled={search.isPending} onClick={() => search.mutate({ season: se.number })} className="btn btn-clear btn-lg">
+              {search.isSuccess ? 'Sonarr is searching' : 'Search now'}
             </button>
           )}
           {gap.monitor && (
-            <button type="button" disabled={monitor.isPending || monitor.isSuccess} onClick={() => monitor.mutate({ season: se.number, monitored: true })} className={secondaryBtn}>
+            <button type="button" disabled={monitor.isPending || monitor.isSuccess} onClick={() => monitor.mutate({ season: se.number, monitored: true })} className="btn btn-clear btn-lg">
               Monitor {seasonName(se.number).toLowerCase()}
             </button>
           )}
           {gap.inbox && (
-            <Link to="/settings/inbox" className={secondaryBtn}>
+            <Link to="/settings/inbox" className="btn btn-clear btn-lg">
               Open in Inbox
             </Link>
           )}
-          {gap.coming && <span className="text-sm text-neutral-400">Nothing to do yet. It appears here when it arrives.</span>}
+          {gap.coming && <span className="text-sm text-neutral-300">Nothing to do yet. It appears here when it arrives.</span>}
         </div>
         {(mark.error ?? search.error ?? monitor.error) && <p className="text-sm text-warn">{(mark.error ?? search.error ?? monitor.error)?.message}</p>}
+        {left ? <p className="text-[13.5px]">{left}</p> : primary.kind === 'play' && durationMs > 0 && <p className="text-[13.5px] text-neutral-300">Start now and it ends at {endsAt(durationMs, now)}.</p>}
+        {best && (
+          <div className="flex flex-wrap items-center gap-2">
+            <TrackChoices probe={file.data?.probe} choice={choice} onChange={setChoice} />
+          </div>
+        )}
+        {best && (
+          <div className="mt-1.5">
+            <EpisodeFileDetails file={best} plan={plans.get(best.id)} admin={auth.user?.isAdmin ?? false} probe={file.data?.probe} />
+          </div>
+        )}
       </div>
 
       {acting === 'report' && <ReportProblemDialog itemType="episode" itemId={e.id} fileId={best?.id} title={playTitle} onClose={() => setActing(null)} />}
@@ -355,7 +339,7 @@ function EpisodeTop({ show: s, se, e, why, listed }: { show: ShowDetail; se: Sea
           episode={{ title, line, files: e.files }}
           onClose={() => setActing(null)}
           onDeleted={() => {
-            // Stay on the show: the next episode in the row moves on top, else the one before.
+            // Stay on the show: the next episode in the season moves on top, else the one before.
             const to = afterEpisodeDelete(listed, e.id)
             const deleted = { title, season: se.number, which: to?.which }
             const params = { showId: String(s.id), number: String(se.number) }
@@ -397,7 +381,7 @@ function usePickSeason(show: ShowDetail) {
   return { pick, preload, pending }
 }
 
-/** The season tabs (a plain heading for a show with one season), the season's actions and its episodes in a row. */
+/** The season tabs (a plain heading for a show with one season), the season's line and actions, and its episodes as a list or a strip. */
 function SeasonSection({
   show: s,
   se,
@@ -420,54 +404,48 @@ function SeasonSection({
   const search = useSearchMissing(s.id)
   const monitor = useMonitorEpisodes(s.id)
   const [requesting, setRequesting] = useState(false)
+  const [view, setView] = useEpisodesView()
   const { pick, preload, pending } = usePickSeason(s)
-  const list = useRef<HTMLUListElement>(null)
   const tabs = seasonTabs(s.seasons, showMissing, se.number)
   const here = s.seasons.find((x) => x.number === se.number) ?? se
   const mark = seasonMark(here)
   const today = new Date().toISOString().slice(0, 10)
   const missingAired = se.episodes.filter((e) => !e.hasFile && e.aired).length
   const episodes = [...listed].sort((a, b) => a.number - b.number)
-  const showId = String(s.id)
-  const number = String(se.number)
   const name = (x: { number: number; name: string }) => (x.number === 0 ? 'Specials' : x.name || seasonName(x.number))
-
-  // Bring the episode on top into the row's view without scrolling the page.
-  useEffect(() => {
-    const ul = list.current
-    const li = ul?.querySelector<HTMLElement>('[aria-current="page"]')?.parentElement
-    if (!ul || !li) return
-    ul.scrollLeft = li.offsetLeft - ul.offsetLeft - (ul.clientWidth - li.clientWidth) / 2
-  }, [current, se.number])
-  const scrollRow = (dir: number) => list.current?.scrollBy({ left: dir * list.current.clientWidth * 0.8, behavior: 'smooth' })
+  const tabKeys = (e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
+    const all = [...e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')]
+    const i = all.indexOf(document.activeElement as HTMLButtonElement)
+    all[(i + (e.key === 'ArrowRight' ? 1 : all.length - 1)) % all.length]?.focus()
+    e.preventDefault()
+  }
 
   return (
-    <section aria-labelledby="season-head" className="mt-10">
+    <section aria-labelledby="season-head" className="mt-2">
       {tabs.length > 1 ? (
         <>
           <h2 id="season-head" className="sr-only">
-            Seasons
+            Seasons and episodes
           </h2>
-          <div role="tablist" aria-label="Seasons" className="scrollbar-hide -mx-4 flex gap-1 overflow-x-auto border-b border-line px-4 sm:mx-0 sm:px-0">
+          <div role="tablist" aria-label="Seasons" onKeyDown={tabKeys} className="tabs -mx-[clamp(16px,3.4vw,48px)] px-[clamp(16px,3.4vw,48px)] md:mx-0 md:px-0">
             {tabs.map((t) => {
               const on = t.number === se.number
-              const count = showMissing ? seasonTabCount(t) || 'not in library' : String(t.availableCount)
               return (
                 <button
                   key={t.id}
                   type="button"
                   role="tab"
                   aria-selected={on}
+                  tabIndex={on ? 0 : -1}
                   aria-busy={pending === t.number || undefined}
                   onPointerEnter={() => !on && preload(t.number)}
                   onFocus={() => !on && preload(t.number)}
                   onClick={() => !on && void pick(t.number)}
-                  className={`inline-flex min-h-[44px] items-center whitespace-nowrap border-b-2 px-3 text-sm ${
-                    on ? 'border-accent font-semibold text-neutral-100' : 'border-transparent text-neutral-400 hover:text-neutral-100'
-                  } ${t.availableCount === 0 && !on ? 'opacity-60' : ''}`}
+                  className={`tab ${t.availableCount === 0 && !on ? 'opacity-60' : ''}`}
                 >
                   {name(t)}
-                  <span className="ml-1.5 text-xs font-normal text-neutral-500">{count}</span>
+                  <span className="n">{seasonTabWords(t, showMissing)}</span>
                 </button>
               )
             })}
@@ -479,130 +457,212 @@ function SeasonSection({
         </h2>
       )}
 
-      <div className="my-3 flex flex-wrap items-center gap-x-4 gap-y-2.5 sm:mt-4">
-        <p className="text-sm font-medium text-neutral-300">{seasonWatchLine(here)}</p>
+      <div className="mb-2 mt-3.5 flex flex-wrap items-center gap-x-[18px] gap-y-2.5">
+        <p className="text-[13.5px] text-neutral-300">{seasonLine(se.episodes)}</p>
         {mark && (
-          <button type="button" disabled={markSeason.isPending} onClick={() => markSeason.mutate({ showId: s.id, number: se.number, watched: mark.watched })} className={smallBtn}>
+          <button type="button" disabled={markSeason.isPending} onClick={() => markSeason.mutate({ showId: s.id, number: se.number, watched: mark.watched })} className="btn btn-sm">
             {mark.label}
           </button>
         )}
         {options.data?.shows && se.number > 0 && canRequestSeason(se, today) && (
-          <button type="button" onClick={() => setRequesting(true)} className={smallBtn}>
-            ＋ Request {seasonName(se.number).toLowerCase()}
+          <button type="button" onClick={() => setRequesting(true)} className="btn btn-sm">
+            Request {seasonName(se.number).toLowerCase()}
           </button>
         )}
-        {seasonRequested(se) && (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-line-2 px-2.5 py-0.5 text-xs text-neutral-300">
-            <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-neutral-400" />
-            Requested
-          </span>
-        )}
+        {seasonRequested(se) && <span className="pill">Requested</span>}
         {options.data?.manage && s.managedBy && missingAired > 0 && (
-          <button type="button" disabled={search.isPending} onClick={() => search.mutate({ season: se.number })} className={smallBtn}>
-            {search.isSuccess ? 'Sonarr is searching' : '⌕ Search now'}
+          <button type="button" disabled={search.isPending} onClick={() => search.mutate({ season: se.number })} className="btn btn-sm">
+            {search.isSuccess ? 'Sonarr is searching' : 'Search now'}
           </button>
         )}
         {options.data?.manage && se.monitored === false && (
-          <button type="button" disabled={monitor.isPending || monitor.isSuccess} onClick={() => monitor.mutate({ season: se.number, monitored: true })} className={smallBtn}>
+          <button type="button" disabled={monitor.isPending || monitor.isSuccess} onClick={() => monitor.mutate({ season: se.number, monitored: true })} className="btn btn-sm">
             Monitor
           </button>
         )}
         {(markSeason.error ?? search.error ?? monitor.error) && <span className="text-sm text-warn">{(markSeason.error ?? search.error ?? monitor.error)?.message}</span>}
-        <div className="ml-auto flex items-center gap-2">
-          <button type="button" role="switch" aria-checked={showMissing} onClick={() => onShowMissing(!showMissing)} className="inline-flex min-h-[44px] items-center gap-2.5 px-1 text-sm font-medium">
-            <span aria-hidden="true" className={`relative block h-5 w-9 rounded-full ${showMissing ? 'bg-accent' : 'bg-neutral-700'}`}>
-              <span className={`absolute top-0.5 h-4 w-4 rounded-full ${showMissing ? 'left-[18px] bg-ground' : 'left-0.5 bg-neutral-300'}`} />
+        <span className="flex flex-wrap items-center gap-x-[18px] gap-y-2 md:ml-auto">
+          <button type="button" role="switch" aria-checked={showMissing} onClick={() => onShowMissing(!showMissing)} className="inline-flex min-h-9 items-center gap-2 text-[13px] text-neutral-300">
+            <span aria-hidden="true" className={`relative block h-5 w-[34px] rounded-full ${showMissing ? 'bg-accent' : 'bg-line-3'}`}>
+              <span className={`absolute top-[3px] size-3.5 rounded-full ${showMissing ? 'left-[17px] bg-ground' : 'left-[3px] bg-neutral-300'}`} />
             </span>
             Show missing
           </button>
-          <button type="button" aria-label="Scroll episodes left" onClick={() => scrollRow(-1)} className="hidden h-9 w-9 place-items-center rounded-md border border-line-2 bg-surface text-neutral-300 hover:bg-surface-2 sm:grid">
-            <Chevron left />
-          </button>
-          <button type="button" aria-label="Scroll episodes right" onClick={() => scrollRow(1)} className="hidden h-9 w-9 place-items-center rounded-md border border-line-2 bg-surface text-neutral-300 hover:bg-surface-2 sm:grid">
-            <Chevron />
-          </button>
-        </div>
+          <span className="seg" role="group" aria-label="Episodes as">
+            <button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')}>
+              List
+            </button>
+            <button type="button" aria-pressed={view === 'strip'} onClick={() => setView('strip')}>
+              Strip
+            </button>
+          </span>
+        </span>
       </div>
       {deleted && (
         <p role="status" className="mb-3 flex items-center gap-2.5 rounded-[10px] border border-emerald-900 bg-emerald-950/60 px-4 py-3.5 text-[15px] font-medium text-emerald-300">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
-            <path d="m5 12 5 5 9-10" />
-          </svg>
+          <CheckIcon />
           {deleted}
         </p>
       )}
       {se.overview && <p className="mb-3.5 max-w-3xl text-sm leading-relaxed text-neutral-400">{se.overview}</p>}
 
-      <ul ref={list} className="relative -mx-4 flex gap-3 overflow-x-auto px-4 pb-2 pt-0.5 sm:mx-0 sm:px-0.5">
-        {episodes.map((x) => {
-          const sel = x.id === current
-          const pct = watchedPct(x)
-          const min = episodeMinutes(x)
-          const st = x.hasFile ? null : missingStatus(x)
-          const label = `${seasonName(se.number)}, episode ${x.number}: ${x.title || `Episode ${x.number}`}${x.watch?.completed ? ', watched' : ''}${st ? `, ${st.label}` : ''}`
-          return (
-            <li key={x.id} className="flex w-[10.5rem] shrink-0 sm:w-[13.5rem]">
-              <Link
-                to="/shows/$showId/seasons/$number/episodes/$episodeId"
-                params={{ showId, number, episodeId: String(x.id) }}
-                replace
-                aria-current={sel ? 'page' : undefined}
-                aria-label={label}
-                className={`flex min-w-0 flex-1 flex-col gap-2 rounded-lg border p-2 ${
-                  sel ? 'border-accent bg-surface-2 shadow-[inset_0_0_0_1px_var(--color-accent)]' : st ? 'border-dashed border-neutral-700 bg-ground hover:bg-surface' : 'border-line bg-surface hover:bg-surface-2'
-                }`}
-              >
-                {st ? (
-                  <span className="relative grid aspect-video place-items-center overflow-hidden rounded-md border border-dashed border-neutral-700 text-xs font-semibold text-neutral-400">
-                    {st.thumb}
-                    {st.progress !== undefined && (
-                      <span className="absolute inset-x-0 bottom-0 h-1 bg-line-2">
-                        <span className="block h-full bg-accent" style={{ width: `${Math.round(st.progress * 100)}%` }} />
-                      </span>
-                    )}
-                  </span>
-                ) : (
-                  <span className="relative block overflow-hidden rounded-md">
-                    <Poster path={x.stillPath ?? s.backdropPath} size="w300" alt="" ratio="aspect-video" />
-                    {x.watch?.completed && (
-                      <span className="absolute left-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full bg-accent text-black" title="Watched">
-                        <Check size={11} />
-                      </span>
-                    )}
-                    {x.isNew && !x.watch?.completed && (
-                      <Badge tone="accent" className="absolute left-1.5 top-1.5">
-                        New
-                      </Badge>
-                    )}
-                    {min > 0 && <span className="absolute bottom-2 right-1.5 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-bold tracking-wide">{min} min</span>}
-                    {pct > 0 && (
-                      <span className="absolute inset-x-0 bottom-0 h-1 bg-black/60">
-                        <span className="block h-full bg-accent" style={{ width: `${pct}%` }} />
-                      </span>
-                    )}
-                  </span>
-                )}
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="text-xs text-neutral-400">{rowCode(x)}</span>
-                  <span className={`truncate text-sm font-semibold leading-snug ${st ? 'text-neutral-400' : ''}`}>{x.title || `Episode ${x.number}`}</span>
-                  {st && st.thumb === 'Missing' && (
-                    <span className={`inline-flex min-w-0 items-center gap-1.5 text-xs font-semibold ${toneText[st.tone]}`}>
-                      <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${toneDot[st.tone]}`} />
-                      <span className="truncate">{st.label}</span>
-                    </span>
-                  )}
-                </span>
-              </Link>
-            </li>
-          )
-        })}
-      </ul>
+      {view === 'list' ? <EpisodeList show={s} se={se} episodes={episodes} current={current} /> : <EpisodeStrip show={s} se={se} episodes={episodes} current={current} />}
       {requesting && <RequestDialog mediaType="tv" tmdbId={s.tmdbId} preselect={[se.number]} onClose={() => setRequesting(false)} />}
     </section>
   )
 }
 
-/** About the show: its poster, facts and overview, the show's own actions, the cast, and Details, history and On disk. */
+/** Puts an episode on top by replacing the address, and brings the top into view. */
+function onTopLink(s: ShowDetail, se: SeasonDetail, x: Episode) {
+  return {
+    to: '/shows/$showId/seasons/$number/episodes/$episodeId' as const,
+    params: { showId: String(s.id), number: String(se.number), episodeId: String(x.id) },
+    replace: true,
+    onClick: () => window.scrollTo({ top: 0, behavior: 'smooth' }),
+  }
+}
+
+/** The season's episodes as a list: number, still, title, when it aired and how long, the synopsis, where you are, and Play. */
+function EpisodeList({ show: s, se, episodes, current }: { show: ShowDetail; se: SeasonDetail; episodes: Episode[]; current?: number }) {
+  return (
+    <ol className="flex flex-col gap-0.5">
+      {episodes.map((x) => {
+        const sel = x.id === current
+        const title = x.title || `Episode ${x.number}`
+        const st = x.hasFile ? null : missingStatus(x)
+        const state = episodeRowState(x)
+        const pct = watchedPct(x)
+        const file = playFile(x)
+        const play = file
+          ? { to: '/play/$fileId' as const, params: { fileId: String(file.id) }, search: { title: `${s.title} · ${seCode(se.number, x.number)} ${title}`, back: episodePath(s.id, se.number, x.id) } }
+          : undefined
+        const playName = `${state?.gold ? 'Resume' : 'Play'} episode ${x.number}, ${title}`
+        return (
+          <li
+            key={x.id}
+            className={`flex items-center gap-4 rounded-xl border p-3 max-md:grid max-md:grid-cols-[112px_minmax(0,1fr)_auto] max-md:gap-3 max-md:py-2.5 ${
+              sel ? 'border-accent bg-surface max-md:-mx-2 max-md:px-2' : 'border-transparent hover:bg-surface max-md:px-0'
+            }`}
+          >
+            <span aria-hidden="true" className="w-7 shrink-0 text-center text-[15px] font-semibold text-neutral-400 max-md:hidden">
+              {x.number}
+            </span>
+            {st || !play ? (
+              <span className="relative grid aspect-video w-[168px] shrink-0 place-items-center overflow-hidden rounded-lg border border-dashed border-line-3 text-xs font-semibold text-neutral-400 max-md:w-full">
+                {st?.thumb ?? 'Not in library'}
+                {st?.progress !== undefined && (
+                  <span className="absolute inset-x-0 bottom-0 h-1 bg-line-2">
+                    <span className="block h-full bg-accent" style={{ width: `${Math.round(st.progress * 100)}%` }} />
+                  </span>
+                )}
+              </span>
+            ) : (
+              <Link {...play} tabIndex={-1} aria-hidden="true" className="relative block w-[168px] shrink-0 overflow-hidden rounded-lg ring-1 ring-inset ring-white/[.07] hover:ring-2 hover:ring-accent max-md:w-full">
+                <Poster path={x.stillPath ?? s.backdropPath} size="w300" alt="" ratio="aspect-video" className="rounded-none" />
+                {x.watch?.completed && (
+                  <span className="absolute right-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-ground/80 text-accent ring-1 ring-inset ring-accent/70">
+                    <CheckIcon size={11} />
+                  </span>
+                )}
+                {pct > 0 && (
+                  <span className="absolute inset-x-0 bottom-0 h-1 bg-black/60">
+                    <span className="block h-full bg-accent" style={{ width: `${pct}%` }} />
+                  </span>
+                )}
+              </Link>
+            )}
+            <div className="min-w-0 flex-[1_1_220px]">
+              <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                <span className="text-[13px] text-neutral-400 md:hidden">E{x.number}</span>
+                <Link {...onTopLink(s, se, x)} aria-current={sel ? 'page' : undefined} className={`text-[15px] font-semibold hover:text-accent ${st ? 'text-neutral-400' : ''}`}>
+                  {title}
+                </Link>
+                {x.isNew && !x.watch?.completed && x.hasFile && <span className="pill pill-gold">New</span>}
+              </p>
+              <p className="mt-0.5 text-[13px] text-neutral-400">{episodeRowFacts(x)}</p>
+              {st && st.thumb === 'Missing' && (
+                <p className={`mt-0.5 inline-flex items-center gap-1.5 text-xs font-semibold ${toneText[st.tone]}`}>
+                  <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full ${toneDot[st.tone]}`} />
+                  {st.label}
+                </p>
+              )}
+              {x.overview && <p className="mt-1 line-clamp-2 max-w-[86ch] text-[13.5px] text-neutral-300 max-md:hidden">{x.overview}</p>}
+            </div>
+            {state && <span className={`whitespace-nowrap text-[13px] max-md:hidden ${state.gold ? 'text-accent' : 'text-neutral-400'}`}>{state.text}</span>}
+            {play ? (
+              <Link {...play} aria-label={playName} className="ib shrink-0">
+                <PlayIcon size={17} />
+              </Link>
+            ) : (
+              <span className="size-10 shrink-0 max-md:hidden" />
+            )}
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+/** The season's episodes as a strip of stills, the one on top outlined in gold. */
+function EpisodeStrip({ show: s, se, episodes, current }: { show: ShowDetail; se: SeasonDetail; episodes: Episode[]; current?: number }) {
+  const list = useRef<HTMLUListElement>(null)
+  // Bring the episode on top into the strip's view without scrolling the page.
+  useEffect(() => {
+    const ul = list.current
+    const li = ul?.querySelector<HTMLElement>('[aria-current="page"]')?.parentElement
+    if (!ul || !li) return
+    ul.scrollLeft = li.offsetLeft - ul.offsetLeft - (ul.clientWidth - li.clientWidth) / 2
+  }, [current, se.number])
+  return (
+    <ul ref={list} className="scrollbar-hide -mx-1 flex gap-3 overflow-x-auto px-1 pb-2 pt-1 md:gap-4">
+      {episodes.map((x) => {
+        const sel = x.id === current
+        const pct = watchedPct(x)
+        const min = episodeMinutes(x)
+        const st = x.hasFile ? null : missingStatus(x)
+        const label = `${seasonName(se.number)}, episode ${x.number}: ${x.title || `Episode ${x.number}`}${x.watch?.completed ? ', watched' : ''}${st ? `, ${st.label}` : ''}`
+        return (
+          <li key={x.id} className="flex w-[11rem] shrink-0 md:w-[232px]">
+            <Link
+              {...onTopLink(s, se, x)}
+              aria-current={sel ? 'page' : undefined}
+              aria-label={label}
+              className={`group flex min-w-0 flex-1 flex-col rounded-lg ${sel ? 'outline-2 outline-offset-2 outline-accent' : ''}`}
+            >
+              {st ? (
+                <span className="relative grid aspect-video place-items-center overflow-hidden rounded-lg border border-dashed border-line-3 text-xs font-semibold text-neutral-400">
+                  {st.thumb}
+                </span>
+              ) : (
+                <span className="relative block overflow-hidden rounded-lg ring-1 ring-inset ring-white/[.07] group-hover:ring-2 group-hover:ring-accent">
+                  <Poster path={x.stillPath ?? s.backdropPath} size="w300" alt="" ratio="aspect-video" className="rounded-none" />
+                  {x.watch?.completed && (
+                    <span className="absolute right-2 top-2 grid size-[22px] place-items-center rounded-full bg-ground/80 text-accent ring-1 ring-inset ring-accent/70">
+                      <CheckIcon size={13} />
+                    </span>
+                  )}
+                  {x.isNew && !x.watch?.completed && <span className="absolute left-2 top-2 rounded-[5px] bg-accent px-[7px] py-0.5 text-[11px] font-bold text-ground">New</span>}
+                  {min > 0 && <span className="absolute bottom-2 right-2 rounded-[5px] bg-ground/80 px-1.5 py-0.5 text-[11px] font-bold">{min} min</span>}
+                  {pct > 0 && (
+                    <span className="absolute inset-x-0 bottom-0 h-1 bg-black/60">
+                      <span className="block h-full bg-accent" style={{ width: `${pct}%` }} />
+                    </span>
+                  )}
+                </span>
+              )}
+              <span className="mt-2 truncate text-sm font-medium group-hover:text-accent">
+                E{x.number} · {x.title || `Episode ${x.number}`}
+              </span>
+              <span className="truncate text-[12.5px] text-neutral-400">{st ? rowCode(x) : episodeRowFacts(x)}</span>
+            </Link>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+/** About the show: its poster, synopsis and actions, the cast, and Details and Watched here beside them. */
 function AboutShow({ show: s, number, showMissing }: { show: ShowDetail; number?: number; showMissing: boolean }) {
   const options = useQuery(requestOptionsQuery)
   const markShow = useMarkShowWatched()
@@ -612,8 +672,6 @@ function AboutShow({ show: s, number, showMissing }: { show: ShowDetail; number?
   const admin = (auth.user?.isAdmin ?? false) && auth.adminAllowed
   const navigate = useNavigate()
   const { pick } = usePickSeason(s)
-  // Notify me, on servers from API level 29.
-  const notify = useNotifyMe(s)
   // Saving keeps the whole show, by its TMDB id; following stays apart.
   const saving = watchlistTitle('show', s.tmdbId)
   const [acting, setActing] = useState<'fix' | 'poster' | 'request' | 'deleteSeason' | 'deleteShow' | null>(null)
@@ -621,16 +679,7 @@ function AboutShow({ show: s, number, showMissing }: { show: ShowDetail; number?
   const askable = options.data?.shows ? askableSeasons(s.seasons, today) : []
   const mark = showMark(s.seasons)
   const open = s.seasons.find((x) => x.number === number)
-  // Seasons with something on disk, Specials not counted.
-  const onDisk = s.seasons.filter((x) => x.number > 0 && x.availableCount > 0).length
-  const pill =
-    s.status === 'Ended' || s.status === 'Canceled'
-      ? { label: s.status, tone: 'neutral' as const }
-      : s.nextAirDate
-        ? { label: `Continuing · next episode ${formatDate(s.nextAirDate)}`, tone: 'accent' as const }
-        : s.status
-          ? { label: s.status, tone: 'accent' as const }
-          : undefined
+  const state = showState(s)
 
   const items: MoreItem[] = []
   if (admin) items.push({ label: 'Change poster…', icon: 'poster', onSelect: () => setActing('poster') })
@@ -640,85 +689,61 @@ function AboutShow({ show: s, number, showMissing }: { show: ShowDetail; number?
   }
 
   return (
-    <section aria-labelledby="about-head" className="mt-12 grid gap-8 border-t border-line pt-8 lg:grid-cols-[minmax(0,1fr)_280px]">
-      <div className="flex min-w-0 flex-col gap-6">
-        <div className="flex items-start gap-4 sm:gap-5">
-          <span className="w-20 shrink-0 sm:w-28" aria-hidden="true">
-            <Poster path={s.posterPath} size="w185" alt="" className="ring-1 ring-line-2" />
+    <section aria-labelledby="about-head" className="mt-11 flex flex-wrap items-start gap-x-12 gap-y-6 border-t border-line pt-8">
+      <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-8">
+        <div className="flex flex-wrap gap-x-6 gap-y-4">
+          <span className="w-[100px] shrink-0 md:w-[132px]" aria-hidden="true">
+            <Poster path={s.posterPath} size="w185" alt="" className="ring-1 ring-inset ring-white/[.07]" />
           </span>
-          <div className="flex min-w-0 flex-col gap-2">
-            <h2 id="about-head" className="text-xl font-bold sm:text-2xl">
-              {s.title}
+          <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-2.5">
+            <h2 id="about-head" className="text-[19px] font-[650]">
+              About {s.title}
             </h2>
-            <p className="text-sm text-neutral-300">
-              {[showYears(s), plural(onDisk, 'season'), plural(s.episodeCount, 'episode'), s.genres.slice(0, 2).join(', '), s.rating ? `★ ${s.rating.toFixed(1)}` : ''].filter(Boolean).join(' · ')}
-            </p>
-            {pill && (
-              <span className={`inline-flex min-h-6 items-center self-start rounded-full px-2.5 text-xs font-semibold ${pill.tone === 'accent' ? 'bg-accent/10 text-accent' : 'bg-surface-2 text-neutral-300'}`}>
-                {pill.label}
-              </span>
-            )}
-            {s.overview && <p className="mt-1 hidden max-w-3xl text-[15px] leading-relaxed text-neutral-200 sm:block">{s.overview}</p>}
+            {s.overview && <p className="max-w-[70ch] text-[14.5px] leading-[1.55] text-neutral-200">{s.overview}</p>}
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              {mark && (
+                <button type="button" disabled={markShow.isPending} onClick={() => markShow.mutate({ showId: s.id, watched: mark.watched })} className="btn btn-sm">
+                  {mark.label}
+                </button>
+              )}
+              {saving && <WatchlistButton target={saving} title={s.title} holding={s.watchlists ?? []} look="small" />}
+              {askable.length > 0 && (
+                <button type="button" onClick={() => setActing('request')} className="btn btn-sm">
+                  Request missing seasons
+                </button>
+              )}
+              {admin && (
+                <button type="button" onClick={() => setActing('fix')} className="btn btn-sm">
+                  Fix match…
+                </button>
+              )}
+              <MoreMenu look="small" label={`More for ${s.title}`} items={items} />
+              {markShow.error && <span className="text-sm text-warn">{markShow.error.message}</span>}
+            </div>
           </div>
         </div>
-        {s.overview && <p className="-mt-2 text-sm leading-relaxed text-neutral-200 sm:hidden">{s.overview}</p>}
-        <div className="flex flex-col gap-1.5">
-          <div className="flex flex-wrap items-center gap-2">
-            {notify.able && <NotifyMeButton show={s.title} following={notify.following} onPress={notify.press} />}
-            {saving && <WatchlistButton target={saving} title={s.title} holding={s.watchlists ?? []} tall />}
-            {mark && (
-              <button type="button" disabled={markShow.isPending} onClick={() => markShow.mutate({ showId: s.id, watched: mark.watched })} className={secondaryBtn}>
-                {mark.label}
-              </button>
-            )}
-            {askable.length > 0 && (
-              <button type="button" onClick={() => setActing('request')} className={secondaryBtn}>
-                ＋ Request missing seasons
-              </button>
-            )}
-            {admin && (
-              <button type="button" onClick={() => setActing('fix')} className={secondaryBtn}>
-                Fix match
-              </button>
-            )}
-            <MoreMenu tall label={`More for ${s.title}`} items={items} />
-            {markShow.error && <span className="text-sm text-warn">{markShow.error.message}</span>}
-          </div>
-          {notify.failure && <NotifyMeFailure failure={notify.failure} show={s.title} />}
-        </div>
-        {notify.asking && <FollowExplainer show={s.title} onAnswer={notify.answer} />}
-        <CastRow cast={s.credits} />
+        <PeopleRow people={s.credits} small />
       </div>
-      <aside className="space-y-4">
-        <SideCard
+      <aside className="flex min-w-0 flex-[1_1_300px] flex-col gap-4">
+        <DetailsPanel
           title="Details"
           rows={[
             ['Original title', s.originalTitle && s.originalTitle !== s.title ? s.originalTitle : ''],
             ['First aired', formatDate(s.firstAirDate)],
-            ['Last aired', formatDate(s.lastAirDate)],
+            ['Status', state?.label.split(' · ')[0] ?? ''],
             ['Next episode', formatDate(s.nextAirDate)],
-            ['Status', s.status ?? ''],
+            ['Rated', s.contentRating ?? ''],
             ['Genres', s.genres.join(', ')],
-            ['Rating', s.rating ? `${s.rating.toFixed(1)} / 10` : ''],
+            ['On your server', s.totalEpisodes ? `${s.episodeCount} of ${s.totalEpisodes} episodes` : plural(s.episodeCount, 'episode')],
             [
-              'TMDB',
-              <a key="tmdb" href={`https://www.themoviedb.org/tv/${s.tmdbId}`} target="_blank" rel="noreferrer" className="underline">
-                {s.tmdbId}
+              'More',
+              <a key="tmdb" href={`https://www.themoviedb.org/tv/${s.tmdbId}`} target="_blank" rel="noreferrer" className="underline hover:text-accent">
+                TMDB
               </a>,
             ],
           ]}
         />
-        <HistoryCard show={s.id} />
-        <SideCard
-          title="On disk"
-          rows={[
-            ['Episodes', String(s.episodeCount)],
-            ['Files', String(s.fileCount)],
-            ['Size', formatBytes(s.totalSize)],
-            ['Best quality', [s.quality, s.hdr ? 'HDR' : ''].filter(Boolean).join(' · ')],
-            ['Last added', s.addedAt ? relativeTime(s.addedAt) : ''],
-          ]}
-        />
+        <WatchedHere show={s.id} />
       </aside>
 
       {acting === 'fix' && (
