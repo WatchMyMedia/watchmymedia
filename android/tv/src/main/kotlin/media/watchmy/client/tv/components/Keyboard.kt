@@ -31,6 +31,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.utf16CodePoint
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -140,7 +141,7 @@ fun OnScreenKeyboard(
             Key("Space", { onText(" ") }, Modifier.width(unit * 3 - gap * 2).height(keySize), fontSize = 22.sp)
             Key("⌫", onBackspace, Modifier.width(unit * 1.5f - gap / 2).height(keySize), fontSize = 22.sp, onLongClick = { repeat(64) { onBackspace() } })
             if (onDone != null) {
-                Key(doneLabel, onDone, Modifier.width(unit * 2.5f - gap * 1.5f).height(keySize), fontSize = 22.sp, gold = true)
+                Key(doneLabel, onDone, Modifier.width(unit * 2.5f - gap * 1.5f).height(keySize), fontSize = 22.sp)
             }
         }
     }
@@ -202,7 +203,7 @@ fun OnScreenKeyboard(
             Modifier.width((keySize + gap) * 10 - gap).height(keySize).focusRequester(tvKey),
             fontSize = 22.sp,
         )
-        if (note != null) Text(note, style = inter(22.sp, lineHeight = 32.sp), color = WmmColors.TextFaint, modifier = Modifier.width((keySize + gap) * 10 - gap))
+        if (note != null) Text(note, style = TvType.Caption, color = TvPalette.Muted, modifier = Modifier.width((keySize + gap) * 10 - gap))
         // The system's keyboard types into the same field through an editor of its own, out of sight.
         BasicTextField(
             state = field,
@@ -243,23 +244,23 @@ private fun Key(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier,
-    fontSize: androidx.compose.ui.unit.TextUnit = 24.sp,
+    fontSize: androidx.compose.ui.unit.TextUnit = 26.sp,
+    /** A key that stays on (Shift): gold words and a gold underline, never a fill that reads as focus. */
     on: Boolean = false,
-    gold: Boolean = false,
     onLongClick: (() -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(12.dp)
     FocusableBox(onClick = onClick, onLongClick = onLongClick, modifier = modifier, cornerRadius = 12.dp, focusedScale = FocusGrowth.CARD, contentAlignment = Alignment.Center) { focused ->
-        val bg = when {
-            gold || on -> WmmColors.Accent
-            focused -> WmmColors.Surface3
-            else -> WmmColors.Surface2
-        }
         Box(
-            Modifier.fillMaxSize().background(bg, shape).border(1.dp, if (gold || on) WmmColors.Accent else WmmColors.Line2, shape),
+            Modifier.fillMaxSize().background(if (focused) TvPalette.Lift else WmmColors.Surface2, shape).border(2.dp, TvPalette.Lift, shape),
             contentAlignment = Alignment.Center,
         ) {
-            Text(label, style = inter(fontSize, FontWeight.SemiBold), color = if (gold || on) WmmColors.OnAccent else WmmColors.Text, maxLines = 1)
+            Text(
+                label,
+                style = inter(fontSize, FontWeight.SemiBold).copy(textDecoration = if (on) TextDecoration.Underline else null),
+                color = if (on) WmmColors.Accent else WmmColors.Text,
+                maxLines = 1,
+            )
         }
     }
 }
@@ -275,27 +276,33 @@ fun KeyboardField(
     placeholder: String = "",
     masked: Boolean = false,
     active: Boolean = false,
-    height: Dp = 72.dp,
+    height: Dp = 80.dp,
     dim: Boolean = false,
+    /** A leading icon (Search's magnifier). */
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
 ) {
-    val shape = RoundedCornerShape(14.dp)
+    val shape = RoundedCornerShape(16.dp)
     Row(
         modifier
             .fillMaxWidth()
             .height(height)
             .background(WmmColors.Surface, shape)
-            .border(if (active) 2.dp else 1.dp, if (active) WmmColors.Accent else WmmColors.FieldOutline, shape)
+            .border(2.dp, if (active) WmmColors.TextFaint else TvPalette.Line, shape)
             .padding(horizontal = 24.dp),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        if (icon != null) androidx.tv.material3.Icon(icon, contentDescription = null, tint = TvPalette.Muted, modifier = Modifier.size(30.dp))
         val shown = if (masked) "•".repeat(value.length) else value
-        if (shown.isEmpty() && !active) {
-            Text(placeholder, style = inter(24.sp), color = WmmColors.TextFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        } else {
-            // [dim]: words still being heard (voice typing), a shade softer.
-            Text(shown, style = inter(24.sp), color = if (dim) WmmColors.TextSoft else WmmColors.Text, maxLines = 1, overflow = TextOverflow.StartEllipsis, modifier = Modifier.weight(1f, fill = false))
-            if (active) Box(Modifier.padding(start = 2.dp).width(3.dp).height(30.dp).background(WmmColors.Accent))
-            if (shown.isEmpty()) Text(placeholder, style = inter(24.sp), color = WmmColors.TextFaint, maxLines = 1, modifier = Modifier.padding(start = 10.dp))
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            if (shown.isEmpty() && !active) {
+                Text(placeholder, style = TvType.CardTitle.copy(fontWeight = FontWeight.Normal), color = TvPalette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            } else {
+                // [dim]: words still being heard (voice typing), a shade softer.
+                Text(shown, style = TvType.CardTitle.copy(fontWeight = FontWeight.Medium), color = if (dim) WmmColors.TextSoft else WmmColors.Text, maxLines = 1, overflow = TextOverflow.StartEllipsis, modifier = Modifier.weight(1f, fill = false))
+                if (active) Box(Modifier.padding(start = 2.dp).width(3.dp).height(36.dp).background(WmmColors.Accent))
+                if (shown.isEmpty()) Text(placeholder, style = TvType.CardTitle.copy(fontWeight = FontWeight.Normal), color = TvPalette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 12.dp))
+            }
         }
     }
 }
@@ -328,14 +335,14 @@ fun KeyboardDialog(
                     .fillMaxWidth()
                     .background(WmmColors.Surface, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
                     .border(1.dp, WmmColors.Line, RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                    .padding(start = 160.dp, end = 160.dp, top = 44.dp, bottom = 52.dp),
+                    .padding(start = 160.dp, end = 160.dp, top = 44.dp, bottom = SafeY),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(22.dp),
             ) {
                 Column(Modifier.width(980.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text(title, style = inter(28.sp, FontWeight.SemiBold), color = WmmColors.Text)
+                    Text(title, style = TvType.Heading, color = WmmColors.Text)
                     KeyboardField(field.text.toString(), placeholder = placeholder, masked = masked, active = true)
-                    if (note != null) Text(note, style = inter(22.sp, lineHeight = 33.sp), color = if (noteWarns(field.text.toString())) WmmColors.Warn else WmmColors.TextFaint)
+                    if (note != null) Text(note, style = TvType.Second, color = if (noteWarns(field.text.toString())) WmmColors.Warn else TvPalette.Muted)
                 }
                 OnScreenKeyboard(
                     field = field,

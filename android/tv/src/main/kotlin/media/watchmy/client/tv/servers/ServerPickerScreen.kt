@@ -1,6 +1,5 @@
 package media.watchmy.client.tv.servers
 
-import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,14 +10,15 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -32,7 +32,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -40,20 +39,19 @@ import androidx.lifecycle.viewmodel.compose.rememberViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Text
-import media.watchmy.client.model.ADD_A_SERVER
+import media.watchmy.client.model.TOO_OLD_FOR_APP
 import media.watchmy.client.model.alreadyAdded
 import media.watchmy.client.model.serversFull
-import media.watchmy.client.model.MIN_SERVER_VERSION
 import media.watchmy.client.model.needsHttpsNudge
-import media.watchmy.client.tv.components.FocusGrowth
-import media.watchmy.client.tv.components.FocusableBox
 import media.watchmy.client.tv.components.Kicker
 import media.watchmy.client.tv.components.KeyboardDialog
-import media.watchmy.client.tv.components.KeyboardField
-import media.watchmy.client.tv.components.TvButton
-import media.watchmy.client.tv.components.TvButtonStyle
-import media.watchmy.client.tv.components.inter
+import media.watchmy.client.tv.components.PanelRow
+import media.watchmy.client.tv.components.SafeX
+import media.watchmy.client.tv.components.SafeY
+import media.watchmy.client.tv.components.TvPalette
+import media.watchmy.client.tv.components.TvType
 import media.watchmy.client.tv.components.radialGlow
+import media.watchmy.client.tv.home.KeyHint
 import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.BrandLockup
@@ -68,8 +66,10 @@ private const val HTTP_NOTE =
     "An IP address or a .local name works over http on your own network. A hostname needs https; Tailscale Serve or a reverse proxy gives it one."
 
 /**
- * Choose a server:
- * servers on this network, remembered ones, or a typed address. [onBack],
+ * Choose a server: one list of the servers found on this network and the
+ * ones remembered, each saying where it is in words, with "Type its
+ * address" as the last row (the address, http and https are explained in
+ * the keyboard that opens). [onBack],
  * when given, leaves without changing the server (picking again from
  * sign-in or Settings).
  *
@@ -85,13 +85,11 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null,
     val form by vm.state.collectAsStateWithLifecycle()
     // One list on the TV: found on this network, then remembered.
     val rows = form.discovered?.let { it + form.remembered }
-    val needsHttps = form.addressNeedsHttps
     // Android 17's local network access, offered again in the list's place when nothing is found.
     val access = rememberLocalNetworkAccess()
     val showAccess = access.needed && form.discovered?.isEmpty() == true
     val accessRow = remember { FocusRequester() }
     val offline = access.needed && form.addressError != null && isLocalAddress(form.address)
-    val deviceName by services.auth.deviceName.collectAsStateWithLifecycle()
     var typing by remember { mutableStateOf(false) }
     val firstRow = remember { FocusRequester() }
     val addressField = remember { FocusRequester() }
@@ -105,77 +103,66 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null,
             .background(WmmColors.Ground)
             .radialGlow(WmmColors.Brand.copy(alpha = 0.35f), 0.9f, 0.9f, 1000.dp, 640.dp),
     ) {
-        BrandLockup(markSize = 44.dp, fontSize = 26.sp, modifier = Modifier.padding(start = 58.dp, top = 48.dp))
-
-        Column(Modifier.padding(start = 160.dp, top = 200.dp).width(820.dp), verticalArrangement = Arrangement.spacedBy(28.dp)) {
-            Kicker("Servers")
-            Text(if (adding) ADD_A_SERVER else "Choose a server", style = inter(64.sp, FontWeight.Bold, lineHeight = 80.sp, tracking = -0.02f), color = WmmColors.Text)
-            Text("Servers on this network appear by themselves.", style = inter(24.sp), color = WmmColors.TextMuted)
-            if (adding && form.full) Text(serversFull("TV"), style = inter(22.sp, lineHeight = 32.sp), color = WmmColors.Warn)
+        BrandLockup(markSize = 36.dp, fontSize = 24.sp, modifier = Modifier.padding(start = SafeX, top = SafeY))
+        Column(Modifier.padding(start = SafeX, top = 150.dp).width(1000.dp)) {
+            Kicker(if (adding) "Add a server · step 1 of 2" else "Welcome · step 1 of 2")
+            Text("Choose a server", modifier = Modifier.padding(top = 14.dp), style = TvType.Display, color = WmmColors.Text)
             val list = rows
-            when {
-                list == null -> Text("Looking for servers…", style = inter(22.sp), color = WmmColors.TextMuted)
-                list.isEmpty() && !showAccess -> Text(
-                    if (adding && form.alreadyAdded.isNotEmpty()) "No other servers found on this network yet. Enter an address instead." else "No servers found on this network yet. Enter an address instead.",
-                    style = inter(22.sp),
-                    color = WmmColors.TextMuted,
-                )
-                // 12 dp wider on each side than the column, so the focus ring is not clipped.
-                else -> LazyColumn(
-                    Modifier.requiredWidth(844.dp).heightIn(max = 560.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp),
-                    contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp, start = 12.dp, end = 12.dp),
-                ) {
-                    if (showAccess) item(key = "local-network") { AccessRow(access, Modifier.focusRequester(accessRow)) }
-                    items(list, key = { it.key }) { row ->
-                        val isFirst = row == (list.firstOrNull { it.current } ?: list.first())
-                        ServerRow(
-                            row = row,
-                            connecting = form.connecting == row.key,
-                            onClick = { vm.choose(row) },
-                            modifier = if (isFirst) Modifier.focusRequester(firstRow) else Modifier,
-                        )
-                    }
+            Text(
+                when {
+                    showAccess -> "This TV needs your OK before it can look on your home network."
+                    list == null || list.isNotEmpty() -> "Found on your home network. Pick one, then sign in with your phone."
+                    else -> "None found on this network yet. Check the server is on, or type its address."
+                },
+                modifier = Modifier.padding(top = 16.dp).widthIn(max = 820.dp),
+                style = TvType.Body,
+                color = WmmColors.TextSoft,
+            )
+            if (adding && form.full) Text(serversFull("TV"), modifier = Modifier.padding(top = 16.dp), style = TvType.Second, color = WmmColors.Warn)
+            // 10 dp wider on each side than the column, so a focused row's ring and growth aren't clipped.
+            LazyColumn(
+                Modifier.padding(top = 30.dp).requiredWidth(1020.dp).heightIn(max = 600.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(10.dp),
+            ) {
+                if (showAccess) item(key = "local-network") { AccessRow(access, Modifier.focusRequester(accessRow)) }
+                if (list != null) items(list, key = { it.key }) { row ->
+                    val isFirst = row == (list.firstOrNull { it.current } ?: list.first())
+                    ServerRow(
+                        row = row,
+                        connecting = form.connecting == row.key,
+                        onClick = { vm.choose(row) },
+                        modifier = if (isFirst) Modifier.focusRequester(firstRow) else Modifier,
+                    )
+                }
+                item(key = "address") {
+                    PanelRow(
+                        if (form.connecting == ServerPickerViewModel.ADDRESS) "Connecting to ${form.address}…" else "Type its address",
+                        onClick = { typing = true },
+                        modifier = Modifier.focusRequester(addressField),
+                        description = form.address.takeIf { it.isNotBlank() } ?: "For a server on another network, or one that isn’t found",
+                        icon = WmmIcons.Globe,
+                        chevron = true,
+                    )
+                }
+            }
+            if (list == null || list.isNotEmpty() || !showAccess) {
+                Row(Modifier.padding(top = 28.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(16.dp).background(WmmColors.Accent, CircleShape))
+                    Text("Still looking. Servers on this network appear here by themselves.", style = TvType.Second, color = TvPalette.Muted)
                 }
             }
             // The ones this TV is signed in to already aren't offered again.
-            alreadyAdded(form.alreadyAdded)?.let { Text(it, style = inter(22.sp, lineHeight = 33.sp), color = WmmColors.TextMuted) }
-            form.error?.let { Text(it, style = inter(22.sp, lineHeight = 33.sp), color = WmmColors.Error) }
-        }
-
-        Column(Modifier.padding(start = 1100.dp, top = 380.dp).width(660.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
-            Text("Or enter an address", style = inter(28.sp, FontWeight.SemiBold), color = WmmColors.Text)
-            Text("Server address", style = inter(22.sp), color = WmmColors.TextMuted)
-            FocusableBox(onClick = { typing = true }, modifier = Modifier.focusRequester(addressField), cornerRadius = 14.dp, focusedScale = FocusGrowth.ROW) {
-                KeyboardField(form.address, placeholder = "192.168.1.20 or https://media.example.net")
-            }
-            Text(HTTP_NOTE, style = inter(22.sp, lineHeight = 33.sp), color = if (needsHttps) WmmColors.Warn else WmmColors.TextFaint)
-            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                TvButton(
-                    if (form.connecting == ServerPickerViewModel.ADDRESS) "Connecting…" else "Connect",
-                    vm::connectToAddress,
-                    style = TvButtonStyle.Primary,
-                    enabled = form.connecting == null,
-                )
-                if (onBack != null) TvButton("Cancel", onBack)
-            }
+            alreadyAdded(form.alreadyAdded)?.let { Text(it, modifier = Modifier.padding(top = 16.dp), style = TvType.Second, color = TvPalette.Muted) }
             val addressError = if (offline) {
-                "${localNetworkOffMessage(form.address, "TV")} Focus moved to ${if (access.stopped) "Local network access is off" else "Allow local network access"}, on the left."
+                "${localNetworkOffMessage(form.address, "TV")} Focus moved to ${if (access.stopped) "Local network access is off" else "Allow local network access"}, above."
             } else {
                 form.addressError
             }
-            addressError?.let { Text(it, style = inter(22.sp, lineHeight = 33.sp), color = WmmColors.Error) }
+            (form.error ?: addressError)?.let { Text(it, modifier = Modifier.padding(top = 16.dp).widthIn(max = 900.dp), style = TvType.Second, color = WmmColors.Warn) }
         }
-
-        Row(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 58.dp, end = 58.dp, bottom = 44.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Needs server $MIN_SERVER_VERSION or newer", style = inter(22.sp), color = WmmColors.TextFaint)
-            Text("This device: $deviceName · ${Build.MODEL}", style = inter(22.sp), color = WmmColors.TextFaint)
-        }
+        KeyHint("Back", if (onBack != null) "Servers" else "Leaves WatchMyMedia", Modifier.align(Alignment.BottomStart).padding(start = SafeX, bottom = SafeY))
     }
-
     if (typing) {
         KeyboardDialog(
             title = "Server address",
@@ -219,99 +206,45 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null,
  */
 @Composable
 private fun AccessRow(access: LocalNetworkAccess, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(18.dp)
     val stopped = access.stopped
-    FocusableBox(onClick = access::ask, modifier = modifier.fillMaxWidth(), cornerRadius = 18.dp, focusedScale = FocusGrowth.ROW) { focused ->
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 120.dp)
-                .background(if (focused) WmmColors.Surface3 else WmmColors.Surface2, shape)
-                .border(1.dp, WmmColors.Line2, shape)
-                .padding(horizontal = 28.dp, vertical = 18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
-        ) {
-            Box(
-                Modifier.size(64.dp).background(if (stopped) WmmColors.Line2 else WmmColors.Accent.copy(alpha = 0.16f), RoundedCornerShape(16.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(WmmIcons.Server, contentDescription = null, tint = if (stopped) WmmColors.TextSoft else WmmColors.Accent, modifier = Modifier.size(34.dp))
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(if (stopped) "Local network access is off" else "Allow local network access", style = inter(26.sp, FontWeight.SemiBold), color = WmmColors.Text)
-                Text(
-                    if (stopped) {
-                        "The TV has stopped asking. In its settings, open Permissions › Nearby devices and allow it for WatchMyMedia, then come back."
-                    } else {
-                        "WatchMyMedia needs it to find servers on this network and to reach them at their local address. Servers you reach over the internet work without it."
-                    },
-                    style = inter(22.sp, lineHeight = 31.sp),
-                    color = WmmColors.TextMuted,
-                )
-            }
-            Text(
-                if (stopped) "Open settings" else "Allow",
-                modifier = Modifier.background(WmmColors.Brand, RoundedCornerShape(12.dp)).padding(horizontal = 22.dp, vertical = 12.dp),
-                style = inter(22.sp, FontWeight.SemiBold),
-                color = WmmColors.Text,
-            )
-        }
-    }
+    PanelRow(
+        if (stopped) "Local network access is off" else "Let this TV look for servers",
+        onClick = access::ask,
+        modifier = modifier,
+        description = if (stopped) {
+            "The TV has stopped asking. In its settings, open Permissions › Nearby devices and allow it for WatchMyMedia, then come back."
+        } else {
+            "The TV asks once for access to your home network. Servers you reach over the internet work without it."
+        },
+        icon = WmmIcons.Server,
+        iconTint = WmmColors.Accent,
+    )
 }
 
 /** `.tag.warn`: plain http to a server beyond this network. */
 @Composable
-private fun NotEncryptedTag() {
+private fun NotEncryptedTag(modifier: Modifier = Modifier) {
     Row(
-        Modifier.border(2.dp, WmmColors.Warn, RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 4.dp),
+        modifier.border(2.dp, WmmColors.Warn, RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Icon(WmmIcons.LockOpen, contentDescription = null, tint = WmmColors.Warn, modifier = Modifier.size(20.dp))
-        Text("NOT ENCRYPTED", style = inter(22.sp, FontWeight.SemiBold, tracking = 0.04f), color = WmmColors.Warn)
+        Icon(WmmIcons.LockOpen, contentDescription = null, tint = WmmColors.Warn, modifier = Modifier.size(24.dp))
+        Text("Not encrypted", style = TvType.Caption.copy(fontWeight = FontWeight.SemiBold), color = WmmColors.Warn)
     }
 }
 
 @Composable
 private fun ServerRow(row: ServerPickerViewModel.Row, connecting: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(18.dp)
-    FocusableBox(onClick = onClick, modifier = modifier.fillMaxWidth(), cornerRadius = 18.dp, focusedScale = FocusGrowth.ROW) { focused ->
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .height(120.dp)
-                .background(if (focused) WmmColors.Surface3 else WmmColors.Surface2, shape)
-                .border(1.dp, WmmColors.Line2, shape)
-                .padding(horizontal = 28.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
-        ) {
-            Box(
-                Modifier.size(64.dp).background(if (row.onNetwork) WmmColors.Brand else WmmColors.Line2, RoundedCornerShape(16.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(if (row.onNetwork) WmmIcons.Server else WmmIcons.Globe, contentDescription = null, tint = WmmColors.Text, modifier = Modifier.size(34.dp))
-            }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(row.name, style = inter(26.sp, FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(
-                    if (connecting) "Connecting…" else if (row.onNetwork) row.detail else "Remembered · ${row.detail.replaceFirstChar { it.lowercase() }}",
-                    style = inter(22.sp),
-                    color = if (row.tooOld) WmmColors.Warn else WmmColors.TextMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (row.onNetwork) {
-                Text(
-                    "ON THIS NETWORK",
-                    modifier = Modifier.background(WmmColors.Accent, RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 6.dp),
-                    style = inter(22.sp, FontWeight.SemiBold, tracking = 0.04f),
-                    color = WmmColors.OnAccent,
-                )
-            }
-            if (row.notEncrypted) NotEncryptedTag()
-        }
+    val line = when {
+        connecting -> "Connecting…"
+        row.tooOld -> TOO_OLD_FOR_APP
+        row.onNetwork -> "On this network"
+        else -> "You signed in here before"
+    }
+    Box(modifier.fillMaxWidth()) {
+        PanelRow(row.name, onClick = onClick, description = line, icon = if (row.onNetwork) WmmIcons.Server else WmmIcons.Globe, enabled = !row.tooOld)
+        // A server reached over plain http beyond this network: a warning, in words, at the row's end.
+        if (row.notEncrypted) NotEncryptedTag(Modifier.align(Alignment.CenterEnd).padding(end = 24.dp))
     }
 }

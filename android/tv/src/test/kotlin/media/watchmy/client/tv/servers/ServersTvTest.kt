@@ -8,6 +8,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import media.watchmy.client.fake.Cabin
 import media.watchmy.client.fake.FakeAppServices
+import media.watchmy.client.fake.FakeData
 import media.watchmy.client.fake.LivingRoom
 import media.watchmy.client.fake.RemoteHome
 import media.watchmy.client.fake.fakeLatencyMs
@@ -62,7 +64,14 @@ class ServersTvTest {
         services = fakes ?: quietTvFakes()
         compose.setContent { CompositionLocalProvider(LocalAppServices provides services) { TvApp() } }
         compose.waitForIdle()
-        assertEquals("Play", focused())
+        assertHomeOpened()
+    }
+
+    /** Home has opened, with focus on its first row's card. */
+    private fun assertHomeOpened() {
+        compose.onNodeWithText("Row 1 of ", substring = true, useUnmergedTree = true).assertIsDisplayed()
+        compose.onNode(isFocused()).assertIsDisplayed()
+        assertTrue("${focused()} is a card, not the rail", focused() !in listOf("Home", "Search", "Movies", "TV Shows", "Live TV", "Settings"))
     }
 
     /** ◀ to the rail, then down to the account button at its foot. */
@@ -78,8 +87,10 @@ class ServersTvTest {
         assertEquals("the rail has no room for the server's name, so the button says it", "Servers. Sam, on Living room server", focused())
         press(Key.DirectionCenter)
         compose.onNodeWithText("Manage servers").assertExists()
-        compose.onNodeWithText("Sam · 192.168.4.31:27587").assertExists()
-        compose.onNodeWithText("Signed out here · sign in again").assertExists()
+        // Each row says what OK does there, not its address.
+        compose.onNodeWithText("You are here").assertExists()
+        compose.onNodeWithText("Signed out here · OK signs in again").assertExists()
+        compose.onNodeWithText("Sam · 192.168.4.31:27587").assertDoesNotExist()
         assertEquals("focus opens on the first server that isn't the one in use", "Cabin server", focused())
         press(Key.DirectionUp)
         assertEquals("the one in use keeps its place in the path, and OK on it does nothing", "Living room server", focused())
@@ -100,8 +111,9 @@ class ServersTvTest {
         compose.onNodeWithText("Manage servers").assertDoesNotExist()
         compose.onNodeWithText("Now on Cabin server").assertExists()
         // Its own library, and focus where Home opens: the banner takes none.
-        compose.onNodeWithText("Harbour Run").assertExists()
-        assertEquals("Play", focused())
+        // The Cabin server's Home: its Continue watching opens it.
+        assertTrue(compose.onAllNodesWithText("Pine Ledger").fetchSemanticsNodes().isNotEmpty())
+        assertHomeOpened()
         // It goes by itself.
         ShadowLooper.idleMainLooper(5, TimeUnit.SECONDS)
         compose.waitForIdle()
@@ -115,8 +127,8 @@ class ServersTvTest {
         press(Key.DirectionDown)
         assertEquals("Den server", focused())
         press(Key.DirectionCenter)
-        compose.onNodeWithText("Couldn’t reach Den server").assertExists()
-        compose.onNodeWithText("It may be off, or only reachable on its own network. You’re still on Living room server.").assertExists()
+        compose.onNodeWithText("Couldn’t reach Den server", substring = true).assertExists()
+        compose.onNodeWithText("It may be off, or only reachable on its own network. You’re still on Living room server.", substring = true).assertExists()
         assertEquals("Try again", focused())
         assertEquals(LivingRoom.id, current)
         // A TV holds no downloads, so there is nothing else to offer.
@@ -143,7 +155,7 @@ class ServersTvTest {
         assertTrue("the Living room server is on this network, and is not offered again", compose.onAllNodesWithText("Living room server").fetchSemanticsNodes().isEmpty())
         back()
         assertEquals(LivingRoom.id, current)
-        compose.onNodeWithText("Harbor Lights").assertExists()
+        assertTrue(compose.onAllNodesWithText(FakeData.home().continueWatching.first().title).fetchSemanticsNodes().isNotEmpty())
     }
 
     @Test fun `Settings' Servers row opens the list, a server's page, and Remove asks from Keep`() {
@@ -243,7 +255,8 @@ class ServersTvTest {
         compose.waitForIdle()
         compose.onNode(hasText("Harbor Lights") and hasText("Living room server")).assertExists()
         back()
-        compose.onNodeWithText("Harbour Run").assertExists()
+        // The Cabin server's Home: its Continue watching opens it.
+        assertTrue(compose.onAllNodesWithText("Pine Ledger").fetchSemanticsNodes().isNotEmpty())
     }
 
     /**

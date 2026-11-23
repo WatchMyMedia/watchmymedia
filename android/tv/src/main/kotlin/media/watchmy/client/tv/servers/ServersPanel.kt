@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -15,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
@@ -32,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -42,15 +42,17 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Text
 import media.watchmy.client.model.ADD_A_SERVER
-import media.watchmy.client.model.ADD_A_SERVER_LINE
 import media.watchmy.client.model.CURRENT_SERVER
 import media.watchmy.client.model.DeepLink
 import media.watchmy.client.model.MANAGE_SERVERS
@@ -65,12 +67,19 @@ import media.watchmy.client.presentation.servers.ServersActions
 import media.watchmy.client.presentation.servers.ServersViewModel
 import media.watchmy.client.presentation.servers.ServersViewModel.RowState
 import media.watchmy.client.tv.components.FocusableBox
+import media.watchmy.client.tv.components.PanelGroup
+import media.watchmy.client.tv.components.PanelRow
+import media.watchmy.client.tv.components.PanelSide
 import media.watchmy.client.tv.components.TextBright
 import media.watchmy.client.tv.components.TvButton
 import media.watchmy.client.tv.components.TvButtonSize
 import media.watchmy.client.tv.components.TvDialog
+import media.watchmy.client.tv.components.TvPalette
+import media.watchmy.client.tv.components.TvSidePanel
+import media.watchmy.client.tv.components.TvType
 import media.watchmy.client.tv.components.inter
 import media.watchmy.client.tv.components.tryFocus
+import media.watchmy.client.tv.home.KeyHint
 import media.watchmy.client.ui.TestTags
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
@@ -95,18 +104,15 @@ class ServersHost(
 @Suppress("ComposeCompositionLocalUsage")
 val LocalServersHost = staticCompositionLocalOf<ServersHost?> { null }
 
-/** The rail's width: the Servers panel opens beside it, and the rail stays in view with the account button ringed. */
-private val Rail = 96.dp
-
 /**
- * Servers, the switcher, on the TV: a panel from the left over a dimmed
- * screen, opened by OK on the account button at the rail's foot. The servers
- * this TV is signed in to, the one in use first; Add a server; Manage
- * servers. Focus opens on the first server that isn't the one in use, on Add
- * a server when there is one server, and on Try again after a server didn't
- * answer. Back closes it, and focus goes back to the account button.
- * [onWatchlists] adds Watchlists under Manage servers, after a rule: the TV
- * has no Settings row here, since Settings is in the rail.
+ * Servers, the switcher, on the TV: a panel from the left over the dimmed
+ * screen, opened by OK on the person at the rail's foot. It leads with who
+ * is signed in and where; then the servers this TV is signed in to, the one
+ * in use ticked in gold, each saying what OK does (no addresses); Add a
+ * server; and under Yours, Watchlists and Manage servers. Focus opens on the
+ * first server that isn't the one in use, on Add a server when there is one
+ * server, and on Try again after a server didn't answer. Back closes it, and
+ * focus goes back to the person in the rail.
  */
 @Composable
 internal fun ServersPanel(state: ServersViewModel.State, actions: ServersActions, onAdd: () -> Unit, onManage: () -> Unit, onDismiss: () -> Unit, onWatchlists: (() -> Unit)? = null) {
@@ -114,54 +120,90 @@ internal fun ServersPanel(state: ServersViewModel.State, actions: ServersActions
     val retry = remember { FocusRequester() }
     // Where focus opens: the first server that can be switched to; with none, Add a server.
     val entry = state.rows.firstOrNull { it.canChoose }?.serverId
+    val current = state.rows.firstOrNull { it.current }
+    val who = current?.userName.orEmpty()
     TvDialog(onDismiss) {
-        Box(Modifier.fillMaxSize().padding(start = Rail).background(Color.Black.copy(alpha = 0.6f))) {
-            Column(
-                Modifier
-                    .width(640.dp)
-                    .fillMaxHeight()
-                    .background(WmmColors.Surface)
-                    .border(1.dp, WmmColors.Line)
-                    .verticalScroll(rememberScrollState())
-                    .padding(start = 44.dp, end = 44.dp, top = 64.dp, bottom = 54.dp)
-                    .semantics { paneTitle = SERVERS }
-                    .testTag(TestTags.SERVERS),
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-            ) {
-                Text(SERVERS, style = inter(34.sp, FontWeight.ExtraBold, tracking = -0.015f), color = WmmColors.Text, modifier = Modifier.semantics { heading() })
-                state.casting?.let { Text(switchingStopsCasting(it), style = inter(22.sp, lineHeight = 32.sp), color = WmmColors.TextMuted) }
-                state.failure?.let { FailureNote(it, actions::retry, retry) }
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    state.rows.forEach { row ->
-                        ServerOption(row, row.line, onClick = { actions.choose(row.serverId) }, modifier = if (row.serverId == entry) Modifier.focusRequester(first) else Modifier)
+        TvSidePanel(
+            title = null,
+            side = PanelSide.Left,
+            width = 820.dp,
+            modifier = Modifier.semantics { paneTitle = SERVERS }.testTag(TestTags.SERVERS),
+        ) {
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 10.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically, modifier = Modifier.semantics(mergeDescendants = true) { heading() }) {
+                    Box(Modifier.size(88.dp).background(WmmColors.Brand, CircleShape).border(2.dp, WmmColors.BrandLine, CircleShape), contentAlignment = Alignment.Center) {
+                        Text(who.take(1).uppercase(), style = TvType.Heading.copy(fontWeight = FontWeight.Bold), color = WmmColors.Text)
+                    }
+                    Column {
+                        Text(who.ifEmpty { SERVERS }, style = TvType.Heading, color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        current?.let { Text("Signed in on ${it.name}", style = TvType.Second, color = TvPalette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     }
                 }
-                PanelRule()
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    PanelOption(
-                        ADD_A_SERVER, if (state.full) serversFull("TV") else ADD_A_SERVER_LINE, WmmIcons.Plus,
-                        onClick = onAdd, enabled = !state.full,
-                        modifier = if (entry == null && state.failure == null) Modifier.focusRequester(first) else Modifier,
+                state.casting?.let { Text(switchingStopsCasting(it), style = TvType.Second, color = TvPalette.Muted, modifier = Modifier.padding(top = 12.dp)) }
+                PanelGroup(SERVERS, Modifier.padding(top = 20.dp))
+                state.rows.forEach { row ->
+                    PanelRow(
+                        row.name,
+                        onClick = { if (row.canChoose) actions.choose(row.serverId) },
+                        modifier = if (row.serverId == entry) Modifier.focusRequester(first) else Modifier,
+                        description = switcherLine(row, who),
+                        chosen = row.current,
+                        // One too old for this app keeps its place in the path down the panel, dimmed.
+                        enabled = row.state != RowState.TooOld,
                     )
-                    PanelOption(MANAGE_SERVERS, null, WmmIcons.Sliders, onClick = onManage, minHeight = 68.dp) {
-                        Icon(WmmIcons.ChevronRight, contentDescription = null, tint = WmmColors.TextMuted, modifier = Modifier.size(24.dp))
-                    }
                 }
-                if (onWatchlists != null) {
-                    PanelRule()
-                    PanelOption(WatchlistWords.WATCHLISTS, null, WmmIcons.Bookmark, onClick = onWatchlists, minHeight = 68.dp) {
-                        Icon(WmmIcons.ChevronRight, contentDescription = null, tint = WmmColors.TextMuted, modifier = Modifier.size(24.dp))
-                    }
-                }
-                Box(Modifier.weight(1f))
-                Text("Back closes this panel.", style = inter(22.sp), color = WmmColors.TextFaint)
+                PanelRow(
+                    ADD_A_SERVER,
+                    onClick = onAdd,
+                    modifier = if (entry == null && state.failure == null) Modifier.focusRequester(first) else Modifier,
+                    description = if (state.full) serversFull("TV") else "On this network, or by its address",
+                    enabled = !state.full,
+                    chevron = true,
+                )
+                state.failure?.let { SwitchFailure(it, actions::retry, retry, Modifier.padding(top = 12.dp)) }
+                PanelGroup("Yours", Modifier.padding(top = 16.dp))
+                if (onWatchlists != null) PanelRow(WatchlistWords.WATCHLISTS, onClick = onWatchlists, description = "Titles you saved for later", chevron = true)
+                PanelRow(MANAGE_SERVERS, onClick = onManage, description = "Rename, remove, sign out", chevron = true)
             }
+            KeyHint("Back", "Close", Modifier.padding(start = 10.dp))
         }
         // Where focus opens, and where it goes when a server doesn't answer.
         LaunchedEffect(state.failure?.serverId) {
             withFrameNanos { }
             if (state.failure != null) retry.tryFocus() else first.tryFocus()
         }
+    }
+}
+
+/** What a server's row says under its name: where you are, or what OK does there. No addresses. */
+private fun switcherLine(row: ServersViewModel.Row, who: String): String = when {
+    row.current -> "You are here"
+    row.state == RowState.Switching -> SWITCHING
+    row.state == RowState.SignedOut -> "Signed out here · OK signs in again"
+    row.state == RowState.TooOld -> TOO_OLD_FOR_APP
+    row.userName != null && row.userName != who -> "As ${row.userName} · OK switches to it"
+    else -> "OK switches to it"
+}
+
+/** A server that didn't answer: which, where the TV still is, and Try again, which [retry] gives focus to. Orange, as a warning. */
+@Composable
+private fun SwitchFailure(failure: ServersViewModel.Failure, onRetry: () -> Unit, retry: FocusRequester, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(18.dp)
+    Column(
+        modifier.fillMaxWidth().background(WmmColors.Warn.copy(alpha = 0.1f), shape).border(2.dp, WmmColors.Warn, shape).padding(horizontal = 26.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Text(
+            buildAnnotatedString {
+                withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = WmmColors.Text)) { append(failure.title) }
+                append(" ")
+                append(failure.body)
+            },
+            style = TvType.Second,
+            color = WmmColors.TextSoft,
+            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
+        )
+        TvButton("Try again", onRetry, Modifier.focusRequester(retry), size = TvButtonSize.Small, growFrom = TransformOrigin(0f, 0.5f))
     }
 }
 

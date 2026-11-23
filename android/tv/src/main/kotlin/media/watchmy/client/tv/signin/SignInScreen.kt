@@ -1,6 +1,5 @@
 package media.watchmy.client.tv.signin
 
-import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -8,9 +7,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,6 +28,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -39,9 +44,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.rememberViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.Text
-import media.watchmy.client.model.SavedServer
 import media.watchmy.client.model.displayAddress
-import media.watchmy.client.model.versionLabel
 import media.watchmy.client.tv.components.FocusGrowth
 import media.watchmy.client.tv.components.FocusableBox
 import media.watchmy.client.tv.components.InitialFocus
@@ -49,8 +52,12 @@ import media.watchmy.client.tv.components.Kicker
 import media.watchmy.client.tv.components.KeyboardField
 import media.watchmy.client.tv.components.OnScreenKeyboard
 import media.watchmy.client.tv.components.QrCode
+import media.watchmy.client.tv.components.SafeX
+import media.watchmy.client.tv.components.SafeY
 import media.watchmy.client.tv.components.TvButton
 import media.watchmy.client.tv.components.TvButtonStyle
+import media.watchmy.client.tv.components.TvPalette
+import media.watchmy.client.tv.components.TvType
 import media.watchmy.client.tv.components.inter
 import media.watchmy.client.tv.components.radialGlow
 import media.watchmy.client.ui.LocalAppServices
@@ -62,9 +69,11 @@ import media.watchmy.client.model.PairingState
 import media.watchmy.client.ui.rememberModelTextField
 
 /**
- * Sign in on the TV: a
- * pairing code and QR code for the link page, renewed when it runs out, or a
- * name and password typed on the on-screen keyboard.
+ * Sign in on the TV: "Use your phone to sign in", with two numbered steps,
+ * the code and the square to scan, renewed when it runs out; or a name and
+ * password typed on the on-screen keyboard. The server's address, its
+ * version and the TV's model stay off the screen: what the phone will call
+ * this TV is what helps.
  */
 /**
  * [cancel]: the TV switched to this server for its sign-in (one being added,
@@ -89,7 +98,7 @@ fun SignInScreen(onSwitchServer: () -> Unit, cancel: Boolean = false) {
             .radialGlow(WmmColors.Brand.copy(alpha = 0.42f), 0.86f, 0.14f, 1000.dp, 640.dp)
             .radialGlow(WmmColors.Accent.copy(alpha = 0.07f), 0.06f, 0.96f, 760.dp, 520.dp),
     ) {
-        BrandLockup(markSize = 44.dp, fontSize = 26.sp, modifier = Modifier.padding(start = 58.dp, top = 48.dp))
+        BrandLockup(markSize = 36.dp, fontSize = 24.sp, modifier = Modifier.padding(start = SafeX, top = SafeY))
         if (passwordMode) {
             BackHandler(onBack = vm::useCode)
             PasswordSignIn(vm = vm, state = state, serverName = serverName, onUseCode = vm::useCode)
@@ -102,67 +111,115 @@ fun SignInScreen(onSwitchServer: () -> Unit, cancel: Boolean = false) {
                 onSwitchServer = onSwitchServer,
                 // A server that wants a browser check first refuses password sign-in from apps.
                 passwordAllowed = server?.server?.turnstile != true,
-                switchLabel = if (cancel) "Cancel" else "Switch server",
+                switchLabel = if (cancel) "Cancel" else "Choose another server",
+                deviceName = deviceName,
             )
             if (cancel) BackHandler(onBack = onSwitchServer)
         }
-        Footer(server, deviceName, Modifier.align(Alignment.BottomCenter))
     }
 }
 
 @Composable
-private fun PairingSignIn(vm: SignInViewModel, state: SignInViewModel.State, serverName: String, onPassword: () -> Unit, onSwitchServer: () -> Unit, passwordAllowed: Boolean = true, switchLabel: String = "Switch server") {
+private fun PairingSignIn(
+    vm: SignInViewModel,
+    state: SignInViewModel.State,
+    serverName: String,
+    onPassword: () -> Unit,
+    onSwitchServer: () -> Unit,
+    passwordAllowed: Boolean = true,
+    switchLabel: String = "Choose another server",
+    deviceName: String = "",
+) {
     val pairing = state.pairing ?: PairingState.Starting
+    when (pairing) {
+        is PairingState.Failed -> {
+            // Focus follows the failure: Try again is the first button and takes it.
+            val retry = remember { FocusRequester() }
+            SignInMessage(serverName, "Can’t get a code from $serverName", "${pairing.message.trimEnd('.')}. Nothing was signed in.") {
+                TvButton("Try again", vm::newCode, Modifier.focusRequester(retry), style = TvButtonStyle.Primary, growFrom = TransformOrigin(0f, 0.5f))
+                TvButton(switchLabel, onSwitchServer)
+                if (passwordAllowed) TvButton("Type a password instead", onPassword)
+            }
+            InitialFocus(retry)
+            return
+        }
+        is PairingState.Approved -> {
+            SignInMessage(serverName, "Signed in as ${pairing.user.name}", "Getting your rows from $serverName…") {}
+            return
+        }
+        else -> Unit
+    }
     val first = remember { FocusRequester() }
     val waiting = (pairing as? PairingState.Waiting)?.code
-
-    Column(Modifier.padding(start = 160.dp, top = 236.dp).width(960.dp), verticalArrangement = Arrangement.spacedBy(26.dp)) {
-        Kicker("Sign in")
-        Text("Link this TV to\n$serverName", style = inter(64.sp, FontWeight.Bold, lineHeight = 80.sp, tracking = -0.02f), color = WmmColors.Text)
-        Text(
-            buildAnnotatedString {
-                append("On your phone or computer, open ")
+    Column(Modifier.padding(start = SafeX, top = 182.dp).width(1040.dp)) {
+        Kicker("Sign in to $serverName")
+        Text("Use your phone to sign in", modifier = Modifier.padding(top = 14.dp), style = TvType.Display, color = WmmColors.Text)
+        Column(Modifier.padding(top = 40.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
+            Step(1) { append("Point your phone’s camera at the square on the right.") }
+            Step(2) {
+                append("Or open ")
                 withStyle(SpanStyle(color = WmmColors.Text, fontWeight = FontWeight.SemiBold)) { append(waiting?.let { displayAddress(it.linkUrl) } ?: "the link page") }
-                append(" and enter this code.")
-            },
-            style = inter(26.sp, lineHeight = 38.sp),
-            color = WmmColors.TextSoft,
-            modifier = Modifier.widthIn(max = 820.dp),
-        )
-        CodeBoxes(waiting?.code, Modifier.padding(top = 6.dp))
-        StatusLine(pairing, state.codeRemainingMs)
-        Row(Modifier.padding(top = 26.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-            if (pairing is PairingState.Failed) {
-                TvButton("Try again", vm::newCode, style = TvButtonStyle.Primary)
+                append(" on any phone or computer and type this code:")
             }
-            if (passwordAllowed) TvButton("Sign in with a password instead", onPassword, Modifier.focusRequester(first))
-            TvButton(switchLabel, onSwitchServer, if (passwordAllowed) Modifier else Modifier.focusRequester(first))
+        }
+        Column(Modifier.padding(start = 64.dp)) {
+            CodeBoxes(waiting?.code, Modifier.padding(top = 28.dp))
+            StatusLine(pairing, state.codeRemainingMs, Modifier.padding(top = 30.dp))
+            Row(Modifier.padding(top = 44.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                if (passwordAllowed) TvButton("Type a password instead", onPassword, Modifier.focusRequester(first), growFrom = TransformOrigin(0f, 0.5f))
+                TvButton(switchLabel, onSwitchServer, if (passwordAllowed) Modifier else Modifier.focusRequester(first), growFrom = if (passwordAllowed) TransformOrigin.Center else TransformOrigin(0f, 0.5f))
+            }
         }
     }
-
-    Box(Modifier.fillMaxSize().padding(end = 200.dp, top = 258.dp), contentAlignment = Alignment.TopEnd) {
+    Box(Modifier.fillMaxSize().padding(end = SafeX, top = 292.dp), contentAlignment = Alignment.TopEnd) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(22.dp)) {
             Box(
-                Modifier.size(392.dp).background(Color.White, RoundedCornerShape(22.dp)).padding(26.dp),
+                Modifier.size(400.dp).background(Color.White, RoundedCornerShape(24.dp)).padding(36.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 if (waiting != null) {
-                    QrCode(waiting.linkUrl, contentDescription = "QR code for the link page", modifier = Modifier.fillMaxSize())
+                    QrCode(waiting.linkUrl, contentDescription = "A code to scan that opens the link page", modifier = Modifier.fillMaxSize())
                 }
             }
-            Text("Or scan to open the link page", style = inter(22.sp), color = WmmColors.TextMuted)
+            Text("Scan to open the link page", style = TvType.Second, color = WmmColors.TextSoft)
+        }
+    }
+    if (deviceName.isNotBlank()) {
+        Box(Modifier.fillMaxSize().padding(start = SafeX, bottom = SafeY), contentAlignment = Alignment.BottomStart) {
+            Text("Your phone will show this TV as “$deviceName”, so you can check it’s yours.", style = TvType.Second, color = TvPalette.Muted)
         }
     }
     InitialFocus(first)
 }
 
-/** The code in two groups of three with a dash between, as the link page asks for it. */
+/** A numbered step: the number in a round chip, then its words at 28. */
+@Composable
+private fun Step(n: Int, words: AnnotatedString.Builder.() -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+        Box(Modifier.size(44.dp).background(WmmColors.Surface3, CircleShape), contentAlignment = Alignment.Center) {
+            Text("$n", style = TvType.Second.copy(fontWeight = FontWeight.Bold), color = WmmColors.Text)
+        }
+        Text(buildAnnotatedString(words), style = TvType.CardTitle.copy(fontWeight = FontWeight.Normal, lineHeight = 36.sp), color = WmmColors.TextSoft, modifier = Modifier.padding(top = 2.dp))
+    }
+}
+
+/** A sign-in state that replaces the code: the server's name, what happened, why, and its buttons (the first takes focus). */
+@Composable
+private fun SignInMessage(serverName: String, title: String, body: String, buttons: @Composable RowScope.() -> Unit) {
+    Column(Modifier.padding(start = SafeX, top = 354.dp).widthIn(max = 1400.dp)) {
+        Kicker(serverName)
+        Text(title, modifier = Modifier.padding(top = 14.dp), style = TvType.Display, color = WmmColors.Text)
+        Text(body, modifier = Modifier.padding(top = 20.dp).widthIn(max = 860.dp), style = TvType.Body, color = WmmColors.TextSoft)
+        Row(Modifier.padding(top = 36.dp), horizontalArrangement = Arrangement.spacedBy(24.dp), content = buttons)
+    }
+}
+
+/** The code in two groups of three, a gap between them, as the link page asks for it. */
 @Composable
 private fun CodeBoxes(code: String?, modifier: Modifier = Modifier) {
     val chars = (code ?: "").padEnd(6).take(6)
-    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+    Row(modifier.semantics(mergeDescendants = true) { contentDescription = "Code: ${chars.trim().toList().joinToString(" ")}" }, horizontalArrangement = Arrangement.spacedBy(32.dp)) {
         CodeGroup(chars.substring(0, 3))
-        Box(Modifier.size(22.dp, 6.dp).background(WmmColors.Line3, RoundedCornerShape(3.dp)))
         CodeGroup(chars.substring(3))
     }
 }
@@ -173,29 +230,29 @@ private fun CodeGroup(chars: String) {
         for (c in chars) {
             Box(
                 Modifier
-                    .size(92.dp, 116.dp)
-                    .background(WmmColors.Surface2, RoundedCornerShape(16.dp))
-                    .border(1.dp, WmmColors.Line2, RoundedCornerShape(16.dp)),
+                    .size(96.dp, 120.dp)
+                    .background(WmmColors.Surface, RoundedCornerShape(16.dp))
+                    .border(2.dp, TvPalette.Line3, RoundedCornerShape(16.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(c.toString().trim(), style = inter(64.sp, FontWeight.ExtraBold), color = WmmColors.Text)
+                Text(c.toString().trim(), style = inter(72.sp, FontWeight.Bold), color = WmmColors.Text)
             }
         }
     }
 }
 
 @Composable
-private fun StatusLine(pairing: PairingState, remainingMs: Long) {
-    val (text, color) = when (pairing) {
-        PairingState.Starting, PairingState.Expired -> "Getting a code…" to WmmColors.TextMuted
-        is PairingState.Waiting ->
-            "Waiting for the code · refreshes in ${countdownLabel(remainingMs)} · this TV signs in by itself once it is entered" to WmmColors.TextMuted
-        is PairingState.Approved -> "Code accepted. Signing in…" to WmmColors.Accent
-        is PairingState.Failed -> pairing.message to WmmColors.Error
+private fun StatusLine(pairing: PairingState, remainingMs: Long, modifier: Modifier = Modifier) {
+    val text = when (pairing) {
+        PairingState.Starting -> "Getting a code…"
+        PairingState.Expired -> "That code ran out. Getting a new one…"
+        is PairingState.Waiting -> "Waiting for your phone. This TV signs in by itself, and the code lasts another ${countdownLabel(remainingMs)}."
+        is PairingState.Approved -> "Code accepted. Signing in…"
+        is PairingState.Failed -> pairing.message
     }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(Modifier.size(12.dp).background(if (pairing is PairingState.Failed) WmmColors.Error else WmmColors.Accent, CircleShape))
-        Text(text, style = inter(22.sp), color = color)
+    Row(modifier.semantics { liveRegion = LiveRegionMode.Polite }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Box(Modifier.size(16.dp).background(WmmColors.Accent, CircleShape))
+        Text(text, style = TvType.Second, color = WmmColors.TextSoft)
     }
 }
 
@@ -215,10 +272,10 @@ private fun PasswordSignIn(vm: SignInViewModel, state: SignInViewModel.State, se
     var target by rememberSaveable { mutableStateOf(if (form.name.isBlank()) Field.Name else Field.Password) }
     val firstKey = remember { FocusRequester() }
 
-    Column(Modifier.padding(start = 160.dp, top = 200.dp).width(760.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
-        Kicker("Sign in")
-        Text("Sign in to\n$serverName", style = inter(64.sp, FontWeight.Bold, lineHeight = 80.sp, tracking = -0.02f), color = WmmColors.Text)
-        Text("Use the name and password you sign in with on the web app.", style = inter(24.sp, lineHeight = 34.sp), color = WmmColors.TextMuted)
+    Column(Modifier.padding(start = SafeX, top = 182.dp).width(760.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
+        Kicker("Sign in to $serverName")
+        Text("Type your name and password", style = TvType.Title, color = WmmColors.Text)
+        Text("The ones you sign in with on the web.", style = TvType.Body, color = WmmColors.TextSoft)
         Spacer(Modifier.height(4.dp))
         FormField("Name", nameField.text.toString(), masked = false, active = target == Field.Name) {
             target = Field.Name
@@ -228,14 +285,14 @@ private fun PasswordSignIn(vm: SignInViewModel, state: SignInViewModel.State, se
             target = Field.Password
             firstKey.requestFocus()
         }
-        Text(form.error ?: " ", style = inter(22.sp), color = WmmColors.Error)
+        Text(form.error ?: " ", style = TvType.Second, color = WmmColors.Warn)
         Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             TvButton(if (form.busy) "Signing in…" else "Sign in", submit, style = TvButtonStyle.Primary, enabled = !form.busy)
             TvButton("Use a code instead", onUseCode)
         }
     }
 
-    Box(Modifier.fillMaxSize().padding(end = 160.dp, top = 330.dp), contentAlignment = Alignment.TopEnd) {
+    Box(Modifier.fillMaxSize().padding(end = SafeX, top = 292.dp), contentAlignment = Alignment.TopEnd) {
         OnScreenKeyboard(
             field = if (target == Field.Name) nameField else passwordField,
             masked = target == Field.Password,
@@ -250,22 +307,9 @@ private fun PasswordSignIn(vm: SignInViewModel, state: SignInViewModel.State, se
 @Composable
 private fun FormField(label: String, value: String, masked: Boolean, active: Boolean, onClick: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(label, style = inter(22.sp), color = WmmColors.TextMuted)
+        Text(label, style = TvType.Second, color = TvPalette.Muted)
         FocusableBox(onClick = onClick, cornerRadius = 14.dp, focusedScale = FocusGrowth.ROW) {
             KeyboardField(value, placeholder = if (masked) "Password" else "Your name", masked = masked, active = active)
         }
-    }
-}
-
-@Composable
-private fun Footer(server: SavedServer?, deviceName: String, modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth().padding(start = 58.dp, end = 58.dp, bottom = 44.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        val s = server?.server
-        Text(
-            if (s != null) "${s.name} · ${displayAddress(s.baseUrl)} · ${versionLabel(s.version)}" else "",
-            style = inter(22.sp),
-            color = WmmColors.TextFaint,
-        )
-        Text("This device: $deviceName · ${Build.MODEL}", style = inter(22.sp), color = WmmColors.TextFaint)
     }
 }
