@@ -7,12 +7,18 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// TvLivePlayer's linear live transport and Channels/Quality tabs, entirely
-/// separate from the file player's seek, subtitles and next-episode behavior.
+/// The live player: the system's transport bar at the live edge with
+/// Record, Channel down and Channel up as its buttons, Channels and Quality
+/// as its tabs, and a banner after every channel change saying it is live,
+/// what is on, how long is left and what is next. Nothing about the stream
+/// is on the picture. Page Up and Page Down change channel with the banner
+/// at once; Back leaves for the guide, on this channel. A channel that
+/// can't play says why in a sheet, the most useful thing to do first.
 struct LivePlayerScreen: View {
     let request: LivePlayRequest
     @Environment(AppServices.self) private var services
     @Environment(Navigator.self) private var navigator
+    @Environment(LiveRecordingsStore.self) private var recordings
     @Environment(\.scenePhase) private var scenePhase
     @State private var model: TVLivePlayerModel?
 
@@ -26,22 +32,29 @@ struct LivePlayerScreen: View {
         .accessibilityIdentifier("live-player-screen")
         .onAppear {
             guard model == nil, let factory = services.livePlayback else { return }
-            let model = TVLivePlayerModel(request: request, repository: services.liveTV, controller: factory.make(), onExit: { navigator.closePlayer() })
+            let model = TVLivePlayerModel(request: request, repository: services.liveTV, controller: factory.make(),
+                                          recordings: recordings, onExit: { navigator.closePlayer() })
             self.model = model
             model.start()
+            TVLiveWatching.shared.watched(request.channel)
             #if DEBUG
             if let fake = model.controller as? FakeLivePlaybackController {
                 let args = ProcessInfo.processInfo.arguments
                 if args.contains("-liveStillWatching") { fake.showStillWatching() }
                 if args.contains("-livePauseExpired") { fake.showStopped(reason: "pause_expired") }
                 if args.contains("-liveBusy") { fake.showError(reason: "tuners_busy") }
+                if args.contains("-liveNoSignal") { fake.showError(reason: "no_signal") }
                 if args.contains("-liveTakeover") { fake.showTakeover() }
                 if args.contains("-liveTakenOver") { fake.showStopped(reason: "recording") }
                 if args.contains("-liveAutoLow") { fake.setAutomaticStep(.p480) }
             }
             #endif
         }
-        .onDisappear { model?.dispose() }
+        .onChange(of: model?.state.channel?.id) { _, _ in TVLiveWatching.shared.watched(model?.state.channel) }
+        .onDisappear {
+            model?.dispose()
+            TVLiveWatching.shared.playerClosed()
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { model?.enteredBackground() }
             else if phase == .active { model?.becameActive() }
@@ -82,9 +95,21 @@ private struct TVLivePlayerContent: View {
             // AVKit closes its own info panel first; only bubbled commands reach the app.
             .onExitCommand {
                 if previewPanel != nil { previewPanel = nil; return }
+                if problem != nil { backToGuide(); return }
                 if model.back(bannerShowing: banner != nil) == .closeBanner { closedBanner = banner?.id }
             }
             .onPlayPauseCommand { model.playPause() }
+            .tvLiveSheet(item: Binding(get: { model.clash }, set: { model.clash = $0 })) { found in
+                TVLiveRecordingClashView(clash: found) { kept in
+                    if kept { recordings.message = found.kept }
+                    model.clash = nil
+                }
+            }
+    }
+
+    /// What the channel can't do, in the viewer's words; nil while it plays.
+    private var problem: TVLiveProblem? {
+        TVLiveProblem(state: model.state, recordingNow: recordings.page(.now)?.items ?? [], otherChannels: model.changesChannel)
     }
 
     private var content: some View {
@@ -99,98 +124,133 @@ private struct TVLivePlayerContent: View {
                 )
                     .disabled(!model.videoTakesInput || previewPanel != nil || model.goTo != nil)
             }
-            if let previewPanel, model.overlay == nil {
-                // The fake player has no AVPlayerItem, so AVKit cannot open its
-                // native tabs. The same panel content is reachable for UI checks.
-                LiveOptions(model: model, panel: previewPanel, extras: extras, recordings: recordings)
-                    .padding(.horizontal, TVLayout.gutter)
-                    .padding(.bottom, 60)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
-            }
-            switch model.overlay {
-            case .stillWatching:
-                prompt(title: "Are you still watching?", message: "Live TV stops in \(model.state.stillWatchingSeconds) seconds so the tuner is free for someone else.") {
-                    Button("Keep watching") { model.answerStillWatching(keepWatching: true) }
-                        .buttonStyle(TVButtonStyle(kind: .primary)).focused($focused, equals: "keep")
-                        .accessibilityIdentifier("live-keep-watching")
-                    Button("Stop watching") { model.answerStillWatching(keepWatching: false) }
-                        .buttonStyle(TVButtonStyle()).accessibilityIdentifier("live-stop-watching")
+            if let problem, previewPanel == nil {
+                problemSheet(problem)
+            } else if model.overlay == .stillWatching {
+                TVSheet(width: 900) {
+                    Text("Are you still watching?").font(.tv(.title3)).foregroundStyle(Palette.text)
+                    Text("Live TV stops in \(model.state.stillWatchingSeconds) seconds so the tuner is free for someone else.")
+                        .font(.tv(.body)).foregroundStyle(Palette.textSecondary)
+                    VStack(spacing: 12) {
+                        TVSheetRow(title: "Keep watching") { model.answerStillWatching(keepWatching: true) }
+                            .focused($focused, equals: "keep")
+                            .accessibilityIdentifier("live-keep-watching")
+                        TVSheetRow(title: "Stop watching") { model.answerStillWatching(keepWatching: false) }
+                            .accessibilityIdentifier("live-stop-watching")
+                    }
+                    .padding(.top, 8)
+                    .focusSection()
                 }
                 .defaultFocus($focused, "keep", priority: .userInitiated)
-            case .failed(let message):
-                prompt(title: "Can't play this channel", message: message) {
-                    Button("Try again") { model.retry() }
-                        .buttonStyle(TVButtonStyle(kind: .primary)).focused($focused, equals: "retry")
-                        .accessibilityIdentifier("live-retry")
-                    Button("Back") { model.close() }.buttonStyle(TVButtonStyle()).accessibilityIdentifier("live-back")
-                }
-                .defaultFocus($focused, "retry", priority: .userInitiated)
-            case .stopped:
-                prompt(title: model.state.stoppedTitle, message: model.state.stoppedMessage) {
-                    // Only once a recording took the tuner (reason "recording"), not for a warning before it.
-                    if let taken = model.state.stoppedForRecording {
-                        Button("Watch it from the start") { model.close(); navigator.play(.init(fileID: 0, startMs: 0, title: taken.title, recordingID: taken.recordingID)) }
-                            .buttonStyle(TVButtonStyle(kind: .primary)).accessibilityIdentifier("live-watch-recording")
-                    }
-                    Button("Watch live") { model.retry() }
-                        .buttonStyle(TVButtonStyle(kind: .primary)).focused($focused, equals: "retry")
-                        .accessibilityIdentifier("live-retry")
-                    Button("Back") { model.close() }.buttonStyle(TVButtonStyle()).accessibilityIdentifier("live-back")
-                }
-                .defaultFocus($focused, "retry", priority: .userInitiated)
-            case nil:
-                EmptyView()
             }
-            // Like the reminder banner it never takes focus: a swipe down reaches Don't record it, first in Channels.
+            if let previewPanel, model.overlay == nil || problem != nil {
+                // The fake player has no AVPlayerItem, so AVKit cannot open its
+                // native tabs; and a channel that can't play shows Other
+                // channels here. The same panel content either way.
+                LiveOptions(model: model, panel: previewPanel, extras: extras, recordings: recordings)
+                    .padding(.horizontal, TVLayout.gutter)
+                    .padding(.bottom, TVLayout.safeBottom)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+            }
+            // Like the reminder banner it never takes focus: Don't record it is first in Channels.
             if let takeover = model.state.takeover, model.overlay == nil {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(takeover.message()).font(.system(size: 26, weight: .bold)).foregroundStyle(Palette.warning)
-                    Text(takeover.title).font(.system(size: 22)).foregroundStyle(Palette.textSecondary)
-                    if model.cancellableTakeover != nil {
-                        TVLiveHint(systemImage: "chevron.down", text: "Swipe down · Don’t record it")
-                    }
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(takeover.message()).font(.tv(.body, .semibold)).foregroundStyle(Palette.warning)
+                    Text(takeover.title).font(.tv(.caption1)).foregroundStyle(Palette.textSecondary)
                 }
-                .padding(24).frame(maxWidth: 1000, alignment: .leading)
-                .background(Palette.sheet, in: RoundedRectangle(cornerRadius: 20))
-                .padding(.top, 50).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .padding(.horizontal, 34).padding(.vertical, 24).frame(maxWidth: 1100, alignment: .leading)
+                .background(Color(hex: 0x18181B).opacity(0.96), in: RoundedRectangle(cornerRadius: 24))
+                .padding(.top, TVLayout.safeTop).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .allowsHitTesting(false)
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("live-recording-takeover")
             }
-            // A Live TV reminder: Swipe down opens Channels with it first (TvLiveReminder's `bannerPlayer`).
+            // A Live TV reminder: Channels shows it first.
             if let reminder = banner, model.overlay == nil {
                 TVLiveReminderBanner(reminder: reminder, inPlayer: true)
-                    .padding(.top, 60)
+                    .padding(.top, TVLayout.safeTop)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             }
-            // Page Up and Down's note and Go to channel.
+            // Go to channel's keypad.
             if model.overlay == nil { LiveChannelKeysLayer(model: model) }
         }
         .animation(.easeOut(duration: 0.3), value: banner)
+        .messagePill(Binding(get: { model.clash == nil ? recordings.message : nil }, set: { recordings.message = $0 }))
+        // No tuner free: what is recording now, to offer from its start.
+        .task(id: model.state.stopReason) {
+            if model.state.status == .error, model.state.stopReason == "tuners_busy", recordings.available { await recordings.load(.now, force: true) }
+        }
     }
 
-    /// The reminder banner, unless Menu put it away (TvLiveReminder's `bannerPlayer`).
+    /// The reminder banner, unless Menu put it away.
     private var banner: LiveReminder? {
         guard let banner = extras.banner, banner.id != closedBanner else { return nil }
         return banner
     }
 
-    private func prompt<Actions: View>(title: String, message: String, @ViewBuilder actions: () -> Actions) -> some View {
-        ZStack {
-            Color.black.opacity(0.75)
-            VStack(spacing: 24) {
-                Text(title).font(.system(size: 44, weight: .bold))
-                Text(model.state.channel?.title ?? "Live TV").font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.gold)
-                Text(message).font(.system(size: 22)).foregroundStyle(Palette.muted).multilineTextAlignment(.center)
-                HStack(spacing: 24, content: actions).padding(.top, 12).frame(maxWidth: .infinity).focusSection()
+    /// Why the channel can't play, then what can be done, the first focused.
+    private func problemSheet(_ problem: TVLiveProblem) -> some View {
+        TVSheet {
+            Text(problem.title).font(.tv(.title3)).foregroundStyle(Palette.text)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("live-problem-title")
+            Text(problem.why).font(.tv(.body)).foregroundStyle(Palette.textSecondary)
+            VStack(spacing: 12) {
+                ForEach(Array(problem.rows.enumerated()), id: \.element.id) { index, row in
+                    TVSheetRow(title: row.title, value: row.value) { perform(row.action) }
+                        .focused($focused, equals: index == 0 ? "problem-first" : "problem-\(index)")
+                        .accessibilityIdentifier(identifier(row.action))
+                }
             }
-            .padding(48).frame(width: 900)
-            .background(Palette.sheet.opacity(0.97), in: RoundedRectangle(cornerRadius: 28))
+            .padding(.top, 8)
+            .focusSection()
         }
-        .foregroundStyle(Palette.text)
+        .defaultFocus($focused, "problem-first", priority: .userInitiated)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("live-problem")
+    }
+
+    private func identifier(_ action: TVLiveProblem.Action) -> String {
+        switch action {
+        case .watch: "live-watch-recording"
+        case .stopARecording: "live-stop-a-recording"
+        case .tryAgain: "live-retry"
+        case .otherChannels: "live-other-channels"
+        case .backToGuide: "live-back"
+        }
+    }
+
+    private func perform(_ action: TVLiveProblem.Action) {
+        switch action {
+        case .watch(let request):
+            model.close()
+            navigator.play(request)
+        case .stopARecording:
+            model.close()
+            navigator.setPath([.liveRecordings], for: .liveTV)
+            if navigator.tab != .liveTV { navigator.select(.liveTV) }
+        case .tryAgain:
+            model.retry()
+        case .otherChannels:
+            previewPanel = .channels
+        case .backToGuide:
+            backToGuide()
+        }
+    }
+
+    /// Leaves for the guide, on the channel watched.
+    private func backToGuide() {
+        model.close()
+        if navigator.tab != .liveTV {
+            navigator.setPath([], for: .liveTV)
+            navigator.select(.liveTV)
+        }
     }
 }
 
+/// Over the picture: the banner for a few seconds after a channel change,
+/// and with the transport bar; a spinner while tuning; Automatic's note when
+/// it changes quality.
 private struct LiveVideoOverlay: View {
     let model: TVLivePlayerModel
     let standIn: Bool
@@ -203,48 +263,25 @@ private struct LiveVideoOverlay: View {
                 Artwork(url: nil, seed: state.channel?.name ?? "Live TV", maxPixel: 1920)
                     .overlay(.black.opacity(0.45))
             }
-            if let channel = model.listedChannel, banner || model.transportBarVisible || standIn || state.status == .paused {
+            if banner || model.transportBarVisible || standIn || state.status == .paused {
                 TimelineView(.periodic(from: .now, by: 30)) { context in
-                    TVLiveBanner(channel: channel, now: context.date, state: state)
+                    TVLiveBanner(channel: model.listedChannel ?? state.channel, now: context.date, state: state, barUp: model.transportBarVisible)
                 }
-            } else if banner || model.transportBarVisible || standIn || state.status == .paused {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack(spacing: 16) {
-                        Text(state.status == .tuning ? "TUNING" : state.isAtLiveEdge && state.status != .paused ? "LIVE" : "BEHIND LIVE")
-                            .font(.system(size: 17, weight: .bold)).tracking(1.2)
-                            .padding(.horizontal, 14).padding(.vertical, 7)
-                            .background(Color(hex: 0xB42318), in: Capsule())
-                        Text(state.qualityLabel).font(.system(size: 20)).foregroundStyle(Palette.textSecondary)
-                            .accessibilityIdentifier("live-player-quality")
-                        Spacer()
-                        Text("Swipe down for Channels and Quality").font(.system(size: 20)).foregroundStyle(Palette.muted)
-                    }
-                    Text(state.channel?.title ?? "Live TV").font(.system(size: 44, weight: .bold))
-                        .accessibilityIdentifier("live-player-title")
-                    Text("No programme listings").font(.system(size: 20)).foregroundStyle(Palette.muted)
-                    if state.status == .paused {
-                        Text("Paused · \(liveTunerReleasesIn(seconds: state.pauseRemainingSeconds))")
-                            .font(.system(size: 22)).foregroundStyle(Palette.gold)
-                    }
-                }
-                .padding(TVLayout.gutter)
-                .background(LinearGradient(colors: [.black.opacity(0.8), .clear], startPoint: .top, endPoint: .bottom))
-                .frame(maxHeight: .infinity, alignment: .top)
+                .transition(.opacity)
             }
             if state.status == .tuning || state.status == .buffering {
-                ProgressView(state.status == .tuning ? "Tuning channel" : "Buffering").tint(Palette.gold)
+                TVSpinner()
             }
-            if let message = state.message {
-                Text(message).font(.system(size: 22)).padding(20).background(Palette.ground.opacity(0.9), in: Capsule())
-                    .padding(.bottom, 260).frame(maxHeight: .infinity, alignment: .bottom)
-            }
-            if let message = state.switchMessage {
-                Text(message).font(.system(size: 20)).padding(18).background(Palette.ground.opacity(0.9), in: Capsule())
-                    .padding(.bottom, 330).frame(maxHeight: .infinity, alignment: .bottom)
-                    .accessibilityIdentifier("live-switch-message")
+            if let message = state.message ?? state.switchMessage {
+                Text(message).font(.tv(.caption1, .semibold))
+                    .padding(.horizontal, 28).padding(.vertical, 16)
+                    .background(Color(hex: 0x18181B).opacity(0.92), in: RoundedRectangle(cornerRadius: 20))
+                    .padding(.top, TVLayout.safeTop).frame(maxHeight: .infinity, alignment: .top)
+                    .accessibilityIdentifier(state.message == nil ? "live-switch-message" : "live-message")
             }
         }
         .foregroundStyle(Palette.text)
+        .animation(.easeOut(duration: 0.25), value: banner)
         .task(id: model.listings) { if model.listings { await model.live.followSchedule() } }
         .task(id: state.channel?.id) {
             banner = true
@@ -255,11 +292,62 @@ private struct LiveVideoOverlay: View {
     }
 }
 
+/// The banner at the foot of the picture: live (or behind, or paused) and the
+/// channel, the programme, its episode, then how long is left in gold, its
+/// times and what is next. Above the transport bar while the bar is up.
+private struct TVLiveBanner: View {
+    let channel: LiveChannel?
+    let now: Date
+    let state: LivePlayerState
+    let barUp: Bool
+
+    var body: some View {
+        let programme = channel?.programme(at: now)
+        let name = channel.map { "\($0.number) \($0.name)" } ?? "Live TV"
+        VStack(alignment: .leading, spacing: 12) {
+            TVKicker(text: "\(status) · \(name)", color: Palette.text, live: state.status != .paused && state.status != .tuning)
+            Text(programme?.title ?? channel?.name ?? "Live TV")
+                .font(.tv(.title3)).lineLimit(1)
+                .accessibilityIdentifier("live-player-title")
+            if let programme {
+                if let line = programme.episodeLine {
+                    Text(line).font(.tv(.body)).foregroundStyle(Palette.textSecondary).lineLimit(1)
+                }
+                FactsLine(lead: liveTimeLeft(programme, now: now), parts: [LiveClock.device.range(programme.start, programme.end)],
+                          after: [channel?.programme(after: now).map { "Next: \($0.title)" }].compactMap { $0 })
+            } else {
+                Text("No programme listings").font(.tv(.body)).foregroundStyle(Palette.textSecondary)
+            }
+            if state.status == .paused {
+                Text("Paused · \(liveTunerReleasesIn(seconds: state.pauseRemainingSeconds))")
+                    .font(.tv(.body, .semibold)).foregroundStyle(Palette.gold)
+            }
+        }
+        .frame(maxWidth: 1200, alignment: .leading)
+        .padding(.horizontal, TVLayout.gutter)
+        .padding(.bottom, barUp ? 300 : TVLayout.safeBottom)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        .background(LinearGradient(stops: [.init(color: .black.opacity(0.55), location: 0), .init(color: .clear, location: 0.22),
+                                           .init(color: .clear, location: 0.46), .init(color: .black.opacity(0.88), location: 1)],
+                                   startPoint: .top, endPoint: .bottom))
+        .accessibilityElement(children: .contain)
+    }
+
+    /// "Live", "Behind live", "Paused" or "Tuning".
+    private var status: String {
+        switch state.status {
+        case .tuning: "Tuning"
+        case .paused: "Paused"
+        default: state.isAtLiveEdge ? "Live" : "Behind live"
+        }
+    }
+}
+
 /// Live TV on the shared ``SystemPlayer``: AVKit keeps its familiar
-/// transport, but seeking and file skips are off; Last channel, Ch−, Ch+, Go
-/// to channel and Stop are its transport bar's buttons and Go live its
-/// contextual action, Page Up, Page Down and the 123 key change channel,
-/// Channels and Quality are its tabs, and picture in picture stays on.
+/// transport, but seeking and file skips are off; Record, Channel down and
+/// Channel up are its transport bar's buttons and Go live its contextual
+/// action, Page Up, Page Down and the 123 key change channel, Channels and
+/// Quality are its tabs, and picture in picture stays on.
 private extension SystemPlayerBehavior where Action == TVLivePlayerAction {
     @MainActor static func live(_ model: TVLivePlayerModel, extras: LiveExtrasStore, recordings: LiveRecordingsStore) -> Self {
         Self(
@@ -305,13 +393,17 @@ private final class LiveOptionsController: UIHostingController<LiveOptions> {
     init(model: TVLivePlayerModel, panel: LivePanel, extras: LiveExtrasStore, recordings: LiveRecordingsStore) {
         super.init(rootView: LiveOptions(model: model, panel: panel, extras: extras, recordings: recordings))
         title = panel.title
-        preferredContentSize = CGSize(width: 1920, height: 430)
+        preferredContentSize = CGSize(width: 1920, height: LiveOptions.height)
         view.backgroundColor = .clear
     }
     @available(*, unavailable)
     @MainActor required dynamic init?(coder: NSCoder) { fatalError("not used") }
 }
 
+/// The Channels and Quality tabs. Channels opens on the channel being
+/// watched, with Last channel and Go to channel to its left and the others
+/// to its right; Don't record it comes first while a recording is about to
+/// take the tuner, and a reminder due now comes first among the channels.
 private struct LiveOptions: View {
     let model: TVLivePlayerModel
     let panel: LivePanel
@@ -320,6 +412,8 @@ private struct LiveOptions: View {
     let recordings: LiveRecordingsStore
     @FocusState private var focus: String?
     @State private var takeoverError: String?
+
+    static let height: CGFloat = 440
 
     /// A reminder due now, and the channel it is on, which comes first and takes focus.
     private var due: (reminder: LiveReminder, channel: LiveChannel)? {
@@ -339,53 +433,28 @@ private struct LiveOptions: View {
         if model.cancellableTakeover != nil { return "takeover" }
         return due?.channel.id ?? model.state.channel?.id
     }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text(panel.title).font(.system(size: 28, weight: .bold)).accessibilityIdentifier("live-panel-\(panel.rawValue)")
+        VStack(alignment: .leading, spacing: 18) {
+            // AVKit names the tab; this names the panel for VoiceOver and the UI tests.
+            Text(panel.title).font(.tv(.caption2, .bold)).foregroundStyle(.clear).frame(height: 1)
+                .accessibilityIdentifier("live-panel-\(panel.rawValue)")
             if panel == .channels, let takeover = model.cancellableTakeover {
                 takeoverRow(takeover)
             }
             if panel == .channels {
                 // Asked again as time passes and when the banner comes, so a reminder that comes due moves first.
-                TimelineView(.periodic(from: .now, by: 15)) { _ in
-                    let due = extras.banner == nil ? self.due : self.due
-                    VStack(alignment: .leading, spacing: 20) {
-                        channelCards(due)
-                        if due != nil {
-                            Text(liveReminderPanelNote).font(.system(size: 16)).foregroundStyle(Palette.faint)
-                        }
-                    }
+                TimelineView(.periodic(from: .now, by: 15)) { context in
+                    channelCards(extras.banner == nil ? due : due, now: context.date)
                 }
             } else {
-                Text(model.state.qualities.contains(.auto)
-                     ? "Automatic adjusts to this connection. Fixed quality tunes this channel again, at live."
-                     : "Changing quality tunes this channel again, at live.")
-                    .font(.system(size: 20)).foregroundStyle(Palette.muted)
-                if model.state.quality == .auto {
-                    Text("Now \(model.state.qualityLabel)").font(.system(size: 19)).foregroundStyle(Palette.gold)
-                }
-                HStack(spacing: 30) {
-                    ForEach(model.state.qualities, id: \.self) { quality in
-                        Button {
-                            model.pickQuality(quality)
-                        } label: {
-                            if quality == model.state.quality {
-                                Text("\(Image(systemName: "checkmark")) \(quality.title)")
-                            } else {
-                                Text(quality.title)
-                            }
-                        }
-                        .buttonStyle(TVChipStyle(selected: quality == model.state.quality, height: 58, fontSize: 24))
-                        .focused($focus, equals: quality.rawValue)
-                        .accessibilityIdentifier("live-quality-option-\(quality.rawValue)")
-                    }
-                }.padding(.vertical, 20).frame(maxWidth: .infinity, alignment: .leading).focusSection()
+                quality
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, TVLayout.gutter - 20).padding(.vertical, 24)
-        .frame(height: 430)
-        .background(Palette.sheet.opacity(0.96), in: RoundedRectangle(cornerRadius: 28))
+        .padding(.horizontal, 40).padding(.vertical, 24)
+        .frame(height: Self.height)
+        .background(Color(hex: 0x1E1E22).opacity(0.98), in: RoundedRectangle(cornerRadius: 32))
         .defaultFocus($focus, initialFocus, priority: .userInitiated)
         .onAppear {
             // AVKit and the stand-in host can already have focus when this panel
@@ -394,12 +463,33 @@ private struct LiveOptions: View {
         }
     }
 
+    private var quality: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(model.state.qualities.contains(.auto)
+                 ? "Automatic adjusts to this connection. A fixed quality tunes this channel again, at live."
+                 : "Changing quality tunes this channel again, at live.")
+                .font(.tv(.body)).foregroundStyle(Palette.textSecondary)
+            HStack(spacing: 24) {
+                ForEach(model.state.qualities, id: \.self) { quality in
+                    Button(quality.title) { model.pickQuality(quality) }
+                        .buttonStyle(TVChipStyle(selected: quality == model.state.quality))
+                        .focused($focus, equals: quality.rawValue)
+                        .accessibilityIdentifier("live-quality-option-\(quality.rawValue)")
+                }
+            }
+            .padding(.vertical, 12).frame(maxWidth: .infinity, alignment: .leading).focusSection()
+            // What is playing, a press away rather than on the picture.
+            Text("Now \(model.state.qualityLabel)").font(.tv(.caption1)).foregroundStyle(Palette.muted)
+                .accessibilityIdentifier("live-player-quality")
+        }
+    }
+
     /// The takeover banner's action, which the banner itself can't take focus for.
     private func takeoverRow(_ takeover: LiveRecordingTakeover) -> some View {
         HStack(spacing: 24) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(takeover.message()).font(.system(size: 22, weight: .semibold)).foregroundStyle(Palette.warning)
-                Text(takeoverError ?? takeover.title).font(.system(size: 18)).foregroundStyle(takeoverError == nil ? Palette.muted : Palette.warning)
+                Text(takeover.message()).font(.tv(.body, .semibold)).foregroundStyle(Palette.warning)
+                Text(takeoverError ?? takeover.title).font(.tv(.caption2)).foregroundStyle(takeoverError == nil ? Palette.muted : Palette.warning)
             }
             Spacer(minLength: 0)
             Button("Don’t record it") {
@@ -410,7 +500,7 @@ private struct LiveOptions: View {
                     }
                 }
             }
-            .buttonStyle(TVChipStyle(selected: false, height: 58, fontSize: 24))
+            .buttonStyle(TVChipStyle(selected: false))
             .disabled(recordings.changing.contains(takeover.recordingID))
             .focused($focus, equals: "takeover")
             .accessibilityIdentifier("live-takeover-cancel")
@@ -418,123 +508,84 @@ private struct LiveOptions: View {
         .frame(maxWidth: .infinity).focusSection()
     }
 
-    private func channelCards(_ due: (reminder: LiveReminder, channel: LiveChannel)?) -> some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 24) {
-                ForEach(channels) { channel in
-                    Group {
-                        if model.listings {
-                            Button { model.switchChannel(channel) } label: {
-                                TimelineView(.periodic(from: .now, by: 30)) { context in
+    /// Last channel and Go to channel, then the channels from the one being watched.
+    private func channelCards(_ due: (reminder: LiveReminder, channel: LiveChannel)?, now: Date) -> some View {
+        ScrollViewReader { reader in
+            ScrollView(.horizontal) {
+                HStack(alignment: .top, spacing: TVLayout.cardSpacing) {
+                    ForEach(model.channelsPanelActions(now: now)) { action in
+                        Button { model.perform(action.kind) } label: {
+                            LiveTile(title: action.kind == .lastChannel ? (action.channel ?? action.title) : action.title,
+                                     line: action.kind == .lastChannel ? action.title : action.subtitle ?? "",
+                                     lineFirst: action.kind == .lastChannel)
+                        }
+                        .buttonStyle(TVLiveCardButtonStyle())
+                        .focused($focus, equals: action.kind.rawValue)
+                        .accessibilityLabel(action.accessibilityLabel)
+                        .accessibilityIdentifier("live-\(action.kind.rawValue)")
+                    }
+                    ForEach(channels) { channel in
+                        Group {
+                            if model.listings {
+                                Button { model.switchChannel(channel) } label: {
                                     let reminder = due?.channel.id == channel.id ? due?.reminder : nil
-                                    TVLiveOnNowCard(channel: channel, now: context.date, watching: channel.id == model.state.channel?.id, width: 330,
+                                    TVLiveOnNowCard(channel: channel, now: now, watching: channel.id == model.state.channel?.id, width: TVCardWidth.wide,
                                                     reminder: reminder, reminderProgramme: reminder.flatMap(extras.programme(for:)))
                                 }
+                                .buttonStyle(TVLiveCardButtonStyle())
+                            } else {
+                                Button { model.switchChannel(channel) } label: {
+                                    TVLiveChannelCard(channel: channel)
+                                        .overlay(alignment: .topTrailing) {
+                                            if channel.id == model.state.channel?.id { TVBadge("Watching", style: .gold).padding(12) }
+                                        }
+                                }
+                                .buttonStyle(TVLiveCardButtonStyle())
                             }
-                            .buttonStyle(TVLiveCardButtonStyle())
-                        } else {
-                            Button { model.switchChannel(channel) } label: {
-                                LiveChannelOption(channel: channel, selected: channel.id == model.state.channel?.id)
-                            }
-                            .buttonStyle(.borderless)
                         }
+                        .focused($focus, equals: channel.id)
+                        .disabled(!channel.available)
+                        .id(channel.id)
+                        .accessibilityIdentifier("live-channel-option-\(channel.id)")
                     }
-                    .focused($focus, equals: channel.id)
-                    .disabled(!channel.available)
-                    .accessibilityIdentifier("live-channel-option-\(channel.id)")
                 }
-            }.padding(20)
-        }.scrollClipDisabled().focusSection()
+                .padding(.vertical, 24)
+            }
+            .contentMargins(.horizontal, 8, for: .scrollContent)
+            .scrollClipDisabled()
+            .scrollIndicators(.hidden)
+            .focusSection()
+            // The channel being watched in sight with Last channel and Go to channel left of it, where the list allows.
+            .onAppear {
+                if let id = model.state.channel?.id, (channels.firstIndex { $0.id == id } ?? 0) > 1 { reader.scrollTo(id, anchor: .center) }
+            }
+        }
     }
 }
 
-private struct LiveChannelOption: View {
-    let channel: LiveChannel
-    let selected: Bool
+/// A tile in Channels before the channels: Last channel over the channel it
+/// goes back to, or Go to channel over "By its number".
+private struct LiveTile: View {
+    let title: String
+    let line: String
+    /// The line goes above the title (Last channel).
+    var lineFirst = false
     @Environment(\.isFocused) private var focused
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(channel.number).font(.system(size: 32, weight: .bold)).monospacedDigit()
-                Spacer()
-                if selected { Text("\(Image(systemName: "speaker.wave.2.fill")) LIVE").font(.system(size: 17, weight: .bold)) }
-            }
-            Text(channel.name).font(.system(size: 24, weight: .semibold)).lineLimit(1)
-            Text(channel.available ? "No listings" : channel.reason.map(LiveTVError.message) ?? "Channel unavailable")
-                .font(.system(size: 18)).foregroundStyle(focused ? Palette.ground.opacity(0.7) : Palette.muted).lineLimit(2)
+        VStack(alignment: .leading, spacing: 6) {
+            if lineFirst { lineText }
+            Text(title).font(.tv(.callout)).foregroundStyle(focused ? Palette.ground : Palette.text).lineLimit(2)
+            if !lineFirst { lineText }
         }
-        .foregroundStyle(focused ? Palette.ground : Palette.text)
-        .padding(20).frame(width: 330, height: 180)
-        .background(focused ? Palette.text : Palette.surfaceRaised, in: RoundedRectangle(cornerRadius: 16))
-        .focusRim(focused, scale: 1.05)
+        .padding(.horizontal, 28)
+        .frame(width: TVCardWidth.wide, height: 180, alignment: .leading)
+        .background(focused ? Palette.text : Palette.surfaceRaised, in: RoundedRectangle(cornerRadius: 14))
+        .overlay { if !focused { RoundedRectangle(cornerRadius: 14).strokeBorder(Color(hex: 0x34343A), lineWidth: 2) } }
+        .focusLift(focused, scale: 1.08)
     }
-}
 
-/// TvLivePlayer's banner with listings: the hint and quality at the top; at
-/// the bottom the picture, logo, number and LIVE, title, episode line and
-/// tags, times and progress, and what is next.
-private struct TVLiveBanner: View {
-    let channel: LiveChannel
-    let now: Date
-    let state: LivePlayerState
-
-    var body: some View {
-        let programme = channel.programme(at: now)
-        VStack(spacing: 0) {
-            HStack {
-                Spacer()
-                Text("\(Image(systemName: "chevron.down")) Swipe down for Channels and Quality").font(.system(size: 19)).foregroundStyle(Palette.muted)
-                Spacer()
-            }
-            .overlay(alignment: .trailing) {
-                Text(state.qualityLabel).font(.system(size: 19)).foregroundStyle(Palette.textSecondary)
-                    .padding(.horizontal, 12).padding(.vertical, 5).background(.black.opacity(0.5), in: Capsule())
-                    .accessibilityIdentifier("live-player-quality")
-            }
-            .padding(.horizontal, TVLayout.gutter).padding(.top, 50)
-            Spacer()
-            HStack(alignment: .bottom, spacing: 28) {
-                LivePictureView(programme: programme, channel: channel, maxPixel: 600)
-                    .frame(width: 260, height: 146).clipShape(RoundedRectangle(cornerRadius: 12))
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 12) {
-                        if channel.logoURL != nil { LiveLogo(url: channel.logoURL) { Color.clear }.frame(width: 44, height: 33) }
-                        Text("\(channel.number) \(channel.name)").font(.system(size: 24, weight: .semibold))
-                        Text(state.status == .tuning ? "TUNING" : state.isAtLiveEdge && state.status != .paused ? "LIVE" : "BEHIND LIVE")
-                            .font(.system(size: 15, weight: .bold)).tracking(1)
-                            .padding(.horizontal, 10).padding(.vertical, 4)
-                            .background(Palette.liveRed, in: Capsule())
-                    }
-                    Text(programme?.title ?? channel.name).font(.system(size: 40, weight: .bold)).lineLimit(1)
-                        .accessibilityIdentifier("live-player-title")
-                    if let programme {
-                        HStack(spacing: 10) {
-                            if let line = programme.episodeLine { Text(line).font(.system(size: 21)).foregroundStyle(Palette.textSecondary) }
-                            if !programme.tags.isEmpty { LiveTags(programme.tags, size: 14) }
-                        }
-                        HStack(spacing: 14) {
-                            Text(LiveClock.device.range(programme.start, programme.end)).font(.system(size: 19)).foregroundStyle(Palette.textSecondary)
-                            LiveProgressBar(progress: programme.progress(at: now), height: 5).frame(width: 240)
-                            Text(liveTimeLeft(programme, now: now)).font(.system(size: 19)).foregroundStyle(Palette.muted)
-                        }
-                    } else {
-                        Text("No listings for this channel.").font(.system(size: 21)).foregroundStyle(Palette.muted)
-                    }
-                    if state.status == .paused {
-                        Text("Paused · \(liveTunerReleasesIn(seconds: state.pauseRemainingSeconds))")
-                            .font(.system(size: 21)).foregroundStyle(Palette.gold)
-                    }
-                }
-                Spacer(minLength: 20)
-                if let next = channel.programme(after: now) {
-                    Text(liveNextLine(next)).font(.system(size: 21)).foregroundStyle(Palette.textSecondary)
-                }
-            }
-            .padding(.horizontal, TVLayout.gutter)
-            .padding(.bottom, 170)
-        }
-        .background(LinearGradient(stops: [.init(color: .black.opacity(0.6), location: 0), .init(color: .clear, location: 0.2),
-                                           .init(color: .clear, location: 0.5), .init(color: .black.opacity(0.85), location: 1)],
-                                   startPoint: .top, endPoint: .bottom))
+    private var lineText: some View {
+        Text(line).font(lineFirst ? .tv(.caption1) : .tv(.caption2)).foregroundStyle(focused ? Color.tvOnWhiteMuted : Palette.muted).lineLimit(1)
     }
 }

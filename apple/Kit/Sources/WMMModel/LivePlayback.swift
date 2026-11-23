@@ -42,7 +42,8 @@ public struct LivePlayerState: Hashable, Sendable {
     public var message: String?
     public var error: String?
     public var takeover: LiveRecordingTakeover?
-    /// Why the server ended the session, such as `recording` when a recording took its tuner.
+    /// Why the server ended the session, such as `recording` when a recording took its tuner,
+    /// or why a start failed (`tuners_busy`, `no_signal`).
     public var stopReason: String?
     public init() {}
 

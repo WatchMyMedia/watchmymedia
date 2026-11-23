@@ -81,6 +81,20 @@ extension XCUIElement {
 }
 
 extension XCUIApplication {
+    /// Home's first screen on the fakes: the words above Continue watching.
+    @MainActor
+    var homeFirstScreen: XCUIElement {
+        descendants(matching: .any)["homeFocusPanel-continue"]
+    }
+
+    /// The first Continue watching card on the fakes, which Home opens on.
+    /// Every screen of Home is laid out, so a title alone also matches its
+    /// cards on other screens.
+    @MainActor
+    var homeFirstCard: XCUIElement {
+        buttons.matching(NSPredicate(format: "label CONTAINS %@", "S02 E04 · 23 min left")).firstMatch
+    }
+
     /// The button with focus, found again at each look.
     @MainActor
     var focusedButton: XCUIElement {

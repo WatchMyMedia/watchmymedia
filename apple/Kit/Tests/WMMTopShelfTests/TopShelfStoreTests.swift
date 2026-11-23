@@ -33,7 +33,7 @@ import Testing
         try store.write(written)
         let read = try #require(store.current(now: now))
         #expect(read == written)
-        #expect(read.sections.map(\.title) == ["Continue watching", "Recently added"])
+        #expect(read.sections.map(\.title) == ["Continue watching", "New for you"])
         #expect(store.pictureURL("0123abcd.jpg") != nil)
     }
 

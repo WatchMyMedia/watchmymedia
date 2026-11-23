@@ -10,7 +10,7 @@ final class FirstRunAndSubtitleTests: XCTestCase {
         app.launch()
         defer { app.terminate() }
         XCTAssertTrue(app.staticTexts["This server has no movies or TV yet."].waitUntilExists(timeout: 20))
-        XCTAssertTrue(app.staticTexts["192.168.1.20:27587"].exists)
+        XCTAssertTrue(app.staticTexts["Run this server? Add its folders at 192.168.1.20:27587 in a browser."].exists, "the address, for whoever runs it")
         XCTAssertTrue(app.buttons["homeCheckAgain"].exists)
     }
 

@@ -101,6 +101,9 @@ final class SpyPlaybackController: PlaybackController {
     func downloadSubtitle(_ resultID: String) { calls.append("download \(resultID)") }
     func selectQuality(_ quality: StreamQuality) { calls.append("quality \(quality.rawValue)") }
     func noteUserInput() { inputs += 1 }
+    /// What ``describeEnd(_:)`` was told, in order.
+    private(set) var ends: [String?] = []
+    func describeEnd(_ line: String?) { ends.append(line) }
     func stop() { calls.append("stop") }
     func close() { calls.append("close") }
     func release() {

@@ -90,7 +90,8 @@ struct TVArrangedRow: View {
 
     private func posterCard(_ item: BrowseItem) -> some View {
         Button { actions.open(item) } label: {
-            PosterCard(item: item, imageURL: url(item.posterPath, .w500), width: 160)
+            // No words under it: the screen's words above the row are the focused card's.
+            PosterCard(item: item, imageURL: url(item.posterPath, .w500), caption: false)
         }
         .buttonStyle(.borderless)
         .playPauseCard(.card(item)) { actions.open(item) }
@@ -100,8 +101,8 @@ struct TVArrangedRow: View {
     private func wideCard(_ item: BrowseItem) -> some View {
         Button { actions.open(item) } label: {
             WideCard(title: item.title, imageURL: url(item.backdropPath, .w780), seed: item.title) {
-                if let date = formatDate(item.releaseDate) { TVBadge(date).pinned(.bottomLeading, padding: 10) }
-                if item.watched { WatchedCheck(size: 28).pinned(.bottomTrailing, padding: 10) }
+                if let date = formatDate(item.releaseDate) { TVBadge(date).pinned(.bottomLeading) }
+                if item.watched { WatchedCheck(size: 40).pinned(.topTrailing) }
             }
         }
         .buttonStyle(.borderless)
@@ -112,7 +113,7 @@ struct TVArrangedRow: View {
     private func continueCard(_ item: ContinueItem) -> some View {
         Button { actions.resume(item) } label: {
             WideCard(title: item.title, line: item.remainingLine, imageURL: url(item.stillPath ?? item.backdropPath, .w780), seed: item.title) {
-                ProgressStrip(progress: item.progress, height: 6).pinned(.bottom, padding: 0)
+                TVProgressBar(progress: item.progress).pinned(.bottom, padding: 14)
             }
         }
         .buttonStyle(.borderless)
@@ -132,13 +133,13 @@ struct TVArrangedRow: View {
     private func episodeCard(_ episode: EpisodeCard) -> some View {
         Button { actions.openEpisode(episode) } label: {
             WideCard(title: episode.showTitle, line: episode.airedLine(), imageURL: url(episode.stillPath ?? episode.showBackdropPath, .w780), seed: episode.showTitle) {
-                if episode.isNew { TVBadge("New", style: .gold).pinned(.topLeading, padding: 10) }
+                if episode.isNew { TVBadge("New", style: .gold).pinned(.topLeading) }
                 if !episode.hasFile {
-                    TVBadge(notInLibraryBadge, style: .warning).pinned(.topTrailing, padding: 10)
+                    TVBadge(notInLibraryBadge, style: .warning).pinned(.topTrailing)
                 } else if episode.watched {
-                    WatchedCheck(size: 28).pinned(.topTrailing, padding: 10)
+                    WatchedCheck(size: 40).pinned(.topTrailing)
                 }
-                TVBadge(episode.codeBadge).pinned(.bottomLeading, padding: 10)
+                TVBadge(episode.codeBadge).pinned(.bottomLeading)
             }
         }
         .buttonStyle(.borderless)
@@ -176,13 +177,13 @@ enum ShelfCard: Identifiable {
     }
 }
 
-/// A row's last card, the size of its others:
+/// A row's last card, a tile the size of its others:
 /// "See all" over a list's count, or "See all TV shows" over "By
 /// last aired" for a built-in row's library.
 private struct SeeAllCard: View {
     let seeAll: TVRowSeeAll
     let line: String?
-    /// A poster row's 160 × 240; else a 16:9 row's 320 × 180.
+    /// A poster row's 260 × 390; else a 16:9 row's 320 × 180.
     let poster: Bool
 
     var body: some View {
@@ -205,23 +206,20 @@ private struct SeeAllCard: View {
         @Environment(\.isFocused) private var focused
 
         var body: some View {
-            Group {
-                if words.destination == .list {
-                    Text([words.title, line].compactMap { $0 }.joined(separator: "\n"))
-                } else {
-                    VStack(spacing: 8) {
-                        Text(poster ? words.title.replacingOccurrences(of: "See all ", with: "See all\n") : words.title)
-                        if let line { Text(line).font(.system(size: 17, weight: .regular)) }
-                    }
+            VStack(alignment: .leading, spacing: 6) {
+                Text(poster ? words.title.replacingOccurrences(of: "See all ", with: "See all\n") : words.title)
+                    .font(.tv(.callout))
+                    .foregroundStyle(focused ? Palette.ground : Palette.text)
+                if let line {
+                    Text(line).font(.tv(.caption2)).foregroundStyle(focused ? Color.tvOnWhiteMuted : Palette.muted)
                 }
             }
-            .font(.system(size: 20, weight: .semibold))
-            .multilineTextAlignment(.center)
-            .foregroundStyle(focused ? Palette.ground : Palette.textSecondary)
-            .padding(.horizontal, 12)
-            .frame(width: poster ? 160 : 320, height: poster ? 240 : 180)
-            .background(focused ? Palette.text : .white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16))
-            .focusRim(focused, cornerRadius: 16)
+            .lineLimit(3)
+            .padding(.horizontal, 28)
+            .frame(width: poster ? TVCardWidth.poster : TVCardWidth.wide, height: poster ? 390 : 180, alignment: .leading)
+            .background(focused ? Palette.text : Palette.surfaceRaised, in: RoundedRectangle(cornerRadius: 14))
+            .overlay { if !focused { RoundedRectangle(cornerRadius: 14).strokeBorder(Color(hex: 0x34343A), lineWidth: 2) } }
+            .focusLift(focused, scale: 1.08)
         }
     }
 }
@@ -232,7 +230,7 @@ struct TVEditRowsButton: View {
 
     var body: some View {
         Button(action: action) { Text("\(Image(systemName: "slider.horizontal.3")) Edit rows") }
-            .buttonStyle(TVButtonStyle(height: 60, fontSize: 21))
+            .buttonStyle(TVButtonStyle())
             .accessibilityIdentifier("editRows")
     }
 }

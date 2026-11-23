@@ -53,7 +53,7 @@ final class LiveExtrasTests: XCTestCase {
     }
 
     @MainActor
-    func testALongPressRemindsAndTheHeroSaysSo() {
+    func testALaterProgrammesSheetRemindsAndTheLinesSaySo() {
         let app = launch(["-tab", "liveTV"])
         _ = focusFirstCell(app)
         XCTAssertTrue(app.buttons["live-guide-reminders"].exists, "The chips have Reminders")
@@ -64,20 +64,21 @@ final class LiveExtrasTests: XCTestCase {
         XCTAssertTrue(dash.hasFocus)
         XCTAssertTrue(label(hero, contains: "Dollar Dash"))
         XCTAssertTrue(dash.label.contains("reminder set"), dash.label)
-        XCTAssertTrue(any(app, "Reminder set · 5 min before").waitUntilExists(timeout: 5), "The hero says the reminder is set")
-        XCTAssertTrue(any(app, "Hold · Remove reminder").exists)
+        XCTAssertTrue(any(app, "Reminder set · 5 min before").waitUntilExists(timeout: 5), "The lines say the reminder is set")
         snap("tv-guide-reminded")
         let football = app.buttons["live-cell-4.1-Conference Football"]
         // Down three rows to 4.1, then right past The Sleuth Files.
         for _ in 0..<3 { remote.press(.down) }
         for _ in 0..<2 where !football.hasFocus { remote.press(.right) }
         XCTAssertTrue(football.hasFocus, "Conference Football at 9:00 on 4.1")
-        XCTAssertTrue(any(app, "Hold · Remind me").waitUntilExists(timeout: 5))
         snap("tv-guide-later")
-        longPress()
-        let remind = menuItem(app, "Remind me")
-        XCTAssertTrue(remind.waitUntilExists(timeout: 5), "A long press offers Remind me")
-        snap("tv-menu-programme")
+        remote.press(.select)
+        let remind = app.buttons["live-sheet-remind"]
+        XCTAssertTrue(remind.waitUntilExists(timeout: 5), "Select on a later programme opens its sheet with Remind me")
+        XCTAssertTrue(remind.label.hasPrefix("Remind me"), remind.label)
+        snap("tv-programme-sheet")
+        for _ in 0..<4 where !remind.hasFocus { app.press(.down, thenWaitForFocusToMove: 3) }
+        XCTAssertTrue(remind.hasFocus)
         remote.press(.select)
         XCTAssertTrue(label(football, contains: "reminder set", timeout: 10), football.label)
         XCTAssertTrue(any(app, "Reminder set · 5 min before").waitUntilExists(timeout: 5))
@@ -93,7 +94,6 @@ final class LiveExtrasTests: XCTestCase {
         remote.press(.left)
         XCTAssertTrue(channel.hasFocus, "Left from the first programme reaches the channel")
         XCTAssertTrue(channel.label.contains("favourite"), channel.label)
-        XCTAssertTrue(any(app, "Hold · Remove from Favourites").waitUntilExists(timeout: 5))
         longPress()
         let remove = menuItem(app, "Remove from Favourites")
         XCTAssertTrue(remove.waitUntilExists(timeout: 5))

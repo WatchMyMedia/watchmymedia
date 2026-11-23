@@ -46,22 +46,22 @@ struct RequestDialog: View {
         VStack(alignment: .leading, spacing: 14) {
             if model.item?.state != .available {
                 Text("NOT IN YOUR LIBRARY")
-                    .font(.system(size: 18, weight: .bold))
+                    .font(.tv(.caption2, .bold))
                     .tracking(2)
                     .foregroundStyle(Palette.gold)
             }
             Text(model.title)
-                .font(.system(size: 56, weight: .heavy))
+                .font(.tv(.title2, .bold))
                 .tracking(-1.4)
                 .foregroundStyle(Palette.text)
                 .lineLimit(2)
                 .accessibilityAddTraits(.isHeader)
             if !model.meta.isEmpty {
-                Text(model.meta).font(.system(size: 22)).foregroundStyle(Color.tvTitle)
+                Text(model.meta).font(.tv(.caption2)).foregroundStyle(Color.tvTitle)
             }
             if let overview = model.item?.overview, !overview.isEmpty {
                 Text(overview)
-                    .font(.system(size: 21))
+                    .font(.tv(.caption2))
                     .lineSpacing(6)
                     .foregroundStyle(Palette.textSecondary)
                     .lineLimit(3)
@@ -71,7 +71,7 @@ struct RequestDialog: View {
             case .loading:
                 ProgressView().padding(.top, 30)
             case .failed(let message):
-                Text(message).font(.system(size: 21)).foregroundStyle(Palette.warning).padding(.top, 20)
+                Text(message).font(.tv(.caption2)).foregroundStyle(Palette.warning).padding(.top, 20)
                 Button("Cancel", action: onClose).buttonStyle(TVButtonStyle()).padding(.top, 18)
             case .loaded:
                 if model.sent != nil { sent } else { picking }
@@ -82,7 +82,7 @@ struct RequestDialog: View {
     @ViewBuilder private var picking: some View {
         if !model.seasons.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
-                Text("SEASONS").font(.system(size: 18, weight: .bold)).tracking(1.6).foregroundStyle(Palette.muted)
+                Text("SEASONS").font(.tv(.caption2, .bold)).tracking(1.6).foregroundStyle(Palette.muted)
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(model.seasons) { season in
                         Button { model.toggle(season) } label: { SeasonRow(season: season, ticked: model.isTicked(season)) }
@@ -98,12 +98,12 @@ struct RequestDialog: View {
             .padding(.top, 14)
         }
         if model.inLibrary {
-            Text("It’s in your library already.").font(.system(size: 21)).foregroundStyle(Palette.textSecondary).padding(.top, 10)
+            Text("It’s in your library already.").font(.tv(.caption2)).foregroundStyle(Palette.textSecondary).padding(.top, 10)
         } else if let note = model.approvalNote {
-            Label(note, systemImage: "info.circle").font(.system(size: 19)).foregroundStyle(Palette.muted).padding(.top, 10)
+            Label(note, systemImage: "info.circle").font(.tv(.caption2)).foregroundStyle(Palette.muted).padding(.top, 10)
         }
         if let error = model.error {
-            Text(error).font(.system(size: 19)).foregroundStyle(Palette.warning)
+            Text(error).font(.tv(.caption2)).foregroundStyle(Palette.warning)
         }
         HStack(spacing: 24) {
             if !model.inLibrary {
@@ -124,12 +124,12 @@ struct RequestDialog: View {
         if let text = model.sentMessage {
             HStack(spacing: 20) {
                 Image(systemName: "checkmark")
-                    .font(.system(size: 26, weight: .bold))
+                    .font(.tv(.caption1, .bold))
                     .foregroundStyle(Palette.ground)
                     .frame(width: 56, height: 56)
                     .background(Palette.gold, in: Circle())
                     .accessibilityHidden(true)
-                Text(text).font(.system(size: 28, weight: .semibold)).lineSpacing(6).foregroundStyle(Palette.text)
+                Text(text).font(.tv(.body, .semibold)).lineSpacing(6).foregroundStyle(Palette.text)
             }
             .padding(.horizontal, 28)
             .padding(.vertical, 24)
@@ -154,24 +154,24 @@ private struct SeasonRow: View {
     var body: some View {
         HStack(spacing: 18) {
             Image(systemName: "checkmark")
-                .font(.system(size: 18, weight: .heavy))
+                .font(.tv(.caption2, .bold))
                 .foregroundStyle(season.askable ? Palette.ground : Palette.muted)
                 .opacity(ticked ? 1 : 0)
                 .frame(width: 34, height: 34)
                 .background(season.askable && ticked ? Palette.gold : (season.askable ? Color.clear : Palette.outline), in: RoundedRectangle(cornerRadius: 8))
                 .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(season.askable && !ticked ? (focused ? Palette.ground : Palette.outlineStrong) : .clear, lineWidth: 2))
             Text(season.title)
-                .font(.system(size: 22, weight: .semibold))
+                .font(.tv(.body, .semibold))
                 .foregroundStyle(focused ? Palette.ground : season.askable ? Palette.text : Palette.muted)
-            Text(season.episodesLine).font(.system(size: 18)).foregroundStyle(focused ? Color(hex: 0x525252) : Palette.muted)
+            Text(season.episodesLine).font(.tv(.caption2)).foregroundStyle(focused ? Color(hex: 0x525252) : Palette.muted)
             Spacer(minLength: 12)
             if let label = season.state.label {
-                Text(label).font(.system(size: 18)).foregroundStyle(focused ? Color(hex: 0x525252) : Palette.muted)
+                Text(label).font(.tv(.caption2)).foregroundStyle(focused ? Color(hex: 0x525252) : Palette.muted)
             }
         }
-        .padding(.horizontal, 20)
-        .frame(height: 64)
+        .padding(.horizontal, 24)
+        .frame(minHeight: 76)
         .background(focused ? Palette.text : .white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
-        .focusRim(focused, cornerRadius: 14, scale: 1.02)
+        .focusLift(focused, scale: 1.02)
     }
 }

@@ -54,7 +54,7 @@ public final class LiveGuideModel {
         public init(channelID: String, programmeID: String?) { self.channelID = channelID; self.programmeID = programmeID }
     }
 
-    /// How much time the grid shows across: an hour on iPhone, two on iPad and Apple TV.
+    /// How much time the grid shows across: an hour on iPhone, two on iPad, ninety minutes on Apple TV.
     public var span: TimeInterval
     public var query = ""
     /// A category chip; choosing one leaves Favourites.
@@ -173,7 +173,9 @@ public final class LiveGuideModel {
         start = min(max(target, earliest), latest)
     }
 
-    private var step: TimeInterval { max(span / 2, 1800) }
+    /// Half the span, in whole half hours, so the grid keeps starting on one
+    /// (Apple TV's ninety minutes step by thirty).
+    private var step: TimeInterval { max((span / 2 / 1800).rounded(.down) * 1800, 1800) }
     private var earliest: Date { Self.halfHour(now(), clock.calendar) }
     private var latest: Date {
         // Far enough to see where listings end, with half the span still listed.

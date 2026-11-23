@@ -68,6 +68,15 @@ import WMMTopShelf
         #expect(added.map(\.picturePath) == ["/signal.jpg", "/copperline.jpg", nil, "/glass.jpg"])
     }
 
+    @Test func newForYouLeavesOutWhatWasWatchedOrStarted() throws {
+        var data = home()
+        data.recentlyAddedMovies[0].watched = true
+        data.recentlyAddedShows[1].progress = 0.3
+        let plan = TopShelfPlan(data, serverID: "srv-a")
+        #expect(plan.sections[1].cards.map(\.item.title) == ["Ninety Fathoms", "Copperline"])
+        #expect(TopShelfSection.Kind.recentlyAdded.title == "New for you")
+    }
+
     @Test func selectOpensThePageAndPlayPausePlaysWithLinksPublishedForTheServer() throws {
         let plan = TopShelfPlan(home(), serverID: "srv-a")
         let episode = plan.sections[0].cards[0].item, movie = plan.sections[0].cards[1].item

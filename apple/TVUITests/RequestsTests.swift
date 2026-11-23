@@ -17,11 +17,8 @@ final class RequestsTests: XCTestCase {
         app.launch()
         let address = app.textFields["Server address"]
         XCTAssertTrue(address.waitForExistence(timeout: 15))
-        if !address.hasFocus { remote.press(.right) }
-        if !address.hasFocus { remote.press(.up) }
-        if !address.hasFocus { remote.press(.down) }
-        if !address.hasFocus { remote.press(.up) }
-        if !address.hasFocus { remote.press(.right) }
+        // Enter an address is the list's last row, under any server found.
+        for _ in 0..<8 where !address.hasFocus { remote.press(.down) }
         XCTAssertTrue(address.hasFocus)
         remote.press(.select)
         address.typeText(value)

@@ -3,69 +3,78 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// TvLiveGuide with listings: the focused
-/// programme's hero above (its picture, a matched TMDB still first, the
-/// episode line, times or "Starts in 48 min", tags, categories, description
-/// and channel), the days and category chips, and two hours of channels
-/// below. Select watches the channel, whatever cell is focused. From API
-/// level 15 the chips gain Favourites, a search chip
-/// and Reminders; a favourite channel shows a star, and a long press on a
-/// channel stars it or on a later programme reminds; the hero says when a
-/// reminder is set. No record buttons.
+/// The Live TV guide with listings: three lines about the focused
+/// programme (what it is, how long is left or when it starts, its times and
+/// what follows), at most eight chips (Favourites, All channels, a few
+/// categories, the day, Go to channel, Reminders, Recordings), then ninety
+/// minutes of channels at 500 pt a half hour. Select on a programme on now
+/// watches it; on a later one it opens one sheet with Record, Remind me and
+/// Watch now, which the long press offers too. Play/Pause on any cell
+/// watches that channel now. Moving up or down keeps the time: focus goes
+/// to what airs on the next channel at the time it came from. The channel
+/// watched last is marked, and the guide opens on what is on it now.
 struct TVLiveGuideScreen: View {
+    /// A later programme's sheet.
+    private struct SheetTarget: Identifiable {
+        let channel: LiveChannel
+        let programme: LiveProgramme
+        /// What the channel is showing now, for Watch now's line.
+        let onNow: LiveProgramme?
+        var id: String { "\(channel.id)/\(programme.id)" }
+    }
+
+    @State private var sheet: SheetTarget?
+    /// Record with options…: the full form.
     @State private var recordChoice: LiveProgramme?
-    /// A film or special's Record found the tuners booked.
+    /// Record found the tuners booked.
     @State private var clash: LiveRecordingClash?
+    @State private var goTo: GoToChannelModel?
     @Environment(LiveRecordingsStore.self) private var recordings
     @State private var model: LiveGuideModel
     @State private var live: LiveTVModel
     @FocusState private var focus: String?
+    /// The cell focus came from, for coming back down from the chips.
+    @State private var remembered: String?
+    /// The time focus came from: moving up or down lands on what airs then.
+    @State private var anchor: Date?
     @Environment(Navigator.self) private var navigator
     @Environment(LiveExtrasStore.self) private var extras
+    private let watching = TVLiveWatching.shared
 
     init(repository: any LiveTVRepository, extras: LiveExtrasStore) {
-        _model = State(initialValue: LiveGuideModel(repository: repository, extras: extras, spanMinutes: 120))
+        _model = State(initialValue: LiveGuideModel(repository: repository, extras: extras, spanMinutes: 90))
         _live = State(initialValue: LiveTVModel(repository: repository))
     }
 
-    /// The channel column has focus, so the hero's hold hint is Favourites.
-    private var channelFocused: Bool { focus?.hasSuffix("|ch") == true }
-
-    private static let column: CGFloat = 220
-    private static let rowHeight: CGFloat = 86
+    /// The channel column, then 500 pt for each half hour across the 1760 pt between the margins.
+    static let column: CGFloat = 260
+    static let rowHeight: CGFloat = 112
+    static let gap: CGFloat = 8
+    private static let track: CGFloat = 1760 - column
 
     var body: some View {
         TabPage {
             TimelineView(.periodic(from: .now, by: 30)) { context in
                 VStack(alignment: .leading, spacing: 0) {
-                    TVLiveHero(selected: model.selected, now: context.date, channelFocused: channelFocused)
-                        .frame(height: 330, alignment: .top)
+                    TVGuideSummary(selected: model.selected, next: nextAfterSelected, now: context.date, stale: model.staleNotice)
+                        .padding(.horizontal, TVLayout.gutter)
+                        .frame(height: 150, alignment: .topLeading)
                     chips
                         .padding(.horizontal, TVLayout.gutter)
-                        .padding(.vertical, 18)
+                        .padding(.top, 4)
+                        .padding(.bottom, 18)
                     grid(now: context.date)
                 }
             }
         }
-        // The hero stays put: only the rows scroll under it.
+        // The lines and chips stay put: only the rows scroll under them.
         .scrollDisabled(true)
         .task { await model.load() }
         .task(id: model.start) { await model.load() }
         // Its marks follow recording events without waiting for the listings to age.
         .task(id: model.end) { await recordings.showGuide(from: model.start, to: model.end) }
         .task { await live.followSchedule() }
-        .onChange(of: focus) { _, value in
-            guard let value else { return }
-            if value.hasSuffix("|ch"), let row = model.rows.first(where: { "\($0.id)|ch" == value }) {
-                // A channel's hero is what is on it now.
-                let date = Date()
-                let current = row.cells.compactMap(\.programme).first { $0.isOn(at: date) }
-                model.selection = .init(channelID: row.channel.id, programmeID: current?.id)
-                return
-            }
-            guard let (row, cell) = find(value) else { return }
-            model.select(row, cell)
-        }
+        .onChange(of: focus) { old, value in focusMoved(from: old, to: value) }
         // Search, Reminders and a reminder's banner open the guide on their programme.
         .onChange(of: extras.reveal, initial: true) { _, reveal in
             guard let reveal else { return }
@@ -73,29 +82,46 @@ struct TVLiveGuideScreen: View {
             extras.reveal = nil
             Task {
                 await model.load()
-                if let target = initialFocus { focus = target }
+                if let target = initialFocus { remembered = target; focus = target }
             }
         }
+        // Back from the player lands on the channel watched, on what is on it now.
+        .onChange(of: watching.closes) { _, _ in landOnWatched() }
+        .tvLiveSheet(item: $sheet) { target in
+            TVGuideProgrammeSheet(channel: target.channel, programme: target.programme, onNow: target.onNow, now: .now,
+                                  options: { recordChoice = $0 }, clashed: { clash = $0 })
+        }
         .fullScreenCover(item: $recordChoice) { programme in TVLiveRecordChoice(programme: programme) }
-        .fullScreenCover(item: $clash) { found in
+        .tvLiveSheet(item: $clash) { found in
             TVLiveRecordingClashView(clash: found) { kept in
                 if kept { recordings.message = found.kept }
                 clash = nil
             }
         }
-        .messagePill(Binding(get: { recordChoice == nil && clash == nil ? recordings.message : nil }, set: { recordings.message = $0 }))
+        .overlay {
+            if let goTo {
+                GoToChannelDialog(model: goTo, listings: true, onClose: { closeGoTo() })
+            }
+        }
+        .messagePill(Binding(get: { sheet == nil && clash == nil ? recordings.message : nil }, set: { recordings.message = $0 }))
         .accessibilityIdentifier("live-tv-guide")
+    }
+
+    /// What follows the focused programme on its channel.
+    private var nextAfterSelected: LiveProgramme? {
+        guard let selected = model.selected, let programme = selected.programme,
+              let row = model.rows.first(where: { $0.channel.id == selected.channel.id }) else { return nil }
+        return row.cells.compactMap(\.programme).first { $0.start >= programme.end }
+            ?? selected.channel.programme(after: programme.start.addingTimeInterval(1))
     }
 
     // MARK: Chips
 
+    /// Favourites, All channels, the categories that fit, the day, Go to
+    /// channel, Reminders and Recordings: eight at most.
     private var chips: some View {
-        HStack(spacing: 16) {
-            ForEach(model.days) { day in
-                Button(day.title) { model.choose(day) }
-                    .buttonStyle(TVChipStyle(selected: model.clock.calendar.isDate(day.date, inSameDayAs: model.start))).fixedSize()
-            }
-            Spacer().frame(width: 18)
+        let fixed = (model.hasFavourites ? 1 : 0) + 1 + 1 + 1 + (extras.available ? 1 : 0) + (recordings.available ? 1 : 0)
+        return HStack(spacing: 16) {
             if model.hasFavourites {
                 Button { if model.showingFavourites { model.showAll() } else { model.showFavourites() } } label: {
                     Text("\(Image(systemName: "star.fill")) \(liveFavouritesTitle)")
@@ -104,36 +130,60 @@ struct TVLiveGuideScreen: View {
                 .accessibilityIdentifier("live-filter-favourites")
             }
             Button(liveAllChannels) { model.showAll() }.buttonStyle(TVChipStyle(selected: model.showingAll)).fixedSize()
-            ForEach(model.filters, id: \.self) { filter in
+                .accessibilityIdentifier("live-filter-all")
+            ForEach(model.filters.prefix(max(8 - fixed, 0)), id: \.self) { filter in
                 Button(filter.title) { model.filter = model.filter == filter ? nil : filter }
                     .buttonStyle(TVChipStyle(selected: model.filter == filter)).fixedSize()
             }
-            Spacer(minLength: 20)
-            if let notice = model.staleNotice {
-                Text("\(Image(systemName: "clock")) \(notice)")
-                    .font(.system(size: 17)).foregroundStyle(Palette.muted).lineLimit(2).frame(maxWidth: 360, alignment: .leading)
-                    .accessibilityIdentifier("live-guide-stale")
+            Spacer(minLength: 16)
+            Menu {
+                ForEach(model.days) { day in
+                    Button {
+                        model.choose(day)
+                    } label: {
+                        if model.clock.calendar.isDate(day.date, inSameDayAs: model.start) {
+                            Label(day.title, systemImage: "checkmark")
+                        } else {
+                            Text(day.title)
+                        }
+                    }
+                }
+            } label: {
+                ChipMenuLabel(title: model.days.first { model.clock.calendar.isDate($0.date, inSameDayAs: model.start) }?.title ?? model.dayLabel)
             }
-            if recordings.available {
-                Button { navigator.open(.liveRecordings) } label: { Text("\(Image(systemName: "record.circle")) Recordings") }
-                    .buttonStyle(TVChipStyle(selected: false)).fixedSize().accessibilityIdentifier("live-guide-recordings")
-            }
+            .buttonStyle(TVChipStyle(selected: false)).fixedSize()
+            .accessibilityLabel("Day")
+            .accessibilityValue(model.days.first { model.clock.calendar.isDate($0.date, inSameDayAs: model.start) }?.title ?? model.dayLabel)
+            .accessibilityIdentifier("live-guide-day")
+            Button(liveGoToChannel) { openGoTo() }
+                .buttonStyle(TVChipStyle(selected: false)).fixedSize()
+                .accessibilityIdentifier("live-guide-goto")
             if extras.available {
-                Button { navigator.select(.search) } label: { Text("\(Image(systemName: "magnifyingglass"))") }
-                    .buttonStyle(TVChipStyle(selected: false)).fixedSize()
-                    .accessibilityLabel(liveSearchListingsTitle)
-                    .accessibilityIdentifier("live-guide-search")
-                Button { navigator.open(.liveReminders) } label: { Text("\(Image(systemName: "bell")) \(liveRemindersTitle)") }
+                Button(liveRemindersTitle) { navigator.open(.liveReminders) }
                     .buttonStyle(TVChipStyle(selected: false)).fixedSize()
                     .accessibilityIdentifier("live-guide-reminders")
             }
-            TextField(liveGoToChannel, text: $model.query)
-                .autocorrectionDisabled()
-                .frame(width: extras.available ? 240 : 300)
-                .accessibilityIdentifier("live-channel-search")
+            if recordings.available {
+                Button("Recordings") { navigator.open(.liveRecordings) }
+                    .buttonStyle(TVChipStyle(selected: false)).fixedSize()
+                    .accessibilityIdentifier("live-guide-recordings")
+            }
         }
         .frame(maxWidth: .infinity)
         .focusSection()
+    }
+
+    private func openGoTo() {
+        let channels = model.rows.map(\.channel)
+        goTo = GoToChannelModel(channels: { channels }, tune: { [navigator] channel in
+            closeGoTo()
+            navigator.playLive(.init(channel: channel))
+        })
+    }
+
+    private func closeGoTo() {
+        goTo?.cancel()
+        goTo = nil
     }
 
     // MARK: Grid
@@ -141,85 +191,87 @@ struct TVLiveGuideScreen: View {
     @ViewBuilder private func grid(now: Date) -> some View {
         let rows = model.rows
         if model.loading {
-            ProgressView(liveLoadingListings).frame(maxWidth: .infinity, minHeight: 300)
+            TVGuideLoading()
         } else if let error = model.error {
-            TVErrorState(title: liveListingsFailedTitle, message: liveListingsFailed(error), retry: model.load)
-                .frame(minHeight: 300)
+            TVGuideProblem(title: liveListingsFailedTitle, message: liveListingsFailed(error), retry: { await model.load() })
         } else if rows.isEmpty {
             TVEmptyState(systemImage: "magnifyingglass", title: "No channels match", message: liveNoChannelMatches)
-                .frame(minHeight: 300)
+                .padding(.top, 80)
         } else {
-            GeometryReader { geo in
-                let track = geo.size.width - Self.column - TVLayout.gutter * 2
-                VStack(spacing: 0) {
-                    header(track: track)
-                    ScrollView(.vertical) {
-                        LazyVStack(spacing: 2) {
-                            ForEach(rows) { row in
-                                HStack(spacing: 0) {
-                                    channelLabel(row).frame(width: Self.column, height: Self.rowHeight, alignment: .leading)
-                                    HStack(spacing: 2) {
-                                        ForEach(row.cells) { cell in
-                                            let id = "\(row.id)|\(cell.id)"
-                                            TVGuideCell(
-                                                clock: model.clock, row: row, cell: cell, now: now, id: id, focused: focus == id,
-                                                focus: $focus, recordChoice: $recordChoice, clash: $clash,
-                                                move: { page($0, row: row, cell: cell) }
-                                            )
-                                            .equatable()
-                                            .frame(width: max(track * cell.end.timeIntervalSince(cell.start) / model.span - 2, 0), height: Self.rowHeight)
-                                        }
+            VStack(alignment: .leading, spacing: 0) {
+                header(now: now)
+                ScrollView(.vertical) {
+                    LazyVStack(alignment: .leading, spacing: Self.gap) {
+                        ForEach(rows) { row in
+                            HStack(spacing: Self.gap) {
+                                channelCell(row)
+                                    .frame(width: Self.column - Self.gap, height: Self.rowHeight)
+                                HStack(spacing: Self.gap) {
+                                    ForEach(row.cells) { cell in
+                                        let id = "\(row.id)|\(cell.id)"
+                                        TVGuideCell(
+                                            clock: model.clock, row: row, cell: cell, now: now, id: id, focused: focus == id,
+                                            focus: $focus,
+                                            open: { sheet = SheetTarget(channel: row.channel, programme: $0, onNow: row.cells.compactMap(\.programme).first { $0.isOn(at: .now) }) },
+                                            move: { page($0, row: row, cell: cell) }
+                                        )
+                                        .equatable()
+                                        .frame(width: max(Self.track * cell.end.timeIntervalSince(cell.start) / model.span - Self.gap, 0), height: Self.rowHeight)
                                     }
-                                    .frame(width: track, alignment: .leading)
                                 }
-                                .focusSection()
+                                .frame(width: Self.track, alignment: .leading)
                             }
-                        }
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 4)
-                        .overlay(alignment: .topLeading) {
-                            if let fraction = model.nowFraction(at: now) {
-                                Rectangle().fill(Palette.gold).frame(width: 3)
-                                    .offset(x: Self.column + track * fraction - 1)
-                                    .allowsHitTesting(false)
-                                    .accessibilityHidden(true)
-                            }
+                            .focusSection()
                         }
                     }
-                    .scrollDisabled(false)
+                    .padding(.bottom, 200)
+                    .overlay(alignment: .topLeading) {
+                        if let fraction = model.nowFraction(at: now) {
+                            Capsule().fill(Palette.gold).frame(width: 4)
+                                .offset(x: Self.column + Self.track * fraction - 2)
+                                .allowsHitTesting(false)
+                                .accessibilityHidden(true)
+                        }
+                    }
                 }
-                .padding(.horizontal, TVLayout.gutter)
+                .scrollClipDisabled()
             }
-            .frame(height: 500)
-            .defaultFocus($focus, initialFocus, priority: .userInitiated)
+            .padding(.horizontal, TVLayout.gutter)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .ignoresSafeArea(edges: .bottom)
+            .defaultFocus($focus, remembered ?? initialFocus, priority: .userInitiated)
         }
     }
 
-    private func header(track: CGFloat) -> some View {
+    /// "Now 8:28 PM" (or the day) over the channels, then the half hours.
+    private func header(now: Date) -> some View {
         HStack(spacing: 0) {
-            Text(model.clock.dayName(model.start, now: .now)).font(.system(size: 19, weight: .semibold)).foregroundStyle(Palette.textSecondary)
+            Text(model.showingNow ? "Now \(model.clock.time(now))" : model.clock.dayName(model.start, now: now))
                 .frame(width: Self.column, alignment: .leading)
-            ZStack(alignment: .leading) {
-                ForEach(model.marks, id: \.self) { mark in
-                    Text(model.clock.time(mark)).font(.system(size: 19)).foregroundStyle(Palette.muted)
-                        .offset(x: track * mark.timeIntervalSince(model.start) / model.span + 10)
-                }
+            ForEach(model.marks, id: \.self) { mark in
+                Text(model.clock.time(mark))
+                    .padding(.leading, 20)
+                    .frame(width: Self.track * 1800 / model.span, alignment: .leading)
             }
-            .frame(width: track, alignment: .leading)
         }
-        .frame(height: 44)
+        .font(.tv(.caption1, .semibold))
+        .foregroundStyle(Palette.muted)
+        .lineLimit(1)
+        .frame(height: 56, alignment: .leading)
         .accessibilityHidden(true)
     }
 
-    /// The logo and number; from API level 15 a focusable button (Select
-    /// watches) whose long press stars the channel, with a gold star on a favourite.
-    @ViewBuilder private func channelLabel(_ row: LiveGuideModel.Row) -> some View {
+    /// The logo and number, "Watching" on the channel watched last, a star on
+    /// a favourite; from API level 15 it takes focus (Select watches) and its
+    /// long press stars it.
+    @ViewBuilder private func channelCell(_ row: LiveGuideModel.Row) -> some View {
+        let watched = watching.channelID == row.channel.id
         if extras.available {
             let favourite = extras.isFavourite(row.channel)
             Button { navigator.playLive(.init(channel: row.channel)) } label: {
-                TVLiveChannelLabel(channel: row.channel, favourite: favourite)
+                TVLiveChannelLabel(channel: row.channel, favourite: favourite, watching: watched)
             }
-            .buttonStyle(TVChannelCellStyle())
+            .buttonStyle(TVChannelCellStyle(watching: watched))
             .disabled(!row.channel.available)
             .focused($focus, equals: "\(row.id)|ch")
             .playPauseCard(.card(row.channel)) { navigator.playLive(.init(channel: row.channel)) }
@@ -229,33 +281,98 @@ struct TVLiveGuideScreen: View {
                 }
                 Button { navigator.playLive(.init(channel: row.channel)) } label: { Label("Watch \(row.channel.number)", systemImage: "play.fill") }
             }
-            .accessibilityLabel("Watch \(row.channel.number) \(row.channel.name)\(favourite ? ", favourite" : "")")
+            .accessibilityLabel("Watch \(row.channel.number) \(row.channel.name)\(favourite ? ", favourite" : "")\(watched ? ", watching" : "")")
             .accessibilityIdentifier("live-channel-\(row.channel.number)")
         } else {
-            TVLiveChannelLabel(channel: row.channel)
+            TVLiveChannelLabel(channel: row.channel, watching: watched)
+                .padding(.horizontal, 20)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .background(Palette.surfaceRaised, in: RoundedRectangle(cornerRadius: 14))
+                .overlay(alignment: .leading) { if watched { WatchingEdge() } }
         }
     }
 
-    /// Right from a row's last cell shows later, left from its first shows earlier, and focus stays on that channel.
+    // MARK: Focus
+
+    /// Coming down from the chips lands on the cell last focused; moving up
+    /// or down lands on what airs at the time focus came from; moving along
+    /// a row sets that time and the lines above.
+    private func focusMoved(from old: String?, to value: String?) {
+        guard let value else { return }
+        if old == nil, let remembered, remembered != value, find(remembered) != nil {
+            focus = remembered
+            return
+        }
+        if value.hasSuffix("|ch"), let row = model.rows.first(where: { "\($0.id)|ch" == value }) {
+            // A channel's lines are what is on it now.
+            let date = Date()
+            let current = row.cells.compactMap(\.programme).first { $0.isOn(at: date) }
+            model.selection = .init(channelID: row.channel.id, programmeID: current?.id)
+            remembered = value
+            return
+        }
+        guard let (row, cell) = find(value) else { return }
+        let from = old.flatMap(find)
+        if let from, from.0.id != row.id, let anchor, !(cell.start <= anchor && anchor < cell.end),
+           let target = row.cells.first(where: { $0.start <= anchor && anchor < $0.end && $0.kind != .gap }) {
+            // Up or down: the programme airing at the time focus came from.
+            focus = "\(row.id)|\(target.id)"
+            return
+        }
+        if from == nil || from?.0.id == row.id || anchor == nil {
+            anchor = max(cell.start, model.start)
+        }
+        remembered = value
+        model.select(row, cell)
+    }
+
+    /// Right from a row's last cell shows later, left from its first shows earlier (never before now), and focus stays on that channel.
     private func page(_ direction: MoveCommandDirection, row: LiveGuideModel.Row, cell: LiveGuideModel.Cell) {
         let last = row.cells.last { $0.programme != nil || $0.kind == .noListings }?.id == cell.id
         let first = row.cells.first { $0.programme != nil || $0.kind == .noListings }?.id == cell.id
         if direction == .right, last, cell.end >= model.end, model.canGoLater { model.later() }
         else if direction == .left, first, model.canGoEarlier { model.earlier() }
         else { return }
-        let target = direction == .right ? model.start.addingTimeInterval(model.span / 2) : model.start
+        let target = direction == .right ? model.start.addingTimeInterval(model.span - 1800) : model.start
         if let next = model.rows.first(where: { $0.id == row.id })?.cells.first(where: { $0.start <= target && target < $0.end && $0.kind != .gap }) {
+            anchor = max(next.start, model.start)
             focus = "\(row.id)|\(next.id)"
         }
     }
 
+    /// Where the guide opens: the programme asked for, else what is on now
+    /// on the channel watched last, else on the first favourite, else the first channel's.
     private var initialFocus: String? {
         if let selection = model.selection, let row = model.rows.first(where: { $0.channel.id == selection.channelID }),
            let cell = row.cells.first(where: { $0.programme?.id == selection.programmeID }) {
             return "\(row.id)|\(cell.id)"
         }
-        guard let row = model.rows.first(where: { $0.listings }) ?? model.rows.first, let cell = row.cells.first(where: { $0.kind != .gap }) else { return nil }
-        return "\(row.id)|\(cell.id)"
+        let rows = model.rows
+        let row = rows.first { $0.channel.id == watching.channelID && $0.listings }
+            ?? rows.first { model.hasFavourites && extras.isFavourite($0.channel) && $0.listings }
+            ?? rows.first { $0.listings } ?? rows.first
+        guard let row else { return nil }
+        let date = Date()
+        let cell = row.cells.first { $0.programme?.isOn(at: date) == true } ?? row.cells.first { $0.kind != .gap }
+        return cell.map { "\(row.id)|\($0.id)" }
+    }
+
+    /// Back from the player: focus on what is on now on the channel watched.
+    private func landOnWatched() {
+        guard let id = watching.channelID, let row = model.rows.first(where: { $0.channel.id == id }) else { return }
+        let date = Date()
+        guard let cell = row.cells.first(where: { $0.programme?.isOn(at: date) == true }) ?? row.cells.first(where: { $0.kind != .gap }) else { return }
+        let target = "\(row.id)|\(cell.id)"
+        model.select(row, cell)
+        remembered = target
+        anchor = max(cell.start, model.start)
+        Task { @MainActor in
+            // The cover's own focus comes back first.
+            for _ in 0..<12 where focus != target {
+                focus = target
+                try? await Task.sleep(for: .milliseconds(120))
+            }
+        }
     }
 
     private func find(_ id: String) -> (LiveGuideModel.Row, LiveGuideModel.Cell)? {
@@ -266,10 +383,63 @@ struct TVLiveGuideScreen: View {
     }
 }
 
+/// The three lines above the chips for the focused programme: on now or
+/// when, and the channel; the title with its episode; time left or when it
+/// starts in gold, its times, its rating and what follows.
+private struct TVGuideSummary: View {
+    let selected: (channel: LiveChannel, programme: LiveProgramme?)?
+    let next: LiveProgramme?
+    let now: Date
+    let stale: String?
+    @Environment(LiveExtrasStore.self) private var extras
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 40) {
+            if let selected {
+                let programme = selected.programme
+                VStack(alignment: .leading, spacing: 8) {
+                    TVKicker(text: liveGuideWhen(programme, channel: selected.channel, now: now),
+                             color: Palette.text, live: programme?.isOn(at: now) == true)
+                    HStack(alignment: .firstTextBaseline, spacing: 24) {
+                        Text(programme?.title ?? selected.channel.name)
+                            .font(.tv(.headline, .bold)).foregroundStyle(Palette.text).lineLimit(1)
+                            .accessibilityIdentifier("live-hero-title")
+                        if let line = programme?.episodeLine {
+                            Text(line).font(.tv(.caption1)).foregroundStyle(Palette.muted).lineLimit(1)
+                        }
+                    }
+                    if let programme {
+                        FactsLine(lead: liveWhen(programme, now: now), parts: [LiveClock.device.range(programme.start, programme.end)],
+                                  rating: programme.rating, after: after(programme))
+                    } else {
+                        Text(liveNoListingsStillPlays).font(.tv(.body)).foregroundStyle(Palette.textSecondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Spacer()
+            }
+            if let stale {
+                Text(stale).font(.tv(.caption2)).foregroundStyle(Palette.muted).multilineTextAlignment(.trailing)
+                    .frame(maxWidth: 420, alignment: .trailing)
+                    .accessibilityIdentifier("live-guide-stale")
+            }
+        }
+        .padding(.top, 20)
+    }
+
+    /// What follows, then a reminder that is set.
+    private func after(_ programme: LiveProgramme) -> [String] {
+        var parts = [liveGuideAfter(programme, next: next, now: now)].compactMap { $0 }
+        if programme.start > now, extras.isReminded(programme) { parts.append(liveReminderSet(leadMinutes: extras.leadMinutes)) }
+        return parts
+    }
+}
+
 /// One cell of the guide: a view of its own, compared by what it shows, so a
 /// move of focus redraws the cells it moves between and not every cell.
-/// Each cell's look when focused comes from
-/// its button style; `focused` is only for the recording mark's colours.
+/// Select on a programme on now (or over) watches its channel; on one still
+/// to come it opens the programme's sheet, whose rows the long press offers too.
 private struct TVGuideCell: View, Equatable {
     let clock: LiveClock
     let row: LiveGuideModel.Row
@@ -278,8 +448,7 @@ private struct TVGuideCell: View, Equatable {
     let id: String
     let focused: Bool
     let focus: FocusState<String?>.Binding
-    @Binding var recordChoice: LiveProgramme?
-    @Binding var clash: LiveRecordingClash?
+    let open: (LiveProgramme) -> Void
     let move: (MoveCommandDirection) -> Void
     @Environment(Navigator.self) private var navigator
     @Environment(LiveExtrasStore.self) private var extras
@@ -296,264 +465,263 @@ private struct TVGuideCell: View, Equatable {
             let mark = recordings.mark(for: p)
             var spoken = p
             let _ = { spoken.recording = mark }()
-            Button { navigator.playLive(.init(channel: row.channel)) } label: {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("\(reminded ? Text("\(Image(systemName: "bell.fill")) ").foregroundStyle(Palette.gold) : Text(""))\((cell.startsBefore ? "‹ " : "") + p.title)")
-                        .font(.system(size: 23, weight: .semibold)).lineLimit(1)
-                    HStack(spacing: 8) {
-                        if let mark { RecordingMark(mark, onLight: focused).accessibilityHidden(true) }
-                        if !p.tags.isEmpty { LiveTags(p.tags, size: 14) }
-                        Text(p.episodeLine ?? clock.shortRange(p.start, p.end)).font(.system(size: 17)).lineLimit(1).opacity(0.7)
+            let later = p.start > now
+            Button { if later { open(p) } else { navigator.playLive(.init(channel: row.channel)) } } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text((cell.startsBefore ? "‹ " : "") + p.title)
+                        .font(.tv(.body, .semibold)).lineLimit(1)
+                    HStack(spacing: 10) {
+                        Text(clock.shortRange(p.start, p.end)).lineLimit(1)
+                        if p.isNew { Text("New").fontWeight(.bold).foregroundStyle(focused ? Color(hex: 0x7A5200) : Palette.gold) }
+                        if reminded { Text("\(Image(systemName: "bell.fill"))").foregroundStyle(focused ? Color(hex: 0x7A5200) : Palette.gold) }
+                        if let mark, mark.state.marked { TVGuideRecordingMark(mark: mark, focused: focused) }
                     }
+                    .font(.tv(.caption2))
+                    .foregroundStyle(focused ? Color.tvOnWhiteMuted : Palette.muted)
                 }
             }
-            .buttonStyle(TVGuideCellStyle(progress: p.isOn(at: now) ? p.progress(at: now) : nil))
+            .buttonStyle(TVGuideCellStyle(onNow: p.isOn(at: now), progress: p.isOn(at: now) ? p.progress(at: now) : nil))
             .disabled(!row.channel.available)
             .focused(focus, equals: id)
             .onMoveCommand(perform: move)
-            // Play/Pause tunes a programme on now; on any other it does what Select does.
-            .playPauseCard(.cell(p, on: row.channel, now: now)) { navigator.playLive(.init(channel: row.channel)) }
-            .contextMenu {
-                // What it offers is decided once, for every menu (LiveProgrammeActions).
-                let actions = LiveProgrammeActions(p, on: row.channel, now: now, extras: extras, recordings: recordings)
-                switch actions.recording {
-                case .marked?:
-                    // Set to record already, by this person or someone else: no second Record.
-                    if let cancel = actions.cancel {
-                        Button(liveCancelRecordingTitle(cancel.state)) { Task { await recordings.cancel(cancel, programmeID: p.id) } }
-                    }
-                case .record(let rest, true, _)?:
-                    Button(liveRecordTitle(rest: rest, choosing: true)) { recordChoice = p }
-                case .record(let rest, false, _)?:
-                    // A film or a special has nothing to choose.
-                    Button(liveRecordTitle(rest: rest)) {
-                        Task { if let result = await recordings.record(p, options: .init()) { clash = LiveRecordingClash(result) } }
-                    }
-                case nil:
-                    EmptyView()
-                }
-                switch actions.reminder {
-                case .set?:
-                    Button { Task { await extras.removeReminder(for: p) } } label: { Label(liveRemoveReminder, systemImage: "bell.slash") }
-                case .offered?:
-                    Button { Task { await extras.remind(p, on: row.channel) } } label: { Label(liveRemindMe, systemImage: "bell") }
-                case .unavailable?, nil:
-                    EmptyView()
-                }
-                Button { navigator.playLive(.init(channel: row.channel)) } label: {
-                    Label(liveWatchLabel(row.channel, programme: p, now: now), systemImage: "play.fill")
-                }
-            }
+            // Play/Pause watches the channel now, whatever is focused on it.
+            .playPauseCard(.card(row.channel)) { navigator.playLive(.init(channel: row.channel)) }
+            // A long press on one still to come is Select's: the sheet. On one on now, Record the rest and Watch.
+            .modifier(OnNowMenu(on: !later) { menu(p) })
             // The recording state is said once, by liveAccessibilityLabel.
             .accessibilityLabel(liveCellAccessibilityLabel(spoken, reminded: reminded, channel: row.channel, clock: clock))
+            .accessibilityHint(later ? "Opens record, remind and watch" : liveWatchesLiveHint)
             .accessibilityIdentifier("live-cell-\(row.channel.number)-\(p.title)")
         case .noListings:
             Button { navigator.playLive(.init(channel: row.channel)) } label: {
-                Text(liveNoListings).font(.system(size: 23, weight: .semibold))
+                Text(liveNoListings).font(.tv(.body, .semibold))
             }
-            .buttonStyle(TVGuideCellStyle(progress: nil, muted: true))
+            .buttonStyle(TVGuideCellStyle(onNow: false, progress: nil, muted: true))
             .disabled(!row.channel.available)
             .focused(focus, equals: id)
             .playPauseCard(.card(row.channel)) { navigator.playLive(.init(channel: row.channel)) }
             .accessibilityLabel(liveNoListingsAccessibilityLabel(row.channel))
             .accessibilityIdentifier("live-cell-\(row.channel.number)-none")
         case .listingsEnd(let date):
-            Text(liveNoListingsAfter(date, clock: clock)).font(.system(size: 19)).foregroundStyle(Palette.muted)
-                .padding(.horizontal, 18).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            Text(liveNoListingsAfter(date, clock: clock)).font(.tv(.caption2)).foregroundStyle(Palette.muted)
+                .padding(.horizontal, 22).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         case .gap:
             Color.clear
         }
     }
+
+    /// The long press on a programme on now: Record the rest (or stop it), and Watch.
+    @ViewBuilder private func menu(_ p: LiveProgramme) -> some View {
+        let actions = LiveProgrammeActions(p, on: row.channel, now: now, extras: extras, recordings: recordings)
+        switch actions.recording {
+        case .marked?:
+            if let cancel = actions.cancel {
+                Button(liveCancelRecordingTitle(cancel.state)) { Task { await recordings.cancel(cancel, programmeID: p.id) } }
+            }
+        case .record(let rest, _, _)?:
+            Button(liveRecordTitle(rest: rest)) { Task { await recordings.record(p, options: .init()) } }
+        case nil:
+            EmptyView()
+        }
+        Button { navigator.playLive(.init(channel: row.channel)) } label: {
+            Label(liveWatchLabel(row.channel, programme: p, now: now), systemImage: "play.fill")
+        }
+    }
 }
 
-/// A guide cell: a dark tile, white with dark text and the gold rim when focused, progress along the bottom while it is on.
+/// A long-press menu only on a programme on now: without one, a long press
+/// on a later programme is a Select, which opens its sheet.
+private struct OnNowMenu<Items: View>: ViewModifier {
+    let on: Bool
+    @ViewBuilder let items: () -> Items
+
+    func body(content: Content) -> some View {
+        if on { content.contextMenu { items() } } else { content }
+    }
+}
+
+/// A recording mark in a cell: a red dot and its words ("Will record",
+/// "Recording"), orange for one that won't record.
+private struct TVGuideRecordingMark: View {
+    let mark: LiveRecordingMark
+    let focused: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle().fill(mark.state == .conflict ? Palette.warning : Color(hex: 0xFF4A3D)).frame(width: 12, height: 12)
+            Text(mark.state == .recording ? "Recording" : mark.state == .conflict ? "Won’t record" : "Will record")
+                .foregroundStyle(mark.state == .conflict ? (focused ? Color(hex: 0xA34A00) : Palette.warning) : focused ? Color.tvOnWhiteMuted : Palette.muted)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// A guide cell: a dark tile, a little lighter while it is on, with how far
+/// it has got along the bottom in gold; focused, it grows and turns white.
 private struct TVGuideCellStyle: ButtonStyle {
+    let onNow: Bool
     let progress: Double?
     var muted = false
 
     func makeBody(configuration: Configuration) -> some View {
-        Styled(configuration: configuration, progress: progress, muted: muted)
+        Styled(configuration: configuration, onNow: onNow, progress: progress, muted: muted)
     }
 
     private struct Styled: View {
         let configuration: Configuration
+        let onNow: Bool
         let progress: Double?
         let muted: Bool
         @Environment(\.isFocused) private var focused
+        @Environment(\.isEnabled) private var enabled
 
         var body: some View {
+            let pressed = configuration.isPressed && focused
             configuration.label
                 .foregroundStyle(focused ? Palette.ground : muted ? Palette.textSecondary : Palette.text)
-                .padding(.horizontal, 18)
+                .padding(.horizontal, 22)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                .background(focused ? Palette.text : muted ? Palette.surface : Palette.surfaceRaised, in: RoundedRectangle(cornerRadius: 8))
+                .background(focused ? (pressed ? Color.tvPressed : Palette.text) : onNow ? Color(hex: 0x2A2A2F) : Palette.surfaceRaised)
                 .overlay(alignment: .bottomLeading) {
-                    if let progress {
+                    if let progress, !focused {
                         GeometryReader { geo in
-                            Rectangle().fill(Palette.gold).frame(width: geo.size.width * progress, height: 4)
+                            Rectangle().fill(Palette.gold).frame(width: geo.size.width * progress, height: 6)
                                 .frame(maxHeight: .infinity, alignment: .bottom)
                         }
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay { if focused { RoundedRectangle(cornerRadius: 11).strokeBorder(Palette.gold, lineWidth: 3).padding(-3) } }
-                .shadow(color: .black.opacity(focused ? 0.5 : 0), radius: focused ? 18 : 0, y: focused ? 10 : 0)
-                .scaleEffect(configuration.isPressed ? 0.98 : 1)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .scaleEffect(focused && !pressed ? 1.03 : 1)
+                .shadow(color: .black.opacity(focused ? 0.7 : 0), radius: focused ? 30 : 0, y: focused ? 24 : 0)
+                .opacity(enabled ? 1 : 0.45)
                 .zIndex(focused ? 1 : 0)
                 .animation(.easeOut(duration: 0.15), value: focused)
         }
     }
 }
 
-/// The logo and number, or the number and name without a logo; a gold star after a favourite.
+/// The logo and number; "Watching" in gold on the channel watched last, and
+/// a gold star after a favourite.
 struct TVLiveChannelLabel: View {
     let channel: LiveChannel
     var favourite = false
+    var watching = false
     @Environment(\.isFocused) private var focused
 
     var body: some View {
-        HStack(spacing: 14) {
-            if channel.logoURL != nil {
-                LiveLogo(url: channel.logoURL) { Color.clear }.frame(width: 64, height: 48)
-                Text(channel.number).font(.system(size: 28, weight: .bold)).monospacedDigit()
-            } else {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(channel.number).font(.system(size: 24, weight: .bold)).monospacedDigit()
-                    Text(channel.name).font(.system(size: 17)).foregroundStyle(focused ? Color(hex: 0x404040) : Palette.muted).lineLimit(1)
+        HStack(spacing: 16) {
+            TVChannelLogo(channel: channel, onLight: focused)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 8) {
+                    Text(channel.number).font(.tv(.callout, .bold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
+                    if favourite {
+                        Text("\(Image(systemName: "star.fill"))").font(.tv(.caption2)).foregroundStyle(focused ? Color(hex: 0xB7791F) : Palette.gold)
+                            .accessibilityHidden(true)
+                    }
                 }
-            }
-            if favourite {
-                Text("\(Image(systemName: "star.fill"))").font(.system(size: 18)).foregroundStyle(focused ? Color(hex: 0xB7791F) : Palette.gold)
-                    .accessibilityHidden(true)
+                if watching {
+                    Text("Watching").font(.tv(.caption2, .semibold)).foregroundStyle(focused ? Color(hex: 0x7A5200) : Palette.gold)
+                }
             }
         }
         .foregroundStyle(focused ? Palette.ground : Palette.text)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(channel.number) \(channel.name)\(favourite ? ", favourite" : "")")
+        .accessibilityLabel("\(channel.number) \(channel.name)\(favourite ? ", favourite" : "")\(watching ? ", watching" : "")")
     }
 }
 
-/// The channel column's cell when it can take focus: white with the gold rim.
+/// The gold bar down the left of the channel watched last.
+private struct WatchingEdge: View {
+    var body: some View {
+        UnevenRoundedRectangle(topLeadingRadius: 14, bottomLeadingRadius: 14)
+            .fill(Palette.gold).frame(width: 6)
+            .accessibilityHidden(true)
+    }
+}
+
+/// The channel column's cell when it can take focus: a dark tile, with the
+/// gold bar on the channel watched last; focused, it grows and turns white.
 private struct TVChannelCellStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View { Styled(configuration: configuration) }
+    let watching: Bool
+
+    func makeBody(configuration: Configuration) -> some View { Styled(configuration: configuration, watching: watching) }
 
     private struct Styled: View {
         let configuration: Configuration
+        let watching: Bool
         @Environment(\.isFocused) private var focused
 
         var body: some View {
+            let pressed = configuration.isPressed && focused
             configuration.label
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 20)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                .background(focused ? Palette.text : .clear, in: RoundedRectangle(cornerRadius: 10))
-                .overlay { if focused { RoundedRectangle(cornerRadius: 13).strokeBorder(Palette.gold, lineWidth: 3).padding(-3) } }
-                .scaleEffect(focused ? 1.04 : configuration.isPressed ? 0.98 : 1)
+                .background(focused ? (pressed ? Color.tvPressed : Palette.text) : Palette.surfaceRaised, in: RoundedRectangle(cornerRadius: 14))
+                .overlay(alignment: .leading) { if watching && !focused { WatchingEdge() } }
+                .scaleEffect(focused && !pressed ? 1.03 : 1)
+                .shadow(color: .black.opacity(focused ? 0.7 : 0), radius: focused ? 30 : 0, y: focused ? 24 : 0)
                 .zIndex(focused ? 1 : 0)
                 .animation(.easeOut(duration: 0.15), value: focused)
         }
     }
 }
 
-/// The hero: what the focused cell is, with its picture on the right fading into the page.
-struct TVLiveHero: View {
+/// The guide while it loads: shapes where the lines and rows will be.
+struct TVGuideLoading: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: TVLiveGuideScreen.gap) {
+            ForEach(0..<5, id: \.self) { i in
+                HStack(spacing: TVLiveGuideScreen.gap) {
+                    shape(width: TVLiveGuideScreen.column - TVLiveGuideScreen.gap)
+                    shape(width: [992, 492, 992, 1492, 492][i])
+                    if i != 3 { shape(width: [492, 992, 492, 0, 992][i]) }
+                }
+            }
+        }
+        .padding(.top, 56)
+        .padding(.horizontal, TVLayout.gutter)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .accessibilityElement()
+        .accessibilityLabel(liveLoadingListings)
+        .accessibilityIdentifier("live-guide-loading")
+    }
+
+    private func shape(width: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: 14).fill(Palette.surfaceRaised).frame(width: width, height: TVLiveGuideScreen.rowHeight)
+    }
+}
+
+/// Listings or the tuner couldn't be reached: why, Try again focused, and Recordings, which still plays.
+struct TVGuideProblem: View {
+    let title: String
+    let message: String
+    let retry: () async -> Void
     @Environment(LiveRecordingsStore.self) private var recordings
-    let selected: (channel: LiveChannel, programme: LiveProgramme?)?
-    let now: Date
-    /// The channel column has focus: the long press stars it.
-    var channelFocused = false
-    @Environment(LiveExtrasStore.self) private var extras
+    @Environment(Navigator.self) private var navigator
+    @FocusState private var tryAgain: Bool
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            if let selected {
-                let picture = selected.programme?.picture(wide: true)
-                if selected.programme != nil {
-                    LivePictureView(programme: selected.programme, channel: selected.channel, wide: true, maxPixel: 1920)
-                        .frame(width: 980, height: 551)
-                        .overlay(LinearGradient(stops: [.init(color: Palette.ground, location: 0), .init(color: Palette.ground.opacity(0), location: 0.45)], startPoint: .leading, endPoint: .trailing))
-                        .overlay(LinearGradient(stops: [.init(color: Palette.ground.opacity(0), location: 0.45), .init(color: Palette.ground, location: 0.92)], startPoint: .top, endPoint: .bottom))
-                        .overlay(alignment: .bottomTrailing) {
-                            if picture?.fromTMDB == true {
-                                Text(livePictureFromTMDB).font(.system(size: 15)).foregroundStyle(Palette.faint).padding(.trailing, TVLayout.gutter).padding(.bottom, 200)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                        .offset(y: -150)
-                        .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: 24) {
+            Image(systemName: "antenna.radiowaves.left.and.right.slash")
+                .font(.system(size: 64, weight: .medium)).foregroundStyle(Palette.muted)
+                .accessibilityHidden(true)
+            Text(title).font(.tv(.title2)).foregroundStyle(Palette.text)
+            Text(message).font(.tv(.body)).foregroundStyle(Palette.textSecondary).frame(maxWidth: 860, alignment: .leading)
+            HStack(spacing: 24) {
+                Button("Try again") { Task { await retry() } }
+                    .buttonStyle(TVButtonStyle(kind: .primary))
+                    .focused($tryAgain)
+                if recordings.available {
+                    Button("Recordings") { navigator.open(.liveRecordings) }.buttonStyle(TVButtonStyle())
                 }
-                details(selected.channel, selected.programme)
-                    .padding(.horizontal, TVLayout.gutter)
-                    .frame(maxWidth: 1000, alignment: .leading)
             }
+            .padding(.top, 16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .focusSection()
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-    }
-
-    private func details(_ channel: LiveChannel, _ programme: LiveProgramme?) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                if channel.logoURL != nil { LiveLogo(url: channel.logoURL) { Color.clear }.frame(width: 48, height: 36) }
-                Text(channel.number).font(.system(size: 22, weight: .bold))
-                Text(channel.name).font(.system(size: 22)).foregroundStyle(Palette.muted)
-                if extras.isFavourite(channel) {
-                    Text("\(Image(systemName: "star.fill"))").font(.system(size: 18)).foregroundStyle(Palette.gold).accessibilityLabel("Favourite")
-                }
-                Text("·").foregroundStyle(Palette.muted)
-                Text(programme.map { liveStatus($0, now: now) } ?? "Live").font(.system(size: 22))
-                    .foregroundStyle(programme.map { $0.isOn(at: now) } ?? true ? Palette.liveText : Palette.muted)
-            }
-            Text(programme?.title ?? channel.name).font(.system(size: 54, weight: .bold)).lineLimit(1).minimumScaleFactor(0.7)
-                .accessibilityIdentifier("live-hero-title")
-            if let programme {
-                HStack(spacing: 10) {
-                    if let line = programme.episodeLine { Text(line).font(.system(size: 22)).foregroundStyle(Palette.textSecondary).lineLimit(1) }
-                    if !programme.tags.isEmpty { LiveTags(programme.tags, size: 15) }
-                    if let categories = programme.categoryLine { Text(categories).font(.system(size: 20)).foregroundStyle(Palette.muted).lineLimit(1) }
-                }
-                HStack(spacing: 14) {
-                    Text("\(LiveClock.device.weekdayName(programme.start)) \(LiveClock.device.range(programme.start, programme.end))")
-                        .font(.system(size: 20)).foregroundStyle(Palette.textSecondary).monospacedDigit()
-                    if programme.isOn(at: now) { LiveProgressBar(progress: programme.progress(at: now), height: 5).frame(width: 220) }
-                    Text(liveWhen(programme, now: now)).font(.system(size: 20)).foregroundStyle(Palette.muted)
-                }
-                if let description = programme.description {
-                    Text(description).font(.system(size: 21)).foregroundStyle(Palette.muted).lineLimit(2)
-                }
-                if programme.descriptionFromTMDB {
-                    Text(liveDescriptionFromTMDB).font(.system(size: 15)).foregroundStyle(Palette.faint)
-                }
-            } else {
-                Text(liveNoListingsStillPlays).font(.system(size: 22)).foregroundStyle(Palette.muted)
-            }
-            HStack(spacing: 16) {
-                let reminder = programme.flatMap { p in p.start > now ? extras.reminder(for: p).flatMap { $0.state == .gone ? nil : $0 } : nil }
-                if let reminder {
-                    TVLiveReminderStat(reminder: reminder, now: now)
-                } else if let programme, programme.start > now {
-                    Text(liveOnAt(channel, programme: programme, now: now)).font(.system(size: 21, weight: .semibold))
-                }
-                Text("\(Image(systemName: "play.fill")) \(liveWatchLabel(channel, programme: programme, now: now))")
-                    .font(.system(size: 19, weight: .semibold))
-                    .padding(.horizontal, 14).padding(.vertical, 7)
-                    .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
-                    .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Palette.outlineStrong))
-                if let hold = holdHint(channel, programme) {
-                    TVLiveHint(systemImage: "hand.tap", text: "Hold · \(hold)").accessibilityIdentifier("live-hero-hold")
-                }
-            }
-            .padding(.top, 4)
-            .accessibilityElement(children: .combine)
-            .accessibilityHint("Select watches the channel")
-        }
-        .foregroundStyle(Palette.text)
-    }
-
-    /// What a long press does here: star the channel, or what the menu of a
-    /// later programme offers (``LiveProgrammeActions/guideHoldHint``).
-    private func holdHint(_ channel: LiveChannel, _ programme: LiveProgramme?) -> String? {
-        guard extras.available else { return nil }
-        if channelFocused { return liveFavouriteAction(favourite: extras.isFavourite(channel)) }
-        guard let programme else { return nil }
-        return LiveProgrammeActions(programme, on: channel, now: now, extras: extras, recordings: recordings).guideHoldHint
+        .padding(.horizontal, TVLayout.gutter)
+        .padding(.top, 60)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .defaultFocus($tryAgain, true)
     }
 }

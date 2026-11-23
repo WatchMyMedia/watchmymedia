@@ -3,48 +3,26 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// What the remote's channel keys put over Live TV:
-/// the note at the top when Page Up or Page Down changed channel, or when
-/// the transport bar came up ("Select pauses · swipe up for the channel
-/// buttons"); and Go to channel's keypad, from the 123 key or its button.
+/// What the remote's channel keys put over Live TV: Go to channel's keypad,
+/// from the 123 key or the Channels tab. Page Up and Page Down need nothing
+/// of their own: the banner names the new channel at once.
 struct LiveChannelKeysLayer: View {
     let model: TVLivePlayerModel
 
     var body: some View {
         ZStack {
-            if let note = model.keyNote {
-                Text(note.text)
-                    .font(.system(size: 22, weight: .medium))
-                    .foregroundStyle(Palette.text)
-                    .lineLimit(1)
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 14)
-                    .background(Palette.ground.opacity(0.88), in: Capsule())
-                    .overlay(Capsule().strokeBorder(.white.opacity(0.2)))
-                    .shadow(color: .black.opacity(0.55), radius: 20, y: 16)
-                    .padding(.top, 110)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .allowsHitTesting(false)
-                    .accessibilityIdentifier("live-key-note")
-                    .transition(.opacity)
-                    .task(id: note) {
-                        guard (try? await Task.sleep(for: .seconds(note.seconds))) != nil else { return }
-                        model.clearKeyNote(note)
-                    }
-            }
             if let goTo = model.goTo {
                 GoToChannelDialog(model: goTo, listings: model.listings, onClose: { model.closeGoToChannel() })
                     .transition(.opacity)
             }
         }
-        .animation(.easeOut(duration: 0.2), value: model.keyNote)
         .animation(.easeOut(duration: 0.2), value: model.goTo != nil)
     }
 }
 
-/// The artboard's `goTo` dialog: what was typed, the keypad, and the
-/// matching channels with what is on each.
-private struct GoToChannelDialog: View {
+/// Go to channel: what was typed, the keypad, and the matching channels
+/// with what is on each. The live player, the guide and the channels page open it.
+struct GoToChannelDialog: View {
     let model: GoToChannelModel
     let listings: Bool
     let onClose: () -> Void
@@ -56,7 +34,7 @@ private struct GoToChannelDialog: View {
             HStack(alignment: .top, spacing: 64) {
                 VStack(alignment: .leading, spacing: 22) {
                     Text(GoToChannelModel.title)
-                        .font(.system(size: 38, weight: .heavy))
+                        .font(.tv(.headline, .bold))
                         .accessibilityAddTraits(.isHeader)
                     HStack(spacing: 6) {
                         Text(model.typed)
@@ -74,7 +52,7 @@ private struct GoToChannelDialog: View {
                     LazyVGrid(columns: Array(repeating: GridItem(.fixed(96), spacing: 14), count: 3), spacing: 14) {
                         ForEach(GoToChannelModel.keys, id: \.self) { key in
                             Button { model.press(key) } label: {
-                                Text(String(key)).font(.system(size: 32, weight: .semibold))
+                                Text(String(key)).font(.tv(.callout))
                             }
                             .buttonStyle(KeyStyle())
                             .focused($focus, equals: "key-\(key)")
@@ -86,13 +64,8 @@ private struct GoToChannelDialog: View {
                     .focusSection()
                 }
                 VStack(alignment: .leading, spacing: 10) {
-                    Text(GoToChannelModel.matchesHeading.uppercased())
-                        .font(.system(size: 16, weight: .bold))
-                        .tracking(1.6)
-                        .foregroundStyle(Palette.muted)
-                        .padding(.top, 8)
+                    TVGroupLabel(GoToChannelModel.matchesHeading)
                         .padding(.bottom, 10)
-                        .accessibilityAddTraits(.isHeader)
                     TimelineView(.periodic(from: .now, by: 30)) { context in
                         VStack(alignment: .leading, spacing: 10) {
                             ForEach(Array(model.matches.enumerated()), id: \.element.id) { index, channel in
@@ -104,13 +77,13 @@ private struct GoToChannelDialog: View {
                                 .accessibilityIdentifier("live-goto-match-\(channel.id)")
                             }
                             if let note = model.emptyNote {
-                                Text(note).font(.system(size: 21)).foregroundStyle(Palette.muted).padding(.horizontal, 20)
+                                Text(note).font(.tv(.body)).foregroundStyle(Palette.muted).padding(.horizontal, 20)
                             }
                         }
                     }
                     Spacer(minLength: 0)
                     Text(GoToChannelModel.help)
-                        .font(.system(size: 18))
+                        .font(.tv(.caption2))
                         .foregroundStyle(Palette.muted)
                         .lineSpacing(6)
                         .fixedSize(horizontal: false, vertical: true)
@@ -122,7 +95,7 @@ private struct GoToChannelDialog: View {
             .foregroundStyle(Palette.text)
             .padding(.horizontal, 56)
             .padding(.vertical, 52)
-            .frame(width: 1260, height: 700, alignment: .topLeading)
+            .frame(width: 1400, height: 760, alignment: .topLeading)
             .background(Palette.sheet, in: RoundedRectangle(cornerRadius: 32))
             .shadow(color: .black.opacity(0.7), radius: 60, y: 40)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -155,15 +128,15 @@ private struct MatchRow: View {
     var body: some View {
         HStack(spacing: 18) {
             Text(channel.number)
-                .font(.system(size: 26, weight: .bold))
+                .font(.tv(.callout, .bold))
                 .monospacedDigit()
-                .frame(width: 80, alignment: .leading)
+                .frame(width: 96, alignment: .leading)
             VStack(alignment: .leading, spacing: 2) {
-                Text(channel.name).font(.system(size: 21, weight: .semibold)).lineLimit(1)
+                Text(channel.name).font(.tv(.body, .semibold)).lineLimit(1)
                 if let line = onNow {
                     Text(line)
-                        .font(.system(size: 17))
-                        .foregroundStyle(focused ? Palette.ground.opacity(0.7) : Palette.muted)
+                        .font(.tv(.caption2))
+                        .foregroundStyle(focused ? Color.tvOnWhiteMuted : Palette.muted)
                         .lineLimit(1)
                 }
             }
@@ -179,7 +152,7 @@ private struct MatchRow: View {
     }
 }
 
-/// The artboard's `.match`: the first one lighter, as it is what tunes.
+/// A match: the first one lighter, as it is what tunes; focused, white.
 private struct MatchStyle: ButtonStyle {
     let first: Bool
 
@@ -195,14 +168,14 @@ private struct MatchStyle: ButtonStyle {
         var body: some View {
             configuration.label
                 .padding(.horizontal, 20)
-                .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
                 .background(focused ? Palette.text : .white.opacity(first ? 0.10 : 0), in: RoundedRectangle(cornerRadius: 14))
-                .focusRim(focused, cornerRadius: 14, scale: 1.02)
+                .focusLift(focused, scale: 1.02)
         }
     }
 }
 
-/// The artboard's `.key`: 96×80; focused, white with the gold rim.
+/// A key: 96×80; focused, it grows and turns white.
 private struct KeyStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         Styled(configuration: configuration)
@@ -217,7 +190,7 @@ private struct KeyStyle: ButtonStyle {
                 .foregroundStyle(focused ? Palette.ground : Palette.text)
                 .frame(width: 96, height: 80)
                 .background(focused ? Palette.text : .white.opacity(0.10), in: RoundedRectangle(cornerRadius: 16))
-                .focusRim(focused, cornerRadius: 16, scale: 1.08)
+                .focusLift(focused, scale: 1.08)
                 .scaleEffect(configuration.isPressed ? 0.95 : 1)
         }
     }

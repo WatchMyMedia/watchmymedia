@@ -246,7 +246,7 @@ final class LiveTVSyntheticTests: XCTestCase {
     @MainActor private func pair(_ app: XCUIApplication, fixture: TVSyntheticFixture) async throws {
         let address = app.textFields["Server address"]
         XCTAssertTrue(address.waitForExistence(timeout: 15), "Use a fresh owned install; never select a remembered or discovered server.")
-        XCTAssertTrue(focus(address, moves: [.right, .up, .down, .up, .right]))
+        XCTAssertTrue(focus(address, moves: Array(repeating: .down, count: 8)), "Enter an address is the list's last row")
         remote.press(.select)
         for character in fixture.address { address.typeText(String(character)) }
         remote.press(.menu)

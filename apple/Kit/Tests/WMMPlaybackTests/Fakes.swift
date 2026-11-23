@@ -152,8 +152,9 @@ final class FakeMediaPlayer: MediaPlayer {
     private let clock: TestClock
     private var listener: MediaPlayerListener?
     var loads: [PlayerSource] = []
-    /// What ``retitle(_:subtitle:)`` named the item playing.
+    /// What ``retitle(_:subtitle:)`` named the item playing, and the subtitle it gave.
     var titles: [String] = []
+    var subtitles: [String?] = []
     /// What ``describe(_:)`` said about the item playing.
     var described: [ItemDetails] = []
     var seeks: [Int] = []
@@ -218,7 +219,10 @@ final class FakeMediaPlayer: MediaPlayer {
         return true
     }
 
-    func retitle(_ title: String, subtitle: String?) { titles.append(title) }
+    func retitle(_ title: String, subtitle: String?) {
+        titles.append(title)
+        subtitles.append(subtitle)
+    }
 
     func describe(_ details: ItemDetails) { described.append(details) }
 

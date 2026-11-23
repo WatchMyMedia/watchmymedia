@@ -3,11 +3,12 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// The Next Episode card, in the corner while the
-/// transport bar is hidden: the still, the episode, and a button that fills
-/// as the countdown runs ("Next episode in 7", or "Play now" with autoplay
-/// off), with focus; Watch credits puts it away until the end, as Menu does.
-struct NextEpisodeCard: View {
+/// Up next, at the foot of the screen while the credits roll and the
+/// transport bar is hidden: the episode's still, "Up next", its title and
+/// number, and Play in 8, whose fill follows the countdown, with focus
+/// ("Play now" with autoplay off). Watch credits puts it away until the
+/// end, as Back does.
+struct UpNextCard: View {
     let prompt: UpNextPrompt
     let still: URL?
     let onPlay: () -> Void
@@ -18,49 +19,41 @@ struct NextEpisodeCard: View {
 
     var body: some View {
         let next = prompt.next
-        VStack(alignment: .leading, spacing: 0) {
-            Color.clear
-                .frame(width: 440, height: 248)
-                .overlay { Artwork(url: still, seed: "\(next.showTitle) \(next.title)", maxPixel: 880) }
-                .overlay(alignment: .topLeading) { TVBadge("Next episode").padding(14) }
-                .overlay(alignment: .bottomTrailing) {
-                    if let runtime = next.runtimeMs { TVBadge(formatDuration(ms: runtime)).padding(14) }
-                }
-                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 22, topTrailingRadius: 22))
+        HStack(alignment: .center, spacing: 32) {
+            Artwork(url: still, seed: "\(next.showTitle) \(next.title)", maxPixel: 720)
+                .frame(width: 320, height: 180)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
                 .accessibilityHidden(true)
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text(next.cardTitle).font(.system(size: 24, weight: .bold)).foregroundStyle(Palette.text)
-                Text(next.cardMeta).font(.system(size: 18)).foregroundStyle(Palette.muted)
-                HStack(spacing: 12) {
-                    Button(action: onPlay) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "play.fill").font(.system(size: 18))
-                            Text(prompt.buttonLabel).monospacedDigit().minimumScaleFactor(0.8)
-                        }
-                    }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Up next").font(.tv(.caption1)).foregroundStyle(Palette.muted)
+                Text(next.title).font(.tv(.callout)).foregroundStyle(Palette.text).lineLimit(2)
+                Text(next.tvMeta).font(.tv(.caption1)).foregroundStyle(Palette.textSecondary)
+                HStack(spacing: 16) {
+                    Button(action: onPlay) { Text(prompt.tvButtonLabel).monospacedDigit() }
                     .buttonStyle(CountdownButtonStyle(progress: prompt.countdownProgress))
                     .focused($focus, equals: .play)
-                    Button(action: onWatchCredits) { Text("Watch credits").fixedSize().padding(.horizontal, -10) }
-                        .buttonStyle(TVButtonStyle(height: 60, fontSize: 20))
+                    Button("Watch credits", action: onWatchCredits)
+                        .buttonStyle(TVButtonStyle(height: 72))
                         .focused($focus, equals: .credits)
                 }
-                .padding(.top, 16)
+                .fixedSize()
+                .padding(.top, 14)
             }
-            .padding(EdgeInsets(top: 20, leading: 22, bottom: 22, trailing: 22))
+            .frame(minWidth: 420, alignment: .leading)
         }
-        .frame(width: 440)
-        .background(Color(hex: 0x1C1C1E).opacity(0.92), in: RoundedRectangle(cornerRadius: 22))
-        .shadow(color: .black.opacity(0.7), radius: 40, y: 30)
+        .padding(32)
+        .background(Color(hex: 0x18181B).opacity(0.94), in: RoundedRectangle(cornerRadius: 28))
+        .shadow(color: .black.opacity(0.6), radius: 40, y: 30)
         .focusSection()
         .defaultFocus($focus, .play)
         .onAppear { focus = .play }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Next episode")
+        .accessibilityLabel("Up next")
     }
 }
 
-/// The card's main button: burgundy fills it from the left as the countdown runs.
+/// Up next's main button: burgundy with its rim, the countdown filling it
+/// from the left; focused, white, with the fill a paler burgundy.
 private struct CountdownButtonStyle: ButtonStyle {
     let progress: Double
 
@@ -74,191 +67,154 @@ private struct CountdownButtonStyle: ButtonStyle {
         @Environment(\.isFocused) private var focused
 
         var body: some View {
+            let pressed = configuration.isPressed && focused
             configuration.label
-                .font(.system(size: 20, weight: .semibold))
+                .font(.tv(.body, .semibold))
                 .lineLimit(1)
                 .foregroundStyle(focused ? Palette.ground : Palette.text)
-                .padding(.horizontal, 16)
-                .frame(maxWidth: .infinity, minHeight: 60)
+                .padding(.horizontal, 28)
+                .frame(height: 72)
                 .background {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
-                            focused ? Palette.text : .white.opacity(0.14)
-                            Palette.burgundy.opacity(focused ? 0.35 : 1).frame(width: geo.size.width * progress)
+                            focused ? (pressed ? Color.tvPressed : Palette.text) : Palette.burgundy
+                            (focused ? Palette.burgundy.opacity(0.3) : Palette.burgundyEdge.opacity(0.55)).frame(width: geo.size.width * progress)
                         }
                     }
                     .animation(.linear(duration: 0.25), value: progress)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 16))
-                .focusRim(focused, cornerRadius: 16, scale: 1.06)
-                .scaleEffect(configuration.isPressed ? 0.96 : 1)
+                .overlay { if !focused { RoundedRectangle(cornerRadius: 16).strokeBorder(Palette.burgundyEdge, lineWidth: 2) } }
+                .scaleEffect(focused && !pressed ? 1.08 : 1)
+                .shadow(color: .black.opacity(focused ? 0.65 : 0), radius: focused ? 30 : 0, y: focused ? 24 : 0)
+                .animation(.easeOut(duration: 0.15), value: focused)
         }
     }
 }
 
-/// "Are you still watching?": nothing plays
-/// until the viewer answers. Focus starts on Keep watching; Menu and
-/// Play/Pause answer it too.
+/// "Are you still watching?": nothing plays until the viewer answers, and
+/// only a button answers. Focus starts on Keep watching; Back is Stop.
 struct StillWatchingPrompt: View {
-    let state: PlayerState
+    /// "Harbor Lights · S03 E07 The Long Dark".
+    let title: String
     let onAnswer: (Bool) -> Void
     @FocusState private var focus: Bool?
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.5).accessibilityHidden(true)
-            VStack(spacing: 16) {
-                if !state.title.isEmpty {
-                    Text(state.title.uppercased())
-                        .font(.system(size: 18, weight: .bold))
-                        .tracking(2.2)
-                        .foregroundStyle(Palette.gold)
-                }
-                Text("Are you still watching?")
-                    .font(.system(size: 48, weight: .bold))
-                    .foregroundStyle(Palette.text)
-                    .accessibilityAddTraits(.isHeader)
-                Text(stillWatchingMessage(next: state.nextEpisode))
-                    .font(.system(size: 22))
-                    .foregroundStyle(Palette.muted)
-                    .lineSpacing(9)
-                    .frame(maxWidth: 680)
-                HStack(spacing: 24) {
-                    Button { onAnswer(true) } label: { Label("Keep watching", systemImage: "play.fill") }
-                        .buttonStyle(TVButtonStyle(kind: .primary))
-                        .focused($focus, equals: true)
-                    Button("Stop") { onAnswer(false) }
-                        .buttonStyle(TVButtonStyle())
-                        .focused($focus, equals: false)
-                }
-                .padding(.top, 18)
-                Text(stillWatchingRemoteNote)
-                    .font(.system(size: 16))
-                    .foregroundStyle(Palette.faint)
-                    .padding(.top, 6)
+        TVSheet {
+            Text("Are you still watching?")
+                .font(.tv(.title3))
+                .foregroundStyle(Palette.text)
+                .accessibilityAddTraits(.isHeader)
+            if !title.isEmpty {
+                Text(title).font(.tv(.body)).foregroundStyle(Palette.textSecondary).lineLimit(2)
             }
-            .multilineTextAlignment(.center)
-            .padding(EdgeInsets(top: 48, leading: 56, bottom: 44, trailing: 56))
-            .frame(width: 880)
-            .background(Color(hex: 0x1C1C1E).opacity(0.96), in: RoundedRectangle(cornerRadius: 28))
-            .shadow(color: .black.opacity(0.7), radius: 50, y: 40)
+            HStack(spacing: 20) {
+                Button { onAnswer(true) } label: { Text("\(Image(systemName: "play.fill")) Keep watching") }
+                    .buttonStyle(TVButtonStyle(kind: .primary))
+                    .focused($focus, equals: true)
+                    .accessibilityLabel("Keep watching")
+                Button("Stop") { onAnswer(false) }
+                    .buttonStyle(TVButtonStyle())
+                    .focused($focus, equals: false)
+            }
+            .padding(.top, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .focusSection()
-            .defaultFocus($focus, true)
-            .onAppear { focus = true }
-            .accessibilityElement(children: .contain)
-            .accessibilityAddTraits(.isModal)
+            Text(tvStillWatchingNote).font(.tv(.caption1)).foregroundStyle(Palette.muted)
         }
+        .defaultFocus($focus, true)
+        .onAppear { focus = true }
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.isModal)
     }
 }
 
-/// The stopped and can't-play states, on their
-/// own with the video gone: the admin's message with Back, or why it failed
-/// with Try again and Back.
+/// The stopped and can't-play states, on black with the video gone, each
+/// saying why in a sentence and opening with focus on the thing to try.
+/// Can't play offers Try again, the quality below as a button (Play at
+/// 1080p) and Back; for an admin, Details shows the server's own words,
+/// which nobody else sees. Stopped gives the admin's message and Back.
 struct PlayerEndState: View {
     enum Kind {
-        case stopped(message: String, note: String?)
-        case failed(message: String, note: String?)
+        case stopped(message: String, line: String, note: String?)
+        case failed(words: TVCantPlay, lower: StreamQuality?, details: String?)
     }
 
     let kind: Kind
-    let title: String
     let onBack: () -> Void
-    let onRetry: () -> Void
+    var onRetry: () -> Void = {}
+    var onLower: () -> Void = {}
     @FocusState private var focus: Choice?
+    @State private var showsDetails = false
 
-    private enum Choice { case primary, back }
+    private enum Choice { case primary, lower, back, details }
 
     var body: some View {
-        ZStack(alignment: .top) {
-            Color(hex: 0x070708)
-            Text(title)
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(Color.tvTitle)
-                .lineLimit(1)
-                .opacity(0.6)
-                .padding(.top, 48)
-                .padding(.horizontal, TVLayout.gutter)
-
-            VStack(spacing: 16) {
-                icon
-                Text(heading)
-                    .font(.system(size: 48, weight: .bold))
-                    .foregroundStyle(Palette.text)
-                    .padding(.top, 8)
-                    .accessibilityAddTraits(.isHeader)
-                Text(message)
-                    .font(.system(size: 24))
-                    .foregroundStyle(Palette.textSecondary)
-                    .lineSpacing(10)
-                if let note {
-                    Text(note).font(.system(size: 18)).foregroundStyle(Palette.faint)
+        ZStack {
+            Color.black.ignoresSafeArea()
+            TVSheet {
+                switch kind {
+                case .stopped(let message, let line, let note):
+                    heading("Playback stopped")
+                    Text(line).font(.tv(.body)).foregroundStyle(Palette.textSecondary)
+                    Text("“\(message)”").font(.tv(.headline)).foregroundStyle(Palette.text).fixedSize(horizontal: false, vertical: true)
+                    buttons
+                    if let note { Text(note).font(.tv(.caption1)).foregroundStyle(Palette.muted) }
+                case .failed(let words, _, let details):
+                    heading(words.title)
+                    Text(words.message).font(.tv(.body)).foregroundStyle(Palette.textSecondary).fixedSize(horizontal: false, vertical: true)
+                    buttons
+                    if showsDetails, let details {
+                        Text(details)
+                            .font(.tv(.caption2))
+                            .foregroundStyle(Palette.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("player-failure-details")
+                    }
                 }
-                buttons.padding(.top, 14)
             }
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: 1120)
-            .padding(.top, 300)
         }
         .defaultFocus($focus, .primary)
         .onAppear { focus = .primary }
     }
 
-    private var heading: String {
-        switch kind {
-        case .stopped: "Playback stopped"
-        case .failed: "Can’t play this"
-        }
-    }
-
-    private var message: String {
-        switch kind {
-        case .stopped(let message, _): "“\(message)”"
-        case .failed(let message, _): message
-        }
-    }
-
-    private var note: String? {
-        switch kind {
-        case .stopped(_, let note), .failed(_, let note): note
-        }
-    }
-
-    @ViewBuilder
-    private var icon: some View {
-        switch kind {
-        case .stopped:
-            Image(systemName: "stop.fill")
-                .font(.system(size: 40))
-                .foregroundStyle(Palette.text)
-                .frame(width: 96, height: 96)
-                .background(Palette.burgundy, in: Circle())
-                .accessibilityHidden(true)
-        case .failed:
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 44, weight: .semibold))
-                .foregroundStyle(Palette.ground)
-                .frame(width: 96, height: 96)
-                .background(Palette.warning, in: Circle())
-                .accessibilityHidden(true)
-        }
+    private func heading(_ text: String) -> some View {
+        Text(text)
+            .font(.tv(.title3))
+            .foregroundStyle(Palette.text)
+            .accessibilityAddTraits(.isHeader)
     }
 
     @ViewBuilder
     private var buttons: some View {
-        switch kind {
-        case .stopped:
-            Button(action: onBack) { Text("Back").frame(minWidth: 140) }
-                .buttonStyle(TVButtonStyle(kind: .primary))
-                .focused($focus, equals: .primary)
-        case .failed:
-            HStack(spacing: 24) {
-                Button(action: onRetry) { Text("Try again").frame(minWidth: 140) }
+        HStack(spacing: 20) {
+            switch kind {
+            case .stopped:
+                Button("Back", action: onBack)
                     .buttonStyle(TVButtonStyle(kind: .primary))
                     .focused($focus, equals: .primary)
-                Button(action: onBack) { Text("Back").frame(minWidth: 140) }
+            case .failed(_, let lower, let details):
+                Button("Try again", action: onRetry)
+                    .buttonStyle(TVButtonStyle(kind: .primary))
+                    .focused($focus, equals: .primary)
+                if let lower {
+                    Button(tvPlayAtLabel(lower), action: onLower)
+                        .buttonStyle(TVButtonStyle())
+                        .focused($focus, equals: .lower)
+                }
+                Button("Back", action: onBack)
                     .buttonStyle(TVButtonStyle())
                     .focused($focus, equals: .back)
+                if details != nil {
+                    Button(showsDetails ? "Hide details" : "Details") { showsDetails.toggle() }
+                        .buttonStyle(TVButtonStyle())
+                        .focused($focus, equals: .details)
+                }
             }
         }
+        .padding(.top, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .focusSection()
     }
 }

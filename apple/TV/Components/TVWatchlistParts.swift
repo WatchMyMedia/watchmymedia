@@ -25,7 +25,7 @@ struct TVWatchlistButton: View {
         Button { Task { await watchlists.press(title, said: said, fromButton: true) } } label: {
             Text("\(Image(systemName: holding.isEmpty ? "bookmark" : "bookmark.fill"))  \(words)")
         }
-        .buttonStyle(TVButtonStyle(kind: holding.isEmpty ? .secondary : .goldText, height: 62, fontSize: 22))
+        .buttonStyle(TVButtonStyle(kind: holding.isEmpty ? .secondary : .goldText))
         .accessibilityLabel(WatchlistWords.buttonLabel(words, title: title.title))
         .accessibilityAddTraits(holding.isEmpty ? .isToggle : [.isToggle, .isSelected])
         .accessibilityIdentifier("watchlist-button")
@@ -76,14 +76,13 @@ struct TVWatchlistPicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 Text(WatchlistWords.pickerTitle)
-                    .font(.system(size: 56, weight: .heavy))
-                    .tracking(-1.1)
+                    .font(.tv(.title2))
                     .foregroundStyle(Palette.text)
                     .accessibilityAddTraits(.isHeader)
                 Text([picker.title.title, picker.title.year.map(String.init)].compactMap { $0 }.joined(separator: " · "))
-                    .font(.system(size: 26))
+                    .font(.tv(.body))
                     .foregroundStyle(Palette.muted)
             }
             .padding(.bottom, 36)
@@ -101,18 +100,17 @@ struct TVWatchlistPicker: View {
 
     private var checks: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text(WatchlistWords.tvPickerHint).font(.system(size: 20)).foregroundStyle(Palette.faint)
+            Text(WatchlistWords.tvPickerHint).font(.tv(.caption1)).foregroundStyle(Palette.muted)
             ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 12) {
                     ForEach(picker.rows) { row in
                         Button { Task { await picker.toggle(row) } } label: {
-                            HStack(spacing: 0) {
-                                CheckBox(on: row.checked).padding(.leading, 18)
-                                SettingsRow(title: row.name) { Text(row.count) }
+                            HStack(spacing: 22) {
+                                CheckBox(on: row.checked)
+                                TVRowLabel(title: row.name, value: row.count)
                             }
-                            .frame(minHeight: 72)
                         }
-                        .buttonStyle(SettingsRowStyle())
+                        .buttonStyle(TVListRowStyle())
                         .focused($focus, equals: .row(row.id))
                         // The count in the label: a toggle's value is whether it is on.
                         .accessibilityLabel("\(row.name), \(row.count)")
@@ -121,13 +119,12 @@ struct TVWatchlistPicker: View {
                     }
                     Rectangle().fill(.white.opacity(0.12)).frame(height: 1).padding(.vertical, 8).accessibilityHidden(true)
                     if let limit = picker.atLimit {
-                        Text(limit).font(.system(size: 22)).foregroundStyle(Palette.muted).padding(.horizontal, 18)
+                        Text(limit).font(.tv(.caption1)).foregroundStyle(Palette.muted).padding(.horizontal, 28)
                     } else {
                         Button { picker.startNaming() } label: {
-                            SettingsRow(title: WatchlistWords.newWatchlistRow) { Text("\(Image(systemName: "bookmark"))") }
-                                .frame(minHeight: 72)
+                            Text("\(Image(systemName: "bookmark"))  \(WatchlistWords.newWatchlistRow)")
                         }
-                        .buttonStyle(SettingsRowStyle())
+                        .buttonStyle(TVListRowStyle())
                         .focused($focus, equals: .new)
                         .accessibilityIdentifier("watchlist-new")
                     }
@@ -141,31 +138,31 @@ struct TVWatchlistPicker: View {
 
     private var naming: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text(WatchlistWords.newWatchlist).font(.system(size: 34, weight: .bold)).foregroundStyle(Palette.text)
+            Text(WatchlistWords.newWatchlist).font(.tv(.headline)).foregroundStyle(Palette.text)
             TextField(WatchlistWords.name, text: Binding(get: { picker.name }, set: { picker.name = $0 }))
-                .font(.system(size: 26))
+                .font(.tv(.body))
                 .frame(maxWidth: 900)
                 .focused($focus, equals: .name)
                 .onSubmit { Task { await picker.create() } }
                 .accessibilityIdentifier("watchlist-name")
             if let problem = picker.problem {
                 Text(problem)
-                    .font(.system(size: 22))
+                    .font(.tv(.caption1))
                     .foregroundStyle(Palette.warning)
                     .accessibilityIdentifier("watchlist-name-problem")
             }
-            HStack(spacing: 18) {
+            HStack(spacing: 24) {
                 Button(WatchlistWords.cancel) { picker.cancelNaming() }
-                    .buttonStyle(TVButtonStyle(height: 62, fontSize: 22))
+                    .buttonStyle(TVButtonStyle())
                 Button(WatchlistWords.create) { Task { await picker.create() } }
-                    .buttonStyle(TVButtonStyle(kind: .primary, height: 62, fontSize: 22))
+                    .buttonStyle(TVButtonStyle(kind: .primary))
                     .disabled(!picker.canCreate)
                     .focused($focus, equals: .create)
                     .accessibilityIdentifier("watchlist-create")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .focusSection()
-            Text(WatchlistWords.tvCreateHint(picker.title.title)).font(.system(size: 20)).foregroundStyle(Palette.faint)
+            Text(WatchlistWords.tvCreateHint(picker.title.title)).font(.tv(.caption1)).foregroundStyle(Palette.muted)
         }
         .onAppear { focus = .name }
     }
@@ -179,8 +176,8 @@ struct TVWatchlistPicker: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(on ? Palette.gold : .clear)
                 .strokeBorder(on ? Palette.gold : (focused ? Palette.ground : Palette.faint), lineWidth: 2)
-                .frame(width: 34, height: 34)
-                .overlay { if on { Image(systemName: "checkmark").font(.system(size: 20, weight: .bold)).foregroundStyle(Palette.ground) } }
+                .frame(width: 40, height: 40)
+                .overlay { if on { Image(systemName: "checkmark").font(.tv(.caption2, .bold)).foregroundStyle(Palette.ground) } }
                 .accessibilityHidden(true)
         }
     }

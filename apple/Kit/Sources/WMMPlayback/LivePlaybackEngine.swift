@@ -287,6 +287,8 @@ public final class RealLivePlaybackController: LivePlaybackController {
                 } catch {
                     if version == generation, !released {
                         desired = nil; state.status = .error; state.error = error.displayMessage
+                        // Why, for a screen that words it (Apple TV's problem sheet); a new start clears it.
+                        state.stopReason = (error as? LiveTVError)?.reason
                         media.stop()
                     }
                     // A failed stop keeps the session identity for Retry, which must stop

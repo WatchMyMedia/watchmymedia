@@ -3,18 +3,14 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Sign-in's way to the server picker, for a server that isn't the one
-/// chosen. Settings has no Switch server any more (Servers switches, and
-/// Add a server adds), but before anyone is signed in this is still how
-/// another server is chosen.
-private let switchServerTitle = "Switch server"
-
-/// Signing in to the chosen server. By pairing first: a
-/// code to enter on the server's link page from a phone or computer, the
-/// page's QR code, and a new code when one runs out; this Apple TV signs in
-/// by itself once the code is approved. "Sign in with a password instead"
-/// (hidden while the server's sign-in protection is on) opens the form,
-/// typed with the remote or an iPhone's keyboard.
+/// Signing in to the chosen server, called by its name. With a phone first:
+/// two numbered steps, the code and its QR code, and a new code when one
+/// runs out; this Apple TV signs in by itself once the code is approved.
+/// Focus rests on New code, so a stray press does no harm; Use a password
+/// instead (hidden while the server's sign-in protection is on) opens the
+/// form, typed with the system keyboard or an iPhone's, and Another server
+/// the server picker. Menu goes from the form back to the code, and from the
+/// code to choosing a server.
 struct SignInScreen: View {
     @Environment(AppServices.self) private var services
 
@@ -24,52 +20,94 @@ struct SignInScreen: View {
 }
 
 private struct SignInContent: View {
-    private enum Field: Hashable { case name, password }
+    private enum Field: Hashable { case name, password, newCode }
 
     @State var model: SignInModel
-    @Environment(AppServices.self) private var services
     @Environment(AppFlow.self) private var flow
     @FocusState private var field: Field?
 
     var body: some View {
-        AccountChrome(footerLeading: model.server?.summaryLine, footerTrailing: thisDeviceLine(name: model.deviceName, model: services.client.model)) {
+        // Code and form are built in this one body, so focus finds the form's
+        // name field when it replaces the code (apple/AGENTS.md).
+        AccountChrome {
+            // The server, by its name, over either way in.
+            Text(model.server?.name ?? "")
+                .font(.tv(.caption1, .bold))
+                .foregroundStyle(Palette.muted)
+                .lineLimit(1)
+                .padding(.leading, TVLayout.gutter)
+                .padding(.top, 150)
             if model.codeSignIn { pairing } else { password }
         }
         .task(id: model.codeSignIn ? model.pairingRun : -1) { await model.pair() }
-        .onExitCommand(perform: model.codeSignIn || !model.passwordAllowed ? nil : { model.usePairingCode() })
+        .onExitCommand {
+            if model.codeSignIn || !model.passwordAllowed { flow.choosingServer = true } else { model.usePairingCode() }
+        }
     }
 
-    // MARK: Pairing
+    // MARK: The code
 
     private var pairing: some View {
-        HStack(alignment: .top, spacing: 0) {
-            VStack(alignment: .leading, spacing: 26) {
-                Kicker(text: "Sign in")
-                Text("Link this Apple TV to\n\(model.server?.name ?? "your server")")
-                    .font(.system(size: 60, weight: .bold))
-                    .tracking(-1.2)
-                    .lineSpacing(4)
-                    .foregroundStyle(Palette.text)
-                    .accessibilityAddTraits(.isHeader)
-                instructions
-                codeArea
-                HStack(spacing: 24) {
-                    if model.passwordAllowed {
-                        Button("Sign in with a password instead") { model.usePassword() }
-                            .buttonStyle(TVButtonStyle())
+        Group {
+            HStack(alignment: .top, spacing: 0) {
+                VStack(alignment: .leading, spacing: 24) {
+                    switch model.pairing {
+                    case .approved(let user):
+                        Text(TVSignInWords.signedInAs(user.name)).font(.tv(.title2)).foregroundStyle(Palette.text)
+                            .accessibilityAddTraits(.isHeader)
+                        HStack(spacing: 20) {
+                            TVSpinner()
+                            Text(TVSignInWords.gettingLibrary(from: model.server?.name))
+                        }
+                        .font(.tv(.body))
+                        .foregroundStyle(Palette.textSecondary)
+                        .accessibilityElement(children: .combine)
+                    case .expired, .failed:
+                        Text(model.pairing == .expired ? TVSignInWords.expiredTitle : TVSignInWords.failedTitle)
+                            .font(.tv(.title2)).foregroundStyle(Palette.text)
+                            .accessibilityAddTraits(.isHeader)
+                        Text(model.pairing == .expired ? TVSignInWords.expiredBody : model.pairingProblem ?? "")
+                            .font(.tv(.body)).foregroundStyle(Palette.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        buttons(main: pairingNewCode, primary: true)
+                    case .starting, .waiting, nil:
+                        Text(TVSignInWords.codeTitle).font(.tv(.title2)).foregroundStyle(Palette.text)
+                            .accessibilityAddTraits(.isHeader)
+                        instructions
+                        codeArea
+                        buttons(main: TVSignInWords.newCode, primary: false)
                     }
-                    Button(switchServerTitle) { flow.choosingServer = true }
-                        .buttonStyle(TVButtonStyle())
                 }
-                .padding(.top, 26)
-                .focusSection()
+                .frame(width: 1040, alignment: .leading)
+                .padding(.leading, TVLayout.gutter)
+                .padding(.top, 196)
+                Spacer(minLength: 0)
+                if model.waitingCode != nil || model.pairing == .starting || model.pairing == nil {
+                    qr.padding(.trailing, 160).padding(.top, 250)
+                }
             }
-            .frame(width: 960, alignment: .leading)
-            .padding(.leading, 180)
-            .padding(.top, 236)
-            Spacer(minLength: 0)
-            qr.padding(.trailing, 200).padding(.top, 258)
         }
+        .defaultFocus($field, .newCode)
+    }
+
+    /// New code (Get a new code once one ran out), the password, another server.
+    private func buttons(main: String, primary: Bool) -> some View {
+        HStack(spacing: 20) {
+            Button(main) { model.newCode() }
+                .buttonStyle(TVButtonStyle(kind: primary ? .primary : .secondary))
+                .focused($field, equals: .newCode)
+                .accessibilityIdentifier("signIn-newCode")
+            if model.passwordAllowed {
+                Button(TVSignInWords.usePassword) { model.usePassword() }
+                    .buttonStyle(TVButtonStyle())
+            }
+            Button(TVSignInWords.anotherServer) { flow.choosingServer = true }
+                .buttonStyle(TVButtonStyle())
+        }
+        .padding(.top, 20)
+        // Across the width, so Up and Down reach the row from anywhere (apple/AGENTS.md).
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .focusSection()
     }
 
     @ViewBuilder private var instructions: some View { pairingInstructions(model) }
@@ -82,202 +120,176 @@ private struct SignInContent: View {
 
     private var password: some View {
         HStack(alignment: .top, spacing: 0) {
-            VStack(alignment: .leading, spacing: 26) {
-                Kicker(text: "Sign in")
-                Text("Sign in to\n\(model.server?.name ?? "your server")")
-                    .font(.system(size: 60, weight: .bold))
-                    .tracking(-1.2)
-                    .lineSpacing(4)
+            VStack(alignment: .leading, spacing: 20) {
+                Text(TVSignInWords.passwordTitle)
+                    .font(.tv(.title2))
                     .foregroundStyle(Palette.text)
+                    .padding(.bottom, 8)
                     .accessibilityAddTraits(.isHeader)
-                Text("Select a field to type with the remote. An iPhone nearby offers its keyboard by itself.")
-                    .font(.system(size: 24))
-                    .lineSpacing(6)
-                    .foregroundStyle(Palette.textSecondary)
-                VStack(alignment: .leading, spacing: 22) {
-                    labelled("Username") {
-                        TextField("Username", text: $model.name)
-                            .textContentType(.username)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .focused($field, equals: .name)
-                            .onSubmit { field = .password }
-                    }
-                    labelled("Password") {
-                        SecureField("Password", text: $model.password)
-                            .textContentType(.password)
-                            .focused($field, equals: .password)
-                            .onSubmit { Task { await model.signIn() } }
-                    }
+                labelled(TVSignInWords.nameLabel) {
+                    TextField(TVSignInWords.nameLabel, text: $model.name)
+                        .textContentType(.username)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .focused($field, equals: .name)
+                        .onSubmit { field = .password }
                 }
-                .disabled(model.busy)
-                .padding(.top, 6)
+                labelled(TVSignInWords.passwordLabel) {
+                    SecureField(TVSignInWords.passwordLabel, text: $model.password)
+                        .textContentType(.password)
+                        .focused($field, equals: .password)
+                        .onSubmit { Task { await model.signIn() } }
+                }
                 if let error = model.error { WarningLine(text: error) }
-                HStack(spacing: 24) {
+                HStack(spacing: 20) {
                     Button { Task { await model.signIn() } } label: {
-                        if model.busy { ProgressView() } else { Text("Sign in") }
+                        if model.busy { TVSpinner() } else { Text(TVSignInWords.signIn) }
                     }
                     .buttonStyle(TVButtonStyle(kind: .primary))
                     .disabled(model.busy)
                     .accessibilityIdentifier("signInButton")
-                    Button("Use a pairing code instead") { model.usePairingCode() }
+                    Button(TVSignInWords.useCode) { model.usePairingCode() }
                         .buttonStyle(TVButtonStyle())
-                    Button(switchServerTitle) { flow.choosingServer = true }
+                    Button(TVSignInWords.anotherServer) { flow.choosingServer = true }
                         .buttonStyle(TVButtonStyle())
                 }
-                .padding(.top, 14)
+                .padding(.top, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .focusSection()
             }
-            .frame(width: 900, alignment: .leading)
-            .padding(.leading, 180)
-            .padding(.top, 200)
+            .frame(width: 880, alignment: .leading)
+            .padding(.leading, TVLayout.gutter)
+            .padding(.top, 196)
             Spacer(minLength: 0)
-            iPhoneKeyboardNote.padding(.trailing, 200).padding(.top, 300)
+            iPhoneKeyboardNote.padding(.trailing, TVLayout.gutter).padding(.top, 296)
         }
         .defaultFocus($field, .name)
     }
 
+    /// A field with its name before it, at Body size.
     private func labelled(_ label: String, @ViewBuilder field: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(label).font(.system(size: 20)).foregroundStyle(Palette.muted).accessibilityHidden(true)
+        HStack(spacing: 16) {
+            Text(label)
+                .font(.tv(.body))
+                .foregroundStyle(Palette.muted)
+                .frame(width: 150, alignment: .leading)
+                .accessibilityHidden(true)
             field()
-                .font(.system(size: 28))
-                .frame(width: 760)
+                .font(.tv(.body))
+                .frame(width: 714)
         }
+        .disabled(model.busy)
     }
 
     private var iPhoneKeyboardNote: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Image(systemName: "iphone")
-                .font(.system(size: 30, weight: .semibold))
-                .foregroundStyle(Palette.gold)
-                .frame(width: 64, height: 64)
-                .background(Palette.gold.opacity(0.14), in: RoundedRectangle(cornerRadius: 18))
-            Text("Type on your iPhone").font(.system(size: 28, weight: .bold)).foregroundStyle(Palette.text)
-            Text("When a field is selected, an iPhone on the same Apple Account shows a notification; tap it and type there. Nothing to set up.")
-                .font(.system(size: 20)).lineSpacing(6).foregroundStyle(Palette.textSecondary)
-            Text("Passwords are refused while the server’s sign-in protection is on; the pairing code works then.")
-                .font(.system(size: 18)).lineSpacing(5).foregroundStyle(Palette.faint)
+        VStack(alignment: .leading, spacing: 12) {
+            Text(TVSignInWords.iPhoneTitle).font(.tv(.callout)).foregroundStyle(Palette.text)
+            Text(TVSignInWords.iPhoneBody)
+                .font(.tv(.body))
+                .foregroundStyle(Palette.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(32)
-        .frame(width: 520, alignment: .leading)
-        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 26))
-        .overlay(RoundedRectangle(cornerRadius: 26).strokeBorder(.white.opacity(0.08)))
+        .padding(36)
+        .frame(width: 740, alignment: .leading)
+        .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 24))
+        .accessibilityElement(children: .combine)
     }
 }
 
-// The pairing code's pieces, shared by sign-in and Switch server's second
+// The pairing code's pieces, shared by sign-in and Add a server's sign-in
 // step. They are @ViewBuilder functions, not views of their own: as views,
-// choosing "Sign in with a password instead" left nothing focused when the
-// form replaced them (tvOS 27.2 simulator, BusyFocusTests), where built into
-// the same body focus goes to the name field (apple/AGENTS.md).
+// choosing "Use a password instead" left nothing focused when the form
+// replaced them (tvOS 27.2 simulator, BusyFocusTests), where built into the
+// same body focus goes to the name field (apple/AGENTS.md).
 
-/// What to do with the pairing code, once there is one: open the server's
-/// link page on a phone or computer and enter it.
+/// What to do with the code, as two numbered steps: scan it or open the
+/// server's link page, then check the code there.
 @MainActor @ViewBuilder
 func pairingInstructions(_ model: SignInModel) -> some View {
-    if let code = model.waitingCode {
-        (Text("On your iPhone or computer, open ") + Text(linkPageLabel(code.linkURL)).foregroundStyle(Palette.text).fontWeight(.semibold) + Text(" and enter this code."))
-            .font(.system(size: 26))
-            .lineSpacing(8)
-            .foregroundStyle(Palette.textSecondary)
-            .frame(maxWidth: 820, alignment: .leading)
-    } else {
-        Text("On your iPhone, open WatchMyMedia and choose Link a TV, or open the server’s link page on a computer.")
-            .font(.system(size: 26))
-            .lineSpacing(8)
-            .foregroundStyle(Palette.textSecondary)
-            .frame(maxWidth: 820, alignment: .leading)
+    VStack(alignment: .leading, spacing: 12) {
+        Text(TVSignInWords.stepOne(link: model.waitingCode?.linkURL))
+        Text(TVSignInWords.stepTwo)
     }
+    .font(.tv(.body))
+    .foregroundStyle(Palette.textSecondary)
+    .frame(maxWidth: 1040, alignment: .leading)
+    .fixedSize(horizontal: false, vertical: true)
+    .accessibilityElement(children: .combine)
 }
 
-/// The pairing code as tiles and how it stands: waiting with the time
-/// left, accepted, run out with Get a new code, or still coming.
+/// The pairing code in gold and how it stands: waiting with how long it
+/// lasts, accepted, run out with Get a new code, or still coming.
 @MainActor @ViewBuilder
 func pairingCodeArea(_ model: SignInModel) -> some View {
     switch model.pairing {
     case .waiting(let code):
-        CodeTiles(code: code.code)
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            HStack(spacing: 12) {
-                Circle().fill(Palette.gold).frame(width: 12, height: 12)
-                Text(tvPairingWaitingLine(expiresAt: code.expiresAt, now: context.date))
-            }
-            .font(.system(size: 20))
-            .foregroundStyle(Palette.muted)
+        PairingCodeText(code: code.code)
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            Text(TVSignInWords.goodFor(expiresAt: code.expiresAt, now: context.date))
+                .font(.tv(.caption1))
+                .foregroundStyle(Palette.muted)
         }
     case .approved:
-        CodeTiles(code: "", dim: true)
+        PairingCodeText(code: "", dim: true)
         Label(pairingCodeAccepted, systemImage: "checkmark.circle.fill")
-            .font(.system(size: 22, weight: .semibold))
+            .font(.tv(.caption1, .semibold))
             .foregroundStyle(Palette.gold)
     case .expired, .failed:
-        CodeTiles(code: "", dim: true)
+        PairingCodeText(code: "", dim: true)
         if let problem = model.pairingProblem { WarningLine(text: problem) }
         Button(pairingNewCode) { model.newCode() }
             .buttonStyle(TVButtonStyle(kind: .primary))
     case .starting, nil:
-        CodeTiles(code: "", dim: true)
-        HStack(spacing: 12) {
-            ProgressView()
+        PairingCodeText(code: "", dim: true)
+        HStack(spacing: 16) {
+            TVSpinner()
             Text(pairingGettingCode)
         }
-        .font(.system(size: 20))
+        .font(.tv(.caption1))
         .foregroundStyle(Palette.muted)
     }
     if !model.passwordAllowed {
-        Text("This server’s sign-in protection is on, so this Apple TV signs in with the code.")
-            .font(.system(size: 18))
-            .foregroundStyle(Palette.faint)
+        Text(TVSignInWords.protectionOn)
+            .font(.tv(.caption2))
+            .foregroundStyle(Palette.muted)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
-/// The link page's QR code, which opens it with the code filled in.
+/// The link page's QR code, which opens it with the code filled in, and what to do with it.
 @MainActor
-func pairingQR(_ model: SignInModel, size: CGFloat = 392) -> some View {
-    VStack(spacing: 22) {
+func pairingQR(_ model: SignInModel, size: CGFloat = 340) -> some View {
+    VStack(spacing: 20) {
         Group {
             if let code = model.waitingCode {
                 QRCodeView(code.linkURL.absoluteString)
+                    .padding(size * 0.09)
             } else {
-                Color.white.overlay { ProgressView().tint(Palette.ground) }
+                TVSpinner().tint(Palette.ground)
             }
         }
         .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: 26))
-        .shadow(color: .black.opacity(0.6), radius: 35, y: 30)
+        .background(Palette.text, in: RoundedRectangle(cornerRadius: 24))
         .accessibilityLabel("QR code for the link page")
-        Text("Or scan with the iPhone camera").font(.system(size: 20)).foregroundStyle(Palette.muted)
+        Text(TVSignInWords.qrCaption).font(.tv(.caption1)).foregroundStyle(Palette.muted)
     }
+    .frame(width: max(size, 400))
 }
 
-/// The pairing code as tiles, three and three with a dash between;
-/// empty and dim before there is one.
-private struct CodeTiles: View {
+/// The pairing code, three and three, large and gold; dim dashes before there is one.
+private struct PairingCodeText: View {
     let code: String
     var dim = false
 
     var body: some View {
-        let characters = Array(code)
-        HStack(spacing: 28) {
-            tiles(characters, 0..<3)
-            RoundedRectangle(cornerRadius: 3).fill(Palette.outlineStrong).frame(width: 22, height: 6)
-            tiles(characters, 3..<6)
-        }
-        .padding(.top, 6)
-        .accessibilityElement()
-        .accessibilityLabel(pairingCodeAccessibilityLabel(code))
-    }
-
-    private func tiles(_ characters: [Character], _ range: Range<Int>) -> some View {
-        HStack(spacing: 14) {
-            ForEach(range, id: \.self) { index in
-                Text(index < characters.count ? String(characters[index]) : " ")
-                    .font(.system(size: 72, weight: .bold))
-                    .foregroundStyle(dim ? Palette.muted : Palette.text)
-                    .frame(width: 92, height: 116)
-                    .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 18))
-            }
-        }
+        Text(code.isEmpty ? "––– –––" : TVSignInWords.shownCode(code))
+            .font(.system(size: 96, weight: .bold))
+            .tracking(11)
+            .monospacedDigit()
+            .foregroundStyle(dim ? Palette.muted.opacity(0.5) : Palette.gold)
+            .lineLimit(1)
+            .padding(.top, 12)
+            .accessibilityElement()
+            .accessibilityLabel(pairingCodeAccessibilityLabel(code))
     }
 }

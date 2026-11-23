@@ -245,10 +245,6 @@ public final class TVPlayerEpisodesModel {
         return [season.season.chipName, plural(season.episodes.count, "episode"), playing].compactMap { $0 }.joined(separator: " · ")
     }
 
-    public static let seasonHint = "Move down to the episodes; left and right change the season."
-    public static let panelHint = "Move down to choose a season or an episode."
-    public static let footnote = "Select or Play/Pause plays the episode from where you left it. Swipe up or press Back to close and keep watching this one."
-
     /// What choosing `episode` plays: it, resuming; nil for the one playing.
     public func request(for episode: EpisodeDetail) -> PlayRequest? {
         guard !isPlaying(episode), let place else { return nil }

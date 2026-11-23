@@ -172,15 +172,17 @@ struct SystemPlayerBehavior<Action> {
 extension SystemPlayerBehavior where Action == TVPlayerAction {
     /// The film player: scrubbing and Left and Right to skip 10 s on the
     /// transport bar, Next Episode among its buttons with its picture, Skip
-    /// as a contextual action, and the Audio, Subtitles and Quality tabs. No
+    /// as a contextual action, and after the system's Info the Audio &
+    /// subtitles and Quality tabs. No
     /// picture in picture for files: the model pauses and closes the play
     /// when the app goes to the background, and nothing handles AVKit's
     /// picture-in-picture callbacks for it, so starting it would end the
     /// film. Live TV keeps its own.
     /// `episodesTab`, for an episode, makes the Episodes tab, which comes before the others.
-    @MainActor static func film(_ model: TVPlayerModel, episodesTab: (@MainActor () -> UIViewController)? = nil) -> Self {
+    /// `serverName` is the server in use, which the Quality tab names.
+    @MainActor static func film(_ model: TVPlayerModel, serverName: String?, episodesTab: (@MainActor () -> UIViewController)? = nil) -> Self {
         Self(
-            infoTabs: { (episodesTab.map { [$0()] } ?? []) + PickerTab.allCases.map { OptionsTabController(model: model, tab: $0) } },
+            infoTabs: { (episodesTab.map { [$0()] } ?? []) + TVPlayerTab.allCases.map { OptionsTabController(model: model, tab: $0, serverName: serverName) } },
             uiAction: { action in
                 UIAction(
                     title: action.title,
@@ -201,11 +203,11 @@ extension SystemPlayerBehavior where Action == TVPlayerAction {
     }
 }
 
-/// One of the info panel's tabs (Audio, Subtitles, Quality): the three
-/// columns, with focus starting in its own.
+/// One of the app's tabs in the info panel (Audio & subtitles, Quality),
+/// focus opening on what is chosen.
 final class OptionsTabController: UIHostingController<PlaybackOptions> {
-    init(model: TVPlayerModel, tab: PickerTab) {
-        super.init(rootView: PlaybackOptions(model: model, tab: tab))
+    init(model: TVPlayerModel, tab: TVPlayerTab, serverName: String?) {
+        super.init(rootView: PlaybackOptions(model: model, tab: tab, serverName: serverName))
         title = tab.title
         preferredContentSize = CGSize(width: 1920, height: PlaybackOptions.height)
         view.backgroundColor = .clear

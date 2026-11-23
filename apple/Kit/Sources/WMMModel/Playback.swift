@@ -462,6 +462,11 @@ public protocol PlaybackController: AnyObject, Observable {
     /// Any tap or seek: resets the Still watching counters.
     func noteUserInput()
 
+    /// What the system player's title view says after the subtitle (Apple
+    /// TV's "Ends at 9:41 PM"); nil adds nothing. Only the Apple TV player
+    /// sets it.
+    func describeEnd(_ line: String?)
+
     /// The viewer left the player: reports "stopped" and releases the session.
     func stop()
 
@@ -469,6 +474,10 @@ public protocol PlaybackController: AnyObject, Observable {
     func close()
 
     func release()
+}
+
+extension PlaybackController {
+    public func describeEnd(_ line: String?) {}
 }
 
 @MainActor

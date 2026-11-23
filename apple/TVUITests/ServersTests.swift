@@ -4,10 +4,11 @@ import XCTest
 /// (`-fakesServers`: Sam on Living room server, Cabin server with a small
 /// library of its own, and Den server, which doesn't answer). The account
 /// is the tab bar's last tab: Right from Settings reaches it, its page is
-/// Servers, Down lands on the first server that can be chosen, and Menu
-/// closes it for Home, with focus back in the tab bar. A switch from Servers shows the
-/// banner and the other server's Home; a server that doesn't answer says so
-/// with focus on Try again; Add a server runs to its last step; a server is
+/// Servers, which says who is signed in and where, Down lands on the server
+/// in use, and Menu closes it for Home, with focus back in the tab bar. A
+/// switch from Servers shows the banner and the other server's Home; a
+/// server that doesn't answer says so on its row, with focus kept there and
+/// Select trying again; Add a server runs to its last step; a server is
 /// removed from its page in Settings after a question that opens on Keep;
 /// signing out goes on to the next server, and the one signed out of signs
 /// in again from its row in Servers; and a search result on another server
@@ -55,13 +56,23 @@ final class ServersTests: XCTestCase {
         app.tabBars.buttons.matching(NSPredicate(format: "hasFocus == true")).firstMatch
     }
 
+    /// Up into the tab bar: Home opens on its first card, and Menu from its
+    /// first screen goes to the tab bar. Waits for Home to take focus first,
+    /// so Menu isn't pressed in the tab bar, where it leaves the app.
+    @MainActor
+    private func toTabBar(_ app: XCUIApplication) {
+        _ = eventually(timeout: 10) { app.focusedButton.lookedAt != nil && self.focusedTab(app).lookedAt == nil }
+        if focusedTab(app).lookedAt == nil { remote.press(.menu) }
+        XCTAssertTrue(eventually(timeout: 10) { self.focusedTab(app).lookedAt != nil }, "focus is in the tab bar: \(app.focusedButton.label)")
+    }
+
     /// Right along the tabs to the account tab at the bar's end: Servers is its page.
     @MainActor
     @discardableResult
     private func openServers(_ app: XCUIApplication) -> XCUIElement {
         let account = accountTab(app)
         XCTAssertTrue(account.waitUntilExists(timeout: 20), "the account is the tab bar's last tab")
-        XCTAssertTrue(app.waitForFocusedButton(timeout: 15) { _ in true }, "the tab bar has focus")
+        toTabBar(app)
         XCTAssertTrue(move(.right, to: account, in: app, presses: 10), "Right from the last tab reaches the account: \(app.focusedButton.label)")
         let panel = app.descendants(matching: .any)["servers-panel"]
         XCTAssertTrue(panel.waitUntilExists(timeout: 10), "its page is Servers")
@@ -74,24 +85,30 @@ final class ServersTests: XCTestCase {
         let account = openServers(app)
         XCTAssertTrue(account.label.contains("Living room server"), "it names the server in use: \(account.label)")
         let panel = app.descendants(matching: .any)["servers-panel"]
+        // It says who is signed in, and where, before anything else.
+        let who = app.descendants(matching: .any)["servers-who"]
+        XCTAssertTrue(who.waitUntilExists(timeout: 10))
+        XCTAssertTrue(who.label.contains("Signed in on Living room server"), who.label)
         shot("Servers, from the account tab")
-        // Down from the tab: the first server that can be chosen, not the one in use above it.
-        let cabin = app.buttons["servers-row-srv-cabin"]
+        // Down from the tab: the server in use, so a second press changes nothing.
+        let living = app.buttons["servers-row-srv-living"]
         remote.press(.down)
-        XCTAssertTrue(cabin.waitForFocus(), "focus opens on the first server that can be chosen: \(app.focusedButton.label)")
-        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] %@", "Current")).firstMatch.exists,
-                      "the server in use carries Current")
-        let hint = app.descendants(matching: .any)["servers-hint"]
-        XCTAssertTrue(hint.waitForLabel(containing: "Select switches to Cabin server"), hint.label)
-        // Down the panel: Den server, Add a server, Manage servers; the hint follows.
+        XCTAssertTrue(living.waitForFocus(), "focus opens on the server in use: \(app.focusedButton.label)")
+        XCTAssertTrue(living.label.contains("Current"), "the server in use carries Current: \(living.label)")
+        XCTAssertFalse(living.label.contains("192.0.2") || living.label.contains(":27587"), "no address on a row: \(living.label)")
+        XCTAssertFalse(app.descendants(matching: .any)["servers-hint"].exists, "no line explains the remote")
+        remote.press(.select)
+        XCTAssertTrue(living.waitForFocus(), "Select on the server in use changes nothing")
+        XCTAssertTrue(accountTab(app).exists)
+        // Down the list: Cabin server, Den server, Add a server, Manage servers.
+        remote.press(.down)
+        XCTAssertTrue(app.buttons["servers-row-srv-cabin"].waitForFocus())
         remote.press(.down)
         XCTAssertTrue(app.buttons["servers-row-srv-den"].waitForFocus())
         remote.press(.down)
         XCTAssertTrue(app.buttons["servers-add"].waitForFocus())
-        XCTAssertTrue(hint.waitForLabel(containing: "Select starts"), hint.label)
         remote.press(.down)
         XCTAssertTrue(app.buttons["servers-manage"].waitForFocus())
-        XCTAssertTrue(hint.waitForLabel(containing: "Select opens it"), hint.label)
         shot("Servers, Manage servers focused")
 
         // Menu closes Servers and goes Home, as from any section, with focus in the tab bar.
@@ -99,7 +116,7 @@ final class ServersTests: XCTestCase {
         XCTAssertTrue(panel.waitUntilGone(timeout: 10), "Menu closes Servers")
         XCTAssertTrue(eventually(timeout: 10) { self.focusedTab(app).lookedAt?.label == "Home" },
                       "and focus is back in the tab bar, on Home: \(app.focusedButton.label)")
-        XCTAssertTrue(app.buttons["Play"].waitUntilExists(timeout: 10), "Home is showing")
+        XCTAssertTrue(app.homeFirstScreen.waitUntilExists(timeout: 10), "Home is showing")
         // Right along the tabs shows it again; Left leaves it, as any tab.
         XCTAssertTrue(move(.right, to: account, in: app, presses: 8))
         XCTAssertTrue(panel.waitUntilExists(timeout: 10))
@@ -119,14 +136,16 @@ final class ServersTests: XCTestCase {
         XCTAssertTrue(note.wait(until: NSPredicate(format: "label == %@", "Now on Cabin server"), timeout: 15), "the banner says where this Apple TV is now")
         XCTAssertTrue(app.descendants(matching: .any)["servers-panel"].waitUntilGone(timeout: 10), "Servers closes")
         XCTAssertTrue(app.staticTexts["Harbour Run"].waitUntilExists(timeout: 15), "Home is Cabin server's")
-        XCTAssertFalse(app.staticTexts["The Long Dark"].exists, "and not Living room server's")
+        XCTAssertFalse(app.homeFirstCard.exists, "and not Living room server's")
         XCTAssertTrue(accountTab(app, on: "Cabin server").waitUntilExists(timeout: 10), "the account tab names Cabin server now")
         shot("Now on Cabin server")
         // The banner takes no focus: the remote still drives Home.
         XCTAssertTrue(app.waitForFocusedButton(timeout: 10) { _ in true })
         XCTAssertFalse(note.lookedAt?.hasFocus == true)
-        remote.press(.down)
-        XCTAssertTrue(app.buttons["Play"].waitForFocus(), "Down from the tabs lands on Home's Play: \(app.focusedButton.label)")
+        // Cabin server's Home opens on its first card, as a new Home does; from the tabs, Down reaches it.
+        if focusedTab(app).lookedAt != nil { remote.press(.down) }
+        XCTAssertTrue(eventually(timeout: 10) { self.focusedTab(app).lookedAt == nil && app.focusedButton.lookedAt != nil },
+                      "focus is in Cabin server's Home: \(app.focusedButton.label)")
     }
 
     @MainActor
@@ -136,20 +155,17 @@ final class ServersTests: XCTestCase {
         let den = app.buttons["servers-row-srv-den"]
         XCTAssertTrue(move(.down, to: den, in: app, presses: 3))
         remote.press(.select)
-        let failure = app.descendants(matching: .any)["servers-failure"]
-        XCTAssertTrue(failure.waitUntilExists(timeout: 15), "it says Den server didn't answer")
-        XCTAssertTrue(failure.label.contains("Couldn’t reach Den server"), failure.label)
-        XCTAssertTrue(failure.label.contains("You’re still on Living room server."), failure.label)
-        let again = app.buttons["servers-try-again"]
-        XCTAssertTrue(again.waitForFocus(timeout: 10), "focus is on Try again: \(app.focusedButton.label)")
-        let hint = app.descendants(matching: .any)["servers-hint"]
-        XCTAssertTrue(hint.waitForLabel(containing: "Select tries again"), hint.label)
+        // The row says it didn't answer, and offers Try again, with focus kept on it.
+        XCTAssertTrue(den.wait(until: NSPredicate(format: "label CONTAINS %@", "Couldn’t reach Den server"), timeout: 15), "it says Den server didn't answer: \(den.label)")
+        XCTAssertTrue(den.label.contains("Try again"), den.label)
+        XCTAssertTrue(den.waitForFocus(timeout: 10), "focus stays on Den server: \(app.focusedButton.label)")
+        XCTAssertTrue(app.descendants(matching: .any)["servers-who"].label.contains("Signed in on Living room server"), "and the page still says where this Apple TV is")
         XCTAssertFalse(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Watch its")).firstMatch.exists, "Apple TV keeps no downloads to watch")
         shot("Servers, Den server didn't answer")
         // It still doesn't answer; the failure stays, with focus where it was.
         remote.press(.select)
-        XCTAssertTrue(failure.waitUntilExists(timeout: 15))
-        XCTAssertTrue(again.waitForFocus(timeout: 10))
+        XCTAssertTrue(den.wait(until: NSPredicate(format: "label CONTAINS %@", "Couldn’t reach Den server"), timeout: 15))
+        XCTAssertTrue(den.waitForFocus(timeout: 10))
         remote.press(.menu)
         XCTAssertTrue(app.descendants(matching: .any)["servers-panel"].waitUntilGone(timeout: 10), "Menu closes Servers")
         XCTAssertTrue(eventually(timeout: 10) { self.focusedTab(app).lookedAt?.label == "Home" },
@@ -158,7 +174,8 @@ final class ServersTests: XCTestCase {
         // Opened again, the failure it was showing has gone.
         XCTAssertTrue(move(.right, to: account, in: app, presses: 8))
         XCTAssertTrue(app.descendants(matching: .any)["servers-panel"].waitUntilExists(timeout: 10))
-        XCTAssertFalse(failure.exists)
+        XCTAssertTrue(den.waitUntilExists(timeout: 10))
+        XCTAssertFalse(den.label.contains("Couldn’t reach"), den.label)
     }
 
     @MainActor
@@ -276,10 +293,11 @@ final class ServersTests: XCTestCase {
         XCTAssertTrue(switchTo.waitUntilExists(timeout: 20))
         XCTAssertTrue(switchTo.waitForFocus())
         remote.press(.select)
-        let failure = app.descendants(matching: .any)["servers-failure"]
-        XCTAssertTrue(failure.waitUntilExists(timeout: 20), "Servers opens to say Den server didn't answer")
-        XCTAssertTrue(failure.label.contains("You’re still on Living room server."), failure.label)
-        XCTAssertTrue(app.buttons["servers-try-again"].waitForFocus(timeout: 10), "with focus on Try again: \(app.focusedButton.label)")
+        let den = app.buttons["servers-row-srv-den"]
+        XCTAssertTrue(den.wait(until: NSPredicate(format: "label CONTAINS %@", "Couldn’t reach Den server"), timeout: 20),
+                      "Servers opens to say Den server didn't answer, on its row")
+        XCTAssertTrue(app.descendants(matching: .any)["servers-who"].label.contains("Signed in on Living room server"), "and where this Apple TV still is")
+        XCTAssertTrue(den.waitForFocus(timeout: 10), "with focus on its row, where Select tries again: \(app.focusedButton.label)")
         XCTAssertFalse(app.descendants(matching: .any)["server-page"].exists, "its page has closed")
     }
 
@@ -302,14 +320,12 @@ final class ServersTests: XCTestCase {
         // The server signed out of stays in Servers, and says so; Select opens its sign-in.
         let account = accountTab(app, on: "Cabin server")
         XCTAssertTrue(account.waitUntilExists(timeout: 10))
-        XCTAssertTrue(app.waitForFocusedButton(timeout: 15) { _ in true })
+        toTabBar(app)
         XCTAssertTrue(move(.right, to: account, in: app, presses: 10), "Right reaches the account tab: \(app.focusedButton.label)")
         let living = app.buttons["servers-row-srv-living"]
         XCTAssertTrue(living.waitUntilExists(timeout: 10))
         XCTAssertTrue(living.label.contains("Signed out here"), living.label)
-        XCTAssertTrue(move(.down, to: living, in: app, presses: 2), "it is the first server that can be chosen: \(app.focusedButton.label)")
-        let hint = app.descendants(matching: .any)["servers-hint"]
-        XCTAssertTrue(hint.waitForLabel(containing: "Select signs in to Living room server"), hint.label)
+        XCTAssertTrue(move(.down, to: living, in: app, presses: 3), "it is under the server in use: \(app.focusedButton.label)")
         shot("Servers, signed out of Living room server")
         remote.press(.select)
         XCTAssertTrue(app.staticTexts["Sign in to Living room server"].waitUntilExists(timeout: 15), "its sign-in takes the screen")
@@ -323,7 +339,7 @@ final class ServersTests: XCTestCase {
         remote.press(.select)
         XCTAssertTrue(home.waitUntilGone(timeout: 10))
         XCTAssertTrue(accountTab(app, on: "Living room server").waitUntilExists(timeout: 15), "Home, on the server signed in to again")
-        XCTAssertTrue(app.staticTexts["The Long Dark"].waitUntilExists(timeout: 15))
+        XCTAssertTrue(app.homeFirstScreen.waitUntilExists(timeout: 15), "Living room server's Home")
     }
 
     @MainActor

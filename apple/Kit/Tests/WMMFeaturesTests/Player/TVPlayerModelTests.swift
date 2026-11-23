@@ -119,11 +119,11 @@ private struct TVHarness {
         #expect(h.spy.state.status == .playing)
     }
 
-    @Test func menuAnswersStillWatchingPutsTheCardAwayOrLeaves() {
+    @Test func menuStopsAtStillWatchingPutsTheCardAwayOrLeaves() {
         let h = TVHarness()
         h.spy.state.askStillWatching = true
         h.model.back()
-        #expect(h.spy.calls.last == "stillWatching true")
+        #expect(h.spy.calls.last == "stillWatching false")
         h.spy.state.askStillWatching = false
         h.spy.state.upNext = UpNextPrompt(next: next, countdownMs: 7_000)
         h.model.back()
@@ -136,13 +136,60 @@ private struct TVHarness {
         #expect(h.exits.count == 1)
     }
 
-    @Test func playPauseOnStillWatchingIsAnAnswer() {
+    @Test func onlyAButtonAnswersStillWatching() {
         let h = TVHarness()
         h.model.playPause()
         #expect(h.spy.state.status == .paused)
         h.spy.state.askStillWatching = true
+        let before = h.spy.calls
         h.model.playPause()
+        #expect(h.spy.calls == before, "Play/Pause is not an answer")
+        h.model.answerStillWatching(keepWatching: true)
         #expect(h.spy.calls.last == "stillWatching true")
+    }
+
+    @Test func theTitleViewSaysWhenItEndsWhileTheBarShows() {
+        let zone = TimeZone(identifier: "America/New_York")!
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        let at = calendar.date(from: DateComponents(year: 2026, month: 11, day: 23, hour: 21, minute: 18))!
+        let now = WallClock(at)
+        let spy = SpyPlaybackController()
+        let model = TVPlayerModel(
+            controller: spy,
+            request: PlayRequest(fileID: 9101, title: "Harbor Lights", subtitle: "S03 E07 · The Long Dark"),
+            onExit: {},
+            now: { now.date },
+            clock: LiveClock(locale: Locale(identifier: "en_US"), calendar: calendar)
+        )
+        spy.state.status = .playing
+        model.start()
+        spy.state.durationMs = 52 * 60_000
+        spy.state.positionMs = 29 * 60_000
+        func plain(_ s: String??) -> String? { s.flatMap { $0 }?.replacingOccurrences(of: "\u{202F}", with: " ") }
+        model.transportBarChanged(visible: true)
+        #expect(plain(spy.ends.last) == "Ends at 9:41 PM")
+        // Paused, the end moves on with the clock.
+        spy.state.status = .paused
+        now.date = at.addingTimeInterval(5 * 60)
+        model.refreshEndsAt()
+        #expect(plain(spy.ends.last) == "Ends at 9:46 PM")
+        // A recording still being made has no end to give.
+        spy.state.growing = .init(startedAt: at, endsAt: at.addingTimeInterval(3600))
+        model.refreshEndsAt()
+        #expect(spy.ends.last == .some(nil))
+    }
+
+    @Test func cantPlayOffersTheQualityBelowAndKeepsIt() {
+        let h = TVHarness()
+        h.spy.state.qualities = StreamQuality.allCases
+        h.spy.state.quality = .original
+        h.spy.state.error = "The server couldn’t start the stream."
+        #expect(h.model.lowerQuality == .fullHD)
+        h.model.playAtLowerQuality()
+        #expect(h.spy.calls.suffix(2) == ["quality 1080", "start 9101"])
+        h.spy.state.quality = .low
+        #expect(h.model.lowerQuality == nil)
     }
 
     @Test func theAdminsStopIsNotedWithWhenAndWhereAndBackLeaves() async {
@@ -208,4 +255,11 @@ private struct TVHarness {
     private func settle() async {
         for _ in 0..<30 { await Task.yield() }
     }
+}
+
+/// A wall clock a test moves.
+@MainActor
+private final class WallClock {
+    var date: Date
+    init(_ date: Date) { self.date = date }
 }

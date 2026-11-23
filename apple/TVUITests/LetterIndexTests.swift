@@ -62,7 +62,8 @@ final class LetterIndexTests: XCTestCase {
     /// Down from the tab bar onto the grid's first row.
     @MainActor
     private func focusGrid(_ app: XCUIApplication) {
-        for _ in 0..<4 where !Self.isPoster(focusedButton(app).label) { move(app, .down) }
+        // The control under the tab bar may be a menu (Sort), which XCUI lists as no focused button.
+        for _ in 0..<4 where !Self.isPoster(focusedButton(app).lookedAt?.label ?? "") { move(app, .down) }
         XCTAssertTrue(focus(app, where: Self.isPoster), "Down from the tab bar reaches the grid")
     }
 
@@ -85,13 +86,13 @@ final class LetterIndexTests: XCTestCase {
         for _ in 0..<8 where !focusedButton(app).identifier.hasPrefix("letter-") { move(app, .right) }
         let a = app.buttons["letter-A"]
         XCTAssertTrue(focused(a), "the index takes focus at the poster's letter")
-        XCTAssertTrue(app.otherElements["letter-bubble"].exists || app.staticTexts["Select or swipe left to go there"].exists, "the bubble says what the letter holds")
+        XCTAssertTrue(app.descendants(matching: .any)["letter-bubble"].waitUntilExists(timeout: 5), "the bubble says what the letter holds")
 
         // Down to W, beyond the first page, passing X going on to Y.
         let target = "W"
         for _ in 0..<30 where !app.buttons["letter-\(target)"].hasFocus { move(app, .down) }
         XCTAssertTrue(focused(app.buttons["letter-\(target)"]))
-        XCTAssertTrue(app.staticTexts["Select or swipe left to go there"].waitUntilExists(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["letter-bubble"].waitUntilExists(timeout: 5))
         shot("Index focused on W")
         remote.press(.select)
         XCTAssertTrue(focus(app, timeout: 15) { $0.hasPrefix("Wyn") }, "Select lands on W's first title")

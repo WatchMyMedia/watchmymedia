@@ -17,21 +17,21 @@ struct ReportProblemDialog: View {
             Color(hex: 0x0A0A0B).ignoresSafeArea()
             VStack(alignment: .leading, spacing: 22) {
                 Text(model.target.kicker.uppercased())
-                    .font(.system(size: 18, weight: .bold))
+                    .font(.tv(.caption2, .bold))
                     .tracking(2)
                     .foregroundStyle(Palette.gold)
                 Text(reportProblemTitle)
-                    .font(.system(size: 56, weight: .heavy))
+                    .font(.tv(.title2, .bold))
                     .foregroundStyle(Palette.text)
                     .accessibilityAddTraits(.isHeader)
                 if model.sent {
-                    Text(model.sentMessage).font(.system(size: 28, weight: .semibold)).foregroundStyle(Palette.text)
+                    Text(model.sentMessage).font(.tv(.body, .semibold)).foregroundStyle(Palette.text)
                     Button("Done", action: onClose).buttonStyle(TVButtonStyle()).padding(.top, 10)
                 } else {
                     HStack(spacing: 4) {
                         ForEach(ProblemKind.allCases, id: \.self) { kind in
                             Button(kind.label) { model.pick(kind) }
-                                .buttonStyle(TVChipStyle(selected: model.kind == kind, height: 56, fontSize: 22))
+                                .buttonStyle(TVChipStyle(selected: model.kind == kind))
                                 .focused($focus, equals: kind)
                         }
                     }
@@ -39,16 +39,16 @@ struct ReportProblemDialog: View {
                     .background(.white.opacity(0.08), in: Capsule())
                     .focusSection()
                     TextField("Note", text: $model.note)
-                        .font(.system(size: 22))
+                        .font(.tv(.caption2))
                         .frame(maxWidth: 900)
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(reportAttachNote).font(.system(size: 20)).foregroundStyle(Palette.textSecondary)
+                        Text(reportAttachNote).font(.tv(.caption2)).foregroundStyle(Palette.textSecondary)
                         if let line = model.fileLine {
-                            Text(line).font(.system(size: 17)).foregroundStyle(Palette.faint)
+                            Text(line).font(.tv(.caption2)).foregroundStyle(Palette.faint)
                         }
                     }
                     if let error = model.error {
-                        Text(error).font(.system(size: 19)).foregroundStyle(Palette.warning)
+                        Text(error).font(.tv(.caption2)).foregroundStyle(Palette.warning)
                     }
                     HStack(spacing: 24) {
                         Button { Task { await model.send() } } label: {

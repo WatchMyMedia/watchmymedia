@@ -194,12 +194,6 @@ import WMMModel
         ])
     }
 
-    @Test func theAppleTVsInfoPanelWording() {
-        #expect(qualityRememberedNote(device: "Apple TV") == "Remembered on this Apple TV")
-        #expect(infoPanelFootnote.hasPrefix("Swipe up or press Back to close."))
-        #expect(infoPanelHint == "Swipe down for info, audio and subtitles")
-    }
-
     @Test func pickerTabsAreNamed() {
         #expect(PickerTab.allCases.map(\.title) == ["Audio", "Subtitles", "Quality"])
     }

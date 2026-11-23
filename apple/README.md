@@ -155,6 +155,16 @@ card changes the page in place, so Back leaves the show. On Apple TV, focus
 moving along the row changes the episode on top, and Select on a card takes
 focus back up to Play.
 
+On Apple TV a movie's and an episode's More is a panel from the right
+(`MovieScreen.swift`, `ShowScreen.swift`): another version, the sound and
+subtitles to start with (`TrackChoice`, kept by `MovieModel` and
+`ShowPageModel` and put on the play request), Mark watched, File details
+and the page's other actions. File details is the one place on the page
+that names the file's formats, under a sentence saying how it plays here
+(`TitlePageWords.swift`); the show page asks for its files' plans only when
+it opens (`ShowPageModel.loadPlans()`). The pages say the picture and sound
+in words ("In 4K with Dolby Vision and 5.1 sound") and when it would end.
+
 Your requests remains available on API level 5 servers after requesting is
 disabled. With Seerr, the admin Inbox keeps earlier local requests alongside
 Seerr’s approval page; reports confirm whether Seerr accepted an issue or the
@@ -196,10 +206,17 @@ Its player takes these too, on the fakes and in debug builds
 (`TV/Screens/Player/PlayerLaunchArguments.swift`): `-playerSeek 2970000`
 (the Next Episode card), `-playerSubtitle s4`, `-playerStillWatching`,
 `-playerStopped` and `-playerError`, after `-open watchmymedia://play/9101`.
-The fakes have no video, so the system player runs empty over the backdrop:
-Skip, the card and the prompts show, but not the transport bar or its
-Episodes, Audio, Subtitles and Quality tabs, which need a server;
-`-playerPanel episodes` shows the Episodes tab over the video instead.
+The fakes have no video, so the system player runs empty over the backdrop,
+with the title, the episode and when it would end where the system's title
+view draws them: Skip, Up next and the prompts show, but not the transport
+bar or its Episodes, Audio & subtitles and Quality tabs, which need a server;
+`-playerPanel episodes`, `tracks` or `quality` shows that tab over the video
+instead. Nothing about the stream is on the picture: the Quality tab says
+how the file plays, in a sentence and then the picture, sound, speed and
+server (`TVWhatIsPlaying`), and the tracks are named in words
+(`TVPlayerWords.swift` in the Kit). While the transport bar shows, the
+model tells the controller when the play would end (`describeEnd`), which
+the title view shows after the episode.
 
 The info panel's Episodes tab
 comes after Info for an episode, never a film or a recording: the
@@ -257,8 +274,16 @@ shows a group with focus on it at launch; `-renameDevice`, `-changePassword`,
 `-homeRowsSettings` open the rest, in debug builds.
 `TVUITests/SettingsTests.swift` drives them with the remote.
 
-Sorted by title, the Apple TV grid has a letter index down its right edge:
-right from the last column
+The Apple TV grid has four controls on one line with its heading: Sort,
+Unwatched, Genre and More filters, which holds the other filters and the
+decade (`TVLibraryControls.swift` in the Kit); only the focused poster
+carries words, under it (`GridPoster`). Search on Apple TV lists movies
+and shows in one row (`SearchListing.titles`), offers the recent searches
+before anything is typed, and watches a programme on now from On live TV
+on Select (`LiveSearchHit.searchSelect`).
+
+Sorted by title, the Apple TV grid has a letter index down its right edge,
+inside the safe area: right from the last column
 enters it at the poster's letter, the grid follows the letters up and down,
 Select or left lands on the letter's first title, and Menu goes back to the
 poster. It is built from the `letters` the server already sends with a
@@ -378,7 +403,11 @@ are made on the web.
 `-fakes -fakesRows` puts the fakes' server at level 22: Home has two list rows
 and Trending this week waits in Add a row; Movies has Best of 2026, whose last
 MDBList fetch failed. On iPad and Apple TV an arranged Home is drawn one row a
-screen (`-fakesRows` is needed to see it). `-editRows` opens Home rows at launch and `-addRow` its
+screen (`-fakesRows` is needed to see it). On Apple TV every screen is a row
+with the focused card's words above it (`TVFocusWords`: what it is, time
+left and "Ends at", never the file's format), the first screen is the first
+row, Home opens on its first card, and a server below level 22 has its
+fixed rows drawn the same way. `-editRows` opens Home rows at launch and `-addRow` its
 Add a row; `-open watchmymedia://lists/9001` opens Top rated science fiction
 (with titles to request) and `lists/9002` Rainy Sunday films (an import with a
 title not found). On Apple TV, `-tab settings -homeRowsSettings` opens Home
@@ -499,9 +528,12 @@ server on an iPad across a rotation.
 
 On Apple TV the account is the tab bar's last tab (`TV/Shell/MainTabs.swift`):
 the person's name, or the server in use when there are several. Right from
-Settings reaches it and its page is Servers (`TV/Screens/Servers/`), a panel
-at the right; Down lands on the first server that can be chosen, the foot of
-the panel says what Select does, and Menu closes it for Home. It is a tab
+Settings reaches it and its page is Servers (`TV/Screens/Servers/`): who is
+signed in and where, then one list of the servers by name (where each is, or
+who is signed in there, never an address), Add a server, Manage servers and
+Watchlists. Down lands on the server in use, a switch and a server that
+didn't answer show on its row (Select there tries again), and Menu closes it
+for Home. It is a tab
 because nothing beside the system tab bar takes focus from it. After a switch
 a banner at the top right says "Now on Cabin server", and the Top Shelf is
 published again for that server, whichever screen the switch lands on.
@@ -719,11 +751,12 @@ drawn with Home's poster rows and cards, without See all.
   end of the iPad's right-hand column, and after About the show. Both
   pages keep the tab bar on iPhone, as the boards draw them. A card opens
   its page over this one, and Back comes back to the row.
-- **Apple TV** (`RelatedShelves`): the movie page's first screen ends with
-  the shelves' names along its bottom edge (`PageFold` from `TabPage`)
-  and the shelves wait below it; Down from the versions reaches them. On a
-  show, Down from About the show reaches More like this. Up leaves them,
-  and Menu from a card's page comes back to the card.
+- **Apple TV**: on a movie the collection and More like this are one line
+  under the cast (`RelatedLine`), its names and the tops of its posters in
+  sight from the buttons; Down from the buttons reaches it, Right runs
+  through both, and Up or Menu goes back to the buttons. On a show
+  (`RelatedShelves`), Down from About the show reaches More like this and
+  Up leaves it. Menu from a card's page comes back to the card.
 
 `-fakesRelated` puts the fakes' server at level 30 (`FakeRelated`): Cold
 Harbour Road, Low Tide at Carrow and Dead Reckoning Bay (`movies/500`) are
@@ -779,7 +812,9 @@ read a library, or finished a scan without finding media. Admins get **Open the
 web page** on iPhone/iPad and its address on Apple TV; members get instructions
 to ask the server owner. Scan transitions refresh it, and Check again remains
 available. `-fakes -fakesFirstRun noLibraries` (or `scanning`, `failed`, `empty`)
-previews the states; add `-fakesMember` for the member wording.
+previews the states; add `-fakesMember` for the member wording. On Apple TV
+Home also says when the server doesn't answer, naming it, with Try again and
+Switch server (`-fakes -fakesUnreachable`, Apple TV only).
 
 Settings › Audio & subtitles is one page
 on iPhone, iPad (two columns where the page is wide) and Apple TV (a sheet in
@@ -858,8 +893,8 @@ output, including Original, and acknowledges a prepared replacement after AVPlay
 decodes a frame. A failed replacement restores the previous live URL. Mobile-data
 or display-profile changes retune only after the old session releases its tuner.
 
-The existing iPhone, iPad and Apple TV Auto chip, quality picker and short note
-display these transitions. The Cast remote offers Live TV Automatic only when
+The iPhone and iPad Auto chip and quality picker, the Apple TV's Quality tab,
+and the short note on each display these transitions. The Cast remote offers Live TV Automatic only when
 the receiver advertises `live-auto` and its server is capable; a handoff to an
 older receiver uses fixed 1080p. On debug fakes,
 `-open watchmymedia://play/9101 -playerAutomatic slowed|recovered|failed`
@@ -915,12 +950,20 @@ described above under Google Cast.
 
 On servers at API level 13 or later whose capabilities say `guide`, Live TV
 shows programme listings.
-The guide is a grid of channels against an hour (iPhone) or two (iPad,
-Apple TV) from the half hour, with the days listed, Now, earlier and later,
-category chips and Go to channel. On iPhone the selected programme's card sits
-above the grid and its details open in a sheet; a wide iPad shows them in a
-panel beside the grid and switches between Guide and Channels; on Apple TV the
-hero follows focus and Select watches the channel. Home's On now row, the
+The guide is a grid of channels against an hour (iPhone), two (iPad) or
+ninety minutes (Apple TV, 500 pt a half hour) from the half hour, with the
+days listed, Now, earlier and later, category chips and Go to channel. On
+iPhone the selected programme's card sits above the grid and its details open
+in a sheet; a wide iPad shows them in a panel beside the grid and switches
+between Guide and Channels. On Apple TV three lines above at most eight chips
+follow focus (what is on and where, the title, time left or when it starts,
+its times and what is next); Select on a programme on now watches it, and
+Select (a long press too) on a later one opens its sheet: Record this episode,
+Record every new episode, Remind me and Watch now, with a clash said there.
+Play/Pause on any cell watches that channel now. Moving up or down keeps the
+time, landing on what airs then on the next channel. The channel watched last
+says Watching, the guide opens on what is on it, and Back from the player lands
+there. Without listings it is the channels, five across. Home's On now row, the
 watch screen's banner and On now list, and the players' banners and channel
 panels show what is on with pictures. Pictures load through the server's
 `/api/live-tv/art/` with the usual sign-in, never from the listings provider;
@@ -938,11 +981,12 @@ On servers at API level 15 with listings, each channel in the guide
 has a star (its own 44 pt button on iPhone and iPad; on Apple TV the channel
 column takes focus and a long press stars it), and Favourites leads the chips
 once there is one: it shows the favourite channels, with or without listings,
-in channel order. A later programme offers Remind me (a long press on Apple
+in channel order. A later programme offers Remind me (in its sheet on Apple
 TV) and then says its reminder is set, moved or no longer in the listings,
 with Remove; its cell has a bell. The guide's search button and bell open
 Search listings and Reminders (pushed on iPhone, in the panel beside a wide
-iPad's grid, chips on Apple TV), and Search has On Live TV after the
+iPad's grid; on Apple TV Reminders is a chip and listings are searched from
+the Search tab), and Search has On Live TV after the
 library's groups. `LiveExtrasStore` (in `WMMFeatures`, one per app) keeps the
 stars and reminders: a change shows at once and goes back if the server
 refuses it, and the server's `live.favourites.changed` and
@@ -1009,22 +1053,28 @@ The AirPlay receiver must be able to reach the selected server address; live
 playback does not perform the file player's LAN-address handoff. Simulator playback
 does not certify physical AirPlay, PiP, cellular networks or Apple TV remotes.
 
-Apple TV uses AVKit's native Play/Pause and a linear live transport.
-Last channel (once there is one), Channel down,
-Channel up and Go to channel are transport bar buttons, before Stop and the
-system's own, each naming where it goes; as contextual actions they took
-Select from the bar. Go live stays a
-contextual action. The first time the bar comes up a note says Select
-pauses and the buttons are a swipe up. Page Up and Page Down change channel
-with a note naming it; the 123 key (tvOS 18.1) or the button opens Go to
-channel, a keypad that lists the channels whose number starts with what was
-typed and tunes the first two seconds after the last key, or the one chosen;
-digit keys type into it and Back closes it. `LiveChannelStep` (the list's
-order, skipping channels that can't be watched, wrapping) and
-`GoToChannelModel` are the rules, shared with the iPhone's channel keys.
-Swipe down opens Channels and Quality while video continues. Back closes an open native
-panel first, then stops and returns to the channel browser. The still-watching
-prompt takes focus; its first Back keeps watching, and the next Back leaves.
+Apple TV uses AVKit's native Play/Pause and a linear live transport. Nothing
+about the stream is on the picture: after a channel change, and with the bar,
+a banner at the foot says live (or behind, or paused) and the channel, the
+programme, time left in gold, its times and what is next. Record (Stop
+recording, once this person's recording of it is under way), Channel down and
+Channel up are transport bar buttons, before the system's own, each naming
+where it goes; as contextual actions they took Select from the bar. Go live
+stays a contextual action. Page Up and Page Down change channel, the banner
+naming it at once; the 123 key (tvOS 18.1) or Channels' Go to channel opens a
+keypad that lists the channels whose number starts with what was typed and
+tunes the first two seconds after the last key, or the one chosen; digit keys
+type into it and Back closes it. `LiveChannelStep` (the list's order, skipping
+channels that can't be watched, wrapping) and `GoToChannelModel` are the
+rules, shared with the iPhone's channel keys. Swipe down opens Channels and
+Quality while video continues: Channels opens on the channel being watched,
+with Last channel and Go to channel to its left; Quality says what is playing.
+Back closes an open native panel first, then stops and returns to the guide on
+that channel. The still-watching prompt takes focus; its first Back keeps
+watching, and the next Back leaves. A channel that can't play says why in the
+viewer's words (no tuner free, no signal, stopped for a recording) with what
+can be done, most useful first (`TVLiveProblem`): watch a recording that holds
+a tuner from its start, try again, other channels, back to the guide.
 
 For channel-only fakes, use `-fakes -fakesLiveTV -tab liveTV`, or
 `-fakes -fakesLiveTV -open watchmymedia://live-tv/live-1` to open a channel.
@@ -1104,19 +1154,25 @@ Record beside the reminder controls and Recordings in Live TV. A programme of
 a series (one with the listing's series key) offers just this episode or every
 new episode; Options set new-only, channel, retention and minute padding. A film
 or special records at once. When the tuners are booked, the clash shows at once
-(a sheet on iPhone and iPad, full screen on Apple TV) and asks which recording,
-not yet recording, gives way; Keep leaves the new one under Won’t record, whose
-rows offer the same choice. The guide marks a programme that will record (a red
+(a sheet on iPhone and iPad; on Apple TV one choice of which to leave out, the
+new one last with focus) and asks which recording, not yet recording, gives
+way; Keep leaves the new one under Won’t record, whose rows offer the same
+choice. The guide marks a programme that will record (a red
 dot, ringed for a series), REC while recording and a hollow orange dot for a
 clash; anything else offers Record again with its reason's words. Marks follow
 `live.recordings.changed`: the span on screen is asked for again in one request. iPhone and iPad also make manual recordings by channel and time,
 including daily, weekday and weekly repeats in the device’s time zone. Apple TV
-uses a full-screen record choice and keeps manual scheduling on the phone or web.
+records from the programme's sheet (Record with options… for the full form)
+and keeps manual scheduling on the phone or web.
 Admins set folders and recording access in the server’s web app.
 
 Recordings shows Recording now, Won’t record, Upcoming, Series and Recorded,
 hiding empty sections; on iPhone and iPad a swipe left skips, stops or doesn't
-record one. Each section loads 20 at a time with Load more; a
+record one. On Apple TV it is rows: Ready to watch (what is recording now
+first, a title recorded several times as one card that opens its episodes),
+Coming up (Won't record marked in orange, opening the clash), and the series
+recorded, with how many hours are recorded and, at the rate they took, room
+for how many more. Each section loads 20 at a time with Load more; a
 `live.recordings.changed` event refreshes the sections on screen (a screen
 says which with `LiveRecordingsStore.show(_:)`; one that has left is
 forgotten and loads again on return) and the guide's span while
@@ -1195,7 +1251,8 @@ their own:
   ends its tab's pages there. A launch with `-open` or `-tab` goes where it
   says; on the fakes nothing is kept unless `-fakesRestorePlace` is given.
 - **Recent searches** are kept between launches per account and server
-  (`RecentSearches`); they show on iPad, as before.
+  (`RecentSearches`); they show on iPad, as before, and on Apple TV before
+  anything is typed.
 - **A Live TV reminder's notification** offers Watch and Remind again,
   which notifies once more five minutes later.
 - **Text size.** `PrimaryButtonStyle`, `GhostButtonStyle` and `Chip` scale
@@ -1219,8 +1276,8 @@ their own:
 
 With the app in the top row of the Apple TV's Home Screen, the Top Shelf
 shows Continue watching (16:9 cards with the system's progress bar) and
-Recently added (posters, movies and shows in turn) as two sections the
-system draws. Select
+New for you (posters, movies and shows in turn, added lately and neither
+watched nor started) as two sections the system draws. Select
 opens the page; Play/Pause plays, as on the card in the app: a Continue
 watching item resumes, a movie plays its first version, and a show, which has
 no single episode to play, opens. Signed out, or with nothing to show, the
@@ -1236,7 +1293,7 @@ system shows the static Top Shelf image from `TV/Resources`.
   (`.publishesTopShelf` in `TV/Screens/Home/HomeScreen.swift`, then
   `TopShelfPublisher` in WMMFeatures): the rows the person shows on Home (a
   row hidden from Home isn't on the shelf), ten Continue watching and twelve
-  Recently added, each picture fetched with the app's sign-in and saved as a
+  New for you, each picture fetched with the app's sign-in and saved as a
   file in the group, then `TVTopShelfContentProvider.topShelfContentDidChange()`.
   Signing out, or another person or server signing in, clears it
   (`.clearsTopShelfOnAccountChange` in `TV/Shell/WatchMyMediaTVApp.swift`);
@@ -1446,11 +1503,17 @@ brand views and the QR code in `WMMUI`. The two targets share no files.
   failed as a message, and the newest wins.
 - **Concurrency**: Swift 6 language mode. Repositories, models and the
   controller are `@MainActor`; network work suspends off it.
-- **Apple TV**: every page is a `TabPage` (a scroll view from the screen's
-  edges, the artboards' 90 pt gutter, the lockup beside the tab bar, whose
-  last tab is the account). Buttons, cards and rows draw the focus themselves from
-  `isFocused` (`TVButtonStyle`, `TVChipStyle`, `focusRim`): the system's
-  lift and shadow plus the gold rim. A row of cards is a `ShelfRow`, a
+- **Apple TV**: tvOS's own numbers (`TV/Components/TVStyle.swift`): text
+  and controls inside the safe area, 80 pt at the sides and 60 pt at the top
+  and bottom (`TVLayout`), pictures to the edges, and only tvOS's text styles,
+  76 pt down to 23 pt (`TVText`, `Font.tv`). Every page is a `TabPage` (a
+  scroll view from the screen's edges, the lockup beside the tab bar, whose
+  last tab is the account). Focus is the system's look with nothing drawn
+  around it: buttons, chips and rows grow and turn white (`TVButtonStyle`,
+  `TVChipStyle`, `TVListRowStyle`) and cards lift and catch the light
+  (`focusLift`, `FocusSheen`), drawn from `isFocused`. Gold marks what is
+  chosen (a chip's edge, a tick, the selected tab's title), progress and
+  badges; burgundy fills the main button. A row of cards is a `ShelfRow`, a
   focus section that remembers its focused card. Every row of cards shows
   where it starts (`RowStartScrolling`, as Android TV's rows do): moving
   back, the card before the focused one stays whole in view, so at the

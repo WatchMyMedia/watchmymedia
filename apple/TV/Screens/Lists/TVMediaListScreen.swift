@@ -38,7 +38,8 @@ private struct TVMediaListView: View {
     @State private var confirmingDelete = false
 
     private static let columnCount = 7
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 24, alignment: .top), count: TVMediaListView.columnCount)
+    /// The library grid's seven across, at tvOS's seven-across width.
+    private let columns = Array(repeating: GridItem(.fixed(TVCardWidth.gridPoster), spacing: TVLayout.cardSpacing, alignment: .top), count: TVMediaListView.columnCount)
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -73,7 +74,7 @@ private struct TVMediaListView: View {
                     if model.isWatchlist && model.countsLine == nil {
                         TVEmptyState(systemImage: "bookmark", title: WatchlistWords.emptyTitle, message: WatchlistWords.emptyMessage).padding(.top, 40)
                     } else {
-                        LazyVGrid(columns: columns, alignment: .leading, spacing: 36) {
+                        LazyVGrid(columns: columns, alignment: .leading, spacing: 56) {
                             ForEach(model.entries) { entry in card(entry).focused($focusedRank, equals: entry.rank) }
                         }
                         .focusSection()
@@ -81,7 +82,7 @@ private struct TVMediaListView: View {
                 }
                 .padding(.horizontal, TVLayout.gutter)
                 .padding(.top, 16)
-                .padding(.bottom, 60)
+                .padding(.bottom, TVLayout.safeBottom)
             }
             .frame(minHeight: 600)
         }
@@ -99,22 +100,18 @@ private struct TVMediaListView: View {
     /// The name, then "From TMDB · Updated 3 h ago · 18 of 50 in your library · For everyone";
     /// a watchlist's with Watchlist over it.
     private var header: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             if model.isWatchlist {
-                Text(WatchlistWords.kicker.uppercased())
-                    .font(.system(size: 20, weight: .bold))
-                    .tracking(1)
-                    .foregroundStyle(Palette.gold)
+                TVKicker(text: WatchlistWords.kicker)
             }
             Text(model.title)
-                .font(.system(size: 56, weight: .heavy))
-                .tracking(-1.1)
+                .font(.tv(.title2))
                 .foregroundStyle(Palette.text)
                 .lineLimit(2)
                 .accessibilityAddTraits(.isHeader)
             (Text(model.sourceLine ?? "").foregroundStyle(Palette.gold).fontWeight(.semibold)
                 + Text([model.sourceLine == nil ? nil : "", model.whenLine(), model.countsLine].compactMap { $0 }.joined(separator: " · ")).foregroundStyle(Palette.muted))
-                .font(.system(size: 23))
+                .font(.tv(.caption1))
                 .lineSpacing(4)
         }
     }
@@ -122,17 +119,17 @@ private struct TVMediaListView: View {
     private func callout(_ text: String) -> some View {
         HStack(spacing: 18) {
             Text("\(Image(systemName: "exclamationmark.triangle"))").foregroundStyle(Palette.warning)
-            Text(text).font(.system(size: 21)).lineSpacing(4).foregroundStyle(Palette.text).frame(maxWidth: .infinity, alignment: .leading)
+            Text(text).font(.tv(.caption1)).lineSpacing(4).foregroundStyle(Palette.text).frame(maxWidth: .infinity, alignment: .leading)
             if model.canRefresh {
                 Button("Try again") { Task { await model.refreshNow() } }
-                    .buttonStyle(TVButtonStyle(height: 56, fontSize: 20))
+                    .buttonStyle(TVButtonStyle())
                     .disabled(model.working)
             }
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 20)
+        .padding(.horizontal, 28)
+        .padding(.vertical, 22)
         .background(Palette.warning.opacity(0.10), in: RoundedRectangle(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Palette.warning.opacity(0.4)))
+        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(Palette.warning.opacity(0.4), lineWidth: 2))
         .accessibilityElement(children: .combine)
     }
 
@@ -184,10 +181,10 @@ private struct TVMediaListView: View {
         VStack(alignment: .leading, spacing: 24) {
             HStack(spacing: 18) {
                 Button { newName = model.title; renaming = true } label: { Text("\(Image(systemName: "pencil"))  \(WatchlistWords.rename)") }
-                    .buttonStyle(TVButtonStyle(height: 62, fontSize: 22))
+                    .buttonStyle(TVButtonStyle())
                     .accessibilityIdentifier("watchlist-rename")
                 Button { confirmingDelete = true } label: { Text("\(Image(systemName: "trash"))  \(WatchlistWords.delete)") }
-                    .buttonStyle(TVButtonStyle(kind: .redText, height: 62, fontSize: 22))
+                    .buttonStyle(TVButtonStyle(kind: .redText))
                     .accessibilityIdentifier("watchlist-delete")
                 Button { Task { await model.setRemovesWatched(!model.removesWatched) } } label: {
                     HStack(spacing: 14) {
@@ -195,22 +192,22 @@ private struct TVMediaListView: View {
                         TVSwitch(on: model.removesWatched, compact: true)
                     }
                 }
-                .buttonStyle(TVButtonStyle(height: 62, fontSize: 22))
+                .buttonStyle(TVButtonStyle())
                 .accessibilityValue(model.removesWatched ? "On" : "Off")
                 .accessibilityHint(WatchlistWords.removeWatchedDetail)
                 .accessibilityIdentifier("watchlist-switch")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .focusSection()
-            Text(WatchlistWords.removeWatchedDetail).font(.system(size: 20)).foregroundStyle(Palette.muted)
+            Text(WatchlistWords.removeWatchedDetail).font(.tv(.caption1)).foregroundStyle(Palette.muted)
             if model.countsLine != nil {
-                HStack(spacing: 14) {
+                HStack(spacing: 16) {
                     ForEach([nil, MediaType.movie, .tv], id: \.self) { type in
                         Button(WatchlistWords.filterName(type)) { model.filter = type }
                             .buttonStyle(TVChipStyle(selected: model.filter == type))
                             .accessibilityAddTraits(model.filter == type ? .isSelected : [])
                     }
-                    Text("Sort").font(.system(size: 19)).foregroundStyle(Palette.muted).padding(.leading, 24)
+                    Text("Sort").font(.tv(.caption1)).foregroundStyle(Palette.muted).padding(.leading, 24)
                     Menu {
                         Picker("Sort", selection: Binding(get: { model.sort }, set: { sort in Task { await model.setSort(sort) } })) {
                             ForEach(ListSort.allCases, id: \.self) { Text(WatchlistWords.sortName($0)).tag($0) }
@@ -246,6 +243,7 @@ private struct TVMediaListView: View {
 /// A title's card: the 2:3 artwork with the rank, then the title and its line.
 /// A missing title is dimmed, with Request, Requested, Downloading or Not in
 /// your library under it; one TMDB couldn't find is a dashed box, Not found.
+/// No format on the picture: that is on the title's page.
 private struct EntryFace: View {
     let entry: MediaListEntry
     let imageURL: URL?
@@ -255,27 +253,27 @@ private struct EntryFace: View {
     @Environment(\.isFocused) private var focused
     @Environment(\.displayScale) private var scale
 
-    private let width: CGFloat = 218
+    private let width = TVCardWidth.gridPoster
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             artwork
                 .frame(width: width, height: (width * 1.5).rounded())
-                .overlay(alignment: .topLeading) { if ranked { rank.padding(10) } }
+                .overlay(alignment: .topLeading) { if ranked { rank.padding(12) } }
                 .overlay { FocusSheen(focused: focused) }
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .focusRim(focused, cornerRadius: 16)
-            VStack(alignment: .leading, spacing: 4) {
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .focusLift(focused)
+            VStack(alignment: .leading, spacing: 2) {
                 Text(entry.title)
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.tv(.caption1, .semibold))
                     .foregroundStyle(entry.item == nil ? Palette.muted : focused ? .white : Color.tvTitle)
                     .lineLimit(1)
                 Text(entry.item?.gridSubtitle ?? entry.year.map(String.init) ?? " ")
-                    .font(.system(size: 17)).foregroundStyle(Palette.muted).lineLimit(1)
+                    .font(.tv(.caption2)).foregroundStyle(Palette.muted).lineLimit(1)
                 if entry.item == nil && entry.found { state }
             }
-            .padding(.top, 12)
-            .offset(y: focused ? 12 : 0)
+            .padding(.top, 16)
+            .offset(y: focused ? 10 : 0)
             .animation(.easeOut(duration: 0.18), value: focused)
         }
         .frame(width: width, alignment: .leading)
@@ -284,19 +282,19 @@ private struct EntryFace: View {
     @ViewBuilder private var artwork: some View {
         if let item = entry.item {
             Artwork(url: imageURL, seed: item.title, maxPixel: cardPixels(width: width, height: width * 1.5, scale: scale))
+                .overlay { if imageURL == nil { PlaceholderTitle(title: item.title) } }
                 .overlay {
-                    if let quality = item.quality { TVBadge(quality).pinned(.topTrailing) }
                     if item.watched {
-                        WatchedCheck(size: 28).pinned(.bottomTrailing)
+                        WatchedCheck(size: 40).pinned(.topTrailing)
                     } else if let progress = item.progress, progress > 0 {
-                        ProgressStrip(progress: progress, height: 6).pinned(.bottom, padding: 0)
+                        TVProgressBar(progress: progress).pinned(.bottom, padding: 14)
                     }
                 }
         } else if !entry.found {
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 14)
                 .fill(Palette.surface)
-                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Palette.outlineStrong, style: StrokeStyle(lineWidth: 2, dash: [8, 5])))
-                .overlay { TVBadge("Not found", style: .warning).pinned(.bottomLeading, padding: 10) }
+                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Palette.outlineStrong, style: StrokeStyle(lineWidth: 2, dash: [8, 6])))
+                .overlay { TVBadge("Not found", style: .warning).pinned(.bottomLeading) }
         } else {
             Artwork(url: imageURL, seed: entry.title, maxPixel: cardPixels(width: width, height: width * 1.5, scale: scale))
                 .overlay { Color(hex: 0x0F0F10).opacity(focused ? 0.35 : 0.62) }
@@ -305,23 +303,27 @@ private struct EntryFace: View {
 
     private var rank: some View {
         Text("\(entry.rank)")
-            .font(.system(size: 16, weight: .bold).monospacedDigit())
+            .font(.tv(.caption2, .bold).monospacedDigit())
             .foregroundStyle(Palette.text)
-            .padding(.horizontal, 8)
-            .frame(minWidth: 30, minHeight: 30)
+            .padding(.horizontal, 12)
+            .frame(minWidth: 38, minHeight: 38)
             .background(.black.opacity(0.78), in: Capsule())
     }
 
     @ViewBuilder private var state: some View {
-        switch entry.requestState {
-        case .requestable? where canRequest:
-            Text("Request").font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.gold)
-        case .requested?, .available?:
-            Text("\(Image(systemName: "checkmark")) Requested").font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.textSecondary)
-        case .downloading?:
-            Text("\(Image(systemName: "arrow.down.to.line")) Downloading").font(.system(size: 17, weight: .semibold)).foregroundStyle(Palette.gold)
-        default:
-            Text("Not in your library").font(.system(size: 17)).foregroundStyle(Palette.textSecondary)
+        Group {
+            switch entry.requestState {
+            case .requestable? where canRequest:
+                Text("Request").fontWeight(.semibold).foregroundStyle(Palette.gold)
+            case .requested?, .available?:
+                Text("\(Image(systemName: "checkmark")) Requested").fontWeight(.semibold).foregroundStyle(Palette.textSecondary)
+            case .downloading?:
+                Text("\(Image(systemName: "arrow.down.to.line")) Downloading").fontWeight(.semibold).foregroundStyle(Palette.gold)
+            default:
+                Text("Not in your library").foregroundStyle(Palette.textSecondary)
+            }
         }
+        .font(.tv(.caption2))
+        .lineLimit(1)
     }
 }

@@ -131,18 +131,6 @@ public func streamReason(_ state: PlayerState) -> String? {
     return "\(mode.label): \(state.reasons.joined(separator: "; "))."
 }
 
-/// Over the video while the Apple TV's transport bar shows.
-public let infoPanelHint = "Swipe down for info, audio and subtitles"
-
-/// The line along the bottom of the Apple TV's info panel.
-public let infoPanelFootnote = "Swipe up or press Back to close. Changes apply at once; a burned-in subtitle restarts the stream from here. Subtitle size and style follow the Apple TV’s accessibility settings."
-
-/// Under the quality steps on Apple TV: "Remembered on this Apple TV".
-public func qualityRememberedNote(device: String) -> String { "Remembered on this \(device)" }
-
-/// Under the Apple TV's Still watching buttons.
-public let stillWatchingRemoteNote = "Any press on the remote counts as an answer."
-
 /// The line along the bottom of the picker; `device` is "iPhone" or "iPad".
 public func pickerFootnote(device: String, offline: Bool = false) -> String {
     if offline { return "Only tracks in this download are available · changes apply at once" }

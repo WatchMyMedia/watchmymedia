@@ -45,6 +45,8 @@ public final class RealPlaybackController: PlaybackController {
     @ObservationIgnored var media: (any MediaPlayer)?
     @ObservationIgnored var session: (any SystemSession)?
     @ObservationIgnored var viewing: Viewing?
+    /// After the subtitle in the system's title view: Apple TV's "Ends at 9:41 PM" (``describeEnd(_:)``).
+    @ObservationIgnored var endLine: String?
     @ObservationIgnored var generation = 0
     /// The viewer's pick; ``asked`` is what this server is asked for.
     @ObservationIgnored var quality: StreamQuality
@@ -254,6 +256,19 @@ public final class RealPlaybackController: PlaybackController {
         stillWatching.noteInput()
     }
 
+    public func describeEnd(_ line: String?) {
+        guard line != endLine else { return }
+        endLine = line
+        guard let v = active() else { return }
+        media?.retitle(v.request.title, subtitle: shownSubtitle(v.request))
+    }
+
+    /// The subtitle the system's title view shows: the request's, then ``endLine``.
+    func shownSubtitle(_ request: PlayRequest) -> String? {
+        let parts = [request.subtitle, endLine].compactMap { $0 }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     public func stop() {
         endViewing(.stopped)
     }
@@ -398,6 +413,8 @@ public final class RealPlaybackController: PlaybackController {
 
     func begin(_ request: PlayRequest) {
         generation += 1
+        // Another play ends at another time: the screen says when once it knows.
+        endLine = nil
         let v = Viewing(request: request, generation: generation, at: clock.elapsedMs)
         // A play handed over from another device keeps its tracks.
         v.selectedAudio = request.audioIndex
@@ -490,7 +507,7 @@ public final class RealPlaybackController: PlaybackController {
         state.backdropPath = v.request.backdropPath
         state.stillPath = v.request.stillPath
         state.posterPath = v.request.posterPath
-        media?.retitle(v.request.title, subtitle: v.request.subtitle)
+        media?.retitle(v.request.title, subtitle: shownSubtitle(v.request))
         media?.describe(details(v.request))
         showArtwork(for: v.request)
         refresh(0)
@@ -669,7 +686,7 @@ public final class RealPlaybackController: PlaybackController {
             startPositionMs: streamClock.playerPosition(start),
             playWhenReady: playWhenReady,
             title: v.request.title,
-            subtitle: v.request.subtitle,
+            subtitle: shownSubtitle(v.request),
             audio: audioStart(d, v.selectedAudio),
             details: details(v.request)
         ))

@@ -8,12 +8,12 @@ import WMMUI
 /// after Info, for episodes only. The show's
 /// name and its seasons as buttons, focus reaching one choosing it; under
 /// them the chosen season's episodes on disk, focus starting on the one
-/// playing; what the focused one is, and how to leave. Select or Play/Pause
+/// playing; what the focused one is, and what happens in it. Select or Play/Pause
 /// on another episode plays it from where the person left it; the one
 /// playing keeps playing. ``TVPlayerEpisodesModel`` decides all of it.
 struct EpisodesTab: View {
     /// The panel's height under the system's tab bar.
-    static let height: CGFloat = 540
+    static let height: CGFloat = 660
 
     let model: TVPlayerModel
     let episodes: TVPlayerEpisodesModel
@@ -28,35 +28,31 @@ struct EpisodesTab: View {
     @FocusState private var focus: Focus?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 26) {
+        VStack(alignment: .leading, spacing: 24) {
             seasonsRow
             switch episodes.status {
             case .failed(let message):
                 HStack(spacing: 24) {
-                    Text(message).font(.system(size: 21)).foregroundStyle(Palette.muted)
+                    Text(message).font(.tv(.body)).foregroundStyle(Palette.textSecondary)
                     Button("Try again") { Task { await episodes.retry() } }
-                        .buttonStyle(TVButtonStyle(height: 56, fontSize: 21))
+                        .buttonStyle(TVButtonStyle(kind: .primary))
                         .accessibilityIdentifier("player-episodes-retry")
                 }
-                .frame(maxWidth: .infinity, minHeight: 246, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 300, alignment: .leading)
                 .focusSection()
             case .loaded where !episodes.chosenSeasonPending:
                 episodeRow
             default:
-                ProgressView().tint(Palette.gold).frame(maxWidth: .infinity, minHeight: 246)
+                TVSpinner().frame(maxWidth: .infinity, minHeight: 300)
             }
             focusDetail
             Spacer(minLength: 0)
-            Text(TVPlayerEpisodesModel.footnote)
-                .font(.system(size: 16))
-                .foregroundStyle(Palette.faint)
         }
-        .padding(.horizontal, TVLayout.gutter - 26)
-        .padding(.top, 20)
-        .padding(.bottom, 28)
+        .padding(EdgeInsets(top: 32, leading: 40, bottom: 32, trailing: 40))
         .frame(maxWidth: .infinity, alignment: .leading)
-        // tvOS draws nothing behind a custom tab: the artboard's panel, over the video.
-        .background(Color(hex: 0x161618).opacity(0.94), in: RoundedRectangle(cornerRadius: 28))
+        // tvOS draws nothing behind a custom tab: the panel, over the video.
+        .background(Color(hex: 0x1E1E22).opacity(0.94), in: RoundedRectangle(cornerRadius: 32))
+        .padding(.horizontal, TVLayout.gutter)
         .frame(height: Self.height)
         .defaultFocus($focus, episodes.initialFocusID.map(Focus.episode), priority: .userInitiated)
         .onChange(of: focus) { old, new in
@@ -84,13 +80,13 @@ struct EpisodesTab: View {
     private var seasonsRow: some View {
         HStack(spacing: 12) {
             Text(episodes.showTitle.isEmpty ? model.request.title : episodes.showTitle)
-                .font(.system(size: 24, weight: .bold))
+                .font(.tv(.callout))
                 .foregroundStyle(Palette.text)
                 .lineLimit(1)
                 .padding(.trailing, 14)
             ForEach(episodes.seasons) { season in
                 Button(season.chipName) { Task { await episodes.choose(season: season.number) } }
-                    .buttonStyle(SeasonButtonStyle(chosen: season.number == episodes.chosenSeason))
+                    .buttonStyle(TVChipStyle(selected: season.number == episodes.chosenSeason))
                     .focused($focus, equals: .season(season.number))
                     .accessibilityIdentifier("player-season-\(season.number)")
             }
@@ -102,7 +98,7 @@ struct EpisodesTab: View {
     private var episodeRow: some View {
         ScrollView(.horizontal) {
             // Not lazy: a season is a few dozen cards at most, and every card is then there for focus and VoiceOver.
-            HStack(spacing: 28) {
+            HStack(spacing: TVLayout.cardSpacing) {
                 ForEach(episodes.episodes) { episode in
                     Button { play(episode) } label: {
                         EpisodeCard(
@@ -118,43 +114,42 @@ struct EpisodesTab: View {
                     .accessibilityIdentifier("player-episode-\(episode.number)")
                 }
             }
-            .padding(.vertical, 22)
+            .padding(.vertical, 24)
             .padding(.horizontal, 4)
         }
         .scrollClipDisabled()
-        .frame(height: 290)
+        .frame(height: 320)
         .padding(.vertical, -12)
         .focusSection()
     }
 
-    /// What the focused episode or season is, or where the person is.
+    /// What the focused episode or season is, or where the person is; for
+    /// an episode, two lines of what happens in it.
     private var focusDetail: some View {
-        let lines: (String, String)? = {
+        let lines: (String, String?)? = {
             switch focus {
             case .episode(let id)?:
                 guard let episode = episodes.episodes.first(where: { $0.id == id }) else { return nil }
                 return (episodes.focusLine(episode), episode.overview)
             case .season(let number)?:
                 guard let season = episodes.seasons.first(where: { $0.number == number }) else { return nil }
-                return (episodes.seasonLine(season), TVPlayerEpisodesModel.seasonHint)
+                return (episodes.seasonLine(season), nil)
             case nil:
-                return episodes.panelLine.map { ($0, TVPlayerEpisodesModel.panelHint) }
+                return episodes.panelLine.map { ($0, nil) }
             }
         }()
         return VStack(alignment: .leading, spacing: 8) {
             Text(lines?.0 ?? " ")
-                .font(.system(size: 21, weight: .semibold))
+                .font(.tv(.body, .semibold))
                 .foregroundStyle(Palette.text)
                 .lineLimit(1)
                 .accessibilityIdentifier("player-episodes-focus-line")
             Text(lines?.1 ?? " ")
-                .font(.system(size: 19))
-                .foregroundStyle(Color(hex: 0xBDBDBD))
-                .lineSpacing(6)
+                .font(.tv(.caption1))
+                .foregroundStyle(Palette.textSecondary)
                 .lineLimit(2, reservesSpace: true)
         }
-        .frame(maxWidth: 1100, alignment: .leading)
-        .padding(.top, 6)
+        .frame(maxWidth: 1200, alignment: .leading)
     }
 
     private func play(_ episode: EpisodeDetail) {
@@ -163,8 +158,9 @@ struct EpisodesTab: View {
     }
 }
 
-/// The artboard's `.ep`: a 330×186 still with the duration, Now playing,
-/// the watched check and the progress bar on it; "Episode 8" and the title under it.
+/// An episode in the tab: a 320 x 180 still with Now playing, its length,
+/// the watched check and how far it was watched on it; the number and the
+/// title under it. Focused, it lifts as any card does.
 private struct EpisodeCard: View {
     let episode: EpisodeDetail
     let episodes: TVPlayerEpisodesModel
@@ -174,114 +170,47 @@ private struct EpisodeCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Artwork(url: still, seed: episode.title, maxPixel: 700)
-                .frame(width: 330, height: 186)
+            Artwork(url: still, seed: episode.title, maxPixel: 720)
+                .frame(width: TVCardWidth.wide, height: 180)
                 .overlay(alignment: .topLeading) {
-                    if episodes.isPlaying(episode) {
-                        Text("\(Image(systemName: "play.fill")) NOW PLAYING")
-                            .font(.system(size: 14, weight: .bold))
-                            .tracking(0.7)
-                            .foregroundStyle(Palette.text)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 8))
-                            .padding(10)
-                    }
+                    if episodes.isPlaying(episode) { TVBadge("Now playing").padding(12) }
                 }
                 .overlay(alignment: .topTrailing) {
-                    if let duration = episodes.durationLabel(episode) {
-                        Text(duration)
-                            .font(.system(size: 14, weight: .semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(Palette.text)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 6))
-                            .padding(10)
-                    }
-                }
-                .overlay(alignment: .bottomTrailing) {
                     if episodes.showsWatched(episode) {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 14, weight: .heavy))
-                            .foregroundStyle(Palette.ground)
-                            .frame(width: 28, height: 28)
-                            .background(Palette.gold, in: Circle())
-                            .padding(.trailing, 10)
-                            .padding(.bottom, 12)
+                        WatchedCheck(size: 40).padding(12)
+                    } else if let duration = episodes.durationLabel(episode) {
+                        TVBadge(duration).monospacedDigit().padding(12)
                     }
                 }
                 .overlay(alignment: .bottom) {
-                    if let progress {
-                        ZStack(alignment: .leading) {
-                            Rectangle().fill(.black.opacity(0.6))
-                            Rectangle().fill(Palette.gold).frame(width: 330 * progress)
-                        }
-                        .frame(height: 6)
-                    }
+                    if let progress { TVProgressBar(progress: progress).padding(14) }
                 }
-                .overlay {
-                    if focused {
-                        LinearGradient(colors: [.white.opacity(0.14), .clear], startPoint: .topLeading, endPoint: .center)
-                    }
-                }
+                .overlay { FocusSheen(focused: focused) }
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                .focusRim(focused, cornerRadius: 14, scale: 1.08)
+                .focusLift(focused)
                 .zIndex(focused ? 2 : 0)
             VStack(alignment: .leading, spacing: 2) {
                 Text(episodes.numberLabel(episode))
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.tv(.caption2))
                     .monospacedDigit()
                     .foregroundStyle(Palette.muted)
                 Text(episode.title)
-                    .font(.system(size: 21, weight: .semibold))
+                    .font(.tv(.caption1, .semibold))
                     .foregroundStyle(focused ? .white : Color.tvTitle)
                     .lineLimit(1)
             }
-            .padding(.top, 12)
-            .offset(y: focused ? 8 : 0)
+            .padding(.top, 16)
+            .offset(y: focused ? 10 : 0)
             .animation(.easeOut(duration: 0.18), value: focused)
         }
-        .frame(width: 330, alignment: .leading)
+        .frame(width: TVCardWidth.wide, alignment: .leading)
     }
 }
 
-/// The card draws its own focus.
+/// The card draws its own lift; held down, it settles a little.
 private struct EpisodeCardStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.scaleEffect(configuration.isPressed ? 0.97 : 1)
-    }
-}
-
-/// The artboard's `.ss`: a season button, lighter when chosen; focused, white with the gold rim.
-private struct SeasonButtonStyle: ButtonStyle {
-    let chosen: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        Styled(configuration: configuration, chosen: chosen)
-    }
-
-    private struct Styled: View {
-        let configuration: Configuration
-        let chosen: Bool
-        @Environment(\.isFocused) private var focused
-
-        var body: some View {
-            configuration.label
-                .font(.system(size: 19, weight: .semibold))
-                .lineLimit(1)
-                .foregroundStyle(focused ? Palette.ground : chosen ? Palette.text : Palette.textSecondary)
-                .padding(.horizontal, 20)
-                .frame(height: 44)
-                .background(focused ? Palette.text : .white.opacity(chosen ? 0.22 : 0.08), in: Capsule())
-                .overlay {
-                    if focused { Capsule().strokeBorder(Palette.gold, lineWidth: 3).padding(-3) }
-                }
-                .scaleEffect(focused ? 1.06 : configuration.isPressed ? 0.96 : 1)
-                .shadow(color: .black.opacity(focused ? 0.6 : 0), radius: focused ? 18 : 0, y: focused ? 14 : 0)
-                .animation(.easeOut(duration: 0.15), value: focused)
-                .accessibilityAddTraits(chosen ? .isSelected : [])
-        }
     }
 }
 

@@ -25,7 +25,7 @@ import TVServices
         ]))
 
         let content = try #require(store.topShelfContent())
-        #expect(content.sections.map(\.title) == ["Continue watching", "Recently added"])
+        #expect(content.sections.map(\.title) == ["Continue watching", "New for you"])
 
         let card = try #require(content.sections[0].items.first)
         #expect(card.identifier == "continue-9001")

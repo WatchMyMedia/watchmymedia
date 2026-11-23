@@ -27,13 +27,11 @@ final class SeeAllTests: XCTestCase {
         app.press(.down, thenWaitForFocusToMove: 5)
         XCTAssertFalse(app.tabBars.buttons.matching(NSPredicate(format: "hasFocus == true")).firstMatch.exists, "focus is in TV Shows")
         remote.press(.menu)
-        let play = app.buttons["Play"]
-        XCTAssertTrue(play.waitUntilExists(timeout: 15), "Home shows the hero")
+        let continuing = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "S02 E04 · 23 min left")).firstMatch
+        XCTAssertTrue(continuing.waitUntilExists(timeout: 15), "Home shows its first row")
         XCTAssertTrue(app.waitForFocusedButton(timeout: 15) { _ in true }, "the tab bar has focus")
         remote.press(.down)
-        XCTAssertTrue(play.waitForFocus(), "Down from the tab bar lands on Play")
-        remote.press(.down)
-        XCTAssertTrue(app.waitForFocusedButton { $0 != "Play" }, "Down from Play lands on Continue watching")
+        XCTAssertTrue(continuing.waitForFocus(), "Down from the tab bar lands on the first Continue watching card")
 
         // Recently aired is the fourth row: Recently added · TV Shows and a list come first.
         let panel = app.descendants(matching: .any)["homeFocusPanel-recentlyAired"]

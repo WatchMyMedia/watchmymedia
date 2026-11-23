@@ -24,7 +24,7 @@ private struct MyRequestsView: View {
         TabPage {
             VStack(alignment: .leading, spacing: 24) {
                 Text("Your requests")
-                    .font(.system(size: 52, weight: .heavy))
+                    .font(.tv(.title3, .bold))
                     .foregroundStyle(Palette.text)
                     .accessibilityAddTraits(.isHeader)
                 switch model.state {
@@ -83,19 +83,19 @@ private struct RequestRow: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 6) {
-                Text(request.title).font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
-                Text("\(request.what) · \(formatWhen(request.createdAt))").font(.system(size: 18)).foregroundStyle(Palette.muted)
+                Text(request.title).font(.tv(.caption1, .semibold)).foregroundStyle(Palette.text)
+                Text("\(request.what) · \(formatWhen(request.createdAt))").font(.tv(.caption2)).foregroundStyle(Palette.muted)
                 StatusLineView(request.stateLine, fontSize: 18, barWidth: 440)
             }
             Spacer(minLength: 12)
             if request.status == .pending {
-                Text("Cancel request").font(.system(size: 18, weight: .semibold)).foregroundStyle(focused ? Palette.text : Palette.muted)
+                Text("Cancel request").font(.tv(.caption2, .semibold)).foregroundStyle(focused ? Palette.text : Palette.muted)
             }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
         .background(focused ? Color.white.opacity(0.10) : .white.opacity(0.04), in: RoundedRectangle(cornerRadius: 18))
-        .focusRim(focused, cornerRadius: 18, scale: 1.015)
+        .focusLift(focused, scale: 1.015)
         .accessibilityElement(children: .combine)
     }
 }
@@ -119,13 +119,13 @@ private struct InboxView: View {
         TabPage {
             VStack(alignment: .leading, spacing: 24) {
                 Text("Inbox")
-                    .font(.system(size: 52, weight: .heavy))
+                    .font(.tv(.title3, .bold))
                     .foregroundStyle(Palette.text)
                     .accessibilityAddTraits(.isHeader)
                 HStack(spacing: 4) {
                     ForEach(InboxModel.Tab.allCases, id: \.self) { tab in
                         Button(model.count(tab).map { "\(tab.title)  \($0)" } ?? tab.title) { model.tab = tab }
-                            .buttonStyle(TVChipStyle(selected: model.tab == tab, height: 52, fontSize: 21))
+                            .buttonStyle(TVChipStyle(selected: model.tab == tab))
                     }
                 }
                 .padding(6)
@@ -154,7 +154,7 @@ private struct InboxView: View {
         if model.viaSeerr {
             HStack(spacing: 24) {
                 if let url = model.seerrRequestsURL { QRCodeView(url.absoluteString).frame(width: 160, height: 160) }
-                Text("Requests are approved in Seerr").font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
+                Text("Requests are approved in Seerr").font(.tv(.caption1, .semibold)).foregroundStyle(Palette.text)
             }
         }
         if model.requestList.isEmpty && !model.viaSeerr {
@@ -169,7 +169,7 @@ private struct InboxView: View {
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 14) {
                             Text("\(request.requestedBy) asked for \(request.inboxSeasons.map { "\($0) of " } ?? "")\(request.title) · \(formatWhen(request.createdAt))")
-                                .font(.system(size: 22))
+                                .font(.tv(.caption2))
                                 .foregroundStyle(Palette.text)
                             if request.status != .pending { StatusLineView(request.stateLine, fontSize: 18) }
                             if request.needsDecision { decision(request) }
@@ -183,22 +183,22 @@ private struct InboxView: View {
     @ViewBuilder private func decision(_ request: MediaRequest) -> some View {
         if model.declining == request.id {
             TextField(declinePrompt(request.requestedBy), text: $model.note)
-                .font(.system(size: 20))
+                .font(.tv(.caption2))
                 .frame(maxWidth: 900)
             HStack(spacing: 18) {
                 Button("Decline") { Task { await model.decline(request) } }
-                    .buttonStyle(TVButtonStyle(kind: .primary, height: 56, fontSize: 20))
+                    .buttonStyle(TVButtonStyle(kind: .primary))
                 Button("Cancel") { model.stopDeclining() }
-                    .buttonStyle(TVButtonStyle(height: 56, fontSize: 20))
+                    .buttonStyle(TVButtonStyle())
             }
             .disabled(model.busy != nil)
             .focusSection()
         } else {
             HStack(spacing: 18) {
                 Button("Approve") { Task { await model.approve(request) } }
-                    .buttonStyle(TVButtonStyle(kind: .primary, height: 56, fontSize: 20))
+                    .buttonStyle(TVButtonStyle(kind: .primary))
                 Button("Decline") { model.startDeclining(request) }
-                    .buttonStyle(TVButtonStyle(height: 56, fontSize: 20))
+                    .buttonStyle(TVButtonStyle())
             }
             .disabled(model.busy != nil)
             .focusSection()
@@ -213,16 +213,16 @@ private struct InboxView: View {
                 card {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("\(problem.reportedBy) reported \(problem.kind.label) on \(problem.title) · \(formatWhen(problem.createdAt))")
-                            .font(.system(size: 22))
+                            .font(.tv(.caption2))
                             .foregroundStyle(Palette.text)
                         if !problem.note.isEmpty {
-                            Text("“\(problem.note)”").font(.system(size: 22)).foregroundStyle(Palette.textSecondary)
+                            Text("“\(problem.note)”").font(.tv(.caption2)).foregroundStyle(Palette.textSecondary)
                         }
                         if !problem.details.isEmpty {
-                            Text(problem.details).font(.system(size: 17)).foregroundStyle(Palette.muted)
+                            Text(problem.details).font(.tv(.caption2)).foregroundStyle(Palette.muted)
                         }
                         Button("Mark resolved") { Task { await model.resolve(problem) } }
-                            .buttonStyle(TVButtonStyle(height: 56, fontSize: 20))
+                            .buttonStyle(TVButtonStyle())
                             .disabled(model.busy != nil)
                     }
                 }
