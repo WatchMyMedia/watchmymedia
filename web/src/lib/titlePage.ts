@@ -281,3 +281,14 @@ export function initials(name: string): string {
   const parts = name.split(/\s+/).filter(Boolean)
   return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? (parts.at(-1)?.[0] ?? '') : '')).toUpperCase()
 }
+
+/**
+ * Whether Hide spoilers keeps an episode's synopsis and still back: one the
+ * person hasn't finished or started. Titles stay, so the list can be read.
+ */
+export function spoilerHidden(e: Pick<Episode, 'watch'>, hide: boolean): boolean {
+  return hide && !e.watch?.completed && !(e.watch && e.watch.positionMs > 0)
+}
+
+/** What a hidden synopsis says instead. */
+export const HIDDEN_SYNOPSIS = 'Hidden until you have watched it.'

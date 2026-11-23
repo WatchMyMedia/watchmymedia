@@ -3,6 +3,7 @@ import {
   channelWords,
   codecName,
   episodeRowFacts,
+  spoilerHidden,
   episodeRowState,
   filesSummary,
   historyWords,
@@ -165,5 +166,17 @@ describe('seasons and episodes', () => {
     expect(initials('Ines Calloway')).toBe('IC')
     expect(initials('Cher')).toBe('C')
     expect(initials('Mary Ann de Vries')).toBe('MV')
+  })
+})
+
+describe('spoilerHidden', () => {
+  const watched = { watch: { completed: true, positionMs: 0, durationMs: 1 } }
+  const started = { watch: { completed: false, positionMs: 60_000, durationMs: 1 } }
+  const fresh = {}
+  it('hides only what the person has not watched or started, and only when asked', () => {
+    expect(spoilerHidden(fresh as never, true)).toBe(true)
+    expect(spoilerHidden(watched as never, true)).toBe(false)
+    expect(spoilerHidden(started as never, true)).toBe(false)
+    expect(spoilerHidden(fresh as never, false)).toBe(false)
   })
 })

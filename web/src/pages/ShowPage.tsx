@@ -50,7 +50,8 @@ import {
   type OnTopReason,
 } from '../lib/showPage'
 import { useShowMissing } from '../lib/showMissing'
-import { episodeRowFacts, episodeRowState, playChoices, seasonLine, seasonTabWords, showState } from '../lib/titlePage'
+import { HIDDEN_SYNOPSIS, episodeRowFacts, episodeRowState, playChoices, seasonLine, seasonTabWords, showState, spoilerHidden } from '../lib/titlePage'
+import { useHideSpoilers } from '../components/useHideSpoilers'
 import { watchlistTitle } from '../lib/watchlists'
 import { hasShowTracks, pickBody, rememberedChoice } from '../lib/showTracks'
 import { forgetShowTracks, setShowTracks } from '../api/showTracks'
@@ -231,13 +232,14 @@ function EpisodeTop({ show: s, se, e, why, listed }: { show: ShowDetail; se: Sea
     if (canDelete) items.push({ label: 'Delete episode…', icon: 'delete', danger: true, divider: true, onSelect: () => setActing('delete') })
   }
   const playLabel = primary.kind === 'play' ? (fromStart ? 'Resume' : 'Play') : ''
+  const hidden = spoilerHidden(e, useHideSpoilers().on)
 
   const still = (
     <>
       {status ? (
         <span className="grid size-full place-items-center text-[15px] font-semibold text-neutral-400">{status.thumb}</span>
       ) : (
-        <Poster path={e.stillPath ?? s.backdropPath} size="w780" alt="" ratio="aspect-video" className="rounded-none" />
+        <Poster path={e.stillPath ?? s.backdropPath} size="w780" alt="" ratio="aspect-video" className={`rounded-none ${hidden ? 'opacity-35' : ''}`} />
       )}
       {e.isNew && !e.watch?.completed && <span className="absolute left-2.5 top-2.5 rounded-[5px] bg-accent px-[7px] py-0.5 text-[11px] font-bold text-ground">New</span>}
       {e.watch?.completed && (
@@ -272,7 +274,7 @@ function EpisodeTop({ show: s, se, e, why, listed }: { show: ShowDetail; se: Sea
         </h2>
         {facts.length > 0 && <FactsLine facts={facts} />}
         <RecordingProvenance recording={best?.recording} />
-        {e.overview && <p className="max-w-[66ch] text-[15px] leading-[1.55] text-neutral-200">{e.overview}</p>}
+        {e.overview && <p className={`max-w-[66ch] text-[15px] leading-[1.55] ${hidden ? 'text-neutral-400' : 'text-neutral-200'}`}>{hidden ? HIDDEN_SYNOPSIS : e.overview}</p>}
         {why === 'again' && <p className="text-sm text-neutral-300">You&rsquo;ve watched every episode. Start again here, or pick any episode below.</p>}
         {status && (
           <p className={`mt-1 inline-flex items-center gap-2 text-[15px] font-semibold ${toneText[status.tone]}`}>
@@ -422,6 +424,7 @@ function SeasonSection({
   const monitor = useMonitorEpisodes(s.id)
   const [requesting, setRequesting] = useState(false)
   const [view, setView] = useEpisodesView()
+  const spoilers = useHideSpoilers()
   const { pick, preload, pending } = usePickSeason(s)
   const tabs = seasonTabs(s.seasons, showMissing, se.number)
   const here = s.seasons.find((x) => x.number === se.number) ?? se
@@ -499,12 +502,8 @@ function SeasonSection({
         )}
         {(markSeason.error ?? search.error ?? monitor.error) && <span className="text-sm text-warn">{(markSeason.error ?? search.error ?? monitor.error)?.message}</span>}
         <span className="flex flex-wrap items-center gap-x-[18px] gap-y-2 md:ml-auto">
-          <button type="button" role="switch" aria-checked={showMissing} onClick={() => onShowMissing(!showMissing)} className="inline-flex min-h-9 items-center gap-2 text-[13px] text-neutral-300">
-            <span aria-hidden="true" className={`relative block h-5 w-[34px] rounded-full ${showMissing ? 'bg-accent' : 'bg-line-3'}`}>
-              <span className={`absolute top-[3px] size-3.5 rounded-full ${showMissing ? 'left-[17px] bg-ground' : 'left-[3px] bg-neutral-300'}`} />
-            </span>
-            Show missing
-          </button>
+          <Switch on={spoilers.on} onChange={spoilers.set} label="Hide spoilers" />
+          <Switch on={showMissing} onChange={onShowMissing} label="Show missing" />
           <span className="seg" role="group" aria-label="Episodes as">
             <button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')}>
               List
@@ -523,7 +522,12 @@ function SeasonSection({
       )}
       {se.overview && <p className="mb-3.5 max-w-3xl text-sm leading-relaxed text-neutral-400">{se.overview}</p>}
 
-      {view === 'list' ? <EpisodeList show={s} se={se} episodes={episodes} current={current} /> : <EpisodeStrip show={s} se={se} episodes={episodes} current={current} />}
+      {spoilers.error && <p className="mb-3 text-sm text-warn">Hide spoilers wasn’t saved: {spoilers.error}</p>}
+      {view === 'list' ? (
+        <EpisodeList show={s} se={se} episodes={episodes} current={current} hide={spoilers.on} />
+      ) : (
+        <EpisodeStrip show={s} se={se} episodes={episodes} current={current} hide={spoilers.on} />
+      )}
       {requesting && <RequestDialog mediaType="tv" tmdbId={s.tmdbId} preselect={[se.number]} onClose={() => setRequesting(false)} />}
     </section>
   )
@@ -540,7 +544,7 @@ function onTopLink(s: ShowDetail, se: SeasonDetail, x: Episode) {
 }
 
 /** The season's episodes as a list: number, still, title, when it aired and how long, the synopsis, where you are, and Play. */
-function EpisodeList({ show: s, se, episodes, current }: { show: ShowDetail; se: SeasonDetail; episodes: Episode[]; current?: number }) {
+function EpisodeList({ show: s, se, episodes, current, hide }: { show: ShowDetail; se: SeasonDetail; episodes: Episode[]; current?: number; hide: boolean }) {
   return (
     <ol className="flex flex-col gap-0.5">
       {episodes.map((x) => {
@@ -554,6 +558,7 @@ function EpisodeList({ show: s, se, episodes, current }: { show: ShowDetail; se:
           ? { to: '/play/$fileId' as const, params: { fileId: String(file.id) }, search: { title: `${s.title} · ${seCode(se.number, x.number)} ${title}`, back: episodePath(s.id, se.number, x.id) } }
           : undefined
         const playName = `${state?.gold ? 'Resume' : 'Play'} episode ${x.number}, ${title}`
+        const hidden = spoilerHidden(x, hide)
         return (
           <li
             key={x.id}
@@ -575,7 +580,7 @@ function EpisodeList({ show: s, se, episodes, current }: { show: ShowDetail; se:
               </span>
             ) : (
               <Link {...play} tabIndex={-1} aria-hidden="true" className="relative block w-[168px] shrink-0 overflow-hidden rounded-lg ring-1 ring-inset ring-white/[.07] hover:ring-2 hover:ring-accent max-md:w-full">
-                <Poster path={x.stillPath ?? s.backdropPath} size="w300" alt="" ratio="aspect-video" className="rounded-none" />
+                <Poster path={x.stillPath ?? s.backdropPath} size="w300" alt="" ratio="aspect-video" className={`rounded-none ${hidden ? 'opacity-35' : ''}`} />
                 {x.watch?.completed && (
                   <span className="absolute right-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-ground/80 text-accent ring-1 ring-inset ring-accent/70">
                     <CheckIcon size={11} />
@@ -603,7 +608,7 @@ function EpisodeList({ show: s, se, episodes, current }: { show: ShowDetail; se:
                   {st.label}
                 </p>
               )}
-              {x.overview && <p className="mt-1 line-clamp-2 max-w-[86ch] text-[13.5px] text-neutral-300 max-md:hidden">{x.overview}</p>}
+              {x.overview && <p className={`mt-1 line-clamp-2 max-w-[86ch] text-[13.5px] max-md:hidden ${hidden ? 'text-neutral-400' : 'text-neutral-300'}`}>{hidden ? HIDDEN_SYNOPSIS : x.overview}</p>}
             </div>
             {state && <span className={`whitespace-nowrap text-[13px] max-md:hidden ${state.gold ? 'text-accent' : 'text-neutral-400'}`}>{state.text}</span>}
             {play ? (
@@ -621,7 +626,7 @@ function EpisodeList({ show: s, se, episodes, current }: { show: ShowDetail; se:
 }
 
 /** The season's episodes as a strip of stills, the one on top outlined in gold. */
-function EpisodeStrip({ show: s, se, episodes, current }: { show: ShowDetail; se: SeasonDetail; episodes: Episode[]; current?: number }) {
+function EpisodeStrip({ show: s, se, episodes, current, hide }: { show: ShowDetail; se: SeasonDetail; episodes: Episode[]; current?: number; hide: boolean }) {
   const list = useRef<HTMLUListElement>(null)
   // Bring the episode on top into the strip's view without scrolling the page.
   useEffect(() => {
@@ -652,7 +657,7 @@ function EpisodeStrip({ show: s, se, episodes, current }: { show: ShowDetail; se
                 </span>
               ) : (
                 <span className="relative block overflow-hidden rounded-lg ring-1 ring-inset ring-white/[.07] group-hover:ring-2 group-hover:ring-accent">
-                  <Poster path={x.stillPath ?? s.backdropPath} size="w300" alt="" ratio="aspect-video" className="rounded-none" />
+                  <Poster path={x.stillPath ?? s.backdropPath} size="w300" alt="" ratio="aspect-video" className={`rounded-none ${spoilerHidden(x, hide) ? 'opacity-35' : ''}`} />
                   {x.watch?.completed && (
                     <span className="absolute right-2 top-2 grid size-[22px] place-items-center rounded-full bg-ground/80 text-accent ring-1 ring-inset ring-accent/70">
                       <CheckIcon size={13} />
@@ -808,5 +813,17 @@ function AboutShow({ show: s, number, showMissing }: { show: ShowDetail; number?
         />
       )}
     </section>
+  )
+}
+
+/** A labelled switch in the season's line: Hide spoilers, Show missing. */
+function Switch({ on, onChange, label }: { on: boolean; onChange: (on: boolean) => void; label: string }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)} className="inline-flex min-h-9 items-center gap-2 text-[13px] text-neutral-300">
+      <span aria-hidden="true" className={`relative block h-5 w-[34px] rounded-full ${on ? 'bg-accent' : 'bg-line-3'}`}>
+        <span className={`absolute top-[3px] size-3.5 rounded-full ${on ? 'left-[17px] bg-ground' : 'left-[3px] bg-neutral-300'}`} />
+      </span>
+      {label}
+    </button>
   )
 }
