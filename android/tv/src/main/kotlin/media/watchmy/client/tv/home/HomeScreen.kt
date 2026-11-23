@@ -158,7 +158,7 @@ fun HomeScreen(
                             home = home,
                             library = services.library,
                             memory = memory,
-                            actions = TvRowActions(onPlay, onOpenShow, onOpenMovie, onOpenEpisode, rememberNotMatchedNotice(), vm::toggleMovieWatched) { id -> onNavigate(TvRoutes.MediaList(id)) },
+                            actions = TvRowActions(onPlay, onOpenShow, onOpenMovie, onOpenEpisode, rememberNotMatchedNotice(), vm::toggleMovieWatched, { id -> onNavigate(TvRoutes.MediaList(id)) }, vm::hideFromContinue.takeIf { state.canHideContinue }),
                             liveChannels = liveChannels,
                             onWatchLive = onWatchLive,
                             liveListings = liveListings,

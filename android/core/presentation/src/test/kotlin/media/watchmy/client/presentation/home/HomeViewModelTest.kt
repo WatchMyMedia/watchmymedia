@@ -35,4 +35,39 @@ class HomeViewModelTest {
         assertEquals(HomeEmptyState.Kind.Unavailable, vm.state.value.emptyState?.kind)
         assertNotNull(vm.state.value.home)
     }
+
+    @Test fun `Remove from Continue watching takes the card off at once and keeps it off`() = runTest(main.dispatcher) {
+        val library = FakeLibraryRepository()
+        val vm = HomeViewModel(library)
+        advanceUntilIdle()
+        assertTrue(vm.state.value.canHideContinue)
+        val first = vm.state.value.home!!.continueWatching.first()
+        vm.hideFromContinue(first)
+        assertFalse(vm.state.value.home!!.continueWatching.any { it.fileId == first.fileId })
+        advanceUntilIdle()
+        assertEquals(REMOVED_FROM_CONTINUE, vm.state.value.message)
+        vm.load(); advanceUntilIdle()
+        assertFalse(vm.state.value.home!!.continueWatching.any { it.fileId == first.fileId })
+        // The place is kept: the movie's page still has it.
+        assertTrue(library.continueWatching().none { it.fileId == first.fileId })
+    }
+
+    @Test fun `a refused removal puts the card back and says why`() = runTest(main.dispatcher) {
+        val repository = object : LibraryRepository by FakeLibraryRepository() {
+            override suspend fun hideFromContinue(kind: ContinueItem.Kind, id: Long) = throw ApiException(500, "The server had a problem.")
+        }
+        val vm = HomeViewModel(repository)
+        advanceUntilIdle()
+        val first = vm.state.value.home!!.continueWatching.first()
+        vm.hideFromContinue(first)
+        advanceUntilIdle()
+        assertTrue(vm.state.value.home!!.continueWatching.any { it.fileId == first.fileId })
+        assertEquals("The server had a problem.", vm.state.value.message)
+    }
+
+    @Test fun `an older server offers no removal`() = runTest(main.dispatcher) {
+        val vm = HomeViewModel(FakeLibraryRepository(level = { REDESIGN_API_LEVEL - 1 }))
+        advanceUntilIdle()
+        assertFalse(vm.state.value.canHideContinue)
+    }
 }

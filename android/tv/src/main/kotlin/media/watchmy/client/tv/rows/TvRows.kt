@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -78,6 +79,8 @@ internal class TvRowActions(
     val onNotMatched: () -> Unit,
     val onToggleWatched: ((BrowseItem) -> Unit)?,
     val onOpenList: (Long) -> Unit,
+    /** Hold OK on a Continue watching card offers Remove from Continue watching, where the server can ([media.watchmy.client.model.ServerFeatures.hideFromContinue]). */
+    val onHideContinue: ((ContinueItem) -> Unit)? = null,
 )
 
 /**
@@ -182,7 +185,7 @@ internal fun TvArrangedRow(
                         artWidth = WideCardWidth,
                         artHeight = WideCardHeight,
                         onClick = { actions.onPlay(c.playRequest()) },
-                        onLongClick = { c.openPage(actions) },
+                        onLongClick = continueHold(c, actions),
                         modifier = Modifier.rowCard(memory, "cw:${c.fileId}", i, onFocusItem),
                     ) {
                         ArtProgress(c.progress)
@@ -243,6 +246,33 @@ internal fun TvArrangedRow(
             }
             if (seeAll != null) {
                 item("see-all") { SeeAllCard(seeAll, wide = row.style != RowStyle.Poster, modifier = Modifier.rowCard(memory, "${row.id}:all", row.cardCount, onFocusItem)) }
+            }
+        }
+    }
+}
+
+/**
+ * Hold OK on a Continue watching card: a menu with the title's page and
+ * Remove from Continue watching, which keeps the place; with no way to
+ * remove it (an older server), the page, as before.
+ */
+@Composable
+private fun continueHold(c: ContinueItem, actions: TvRowActions): () -> Unit {
+    val host = media.watchmy.client.tv.watchlists.LocalCardMenu.current
+    val hide = actions.onHideContinue
+    return remember(c, host, hide, actions) {
+        if (host == null || hide == null) {
+            { c.openPage(actions) }
+        } else {
+            {
+                host.open = media.watchmy.client.tv.watchlists.CardMenu(
+                    c.title,
+                    c.remainingLine,
+                    listOf(
+                        media.watchmy.client.tv.watchlists.CardMenuEntry(if (c.showId != null) "Go to the show" else "Go to the movie", WmmIcons.Info) { c.openPage(actions) },
+                        media.watchmy.client.tv.watchlists.CardMenuEntry(media.watchmy.client.model.REMOVE_FROM_CONTINUE, WmmIcons.Close) { hide(c) },
+                    ),
+                )
             }
         }
     }

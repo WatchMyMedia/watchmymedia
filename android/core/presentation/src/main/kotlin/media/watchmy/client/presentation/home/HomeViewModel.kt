@@ -10,6 +10,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import media.watchmy.client.model.AuthRepository
 import media.watchmy.client.model.BrowseItem
+import media.watchmy.client.model.ContinueItem
+import media.watchmy.client.model.REMOVED_FROM_CONTINUE
+import media.watchmy.client.model.withoutContinue
+import media.watchmy.client.model.at
 import media.watchmy.client.model.HomeData
 import media.watchmy.client.model.HomeEmptyState
 import media.watchmy.client.model.isEmpty
@@ -48,6 +52,8 @@ class HomeViewModel(private val library: LibraryRepository, auth: AuthRepository
         /** The offline Home's Try again is out. */
         val tryingAgain: Boolean = false,
         val emptyState: HomeEmptyState? = null,
+        /** Cards can be taken off Continue watching, keeping their place ([ServerFeatures.hideFromContinue]). */
+        val canHideContinue: Boolean = false,
     ) {
         val isEmpty: Boolean get() = home?.isEmpty() == true
     }
@@ -108,6 +114,29 @@ class HomeViewModel(private val library: LibraryRepository, auth: AuthRepository
 
     fun toggleMovieWatched(item: BrowseItem) = setWatched(item, !item.watched)
 
+    /**
+     * Takes [item] off Continue watching, keeping its place: at once on
+     * screen, then on the server it came from and every other server whose
+     * copy is merged into the card. A refusal puts the card back and says why.
+     */
+    fun hideFromContinue(item: ContinueItem) {
+        val before = _state.value.home
+        _state.update { it.copy(home = it.home?.withoutContinue(item)) }
+        viewModelScope.launch {
+            attempt { hideEverywhere(item) }
+                .onSuccess { _state.update { it.copy(message = REMOVED_FROM_CONTINUE) } }
+                .onFailure { e -> _state.update { it.copy(home = before ?: it.home, message = errorMessage(e)) } }
+        }
+    }
+
+    /** The card's own server first; another server's copy is taken off where it can be, and its failure isn't the card's. */
+    private suspend fun hideEverywhere(item: ContinueItem) {
+        val id = (if (item.kind == ContinueItem.Kind.Movie) item.movieId else item.episodeId) ?: return
+        val own = library.at(item.where.serverId) ?: throw media.watchmy.client.model.SignedOutException()
+        own.hideFromContinue(item.kind, id)
+        item.where.copies.forEach { copy -> attempt { library.at(copy.serverId)?.hideFromContinue(item.kind, copy.id) } }
+    }
+
     fun say(message: String) = _state.update { it.copy(message = message) }
 
     fun messageShown() = _state.update { it.copy(message = null) }
@@ -130,7 +159,14 @@ class HomeViewModel(private val library: LibraryRepository, auth: AuthRepository
                 } else null
                 home to empty
             }
-                .onSuccess { (home, empty) -> _state.update { it.copy(home = home, emptyState = empty, loading = false, refreshing = false, error = null, offline = false, tryingAgain = false) } }
+                .onSuccess { (home, empty) ->
+                    _state.update {
+                        it.copy(
+                            home = home, emptyState = empty, loading = false, refreshing = false, error = null, offline = false, tryingAgain = false,
+                            canHideContinue = library.features().hideFromContinue,
+                        )
+                    }
+                }
                 .onFailure { e ->
                     _state.update {
                         // With something on screen, a failed refresh is a snackbar, not an error page.
