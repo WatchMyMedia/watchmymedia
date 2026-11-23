@@ -132,10 +132,15 @@ function Listed({ item }: { item: ContinueItem }) {
   )
 }
 
-/** The featured item's synopsis, from its movie or its season, which the row's reply doesn't carry. */
+/**
+ * The featured item's synopsis: the row's own (API level 34), else from its
+ * movie or its season, for a reply without one.
+ */
 function useOverview(item: ContinueItem): string | undefined {
-  const movie = useQuery({ ...movieQuery(item.movieId ?? 0), enabled: item.kind === 'movie' && item.movieId != null })
-  const season = useQuery({ ...seasonQuery(item.showId ?? 0, item.seasonNumber ?? 0), enabled: item.kind === 'episode' && item.showId != null && item.seasonNumber != null })
+  const fetch = item.overview === undefined
+  const movie = useQuery({ ...movieQuery(item.movieId ?? 0), enabled: fetch && item.kind === 'movie' && item.movieId != null })
+  const season = useQuery({ ...seasonQuery(item.showId ?? 0, item.seasonNumber ?? 0), enabled: fetch && item.kind === 'episode' && item.showId != null && item.seasonNumber != null })
+  if (!fetch) return item.overview || undefined
   if (item.kind === 'movie') return movie.data?.overview || undefined
   return season.data?.episodes?.find((e) => e.id === item.episodeId)?.overview || undefined
 }

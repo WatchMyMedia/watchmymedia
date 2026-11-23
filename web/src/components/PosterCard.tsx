@@ -6,11 +6,12 @@ import type { components } from '../api/schema'
 import { posterLinks } from '../lib/cardLinks'
 import { PeekHost } from './PeekCard'
 import { CheckIcon } from './icons'
+import { newFlag } from '../lib/browsePrefs'
 
 export type BrowseItem = components['schemas']['BrowseItem']
 
 /**
- * 2:3 poster with the New badge; fixed width inside rows, fluid in grids. Its
+ * 2:3 poster with the New badge ("2 new" for a show's new episodes); fixed width inside rows, fluid in grids. Its
  * parts are links of their own (lib/cardLinks.ts): the
  * title opens the title, a Recently added show card's season and episode
  * open the show there, and the picture is a bigger target for the most
@@ -25,11 +26,12 @@ export function PosterCard({ item, inRow = false, subtitle, showCount = false, r
 
 function MatchedCard({ item, inRow, subtitle, showCount, rank, peek }: { item: BrowseItem; inRow: boolean; subtitle?: string; showCount: boolean; rank?: number; peek: boolean }) {
   const links = posterLinks(item, subtitle)
+  const flag = newFlag(item)
   return (
     <PeekHost item={item} enabled={peek} className={`shrink-0 snap-start ${inRow ? 'w-[124px] md:w-[168px]' : ''}`}>
       <CardPicture {...links.picture}>
         <Poster path={item.posterPath} alt={item.title} />
-        {rank !== undefined ? <RankBadge rank={rank} /> : item.isNew && <CardFlag>New</CardFlag>}
+        {rank !== undefined ? <RankBadge rank={rank} /> : flag && <CardFlag>{flag}</CardFlag>}
         {showCount && item.kind === 'show' && item.episodeCount ? (
           <Badge className="absolute bottom-1.5 left-1.5">{item.episodeCount} ep</Badge>
         ) : null}
