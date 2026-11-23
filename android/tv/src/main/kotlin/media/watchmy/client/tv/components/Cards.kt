@@ -35,6 +35,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRestorer
@@ -67,11 +69,19 @@ import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** Left edge of screen content, right of the rail (154 in the mockups). */
-val ContentStart = 154.dp
+/** Left edge of screen content: the rail's icons at the safe edge (96), 72 wide, and a gap of 48. */
+val ContentStart = 216.dp
 
-/** Right margin of screen content. */
-val ContentEnd = 58.dp
+/** Right margin of screen content: the safe edge. Rows run past it to the screen's edge. */
+val ContentEnd = SafeX
+
+/** A wide (16:9) card's picture: four across with the fifth peeking. */
+val WideCardWidth = 360.dp
+val WideCardHeight = 202.dp
+
+/** A poster (2:3): six across with the seventh peeking. */
+val PosterWidth = 216.dp
+val PosterHeight = 324.dp
 
 /**
  * A card in a row or grid: artwork [artWidth]×[artHeight] with [overlay]
@@ -113,25 +123,28 @@ fun MediaCard(
         onClick = onClick,
         onLongClick = onLongClick,
         modifier = modifier.then(inRow).scaledSize(artWidth, null, scale),
-        cornerRadius = 12.dp,
-        focusedScale = focusedScale,
-    ) {
+        cornerRadius = 14.dp,
+        ring = false,
+    ) { focused ->
         Column {
-            Artwork(
-                url = imageUrl,
-                seed = seed,
-                // The title under it names the card; TalkBack would read it twice.
-                contentDescription = null,
-                modifier = Modifier.scaledSize(artWidth, artHeight, scale),
-                shape = RoundedCornerShape(12.dp),
-                // Decoded at the size a focused row draws it, not the resting size it is first laid out at.
-                decodeSize = row?.let { DpSize(artWidth, artHeight) * ((if (landscape) CardRowFocus.FOCUSED_LANDSCAPE else CardRowFocus.FOCUSED_POSTER) * focusedScale) },
-                overlay = { Box(Modifier.fillMaxSize(), content = overlay) },
-            )
+            FocusedArt(focused, focusedScale) {
+                Artwork(
+                    url = imageUrl,
+                    seed = seed,
+                    // The title under it names the card; TalkBack would read it twice.
+                    contentDescription = null,
+                    modifier = Modifier.scaledSize(artWidth, artHeight, scale),
+                    shape = RoundedCornerShape(14.dp),
+                    // Decoded at the size it is drawn focused.
+                    decodeSize = DpSize(artWidth, artHeight) * focusedScale,
+                    overlay = { Box(Modifier.fillMaxSize(), content = overlay) },
+                )
+            }
             Text(
                 title,
-                modifier = Modifier.padding(top = 10.dp),
-                style = inter(20.sp, FontWeight.SemiBold),
+                // The picture grows over the gap when focused, so the title moves down with it.
+                modifier = Modifier.padding(top = if (focused) CardTitleGap + artHeight * ((focusedScale - 1f) / 2f) else CardTitleGap),
+                style = TvType.Body.copy(fontWeight = FontWeight.SemiBold),
                 color = WmmColors.Text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -140,13 +153,41 @@ fun MediaCard(
             Text(
                 subtitle.orEmpty(),
                 modifier = Modifier.padding(top = 2.dp),
-                style = inter(17.sp),
-                color = WmmColors.TextMuted,
+                style = TvType.Caption,
+                color = TvPalette.Muted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
     }
+}
+
+/** The gap between a card's picture and its title. */
+internal val CardTitleGap = 18.dp
+
+/**
+ * A card's picture with the focus treatment on it rather than on the card:
+ * it grows by [scale] from its centre, takes the gold ring and casts a
+ * shadow, and sinks a little while OK is held. The words under it stay
+ * their size, so they stay sharp.
+ */
+@Composable
+fun FocusedArt(focused: Boolean, scale: Float = FocusGrowth.CARD, cornerRadius: Dp = 14.dp, content: @Composable () -> Unit) {
+    val grown by animateFloatAsState(if (focused) scale else 1f, tween(140), label = "artScale")
+    val shape = remember(cornerRadius) { RoundedCornerShape(cornerRadius) }
+    Box(
+        Modifier
+            .zIndex(if (focused) 1f else 0f)
+            .graphicsLayer {
+                scaleX = grown
+                scaleY = grown
+                if (focused) {
+                    this.shape = shape
+                    shadowElevation = 28.dp.toPx()
+                }
+            }
+            .focusRing(focused, cornerRadius),
+    ) { content() }
 }
 
 /**
@@ -169,7 +210,7 @@ fun RowArtCard(width: Dp, height: Dp, onClick: () -> Unit, modifier: Modifier = 
             .onPlaced { placed[0] = it }
             .onFocusChanged { if (it.isFocused) row.cardFocused(placed[0], with(density) { width.toPx() }, landscape) }
     }
-    FocusableBox(onClick = onClick, modifier = modifier.then(inRow).scaledSize(width, height, scale), cornerRadius = 12.dp, content = content)
+    FocusableBox(onClick = onClick, modifier = modifier.then(inRow).scaledSize(width, height, scale), cornerRadius = 14.dp, focusedScale = FocusGrowth.CARD, content = content)
 }
 
 /**
@@ -231,6 +272,10 @@ class CardRowFocus internal constructor(private val animated: State<Float>, priv
      */
     internal fun holdAnchor(progress: Float, leading: Float, trailing: Float, gap: Float) {
         if (progress == lastProgress) return
+        if (REST == FOCUSED_POSTER && REST == FOCUSED_LANDSCAPE) {
+            lastProgress = progress
+            return
+        }
         val starting = lastProgress == 0f || lastProgress == 1f
         lastProgress = progress
         val a = anchor ?: return
@@ -247,30 +292,31 @@ class CardRowFocus internal constructor(private val animated: State<Float>, priv
     }
 
     companion object {
-        const val REST = 0.9f
-        const val FOCUSED_POSTER = 1.35f
-        const val FOCUSED_LANDSCAPE = 1.5f
+        // Every row's cards are one size, focused or not: the focused card grows on its own (FocusedArt).
+        const val REST = 1f
+        const val FOCUSED_POSTER = 1f
+        const val FOCUSED_LANDSCAPE = 1f
     }
 }
 
 private val LocalCardRowFocus = compositionLocalOf<CardRowFocus?> { null }
 
-/** A badge on artwork at the TV size (`.badge`: 14 px, 4×8 padding). */
+/** A flag on artwork (`.flag`): 22 sp, bold, on gold for New or dark for the rest. */
 @Composable
 fun ArtBadge(text: String, modifier: Modifier = Modifier, style: BadgeStyle = BadgeStyle.Dark) {
-    Badge(text, modifier, style = style, fontSize = 14.sp, horizontalPadding = 8.dp, verticalPadding = 4.dp)
+    Badge(text, modifier, style = style, fontSize = 22.sp, horizontalPadding = 10.dp, verticalPadding = 3.dp)
 }
 
 /** The gold progress strip along the bottom of artwork (6 dp on TV). */
 @Composable
 fun BoxScope.ArtProgress(progress: Float?) {
-    if (progress != null && progress > 0f) ProgressStrip(progress, Modifier.align(Alignment.BottomCenter), height = 6.dp)
+    if (progress != null && progress > 0f) ProgressStrip(progress, Modifier.align(Alignment.BottomCenter), height = 8.dp)
 }
 
 /** The watched check in the bottom-right corner. */
 @Composable
-fun BoxScope.ArtWatched(watched: Boolean, size: Dp = 28.dp) {
-    if (watched) WatchedCheck(Modifier.align(Alignment.BottomEnd).padding(8.dp), size = size)
+fun BoxScope.ArtWatched(watched: Boolean, size: Dp = 38.dp) {
+    if (watched) WatchedCheck(Modifier.align(Alignment.TopEnd).padding(10.dp), size = size)
 }
 
 /** The round play mark in the middle of a Continue watching card. */
@@ -331,7 +377,7 @@ fun CardRow(modifier: Modifier = Modifier, start: Dp = ContentStart, enter: Focu
 }
 
 /** The space between a row's cards. */
-internal val CardGap = 24.dp
+internal val CardGap = 40.dp
 
 /**
  * Fades a row into the ground at its leading edge while there are cards
@@ -357,19 +403,15 @@ private fun HoldFocusedCard(row: CardRowFocus, leading: Float, trailing: Float, 
 }
 
 /**
- * A row heading (`.h2`): "Recently added" with a grey "TV Shows" beside it,
- * and [trailing] ("Row 2 of 7") at the far right when given.
+ * A row heading (`.rowh`): "Recently added" at 28 with a grey "TV Shows"
+ * beside it, and [trailing] ("Row 2 of 7") beside that, all on one line.
  */
 @Composable
 fun SectionHeader(title: String, modifier: Modifier = Modifier, small: String? = null, start: Dp = ContentStart, trailing: String? = null) {
-    val width = if (trailing != null) Modifier.fillMaxWidth().padding(end = ContentEnd) else Modifier
-    Row(modifier.then(width).padding(start = start, bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text(title, style = inter(28.sp, FontWeight.SemiBold), color = WmmColors.Text, modifier = Modifier.alignByBaseline())
-        if (small != null) Text(small, style = inter(19.sp, FontWeight.Medium), color = WmmColors.TextMuted, modifier = Modifier.alignByBaseline())
-        if (trailing != null) {
-            Spacer(Modifier.weight(1f))
-            Text(trailing, style = inter(19.sp), color = WmmColors.TextMuted, maxLines = 1, modifier = Modifier.alignByBaseline())
-        }
+    Row(modifier.padding(start = start, end = ContentEnd, bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+        Text(title, style = TvType.CardTitle, color = WmmColors.Text, modifier = Modifier.alignByBaseline(), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (small != null) Text(small, style = TvType.Second, color = TvPalette.Muted, modifier = Modifier.alignByBaseline(), maxLines = 1)
+        if (trailing != null) Text(trailing, style = TvType.Second, color = TvPalette.Muted, maxLines = 1, modifier = Modifier.alignByBaseline())
     }
 }
 

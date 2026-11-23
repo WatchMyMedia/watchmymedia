@@ -1,5 +1,6 @@
 package media.watchmy.client.tv.library
 
+import media.watchmy.client.tv.components.FocusGrowth
 import media.watchmy.client.tv.watchlists.holdFor
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -155,11 +156,11 @@ fun LibraryScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(title, style = inter(46.sp, FontWeight.ExtraBold, tracking = -0.02f), color = WmmColors.Text)
-                    Text(state.countsLine ?: " ", style = inter(20.sp), color = WmmColors.TextMuted)
+                    Text(title, style = inter(48.sp, FontWeight.ExtraBold, tracking = -0.02f), color = WmmColors.Text)
+                    Text(state.countsLine ?: " ", style = inter(22.sp), color = WmmColors.TextMuted)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text("Sort", style = inter(19.sp), color = WmmColors.TextMuted)
+                    Text("Sort", style = inter(22.sp), color = WmmColors.TextMuted)
                     TvChip(state.choices.sort.label, selected = false, onClick = { picker = Picker.Sort }, trailingIcon = WmmIcons.ChevronDown)
                 }
             }
@@ -211,7 +212,7 @@ fun LibraryScreen(
                                     item(span = { GridItemSpan(maxLineSpan) }) {
                                         Text(
                                             state.moreError ?: "Loading more…",
-                                            style = inter(19.sp),
+                                            style = inter(22.sp),
                                             color = if (state.moreError != null) WmmColors.Error else WmmColors.TextMuted,
                                             modifier = Modifier.padding(vertical = 12.dp),
                                         )
@@ -323,9 +324,9 @@ private fun ArrangedLibrary(
         ) {
             item("head", span = full) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(title, style = inter(46.sp, FontWeight.ExtraBold, tracking = -0.02f), color = WmmColors.Text)
+                    Text(title, style = inter(48.sp, FontWeight.ExtraBold, tracking = -0.02f), color = WmmColors.Text)
                     val lists = drawn.count { it.listId != null }
-                    Text(listOfNotNull(state.countsLine, lists.takeIf { it > 0 }?.let { plural(it, "list") }).joinToString(" · ").ifEmpty { " " }, style = inter(20.sp), color = WmmColors.TextMuted)
+                    Text(listOfNotNull(state.countsLine, lists.takeIf { it > 0 }?.let { plural(it, "list") }).joinToString(" · ").ifEmpty { " " }, style = inter(22.sp), color = WmmColors.TextMuted)
                 }
             }
             drawn.forEach { row ->
@@ -340,10 +341,10 @@ private fun ArrangedLibrary(
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.SpaceBetween) {
                     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                         Text("All $noun", style = inter(28.sp, FontWeight.SemiBold), color = WmmColors.Text, modifier = Modifier.alignByBaseline())
-                        if (!state.loading || state.items.isNotEmpty()) Text(formatCount(state.total), style = inter(19.sp, FontWeight.Medium), color = WmmColors.TextMuted, modifier = Modifier.alignByBaseline())
+                        if (!state.loading || state.items.isNotEmpty()) Text(formatCount(state.total), style = inter(22.sp, FontWeight.Medium), color = WmmColors.TextMuted, modifier = Modifier.alignByBaseline())
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Text("Sort", style = inter(19.sp), color = WmmColors.TextMuted)
+                        Text("Sort", style = inter(22.sp), color = WmmColors.TextMuted)
                         TvChip(state.choices.sort.label, selected = false, onClick = onSort, trailingIcon = WmmIcons.ChevronDown, modifier = Modifier.focusMemory(memory, "sort"))
                     }
                 }
@@ -374,7 +375,7 @@ private fun ArrangedLibrary(
                     }
                     if (state.loadingMore || state.moreError != null) {
                         item("more", span = full) {
-                            Text(state.moreError ?: "Loading more…", style = inter(19.sp), color = if (state.moreError != null) WmmColors.Error else WmmColors.TextMuted, modifier = Modifier.padding(vertical = 12.dp))
+                            Text(state.moreError ?: "Loading more…", style = inter(22.sp), color = if (state.moreError != null) WmmColors.Error else WmmColors.TextMuted, modifier = Modifier.padding(vertical = 12.dp))
                         }
                     }
                 }
@@ -472,7 +473,7 @@ private fun GridCard(item: BrowseItem, imageUrl: String?, onClick: () -> Unit, o
         artHeight = if (narrow) 267.dp else 285.dp,
         onClick = onClick,
         onLongClick = onLongClick,
-        focusedScale = 1.08f,
+        focusedScale = FocusGrowth.CARD,
         modifier = modifier,
     ) {
         if (item.isNew) ArtBadge("New", Modifier.align(Alignment.TopStart).padding(8.dp), BadgeStyle.Gold)

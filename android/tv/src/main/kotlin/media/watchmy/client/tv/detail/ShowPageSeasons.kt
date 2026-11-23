@@ -64,6 +64,7 @@ import media.watchmy.client.tv.components.ArtBadge
 import media.watchmy.client.tv.components.ArtProgress
 import media.watchmy.client.tv.components.ContentEnd
 import media.watchmy.client.tv.components.ContentStart
+import media.watchmy.client.tv.components.FocusGrowth
 import media.watchmy.client.tv.components.FocusMemory
 import media.watchmy.client.tv.components.FocusableBox
 import media.watchmy.client.tv.components.CardGap
@@ -138,7 +139,7 @@ internal fun SeasonTabs(bar: SeasonBar, vm: ShowPageActions, memory: FocusMemory
             }
         }
         if (bar.summary != null) {
-            Text(bar.summary, style = inter(18.sp), color = WmmColors.TextMuted, maxLines = 1, modifier = Modifier.padding(horizontal = 12.dp))
+            Text(bar.summary, style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 1, modifier = Modifier.padding(horizontal = 12.dp))
         }
         if (bar.canMark) {
             TvButton(markSeasonButtonLabel(bar.watched), { vm.setSeasonWatched(!bar.watched) }, nav.focusMemory(memory, "mark-season"), size = TvButtonSize.Small, enabled = !bar.acting)
@@ -153,7 +154,7 @@ internal fun SeasonTabs(bar: SeasonBar, vm: ShowPageActions, memory: FocusMemory
 
 @Composable
 private fun SeasonTab(s: SeasonSummary, on: Boolean, missing: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    FocusableBox(onClick = onClick, modifier = modifier, cornerRadius = 12.dp, focusedScale = 1.04f, ringColor = if (on) WmmColors.Text else WmmColors.Accent) { focused ->
+    FocusableBox(onClick = onClick, modifier = modifier, cornerRadius = 12.dp, focusedScale = FocusGrowth.BUTTON, ringColor = if (on) WmmColors.Text else WmmColors.Accent) { focused ->
         Row(
             Modifier
                 .height(54.dp)
@@ -162,13 +163,13 @@ private fun SeasonTab(s: SeasonSummary, on: Boolean, missing: Boolean, modifier:
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(seasonName(s.number), style = inter(21.sp, FontWeight.SemiBold), color = if (on) WmmColors.OnAccent else TextBright)
+            Text(seasonName(s.number), style = inter(22.sp, FontWeight.SemiBold), color = if (on) WmmColors.OnAccent else TextBright)
             val count = when {
                 !missing || s.availableCount >= s.episodeCount -> "${s.availableCount}"
                 s.availableCount == 0 -> "not in library"
                 else -> "${s.availableCount} of ${s.episodeCount}"
             }
-            Text(count, style = inter(21.sp, FontWeight.Medium), color = if (on) WmmColors.OnAccent else WmmColors.TextMuted)
+            Text(count, style = inter(22.sp, FontWeight.Medium), color = if (on) WmmColors.OnAccent else WmmColors.TextMuted)
         }
     }
 }
@@ -222,7 +223,7 @@ internal fun EpisodeRow(show: ShowDetail, state: ShowPageViewModel.State, vm: Sh
 @Composable
 private fun SeasonCard(ep: EpisodeDetail, url: String?, seed: String, onTop: Boolean, missing: MissingEpisode?, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val shape = RoundedCornerShape(12.dp)
-    FocusableBox(onClick = onClick, modifier = modifier.width(320.dp), cornerRadius = 12.dp, focusedScale = 1.06f) {
+    FocusableBox(onClick = onClick, modifier = modifier.width(320.dp), cornerRadius = 12.dp, focusedScale = FocusGrowth.CARD) {
         Column {
             Box(Modifier.size(320.dp, 180.dp)) {
                 if (missing != null) {
@@ -235,7 +236,7 @@ private fun SeasonCard(ep: EpisodeDetail, url: String?, seed: String, onTop: Boo
                         },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(if (ep.aired) "Not in library" else "Not aired yet", style = inter(17.sp, FontWeight.SemiBold), color = if (ep.aired) WmmColors.Warn else WmmColors.TextMuted)
+                        Text(if (ep.aired) "Not in library" else "Not aired yet", style = inter(22.sp, FontWeight.SemiBold), color = if (ep.aired) WmmColors.Warn else WmmColors.TextMuted)
                     }
                 } else {
                     Artwork(url, seed = seed, contentDescription = null, modifier = Modifier.fillMaxSize(), shape = shape) {
@@ -251,8 +252,8 @@ private fun SeasonCard(ep: EpisodeDetail, url: String?, seed: String, onTop: Boo
                     ArtBadge("On top", Modifier.align(Alignment.TopStart).padding(10.dp), BadgeStyle.Gold)
                 }
             }
-            Text(ep.title, style = inter(20.sp, FontWeight.SemiBold), color = if (ep.aired) WmmColors.Text else WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 10.dp))
-            Text(cardLine(ep, missing), style = inter(17.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+            Text(ep.title, style = inter(22.sp, FontWeight.SemiBold), color = if (ep.aired) WmmColors.Text else WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 10.dp))
+            Text(cardLine(ep, missing), style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
         }
     }
 }

@@ -129,7 +129,7 @@ internal fun ServersPanel(state: ServersViewModel.State, actions: ServersActions
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
                 Text(SERVERS, style = inter(34.sp, FontWeight.ExtraBold, tracking = -0.015f), color = WmmColors.Text, modifier = Modifier.semantics { heading() })
-                state.casting?.let { Text(switchingStopsCasting(it), style = inter(19.sp, lineHeight = 28.sp), color = WmmColors.TextMuted) }
+                state.casting?.let { Text(switchingStopsCasting(it), style = inter(22.sp, lineHeight = 32.sp), color = WmmColors.TextMuted) }
                 state.failure?.let { FailureNote(it, actions::retry, retry) }
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     state.rows.forEach { row ->
@@ -154,7 +154,7 @@ internal fun ServersPanel(state: ServersViewModel.State, actions: ServersActions
                     }
                 }
                 Box(Modifier.weight(1f))
-                Text("Back closes this panel.", style = inter(17.sp), color = WmmColors.TextFaint)
+                Text("Back closes this panel.", style = inter(22.sp), color = WmmColors.TextFaint)
             }
         }
         // Where focus opens, and where it goes when a server doesn't answer.
@@ -175,7 +175,7 @@ internal fun FailureNote(failure: ServersViewModel.Failure, onRetry: () -> Unit,
     ) {
         Column(Modifier.semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Assertive }, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(failure.title, style = inter(22.sp, FontWeight.Bold), color = WmmColors.Text)
-            Text(failure.body, style = inter(19.sp, lineHeight = 28.sp), color = WmmColors.TextSoft)
+            Text(failure.body, style = inter(22.sp, lineHeight = 32.sp), color = WmmColors.TextSoft)
         }
         TvButton("Try again", onRetry, Modifier.focusRequester(retry).padding(start = 6.dp, top = 10.dp), size = TvButtonSize.Settings)
     }
@@ -209,7 +209,7 @@ internal fun ServerOption(row: ServersViewModel.Row, line: String, onClick: () -
                 row.current -> CurrentBadge()
                 row.state == RowState.Switching -> {
                     CircularProgressIndicator(Modifier.size(22.dp), color = WmmColors.Accent, strokeWidth = 3.dp, trackColor = Color.White.copy(alpha = 0.22f))
-                    Text(SWITCHING, style = inter(19.sp), color = WmmColors.TextSoft)
+                    Text(SWITCHING, style = inter(22.sp), color = WmmColors.TextSoft)
                 }
             }
             if (chevron) Icon(WmmIcons.ChevronRight, contentDescription = null, tint = WmmColors.TextMuted, modifier = Modifier.size(24.dp))
@@ -250,8 +250,8 @@ internal fun PanelOption(
                 Icon(icon, contentDescription = null, tint = WmmColors.Text, modifier = Modifier.size(24.dp))
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(title, style = inter(21.sp, FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (line != null) Text(line, style = inter(17.sp, lineHeight = 23.sp), color = lineColor, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(title, style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (line != null) Text(line, style = inter(22.sp, lineHeight = 30.sp), color = lineColor, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             trailing()
         }
@@ -263,7 +263,7 @@ internal fun PanelOption(
 internal fun CurrentBadge() {
     Text(
         CURRENT_SERVER.uppercase(),
-        style = inter(13.sp, FontWeight.Bold, tracking = 0.05f),
+        style = inter(22.sp, FontWeight.Bold, tracking = 0.05f),
         color = WmmColors.OnAccent,
         modifier = Modifier.background(WmmColors.Accent, RoundedCornerShape(6.dp)).padding(horizontal = 10.dp, vertical = 4.dp).semantics { contentDescription = CURRENT_SERVER },
     )

@@ -230,7 +230,7 @@ private fun MovieContent(
                     DetailTitle(movie.title)
                     FactsLine(movie.facts()) {
                         val tags = movie.tags()
-                        if (tags.isNotEmpty()) Text("·", style = inter(21.sp), color = WmmColors.TextFaint)
+                        if (tags.isNotEmpty()) Text("·", style = inter(22.sp), color = WmmColors.TextFaint)
                         for (t in tags) TvTag(t)
                     }
                     Overview(movie.overview)
@@ -280,7 +280,7 @@ private fun MovieContent(
                 Column(Modifier.width(1080.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Text("Versions", style = inter(24.sp, FontWeight.SemiBold), color = WmmColors.Text)
                     if (movie.versions.isEmpty()) {
-                        Text("No file for this movie is in the library.", style = inter(19.sp), color = WmmColors.Warn)
+                        Text("No file for this movie is in the library.", style = inter(22.sp), color = WmmColors.Warn)
                     }
                     movie.versions.forEachIndexed { i, v ->
                         VersionRow(
@@ -296,7 +296,7 @@ private fun MovieContent(
                     if (main != null) {
                         Row(verticalAlignment = Alignment.Bottom) {
                             Text("Tracks", style = inter(24.sp, FontWeight.SemiBold), color = WmmColors.Text)
-                            Text(" · ${versionTitle(main)}", style = inter(17.sp, FontWeight.Medium), color = WmmColors.TextMuted)
+                            Text(" · ${versionTitle(main)}", style = inter(22.sp, FontWeight.Medium), color = WmmColors.TextMuted)
                         }
                         val tracks = versionTracks(main)
                         Column {
@@ -332,7 +332,7 @@ private fun TrailerButton(handOff: Boolean, onClick: () -> Unit, modifier: Modif
         if (handOff) {
             Text(
                 TrailerText.OPENS_YOUTUBE,
-                style = inter(18.sp, FontWeight.Medium),
+                style = inter(22.sp, FontWeight.Medium),
                 color = WmmColors.TextMuted,
                 maxLines = 1,
                 modifier = Modifier.layout { measurable, _ ->
@@ -376,7 +376,7 @@ private fun VersionRow(version: MediaVersion, plan: PlaybackPlan?, isDefault: Bo
             }
             Text(
                 listOfNotNull(version.label, version.recording?.label(media.watchmy.client.ui.components.rememberLiveClockFormat()), plan?.versionLine()).joinToString(" · "),
-                style = inter(16.sp),
+                style = inter(22.sp),
                 color = WmmColors.TextFaint,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -396,9 +396,9 @@ private fun TrackRow(track: TrackLine, last: Boolean) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(track.kind?.uppercase().orEmpty(), style = inter(16.sp, tracking = 0.06f), color = WmmColors.TextMuted, modifier = Modifier.width(110.dp))
-        Text(track.text, style = inter(19.sp), color = WmmColors.Text, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(track.kind?.uppercase().orEmpty(), style = inter(22.sp, tracking = 0.06f), color = WmmColors.TextMuted, modifier = Modifier.width(110.dp))
+        Text(track.text, style = inter(22.sp), color = WmmColors.Text, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (track.default) TvTag("Default", gold = true)
-        if (track.burnIn) Text("Burn-in required", style = inter(15.sp, FontWeight.SemiBold), color = WmmColors.Warn)
+        if (track.burnIn) Text("Burn-in required", style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.Warn)
     }
 }

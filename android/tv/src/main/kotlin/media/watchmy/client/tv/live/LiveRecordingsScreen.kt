@@ -75,13 +75,13 @@ internal fun TvRecordingClash(clash: LiveRecording, model: LiveRecordingsViewMod
                     .padding(start = 44.dp, end = 44.dp, top = 56.dp, bottom = 40.dp).focusGroup(),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Text("WON’T RECORD", style = inter(16.sp, FontWeight.Bold), color = ClashTone)
-                Text(clash.title, style = inter(30.sp, FontWeight.Bold), color = WmmColors.Text)
-                Text(listOfNotNull("${format.weekday(clash.startMs)} ${format.span(clash.startMs, clash.endMs)} · ${clash.number}", clash.userName.takeIf { it.isNotBlank() }?.let { "Set by $it" }).joinToString(" · "), style = inter(18.sp), color = WmmColors.TextMuted)
-                Text(clash.clashIntro(), style = inter(19.sp, lineHeight = 27.sp), color = WmmColors.TextSoft)
+                Text("WON’T RECORD", style = inter(22.sp, FontWeight.Bold), color = ClashTone)
+                Text(clash.title, style = inter(28.sp, FontWeight.Bold), color = WmmColors.Text)
+                Text(listOfNotNull("${format.weekday(clash.startMs)} ${format.span(clash.startMs, clash.endMs)} · ${clash.number}", clash.userName.takeIf { it.isNotBlank() }?.let { "Set by $it" }).joinToString(" · "), style = inter(22.sp), color = WmmColors.TextMuted)
+                Text(clash.clashIntro(), style = inter(22.sp, lineHeight = 31.sp), color = WmmColors.TextSoft)
                 if (clash.conflictsWith.isNotEmpty()) Column(Modifier.fillMaxWidth().background(WmmColors.Text.copy(alpha = .05f), RoundedCornerShape(14.dp)).padding(horizontal = 20.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     clash.conflictsWith.forEach { holder ->
-                        Text(listOfNotNull("${holder.title} on ${holder.line(format)}", holder.setBy(), RECORDING_CLASH_RUNNING.takeIf { holder.running }).joinToString(" · "), style = inter(18.sp), color = WmmColors.TextSoft)
+                        Text(listOfNotNull("${holder.title} on ${holder.line(format)}", holder.setBy(), RECORDING_CLASH_RUNNING.takeIf { holder.running }).joinToString(" · "), style = inter(22.sp), color = WmmColors.TextSoft)
                     }
                 }
                 val choices = if (!choosable) emptyList() else clash.yielding.map { holder -> clash.clashInsteadOf(holder) to { model.prefer(clash, holder) } } +
@@ -90,8 +90,8 @@ internal fun TvRecordingClash(clash: LiveRecording, model: LiveRecordingsViewMod
                     TvButton(label, choose, if (index == 0) Modifier.focusRequester(first) else Modifier, icon = WmmIcons.Record, size = TvButtonSize.Medium, enabled = !state.busy)
                 }
                 TvButton(clash.clashKeep(), model::keepClash, if (choices.isEmpty()) Modifier.focusRequester(first) else Modifier, icon = WmmIcons.Close, size = TvButtonSize.Medium)
-                state.error?.let { Text(it, style = inter(18.sp), color = WmmColors.Error) }
-                Text(listOfNotNull(clash.clashKeepNote().takeIf { clash.reason != "no_tuners" }, "Back closes this panel.").joinToString(" "), style = inter(16.sp), color = WmmColors.TextMuted)
+                state.error?.let { Text(it, style = inter(22.sp), color = WmmColors.Error) }
+                Text(listOfNotNull(clash.clashKeepNote().takeIf { clash.reason != "no_tuners" }, "Back closes this panel.").joinToString(" "), style = inter(22.sp), color = WmmColors.TextMuted)
             }
         }
         InitialFocus(first)
@@ -109,8 +109,8 @@ private fun TvRecordingOptions(title: String, initial: RecordingOptions, series:
     TvDialog(onDismiss) {
         Box(Modifier.fillMaxSize().background(WmmColors.Ground.copy(alpha = .9f)), contentAlignment = Alignment.Center) {
             Column(Modifier.width(800.dp).background(WmmColors.Surface2, RoundedCornerShape(20.dp)).padding(32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(title, style = inter(32.sp, FontWeight.Bold), color = WmmColors.Text)
-                Text("Recording options · OK changes a choice", style = inter(19.sp), color = WmmColors.TextMuted)
+                Text(title, style = inter(34.sp, FontWeight.Bold), color = WmmColors.Text)
+                Text("Recording options · OK changes a choice", style = inter(22.sp), color = WmmColors.TextMuted)
                 if (series) {
                     TvButton(if (options.newOnly) "New episodes only" else "Every episode", { options = options.copy(newOnly = !options.newOnly) }, Modifier.focusRequester(first))
                     TvButton(if (options.anyChannel) "Any channel" else "This channel", { options = options.copy(anyChannel = !options.anyChannel) })
@@ -146,10 +146,10 @@ fun LiveRecordingsScreenTv(onNavigate: (Any) -> Unit, onPlay: (PlayRequest) -> U
     var recordAgain by remember { mutableStateOf(false) }
     TvScaffold(RailSection.LiveTV, onNavigate, modifier) {
         Column(Modifier.fillMaxSize().padding(start = 150.dp, end = 58.dp, top = 40.dp)) {
-            Text("Live TV › Recordings", style = inter(19.sp), color = WmmColors.TextMuted)
-            Text("Recordings", style = inter(56.sp, FontWeight.ExtraBold), color = WmmColors.Text)
-            Text("Record a programme in the guide. Set a channel and time on your phone or in the web app.", style = inter(20.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(top = 8.dp, bottom = 18.dp))
-            state.error?.let { Text(it, style = inter(20.sp), color = WmmColors.Error) }
+            Text("Live TV › Recordings", style = inter(22.sp), color = WmmColors.TextMuted)
+            Text("Recordings", style = inter(64.sp, FontWeight.ExtraBold), color = WmmColors.Text)
+            Text("Record a programme in the guide. Set a channel and time on your phone or in the web app.", style = inter(22.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(top = 8.dp, bottom = 18.dp))
+            state.error?.let { Text(it, style = inter(22.sp), color = WmmColors.Error) }
             if (state.empty && !state.loading) Text(if (state.canRecord) "No recordings yet." else "An admin can turn recording on in the web app’s Live TV settings.", style = inter(24.sp), color = WmmColors.TextSoft)
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(bottom = 36.dp)) {
                 RecordingSection.entries.forEach { section ->
@@ -162,12 +162,12 @@ fun LiveRecordingsScreenTv(onNavigate: (Any) -> Unit, onPlay: (PlayRequest) -> U
                                 Artwork(services.live.artUrl(recording.picture), recording.title, null, Modifier.width(200.dp).height(112.dp), shape = RoundedCornerShape(8.dp))
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                     Text(recording.title, style = inter(28.sp, FontWeight.Bold), color = WmmColors.Text)
-                                    recording.episodeTitle?.let { Text(it, style = inter(20.sp), color = WmmColors.TextSoft) }
-                                    Text("${format.dayTime(recording.startMs)} · ${recording.number} ${recording.channelName}", style = inter(19.sp), color = WmmColors.TextMuted)
-                                    recording.gaps.take(3).forEach { gap -> Text(gap.label(format), style = inter(18.sp), color = WmmColors.TextMuted) }
+                                    recording.episodeTitle?.let { Text(it, style = inter(22.sp), color = WmmColors.TextSoft) }
+                                    Text("${format.dayTime(recording.startMs)} · ${recording.number} ${recording.channelName}", style = inter(22.sp), color = WmmColors.TextMuted)
+                                    recording.gaps.take(3).forEach { gap -> Text(gap.label(format), style = inter(22.sp), color = WmmColors.TextMuted) }
                                     if (recording.active) LiveProgress(recording.progressAt(now), Modifier.fillMaxWidth(.7f), height = 5.dp)
                                 }
-                                Text(recording.label, style = inter(20.sp, FontWeight.SemiBold), color = if (recording.active) WmmColors.Error else if (section == RecordingSection.Conflicts) WmmColors.Warn else WmmColors.TextSoft)
+                                Text(recording.label, style = inter(22.sp, FontWeight.SemiBold), color = if (recording.active) WmmColors.Error else if (section == RecordingSection.Conflicts) WmmColors.Warn else WmmColors.TextSoft)
                             }
                         }
                     }

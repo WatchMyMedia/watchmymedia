@@ -64,6 +64,7 @@ import media.watchmy.client.presentation.detail.ShowPageViewModel
 import media.watchmy.client.tv.components.ArtProgress
 import media.watchmy.client.tv.components.Backdrop
 import media.watchmy.client.tv.components.ContentStart
+import media.watchmy.client.tv.components.FocusGrowth
 import media.watchmy.client.tv.components.FocusMemory
 import media.watchmy.client.tv.components.FocusableBox
 import media.watchmy.client.tv.components.TextBright
@@ -120,11 +121,11 @@ internal fun Top(
         TopStill(ep, library.imageUrl(ep.stillPath, ImageSize.W780), "${show.title} ${ep.season}x${ep.number}", missing, Modifier.align(Alignment.TopEnd).padding(top = 96.dp, end = 100.dp))
         Column(Modifier.padding(start = ContentStart, top = 72.dp).width(1080.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text(episodeKicker(show.title, ep.season, ep.number).uppercase(), style = inter(19.sp, FontWeight.Bold, tracking = 0.14f), color = WmmColors.Accent, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Text(episodeKicker(show.title, ep.season, ep.number).uppercase(), style = inter(22.sp, FontWeight.Bold, tracking = 0.14f), color = WmmColors.Accent, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 state.reason?.let { r ->
                     Text(
                         r.label,
-                        style = inter(16.sp, FontWeight.SemiBold),
+                        style = inter(22.sp, FontWeight.SemiBold),
                         color = WmmColors.Accent,
                         modifier = Modifier.border(1.dp, WmmColors.Accent, RoundedCornerShape(999.dp)).padding(horizontal = 12.dp, vertical = 4.dp),
                     )
@@ -132,13 +133,13 @@ internal fun Top(
                 if (ep.isNew && !ep.watched) {
                     Text(
                         "NEW",
-                        style = inter(14.sp, FontWeight.Bold, tracking = 0.05f),
+                        style = inter(22.sp, FontWeight.Bold, tracking = 0.05f),
                         color = WmmColors.OnAccent,
                         modifier = Modifier.background(WmmColors.Accent, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 3.dp),
                     )
                 }
             }
-            Text(ep.title.ifBlank { "Episode ${ep.number}" }, style = inter(72.sp, FontWeight.ExtraBold, lineHeight = 76.sp, tracking = -0.025f), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(ep.title.ifBlank { "Episode ${ep.number}" }, style = inter(64.sp, FontWeight.ExtraBold, lineHeight = 80.sp, tracking = -0.025f), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically, maxLines = 1) {
                 val facts = listOfNotNull(
                     airedLabel(ep.airDate) ?: "Not aired yet".takeIf { !ep.aired },
@@ -146,13 +147,13 @@ internal fun Top(
                     formatRating(ep.rating),
                 )
                 facts.forEachIndexed { i, f ->
-                    if (i > 0) Text("·", style = inter(23.sp), color = WmmColors.TextFaint)
-                    Text(f, style = inter(23.sp), color = TextBright)
+                    if (i > 0) Text("·", style = inter(24.sp), color = WmmColors.TextFaint)
+                    Text(f, style = inter(24.sp), color = TextBright)
                 }
                 if (ep.watched) {
                     Row(Modifier.padding(start = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         WatchedCheck(size = 28.dp)
-                        Text("Watched", style = inter(21.sp, FontWeight.SemiBold), color = WmmColors.Accent)
+                        Text("Watched", style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.Accent)
                     }
                 }
             }
@@ -166,21 +167,21 @@ internal fun Top(
             if (ep.overview.isNotBlank()) {
                 Text(ep.overview, style = inter(22.sp, lineHeight = 33.sp), color = WmmColors.TextSoft, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 960.dp))
             }
-            if (state.reason == OnTopReason.WatchedItAll) Text(WATCHED_IT_ALL_NOTE, style = inter(20.sp), color = WmmColors.TextSoft)
+            if (state.reason == OnTopReason.WatchedItAll) Text(WATCHED_IT_ALL_NOTE, style = inter(22.sp), color = WmmColors.TextSoft)
             if (version != null) {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically, maxLines = 1) {
                     episodeTags(version).forEach { TvTag(it) }
                     val rest = listOfNotNull(subtitleLanguages(version)?.let { "Subtitles: $it" }, formatBytes(version.sizeBytes)).joinToString(" · ")
-                    Text(rest, style = inter(18.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 6.dp))
+                    Text(rest, style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 6.dp))
                 }
-                version.recording?.let { Text(it.label(media.watchmy.client.ui.components.rememberLiveClockFormat()), style = inter(18.sp), color = WmmColors.TextMuted) }
+                version.recording?.let { Text(it.label(media.watchmy.client.ui.components.rememberLiveClockFormat()), style = inter(22.sp), color = WmmColors.TextMuted) }
             }
             if (partway != null && version != null) {
                 Row(Modifier.width(520.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     Box(Modifier.weight(1f).height(6.dp).background(WmmColors.Line2, RoundedCornerShape(3.dp))) {
                         Box(Modifier.fillMaxWidth(partway.positionMs.toFloat() / partway.durationMs).fillMaxHeight().background(WmmColors.Accent, RoundedCornerShape(3.dp)))
                     }
-                    Text(formatRemaining(partway.durationMs - partway.positionMs), style = inter(18.sp), color = WmmColors.TextSoft)
+                    Text(formatRemaining(partway.durationMs - partway.positionMs), style = inter(22.sp), color = WmmColors.TextSoft)
                 }
             }
             Buttons(ep, state, vm, missing, memory, onPlay, onMore, onAsk)
@@ -266,7 +267,7 @@ private fun Buttons(
 @Composable
 internal fun MoreButton(onClick: () -> Unit, modifier: Modifier = Modifier, size: Dp = 64.dp, iconSize: Dp = 28.dp) {
     val shape = RoundedCornerShape(14.dp)
-    FocusableBox(onClick = onClick, modifier = modifier.semantics { contentDescription = "More" }, cornerRadius = 14.dp, focusedScale = 1.04f) { focused ->
+    FocusableBox(onClick = onClick, modifier = modifier.semantics { contentDescription = "More" }, cornerRadius = 14.dp, focusedScale = FocusGrowth.BUTTON) { focused ->
         Box(
             Modifier.size(size).background(Color.White.copy(alpha = if (focused) 0.16f else 0.10f), shape).border(1.dp, Color.White.copy(alpha = 0.14f), shape),
             contentAlignment = Alignment.Center,

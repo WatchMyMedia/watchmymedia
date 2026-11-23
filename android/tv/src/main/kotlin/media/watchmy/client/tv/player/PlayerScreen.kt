@@ -558,7 +558,7 @@ private fun VideoLayer(controller: PlaybackController, state: PlayerUiState, ima
         ContentFrame(player, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
         SubtitleCues(
             player,
-            fontSize = 44.sp,
+            fontSize = 48.sp,
             sidePadding = 160.dp,
             bottomPadding = if (raisedSubtitles) 250.dp else 72.dp,
             topPadding = 72.dp,

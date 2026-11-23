@@ -42,6 +42,7 @@ import androidx.tv.material3.Text
 import media.watchmy.client.model.SavedServer
 import media.watchmy.client.model.displayAddress
 import media.watchmy.client.model.versionLabel
+import media.watchmy.client.tv.components.FocusGrowth
 import media.watchmy.client.tv.components.FocusableBox
 import media.watchmy.client.tv.components.InitialFocus
 import media.watchmy.client.tv.components.Kicker
@@ -117,7 +118,7 @@ private fun PairingSignIn(vm: SignInViewModel, state: SignInViewModel.State, ser
 
     Column(Modifier.padding(start = 160.dp, top = 236.dp).width(960.dp), verticalArrangement = Arrangement.spacedBy(26.dp)) {
         Kicker("Sign in")
-        Text("Link this TV to\n$serverName", style = inter(60.sp, FontWeight.Bold, lineHeight = 65.sp, tracking = -0.02f), color = WmmColors.Text)
+        Text("Link this TV to\n$serverName", style = inter(64.sp, FontWeight.Bold, lineHeight = 80.sp, tracking = -0.02f), color = WmmColors.Text)
         Text(
             buildAnnotatedString {
                 append("On your phone or computer, open ")
@@ -149,7 +150,7 @@ private fun PairingSignIn(vm: SignInViewModel, state: SignInViewModel.State, ser
                     QrCode(waiting.linkUrl, contentDescription = "QR code for the link page", modifier = Modifier.fillMaxSize())
                 }
             }
-            Text("Or scan to open the link page", style = inter(20.sp), color = WmmColors.TextMuted)
+            Text("Or scan to open the link page", style = inter(22.sp), color = WmmColors.TextMuted)
         }
     }
     InitialFocus(first)
@@ -177,7 +178,7 @@ private fun CodeGroup(chars: String) {
                     .border(1.dp, WmmColors.Line2, RoundedCornerShape(16.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                Text(c.toString().trim(), style = inter(72.sp, FontWeight.ExtraBold), color = WmmColors.Text)
+                Text(c.toString().trim(), style = inter(64.sp, FontWeight.ExtraBold), color = WmmColors.Text)
             }
         }
     }
@@ -194,7 +195,7 @@ private fun StatusLine(pairing: PairingState, remainingMs: Long) {
     }
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(Modifier.size(12.dp).background(if (pairing is PairingState.Failed) WmmColors.Error else WmmColors.Accent, CircleShape))
-        Text(text, style = inter(20.sp), color = color)
+        Text(text, style = inter(22.sp), color = color)
     }
 }
 
@@ -216,7 +217,7 @@ private fun PasswordSignIn(vm: SignInViewModel, state: SignInViewModel.State, se
 
     Column(Modifier.padding(start = 160.dp, top = 200.dp).width(760.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
         Kicker("Sign in")
-        Text("Sign in to\n$serverName", style = inter(60.sp, FontWeight.Bold, lineHeight = 65.sp, tracking = -0.02f), color = WmmColors.Text)
+        Text("Sign in to\n$serverName", style = inter(64.sp, FontWeight.Bold, lineHeight = 80.sp, tracking = -0.02f), color = WmmColors.Text)
         Text("Use the name and password you sign in with on the web app.", style = inter(24.sp, lineHeight = 34.sp), color = WmmColors.TextMuted)
         Spacer(Modifier.height(4.dp))
         FormField("Name", nameField.text.toString(), masked = false, active = target == Field.Name) {
@@ -227,7 +228,7 @@ private fun PasswordSignIn(vm: SignInViewModel, state: SignInViewModel.State, se
             target = Field.Password
             firstKey.requestFocus()
         }
-        Text(form.error ?: " ", style = inter(20.sp), color = WmmColors.Error)
+        Text(form.error ?: " ", style = inter(22.sp), color = WmmColors.Error)
         Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
             TvButton(if (form.busy) "Signing in…" else "Sign in", submit, style = TvButtonStyle.Primary, enabled = !form.busy)
             TvButton("Use a code instead", onUseCode)
@@ -249,8 +250,8 @@ private fun PasswordSignIn(vm: SignInViewModel, state: SignInViewModel.State, se
 @Composable
 private fun FormField(label: String, value: String, masked: Boolean, active: Boolean, onClick: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(label, style = inter(20.sp), color = WmmColors.TextMuted)
-        FocusableBox(onClick = onClick, cornerRadius = 14.dp, focusedScale = 1.02f) {
+        Text(label, style = inter(22.sp), color = WmmColors.TextMuted)
+        FocusableBox(onClick = onClick, cornerRadius = 14.dp, focusedScale = FocusGrowth.ROW) {
             KeyboardField(value, placeholder = if (masked) "Password" else "Your name", masked = masked, active = active)
         }
     }
@@ -262,9 +263,9 @@ private fun Footer(server: SavedServer?, deviceName: String, modifier: Modifier 
         val s = server?.server
         Text(
             if (s != null) "${s.name} · ${displayAddress(s.baseUrl)} · ${versionLabel(s.version)}" else "",
-            style = inter(18.sp),
+            style = inter(22.sp),
             color = WmmColors.TextFaint,
         )
-        Text("This device: $deviceName · ${Build.MODEL}", style = inter(18.sp), color = WmmColors.TextFaint)
+        Text("This device: $deviceName · ${Build.MODEL}", style = inter(22.sp), color = WmmColors.TextFaint)
     }
 }

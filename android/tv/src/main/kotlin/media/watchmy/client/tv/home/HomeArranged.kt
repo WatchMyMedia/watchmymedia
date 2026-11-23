@@ -250,13 +250,13 @@ internal fun ArrangedHomeContent(
                 }
                 HomePage.End -> Box(Modifier.fillMaxSize()) {
                     Column(Modifier.padding(start = ContentStart, top = 300.dp).width(1000.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
-                        Text("That's everything on Home", style = inter(44.sp, FontWeight.Bold, tracking = -0.02f), color = WmmColors.Text)
+                        Text("That's everything on Home", style = inter(48.sp, FontWeight.Bold, tracking = -0.02f), color = WmmColors.Text)
                         Text("Move, hide and add rows. Your order follows you to every device.", style = inter(22.sp, lineHeight = 33.sp), color = WmmColors.TextSoft, modifier = Modifier.widthIn(max = 760.dp))
                         Row(Modifier.padding(top = 6.dp).pageKeys(up = { pageTo(index - 1) }, down = null), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                             TvButton("Edit rows", onEditRows, Modifier.focusMemory(memory, "end:edit"), icon = WmmIcons.Sliders)
                             TvButton("Back to the top", { pageTo(0) }, Modifier.focusMemory(memory, "end:top"))
                         }
-                        Text(home.totalsLine(), style = inter(17.sp), color = WmmColors.TextFaint, modifier = Modifier.padding(top = 18.dp))
+                        Text(home.totalsLine(), style = inter(22.sp), color = WmmColors.TextFaint, modifier = Modifier.padding(top = 18.dp))
                     }
                     val before = pages.getOrNull(index - 1)?.row?.headingLine(liveListings) ?: "Home"
                     PeekLine(before, up = true, Modifier.align(Alignment.BottomStart))

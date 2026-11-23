@@ -45,6 +45,7 @@ import media.watchmy.client.model.alreadyAdded
 import media.watchmy.client.model.serversFull
 import media.watchmy.client.model.MIN_SERVER_VERSION
 import media.watchmy.client.model.needsHttpsNudge
+import media.watchmy.client.tv.components.FocusGrowth
 import media.watchmy.client.tv.components.FocusableBox
 import media.watchmy.client.tv.components.Kicker
 import media.watchmy.client.tv.components.KeyboardDialog
@@ -108,7 +109,7 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null,
 
         Column(Modifier.padding(start = 160.dp, top = 200.dp).width(820.dp), verticalArrangement = Arrangement.spacedBy(28.dp)) {
             Kicker("Servers")
-            Text(if (adding) ADD_A_SERVER else "Choose a server", style = inter(60.sp, FontWeight.Bold, lineHeight = 65.sp, tracking = -0.02f), color = WmmColors.Text)
+            Text(if (adding) ADD_A_SERVER else "Choose a server", style = inter(64.sp, FontWeight.Bold, lineHeight = 80.sp, tracking = -0.02f), color = WmmColors.Text)
             Text("Servers on this network appear by themselves.", style = inter(24.sp), color = WmmColors.TextMuted)
             if (adding && form.full) Text(serversFull("TV"), style = inter(22.sp, lineHeight = 32.sp), color = WmmColors.Warn)
             val list = rows
@@ -138,17 +139,17 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null,
                 }
             }
             // The ones this TV is signed in to already aren't offered again.
-            alreadyAdded(form.alreadyAdded)?.let { Text(it, style = inter(20.sp, lineHeight = 30.sp), color = WmmColors.TextMuted) }
-            form.error?.let { Text(it, style = inter(20.sp, lineHeight = 30.sp), color = WmmColors.Error) }
+            alreadyAdded(form.alreadyAdded)?.let { Text(it, style = inter(22.sp, lineHeight = 33.sp), color = WmmColors.TextMuted) }
+            form.error?.let { Text(it, style = inter(22.sp, lineHeight = 33.sp), color = WmmColors.Error) }
         }
 
         Column(Modifier.padding(start = 1100.dp, top = 380.dp).width(660.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
-            Text("Or enter an address", style = inter(30.sp, FontWeight.SemiBold), color = WmmColors.Text)
-            Text("Server address", style = inter(20.sp), color = WmmColors.TextMuted)
-            FocusableBox(onClick = { typing = true }, modifier = Modifier.focusRequester(addressField), cornerRadius = 14.dp, focusedScale = 1.02f) {
+            Text("Or enter an address", style = inter(28.sp, FontWeight.SemiBold), color = WmmColors.Text)
+            Text("Server address", style = inter(22.sp), color = WmmColors.TextMuted)
+            FocusableBox(onClick = { typing = true }, modifier = Modifier.focusRequester(addressField), cornerRadius = 14.dp, focusedScale = FocusGrowth.ROW) {
                 KeyboardField(form.address, placeholder = "192.168.1.20 or https://media.example.net")
             }
-            Text(HTTP_NOTE, style = inter(18.sp, lineHeight = 27.sp), color = if (needsHttps) WmmColors.Warn else WmmColors.TextFaint)
+            Text(HTTP_NOTE, style = inter(22.sp, lineHeight = 33.sp), color = if (needsHttps) WmmColors.Warn else WmmColors.TextFaint)
             Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 TvButton(
                     if (form.connecting == ServerPickerViewModel.ADDRESS) "Connecting…" else "Connect",
@@ -163,15 +164,15 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null,
             } else {
                 form.addressError
             }
-            addressError?.let { Text(it, style = inter(20.sp, lineHeight = 30.sp), color = WmmColors.Error) }
+            addressError?.let { Text(it, style = inter(22.sp, lineHeight = 33.sp), color = WmmColors.Error) }
         }
 
         Row(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 58.dp, end = 58.dp, bottom = 44.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text("Needs server $MIN_SERVER_VERSION or newer", style = inter(18.sp), color = WmmColors.TextFaint)
-            Text("This device: $deviceName · ${Build.MODEL}", style = inter(18.sp), color = WmmColors.TextFaint)
+            Text("Needs server $MIN_SERVER_VERSION or newer", style = inter(22.sp), color = WmmColors.TextFaint)
+            Text("This device: $deviceName · ${Build.MODEL}", style = inter(22.sp), color = WmmColors.TextFaint)
         }
     }
 
@@ -220,7 +221,7 @@ fun ServerPickerScreen(onServerChosen: () -> Unit, onBack: (() -> Unit)? = null,
 private fun AccessRow(access: LocalNetworkAccess, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(18.dp)
     val stopped = access.stopped
-    FocusableBox(onClick = access::ask, modifier = modifier.fillMaxWidth(), cornerRadius = 18.dp, focusedScale = 1.02f) { focused ->
+    FocusableBox(onClick = access::ask, modifier = modifier.fillMaxWidth(), cornerRadius = 18.dp, focusedScale = FocusGrowth.ROW) { focused ->
         Row(
             Modifier
                 .fillMaxWidth()
@@ -245,14 +246,14 @@ private fun AccessRow(access: LocalNetworkAccess, modifier: Modifier = Modifier)
                     } else {
                         "WatchMyMedia needs it to find servers on this network and to reach them at their local address. Servers you reach over the internet work without it."
                     },
-                    style = inter(19.sp, lineHeight = 27.sp),
+                    style = inter(22.sp, lineHeight = 31.sp),
                     color = WmmColors.TextMuted,
                 )
             }
             Text(
                 if (stopped) "Open settings" else "Allow",
                 modifier = Modifier.background(WmmColors.Brand, RoundedCornerShape(12.dp)).padding(horizontal = 22.dp, vertical = 12.dp),
-                style = inter(20.sp, FontWeight.SemiBold),
+                style = inter(22.sp, FontWeight.SemiBold),
                 color = WmmColors.Text,
             )
         }
@@ -268,14 +269,14 @@ private fun NotEncryptedTag() {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Icon(WmmIcons.LockOpen, contentDescription = null, tint = WmmColors.Warn, modifier = Modifier.size(20.dp))
-        Text("NOT ENCRYPTED", style = inter(17.sp, FontWeight.SemiBold, tracking = 0.04f), color = WmmColors.Warn)
+        Text("NOT ENCRYPTED", style = inter(22.sp, FontWeight.SemiBold, tracking = 0.04f), color = WmmColors.Warn)
     }
 }
 
 @Composable
 private fun ServerRow(row: ServerPickerViewModel.Row, connecting: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(18.dp)
-    FocusableBox(onClick = onClick, modifier = modifier.fillMaxWidth(), cornerRadius = 18.dp, focusedScale = 1.02f) { focused ->
+    FocusableBox(onClick = onClick, modifier = modifier.fillMaxWidth(), cornerRadius = 18.dp, focusedScale = FocusGrowth.ROW) { focused ->
         Row(
             Modifier
                 .fillMaxWidth()
@@ -296,7 +297,7 @@ private fun ServerRow(row: ServerPickerViewModel.Row, connecting: Boolean, onCli
                 Text(row.name, style = inter(26.sp, FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     if (connecting) "Connecting…" else if (row.onNetwork) row.detail else "Remembered · ${row.detail.replaceFirstChar { it.lowercase() }}",
-                    style = inter(19.sp),
+                    style = inter(22.sp),
                     color = if (row.tooOld) WmmColors.Warn else WmmColors.TextMuted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -306,7 +307,7 @@ private fun ServerRow(row: ServerPickerViewModel.Row, connecting: Boolean, onCli
                 Text(
                     "ON THIS NETWORK",
                     modifier = Modifier.background(WmmColors.Accent, RoundedCornerShape(8.dp)).padding(horizontal = 12.dp, vertical = 6.dp),
-                    style = inter(17.sp, FontWeight.SemiBold, tracking = 0.04f),
+                    style = inter(22.sp, FontWeight.SemiBold, tracking = 0.04f),
                     color = WmmColors.OnAccent,
                 )
             }

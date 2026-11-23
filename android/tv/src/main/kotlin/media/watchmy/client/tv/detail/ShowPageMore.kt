@@ -86,7 +86,7 @@ internal fun MorePanel(
                 verticalArrangement = Arrangement.spacedBy(32.dp),
             ) {
                 Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(kicker.uppercase(), style = inter(17.sp, FontWeight.Bold, tracking = 0.1f), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(kicker.uppercase(), style = inter(22.sp, FontWeight.Bold, tracking = 0.1f), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(title, style = inter(34.sp, FontWeight.ExtraBold, lineHeight = 39.sp, tracking = -0.015f), color = WmmColors.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -99,7 +99,7 @@ internal fun MorePanel(
                         showTitle?.let {
                             Text(
                                 it.uppercase(),
-                                style = inter(15.sp, FontWeight.Bold, tracking = 0.1f),
+                                style = inter(22.sp, FontWeight.Bold, tracking = 0.1f),
                                 color = WmmColors.TextMuted,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -114,7 +114,7 @@ internal fun MorePanel(
                     }
                 }
                 Box(Modifier.weight(1f))
-                Text("Back closes this panel.", style = inter(17.sp), color = WmmColors.TextFaint, modifier = Modifier.padding(horizontal = 20.dp))
+                Text("Back closes this panel.", style = inter(22.sp), color = WmmColors.TextFaint, modifier = Modifier.padding(horizontal = 20.dp))
             }
         }
         InitialFocus(first)
@@ -211,8 +211,8 @@ internal fun ConfirmDialog(
                 verticalArrangement = Arrangement.spacedBy(24.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(title, style = inter(44.sp, FontWeight.ExtraBold, lineHeight = 48.sp, tracking = -0.02f), color = WmmColors.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(kicker, style = inter(21.sp), color = WmmColors.TextMuted)
+                    Text(title, style = inter(48.sp, FontWeight.ExtraBold, lineHeight = 60.sp, tracking = -0.02f), color = WmmColors.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(kicker, style = inter(22.sp), color = WmmColors.TextMuted)
                 }
                 if (file != null) {
                     Row(
@@ -221,8 +221,8 @@ internal fun ConfirmDialog(
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         Icon(WmmIcons.File, contentDescription = null, tint = WmmColors.TextMuted, modifier = Modifier.size(24.dp))
-                        Text(file.first, style = inter(19.sp).copy(fontFamily = FontFamily.Monospace), color = WmmColors.TextSoft, modifier = Modifier.weight(1f))
-                        Text(file.second, style = inter(19.sp), color = WmmColors.TextMuted)
+                        Text(file.first, style = inter(22.sp).copy(fontFamily = FontFamily.Monospace), color = WmmColors.TextSoft, modifier = Modifier.weight(1f))
+                        Text(file.second, style = inter(22.sp), color = WmmColors.TextMuted)
                     }
                 }
                 body()

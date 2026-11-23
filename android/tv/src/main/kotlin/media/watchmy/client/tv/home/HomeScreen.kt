@@ -1,5 +1,9 @@
 package media.watchmy.client.tv.home
 
+import media.watchmy.client.tv.components.PosterHeight
+import media.watchmy.client.tv.components.PosterWidth
+import media.watchmy.client.tv.components.WideCardHeight
+import media.watchmy.client.tv.components.WideCardWidth
 import media.watchmy.client.tv.watchlists.holdFor
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -252,8 +256,8 @@ private fun HomeContent(
                                     title = c.title,
                                     subtitle = c.remainingLine,
                                     imageUrl = library.imageUrl(c.stillPath ?: c.backdropPath, ImageSize.W780),
-                                    artWidth = 320.dp,
-                                    artHeight = 180.dp,
+                                    artWidth = WideCardWidth,
+                                    artHeight = WideCardHeight,
                                     onClick = { onPlay(c.playRequest()) },
                                     onLongClick = { c.open(onOpenShow, onOpenMovie) },
                                     modifier = Modifier.focusMemory(memory, "cw:${c.fileId}"),
@@ -294,8 +298,8 @@ private fun HomeContent(
                                     title = e.showTitle,
                                     subtitle = e.airedLine(),
                                     imageUrl = library.imageUrl(e.stillPath ?: e.showBackdropPath, ImageSize.W780),
-                                    artWidth = 320.dp,
-                                    artHeight = 180.dp,
+                                    artWidth = WideCardWidth,
+                                    artHeight = WideCardHeight,
                                     seed = e.showTitle,
                                     // Select opens the episode on its show, focused on Play; holding it plays at once.
                                     onClick = { onOpenEpisode(e.showId, e.season, e.episodeId) },
@@ -342,8 +346,8 @@ private fun HomeContent(
                                     title = m.title,
                                     subtitle = null,
                                     imageUrl = library.imageUrl(m.backdropPath, ImageSize.W780),
-                                    artWidth = 320.dp,
-                                    artHeight = 180.dp,
+                                    artWidth = WideCardWidth,
+                                    artHeight = WideCardHeight,
                                     onClick = { onOpenMovie(m.id) },
                                     onLongClick = holdFor(m, onToggleWatched),
                                     modifier = Modifier.focusMemory(memory, "released:${m.id}"),
@@ -366,7 +370,7 @@ private fun HomeContent(
                         .drawBehind { drawLine(WmmColors.Line, Offset(0f, 0f), Offset(size.width, 0f), 1.dp.toPx()) },
                     contentAlignment = Alignment.CenterStart,
                 ) {
-                    Text(home.totalsLine(), style = inter(17.sp), color = WmmColors.TextFaint)
+                    Text(home.totalsLine(), style = inter(22.sp), color = WmmColors.TextFaint)
                 }
             }
         }
@@ -437,8 +441,8 @@ private fun PosterCard(
         title = item.title,
         subtitle = item.subtitle,
         imageUrl = library.imageUrl(item.posterPath, ImageSize.W342),
-        artWidth = 160.dp,
-        artHeight = 240.dp,
+        artWidth = PosterWidth,
+        artHeight = PosterHeight,
         onClick = onClick,
         onLongClick = onLongClick,
         modifier = modifier,

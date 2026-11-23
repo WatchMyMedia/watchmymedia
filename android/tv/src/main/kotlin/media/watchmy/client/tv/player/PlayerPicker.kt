@@ -146,7 +146,7 @@ private fun PickerOption(row: PickerRow, onClick: () -> Unit, modifier: Modifier
         val text = buildAnnotatedString {
             append(row.label)
             if (row.detail != null) {
-                withStyle(SpanStyle(fontSize = 17.sp, fontWeight = FontWeight.Normal, color = WmmColors.TextMuted)) {
+                withStyle(SpanStyle(fontSize = 22.sp, fontWeight = FontWeight.Normal, color = WmmColors.TextMuted)) {
                     append(" ")
                     append(row.detail)
                 }

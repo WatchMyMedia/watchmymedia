@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
 import media.watchmy.client.model.LiveChannel
+import media.watchmy.client.tv.components.FocusGrowth
 import media.watchmy.client.tv.components.FocusableBox
 import media.watchmy.client.tv.components.inter
 import media.watchmy.client.ui.WmmColors
@@ -31,17 +32,17 @@ fun LiveChannelCard(channel: LiveChannel, onClick: () -> Unit, modifier: Modifie
             contentDescription = "${channel.number} ${channel.name}, ${if (channel.available) "Watch live" else "Unavailable"}"
         },
         cornerRadius = 14.dp,
-        focusedScale = 1.04f,
+        focusedScale = FocusGrowth.BUTTON,
     ) { focused ->
         Column(
             Modifier.fillMaxSize().background(if (focused) WmmColors.Surface2 else WmmColors.Surface, RoundedCornerShape(14.dp))
                 .border(1.dp, WmmColors.Line, RoundedCornerShape(14.dp)).padding(horizontal = 20.dp, vertical = 18.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(channel.number, style = inter(40.sp, FontWeight.Bold), color = if (channel.available) WmmColors.Text else WmmColors.TextMuted)
+            Text(channel.number, style = inter(34.sp, FontWeight.Bold), color = if (channel.available) WmmColors.Text else WmmColors.TextMuted)
             Column {
-                Text(channel.name, style = inter(20.sp, FontWeight.SemiBold), color = if (channel.available) WmmColors.Text else WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(if (channel.available) "No listings" else "Unavailable", style = inter(16.sp), color = WmmColors.TextMuted)
+                Text(channel.name, style = inter(22.sp, FontWeight.SemiBold), color = if (channel.available) WmmColors.Text else WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(if (channel.available) "No listings" else "Unavailable", style = inter(22.sp), color = WmmColors.TextMuted)
             }
         }
     }

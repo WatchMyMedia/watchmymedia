@@ -105,10 +105,10 @@ internal fun ChannelNumberDialog(
                 Modifier.width(620.dp).background(WmmColors.Surface, RoundedCornerShape(24.dp)).padding(36.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-                Text("Go to channel", style = inter(30.sp, FontWeight.Bold), color = WmmColors.Text)
-                Text(number.ifEmpty { "–" }, style = inter(44.sp, FontWeight.Bold), color = WmmColors.Text,
+                Text("Go to channel", style = inter(28.sp, FontWeight.Bold), color = WmmColors.Text)
+                Text(number.ifEmpty { "–" }, style = inter(48.sp, FontWeight.Bold), color = WmmColors.Text,
                     modifier = Modifier.fillMaxWidth().border(2.dp, WmmColors.Accent, RoundedCornerShape(14.dp)).padding(horizontal = 24.dp, vertical = 14.dp))
-                Text(explanation, style = inter(19.sp, lineHeight = 26.sp), color = WmmColors.TextMuted,
+                Text(explanation, style = inter(22.sp, lineHeight = 30.sp), color = WmmColors.TextMuted,
                     modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                 listOf(listOf('1', '2', '3'), listOf('4', '5', '6'), listOf('7', '8', '9'), listOf('.', '0', '\b')).forEach { row ->
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -126,7 +126,7 @@ internal fun ChannelNumberDialog(
                     TvButton(match?.let { "Watch ${it.number}" } ?: "Watch", { match?.let(onWatch) },
                         modifier = Modifier.padding(start = 18.dp), style = TvButtonStyle.Primary, size = TvButtonSize.Medium, enabled = match != null)
                 }
-                Text("Select Watch to tune. A partial number never changes channel.", style = inter(17.sp, lineHeight = 23.sp), color = WmmColors.TextMuted)
+                Text("Select Watch to tune. A partial number never changes channel.", style = inter(22.sp, lineHeight = 30.sp), color = WmmColors.TextMuted)
             }
         }
         InitialFocus(first)
@@ -145,7 +145,7 @@ internal fun LiveMessageDialog(title: String, message: String, onDismiss: () -> 
         }, contentAlignment = Alignment.Center) {
             Column(Modifier.width(850.dp).background(WmmColors.Surface, RoundedCornerShape(24.dp)).padding(44.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
                 Text(title, style = inter(34.sp, FontWeight.Bold), color = WmmColors.Text)
-                Text(message, style = inter(23.sp, lineHeight = 32.sp), color = WmmColors.TextMuted)
+                Text(message, style = inter(24.sp, lineHeight = 33.sp), color = WmmColors.TextMuted)
                 TvButton("Back to channels", onDismiss, Modifier.focusRequester(focus), style = TvButtonStyle.Primary)
             }
         }

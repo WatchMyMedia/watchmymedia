@@ -157,7 +157,7 @@ internal fun LetterStrip(
                             letter == current -> WmmColors.Accent
                             else -> WmmColors.TextSoft
                         }
-                        Text(letter, style = inter(17.sp, FontWeight.Bold), color = color)
+                        Text(letter, style = inter(22.sp, FontWeight.Bold), color = color)
                     }
                 }
             }
@@ -176,8 +176,8 @@ internal fun LetterStrip(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                Text(letter, style = inter(58.sp, FontWeight.ExtraBold), color = WmmColors.Accent)
-                Text(plural(counts[letter] ?: 0, noun), style = inter(15.sp), color = WmmColors.TextSoft)
+                Text(letter, style = inter(64.sp, FontWeight.ExtraBold), color = WmmColors.Accent)
+                Text(plural(counts[letter] ?: 0, noun), style = inter(22.sp), color = WmmColors.TextSoft)
             }
         }
     }
@@ -336,6 +336,6 @@ internal fun JumpHints(onStrip: Boolean, letter: String?, byTitle: Boolean, modi
             .background(Brush.verticalGradient(listOf(WmmColors.Ground.copy(alpha = 0f), WmmColors.Ground.copy(alpha = 0.94f), WmmColors.Ground)))
             .padding(start = ContentStart, top = 48.dp, bottom = 24.dp),
     ) {
-        Text(text, style = inter(19.sp), color = WmmColors.TextSoft)
+        Text(text, style = inter(22.sp), color = WmmColors.TextSoft)
     }
 }

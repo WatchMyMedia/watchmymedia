@@ -70,10 +70,10 @@ import media.watchmy.client.ui.components.WmmIcons
 @Composable
 internal fun TvTimeHeader(state: LiveGuideViewModel.State, format: LiveClockFormat, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth().padding(end = 58.dp).height(48.dp).background(WmmColors.Surface), verticalAlignment = Alignment.CenterVertically) {
-        Text(state.days.getOrNull(state.dayIndex)?.label.orEmpty(), style = inter(18.sp, FontWeight.SemiBold), color = WmmColors.TextSoft, modifier = Modifier.width(ChannelColumn).padding(start = 16.dp))
+        Text(state.days.getOrNull(state.dayIndex)?.label.orEmpty(), style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.TextSoft, modifier = Modifier.width(ChannelColumn).padding(start = 16.dp))
         state.slots.forEach { slot ->
             Box(Modifier.weight(1f).fillMaxHeight().border(0.5.dp, WmmColors.Line), contentAlignment = Alignment.CenterStart) {
-                Text(format.time(slot), style = inter(18.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(horizontal = 14.dp))
+                Text(format.time(slot), style = inter(22.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(horizontal = 14.dp))
             }
         }
     }
@@ -156,7 +156,7 @@ internal fun TvGuideRow(
                         Text(channel.number, style = inter(24.sp, FontWeight.Bold), color = if (channel.available) WmmColors.Text else WmmColors.TextFaint)
                         if (favourite) Icon(WmmIcons.StarFilled, contentDescription = null, tint = WmmColors.Accent, modifier = Modifier.size(18.dp))
                     }
-                    Text(channel.name, style = inter(15.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(channel.name, style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 if (channel.logo != null) ChannelLogo(channel, Modifier.width(52.dp))
             }
@@ -201,8 +201,8 @@ internal fun TvGuideRow(
                     cornerRadius = 0.dp, focusedScale = 1f, ringOffset = (-3).dp,
                 ) { focused ->
                     Column(Modifier.fillMaxSize().background(if (focused) WmmColors.Surface3 else Color(0xFF131315)).padding(horizontal = 14.dp), verticalArrangement = Arrangement.Center) {
-                        Text(if (channel.available) "No listings" else "Unavailable", style = inter(19.sp, FontWeight.SemiBold), color = WmmColors.TextMuted)
-                        Text(if (channel.available) "Plays live" else "Not in the tuner’s last channel list", style = inter(15.sp), color = WmmColors.TextFaint)
+                        Text(if (channel.available) "No listings" else "Unavailable", style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.TextMuted)
+                        Text(if (channel.available) "Plays live" else "Not in the tuner’s last channel list", style = inter(22.sp), color = WmmColors.TextFaint)
                     }
                 }
             }
@@ -257,7 +257,7 @@ internal fun TvGuideRow(
             }
             if (gapStart != null && listedThrough != null) {
                 Box(Modifier.background(WmmColors.Ground).padding(horizontal = 14.dp), contentAlignment = Alignment.CenterStart) {
-                    Text("No listings after ${format.dayHour(listedThrough)}", style = inter(17.sp), color = WmmColors.TextMuted, maxLines = 2)
+                    Text("No listings after ${format.dayHour(listedThrough)}", style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 2)
                 }
             }
         }
@@ -322,11 +322,11 @@ private fun TvGuideCell(
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     programme.recording?.let { RecordingMarkBadge(it, size = 14.dp, textSize = 14.sp) }
                     if (reminded) Icon(WmmIcons.BellFilled, contentDescription = null, tint = WmmColors.Accent, modifier = Modifier.size(17.dp))
-                    Text((if (clippedStart) "‹ " else "") + programme.title, style = inter(19.sp, FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text((if (clippedStart) "‹ " else "") + programme.title, style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    programme.tags().forEach { ProgrammeTag(it, fontSize = 12.sp, height = 20.dp) }
-                    Text(programme.episodeLine() ?: "${format.shortTime(programme.startMs)}–${format.shortTime(programme.endMs)}", style = inter(15.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    programme.tags().forEach { ProgrammeTag(it, fontSize = 22.sp, height = 20.dp) }
+                    Text(programme.episodeLine() ?: "${format.shortTime(programme.startMs)}–${format.shortTime(programme.endMs)}", style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
             if (airing) Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(programme.progressAt(now)).height(3.dp).background(WmmColors.Accent))

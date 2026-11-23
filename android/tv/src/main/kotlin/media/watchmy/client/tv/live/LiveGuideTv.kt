@@ -181,7 +181,7 @@ internal fun LiveTvGuide(
         }
         if (state.stale) Text(
             state.updatedAtMs?.let { "Listings last updated ${format.dayTime(it)} and may be out of date" } ?: "Listings may be out of date",
-            style = inter(18.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(start = 8.dp, bottom = 12.dp),
+            style = inter(22.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(start = 8.dp, bottom = 12.dp),
         )
         TvTimeHeader(state, format)
         // What a row draws of the window: the same object across focus moves, which change only the selection.
@@ -203,7 +203,7 @@ internal fun LiveTvGuide(
                 )
             }
             if (rows.isEmpty()) item("none") {
-                Text(if (state.loading) "Loading listings…" else "No channels show this. Choose All channels to see every channel.", style = inter(21.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(24.dp))
+                Text(if (state.loading) "Loading listings…" else "No channels show this. Choose All channels to see every channel.", style = inter(22.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(24.dp))
             }
         }
     }

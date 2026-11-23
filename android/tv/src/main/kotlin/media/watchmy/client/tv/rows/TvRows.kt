@@ -1,5 +1,9 @@
 package media.watchmy.client.tv.rows
 
+import media.watchmy.client.tv.components.PosterHeight
+import media.watchmy.client.tv.components.PosterWidth
+import media.watchmy.client.tv.components.WideCardHeight
+import media.watchmy.client.tv.components.WideCardWidth
 import media.watchmy.client.tv.watchlists.holdFor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -174,8 +178,8 @@ internal fun TvArrangedRow(
                         title = c.title,
                         subtitle = c.remainingLine,
                         imageUrl = library.imageUrl(c.stillPath ?: c.backdropPath, ImageSize.W780),
-                        artWidth = 320.dp,
-                        artHeight = 180.dp,
+                        artWidth = WideCardWidth,
+                        artHeight = WideCardHeight,
                         onClick = { actions.onPlay(c.playRequest()) },
                         onLongClick = { c.openPage(actions) },
                         modifier = Modifier.rowCard(memory, "cw:${c.fileId}", i, onFocusItem),
@@ -189,8 +193,8 @@ internal fun TvArrangedRow(
                         title = e.showTitle,
                         subtitle = e.airedLine(),
                         imageUrl = library.imageUrl(e.stillPath ?: e.showBackdropPath, ImageSize.W780),
-                        artWidth = 320.dp,
-                        artHeight = 180.dp,
+                        artWidth = WideCardWidth,
+                        artHeight = WideCardHeight,
                         seed = e.showTitle,
                         // Select opens the episode on its show, focused on Play; holding it plays at once.
                         onClick = { actions.onOpenEpisode(e.showId, e.season, e.episodeId) },
@@ -208,8 +212,8 @@ internal fun TvArrangedRow(
                         title = item.title,
                         subtitle = item.subtitle ?: item.year?.toString(),
                         imageUrl = library.imageUrl(item.posterPath, ImageSize.W342),
-                        artWidth = 160.dp,
-                        artHeight = 240.dp,
+                        artWidth = PosterWidth,
+                        artHeight = PosterHeight,
                         onClick = { item.open(actions.onOpenShow, actions.onOpenMovie, actions.onPlay, actions.onNotMatched, actions.onOpenEpisode) },
                         onLongClick = holdFor(item, actions.onToggleWatched),
                         modifier = Modifier.rowCard(memory, "${row.id}:${item.kind}${item.id}", i, onFocusItem),
@@ -224,8 +228,8 @@ internal fun TvArrangedRow(
                         title = m.title,
                         subtitle = null,
                         imageUrl = library.imageUrl(m.backdropPath, ImageSize.W780),
-                        artWidth = 320.dp,
-                        artHeight = 180.dp,
+                        artWidth = WideCardWidth,
+                        artHeight = WideCardHeight,
                         onClick = { if (m.kind == ItemKind.Movie) actions.onOpenMovie(m.id) else m.open(actions.onOpenShow, actions.onOpenMovie, actions.onPlay, actions.onNotMatched) },
                         onLongClick = holdFor(m, actions.onToggleWatched),
                         modifier = Modifier.rowCard(memory, "${row.id}:${m.kind}${m.id}", i, onFocusItem),
@@ -274,9 +278,9 @@ private fun SeeAllCard(seeAll: TvSeeAll, wide: Boolean, modifier: Modifier = Mod
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Icon(if (seeAll.list) WmmIcons.ListBullets else WmmIcons.Grid, contentDescription = null, tint = WmmColors.Accent, modifier = Modifier.size(36.dp))
-            Text(seeAll.words.title, style = inter(21.sp, FontWeight.Bold, lineHeight = 26.sp), color = WmmColors.Text, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(seeAll.words.title, style = inter(22.sp, FontWeight.Bold, lineHeight = 28.sp), color = WmmColors.Text, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
             seeAll.words.detail?.let { detail ->
-                Text(detail, style = inter(17.sp, lineHeight = 23.sp), color = WmmColors.TextMuted, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(detail, style = inter(22.sp, lineHeight = 30.sp), color = WmmColors.TextMuted, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
     }

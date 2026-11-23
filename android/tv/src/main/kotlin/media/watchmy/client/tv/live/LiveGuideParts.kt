@@ -136,7 +136,7 @@ internal fun TvGuideHero(selection: LiveGuideViewModel.Selection?, channelOnly: 
                 Box(Modifier.matchParentSize().background(Brush.verticalGradient(.6f to Color.Transparent, 1f to WmmColors.Ground)))
                 if (programme != null && (programme.still != null || programme.pictureFromTmdb && programme.picture != null)) {
                     Text(
-                        "Picture: TMDB", style = inter(16.sp, FontWeight.SemiBold), color = WmmColors.TextSoft,
+                        "Picture: TMDB", style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.TextSoft,
                         modifier = Modifier.align(Alignment.BottomEnd).padding(18.dp).background(Color.Black.copy(alpha = .72f), RoundedCornerShape(5.dp)).padding(horizontal = 10.dp, vertical = 4.dp),
                     )
                 }
@@ -164,29 +164,29 @@ internal fun TvGuideHero(selection: LiveGuideViewModel.Selection?, channelOnly: 
                 }
             }
             if (programme == null) {
-                Text(channel.name, style = inter(54.sp, FontWeight.ExtraBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(channel.name, style = inter(64.sp, FontWeight.ExtraBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(if (channel.available) "No listings · Plays live" else "Unavailable", style = inter(22.sp), color = WmmColors.TextMuted)
                 if (channel.available) TvOkHint("Watch ${channel.number}")
                 return@Column
             }
-            Text(programme.title, style = inter(54.sp, FontWeight.ExtraBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(programme.title, style = inter(64.sp, FontWeight.ExtraBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                programme.episodeLine()?.let { Text(it, style = inter(21.sp), color = WmmColors.TextSoft, maxLines = 1) }
-                programme.tags().forEach { ProgrammeTag(it, fontSize = 15.sp, height = 26.dp) }
-                programme.categoryLine()?.let { Text(it, style = inter(21.sp), color = WmmColors.TextMuted, maxLines = 1) }
+                programme.episodeLine()?.let { Text(it, style = inter(22.sp), color = WmmColors.TextSoft, maxLines = 1) }
+                programme.tags().forEach { ProgrammeTag(it, fontSize = 22.sp, height = 26.dp) }
+                programme.categoryLine()?.let { Text(it, style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 1) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("${format.weekday(programme.startMs)} ${format.span(programme.startMs, programme.endMs)}", style = inter(21.sp), color = WmmColors.TextSoft)
+                Text("${format.weekday(programme.startMs)} ${format.span(programme.startMs, programme.endMs)}", style = inter(22.sp), color = WmmColors.TextSoft)
                 if (programme.airingAt(now)) {
                     LiveProgress(programme.progressAt(now), Modifier.width(220.dp), height = 5.dp)
-                    Text(liveMinutesLeft(now, programme.endMs), style = inter(21.sp), color = WmmColors.TextMuted)
+                    Text(liveMinutesLeft(now, programme.endMs), style = inter(22.sp), color = WmmColors.TextMuted)
                 }
             }
-            programme.description?.let { Text(it, style = inter(20.sp, lineHeight = 29.sp), color = WmmColors.TextSoft, maxLines = 2, overflow = TextOverflow.Ellipsis) }
-            if (programme.descriptionFromTmdb) Text("Description from TMDB", style = inter(16.sp), color = WmmColors.TextFaint)
+            programme.description?.let { Text(it, style = inter(22.sp, lineHeight = 32.sp), color = WmmColors.TextSoft, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+            if (programme.descriptionFromTmdb) Text("Description from TMDB", style = inter(22.sp), color = WmmColors.TextFaint)
             val airing = programme.airingAt(now)
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (!airing && state != null) Text("On ${channel.number}${if (format.dayName(programme.startMs, now) == "Today") "" else ", ${format.weekday(programme.startMs)}"} at ${format.time(programme.startMs)}", style = inter(21.sp, FontWeight.SemiBold), color = WmmColors.TextSoft)
+                if (!airing && state != null) Text("On ${channel.number}${if (format.dayName(programme.startMs, now) == "Today") "" else ", ${format.weekday(programme.startMs)}"} at ${format.time(programme.startMs)}", style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.TextSoft)
                 TvOkHint(if (airing) "Watch ${channel.number}" else "Watch ${channel.number} now")
                 if (state != null) {
                     val reminder = state.reminderFor(programme)
@@ -201,8 +201,8 @@ internal fun TvGuideHero(selection: LiveGuideViewModel.Selection?, channelOnly: 
 @Composable
 internal fun TvOkHint(text: String, key: String = "OK") {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(key, style = inter(15.sp, FontWeight.Bold), color = WmmColors.Text, modifier = Modifier.border(1.dp, WmmColors.Line3, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 3.dp))
-        Text(text, style = inter(21.sp, FontWeight.SemiBold), color = WmmColors.Text)
+        Text(key, style = inter(22.sp, FontWeight.Bold), color = WmmColors.Text, modifier = Modifier.border(1.dp, WmmColors.Line3, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 3.dp))
+        Text(text, style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.Text)
     }
 }
 
@@ -225,16 +225,16 @@ internal fun TvOnNowCard(channel: LiveChannel, now: Long, onClick: () -> Unit, m
                 ProgrammePicture(on, channel, Modifier.fillMaxWidth())
                 Row(Modifier.align(Alignment.TopStart).padding(10.dp).background(Color.Black.copy(alpha = .72f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (channel.logo != null) ChannelLogo(channel, Modifier.width(34.dp))
-                    Text(channel.number, style = inter(20.sp, FontWeight.Bold), color = WmmColors.Text)
+                    Text(channel.number, style = inter(22.sp, FontWeight.Bold), color = WmmColors.Text)
                 }
                 Row(Modifier.align(Alignment.TopEnd).padding(10.dp).background(Color(0xFFB42318), RoundedCornerShape(5.dp)).padding(horizontal = 8.dp, vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(7.dp).background(Color.White, RoundedCornerShape(4.dp)))
-                    Text("LIVE", style = inter(14.sp, FontWeight.Bold), color = Color.White)
+                    Text("LIVE", style = inter(22.sp, FontWeight.Bold), color = Color.White)
                 }
                 if (on != null) LiveProgress(on.progressAt(now), Modifier.align(Alignment.BottomStart).fillMaxWidth(), height = 5.dp, track = Color.Transparent)
             }
         }
-        Text(on?.title ?: channel.name, style = inter(20.sp, FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(on?.let { liveMinutesLeft(now, it.endMs) } ?: "No listings", style = inter(17.sp), color = WmmColors.TextMuted, maxLines = 1)
+        Text(on?.title ?: channel.name, style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(on?.let { liveMinutesLeft(now, it.endMs) } ?: "No listings", style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 1)
     }
 }

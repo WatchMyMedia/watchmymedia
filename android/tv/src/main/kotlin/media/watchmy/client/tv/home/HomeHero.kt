@@ -45,7 +45,7 @@ import media.watchmy.client.ui.components.WmmIcons
 /** "S03 E07 · The Long Dark · 52 min · [4K] [HDR] · TV-14". */
 @Composable
 private fun HeroFacts(hero: Hero, tags: List<String>) {
-    val style = inter(23.sp)
+    val style = inter(24.sp)
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         var before = false
         if (hero.facts.isNotBlank()) {
@@ -90,10 +90,10 @@ internal fun HeroSection(
             glowY = 0.3f,
         )
         Column(Modifier.padding(start = ContentStart, top = 112.dp).width(900.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            Kicker(hero.kicker, fontSize = 19.sp)
+            Kicker(hero.kicker, fontSize = 22.sp)
             Text(
                 hero.title,
-                style = inter(72.sp, FontWeight.ExtraBold, lineHeight = 76.sp, tracking = -0.025f),
+                style = inter(64.sp, FontWeight.ExtraBold, lineHeight = 80.sp, tracking = -0.025f),
                 color = WmmColors.Text,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

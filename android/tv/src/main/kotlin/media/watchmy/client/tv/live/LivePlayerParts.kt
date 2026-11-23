@@ -88,7 +88,7 @@ internal fun LiveFakeBackdrop(channel: LiveChannel, modifier: Modifier = Modifie
     Box(modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF172D38), WmmColors.Ground, Color(0xFF301C29)))), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(channel.number, style = inter(110.sp, FontWeight.Bold), color = WmmColors.Text.copy(alpha = .3f))
-            Text(channel.name, style = inter(30.sp), color = WmmColors.TextMuted)
+            Text(channel.name, style = inter(28.sp), color = WmmColors.TextMuted)
         }
     }
 }
@@ -112,14 +112,14 @@ internal fun LiveChannelBanner(
             // Cast Connect: who cast, and that the rest is on their phone.
             cast?.let { CastFromBox(it.name) }
         }
-        if (state.quality == StreamQuality.Auto) Text(state.liveQualityLabel(), style = inter(19.sp, FontWeight.SemiBold), color = WmmColors.Accent)
+        if (state.quality == StreamQuality.Auto) Text(state.liveQualityLabel(), style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.Accent)
         val pause = state.session?.pauseRemainingSeconds ?: 300
         val note = when {
             cast != null -> "▲ ▼ Change channel · OK Controls"
             state.status == PlayerStatus.Paused -> "Paused · tuner released in ${pause / 60}:${(pause % 60).toString().padStart(2, '0')} · Resume goes live if the buffer expires."
             else -> "▲ ▼ Change channel when controls are hidden · ◀ ${if (listings) "On now" else "Channels"} · OK Controls"
         }
-        Text(note, style = inter(19.sp), color = WmmColors.TextMuted)
+        Text(note, style = inter(22.sp), color = WmmColors.TextMuted)
     }
 }
 
@@ -127,17 +127,17 @@ internal fun LiveChannelBanner(
 private fun ChannelBannerCard(state: LivePlayerState, channel: LiveChannel, listings: Boolean, now: Long, format: LiveClockFormat?) {
     if (listings && format != null) ListingsBanner(state, channel, now, format) else Row(Modifier.width(1000.dp).background(Color(0xEE101012), RoundedCornerShape(20.dp)).border(1.dp, WmmColors.Line2, RoundedCornerShape(20.dp)).padding(26.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(28.dp)) {
-            Text(channel.number, style = inter(56.sp, FontWeight.Bold), color = WmmColors.Text)
+            Text(channel.number, style = inter(64.sp, FontWeight.Bold), color = WmmColors.Text)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(channel.name, style = inter(30.sp, FontWeight.Bold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("No listings for this channel", style = inter(19.sp), color = WmmColors.TextMuted)
+                Text(channel.name, style = inter(28.sp, FontWeight.Bold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("No listings for this channel", style = inter(22.sp), color = WmmColors.TextMuted)
             }
             val label = when {
                 state.status == PlayerStatus.Paused -> "PAUSED"
                 state.atLiveEdge -> "LIVE"
                 else -> "BEHIND LIVE"
             }
-            Text(label, style = inter(17.sp, FontWeight.Bold), color = Color.White,
+            Text(label, style = inter(22.sp, FontWeight.Bold), color = Color.White,
                 modifier = Modifier.background(if (state.atLiveEdge) Color(0xFFB42318) else WmmColors.Surface3, RoundedCornerShape(6.dp)).padding(horizontal = 12.dp, vertical = 7.dp))
         }
 }
@@ -150,26 +150,26 @@ private fun ListingsBanner(state: LivePlayerState, channel: LiveChannel, now: Lo
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
         Column(Modifier.width(150.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (channel.logo != null) ChannelLogo(channel, Modifier.width(64.dp))
-            Text(channel.number, style = inter(44.sp, FontWeight.Bold), color = WmmColors.Text)
-            Text(channel.name, style = inter(16.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(channel.number, style = inter(48.sp, FontWeight.Bold), color = WmmColors.Text)
+            Text(channel.name, style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         ProgrammePicture(on, channel, Modifier.width(260.dp).clip(RoundedCornerShape(10.dp)))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (on == null) {
-                Text(channel.name, style = inter(30.sp, FontWeight.Bold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text("No listings for this channel", style = inter(19.sp), color = WmmColors.TextMuted)
+                Text(channel.name, style = inter(28.sp, FontWeight.Bold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("No listings for this channel", style = inter(22.sp), color = WmmColors.TextMuted)
             } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(on.title, style = inter(30.sp, FontWeight.Bold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                    on.tags().forEach { ProgrammeTag(it, fontSize = 14.sp, height = 24.dp) }
+                    Text(on.title, style = inter(28.sp, FontWeight.Bold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                    on.tags().forEach { ProgrammeTag(it, fontSize = 22.sp, height = 24.dp) }
                 }
-                on.episodeLine()?.let { Text(it, style = inter(19.sp), color = WmmColors.TextSoft, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                on.episodeLine()?.let { Text(it, style = inter(22.sp), color = WmmColors.TextSoft, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(format.span(on.startMs, on.endMs), style = inter(18.sp), color = WmmColors.TextMuted)
+                    Text(format.span(on.startMs, on.endMs), style = inter(22.sp), color = WmmColors.TextMuted)
                     LiveProgress(on.progressAt(now), Modifier.weight(1f), height = 5.dp)
-                    Text(liveMinutesLeft(now, on.endMs), style = inter(18.sp), color = WmmColors.TextMuted)
+                    Text(liveMinutesLeft(now, on.endMs), style = inter(22.sp), color = WmmColors.TextMuted)
                 }
-                next?.let { Text(liveNextLine(it, format), style = inter(18.sp), color = WmmColors.TextMuted) }
+                next?.let { Text(liveNextLine(it, format), style = inter(22.sp), color = WmmColors.TextMuted) }
             }
         }
         LiveStateLabel(state)
@@ -183,7 +183,7 @@ private fun LiveStateLabel(state: LivePlayerState) {
         state.atLiveEdge -> "LIVE"
         else -> "BEHIND LIVE"
     }
-    Text(label, style = inter(17.sp, FontWeight.Bold), color = Color.White,
+    Text(label, style = inter(22.sp, FontWeight.Bold), color = Color.White,
         modifier = Modifier.background(if (state.atLiveEdge) Color(0xFFB42318) else WmmColors.Surface3, RoundedCornerShape(6.dp)).padding(horizontal = 12.dp, vertical = 7.dp))
 }
 
@@ -198,7 +198,7 @@ internal fun LiveTuning(state: LivePlayerState, channel: LiveChannel, modifier: 
 
 @Composable
 internal fun LiveNotice(message: String, modifier: Modifier = Modifier) {
-    Text(message, style = inter(21.sp, lineHeight = 28.sp), color = WmmColors.Text, textAlign = TextAlign.Center,
+    Text(message, style = inter(22.sp, lineHeight = 29.sp), color = WmmColors.Text, textAlign = TextAlign.Center,
         modifier = modifier.width(1100.dp).background(Color(0xEE101012), RoundedCornerShape(22.dp)).padding(horizontal = 28.dp, vertical = 16.dp).semantics { liveRegion = LiveRegionMode.Polite })
 }
 
@@ -261,7 +261,7 @@ internal fun LiveChannelsPanel(
     val remembered = memory.key?.takeIf { candidate -> channels.any { it.id == candidate } } ?: currentId
     val selectedIndex = channels.indexOfFirst { it.id == remembered }.coerceAtLeast(0)
     Column(modifier.width(640.dp).fillMaxHeight().background(Color(0xFA0F0F10)).border(1.dp, WmmColors.Line).padding(top = 48.dp, bottom = 40.dp).focusGroup()) {
-        Text(if (listings && format != null) "On now · ${format.time(now)}" else "Channels", style = inter(30.sp, FontWeight.Bold), color = WmmColors.Text, modifier = Modifier.padding(horizontal = 28.dp, vertical = 16.dp))
+        Text(if (listings && format != null) "On now · ${format.time(now)}" else "Channels", style = inter(28.sp, FontWeight.Bold), color = WmmColors.Text, modifier = Modifier.padding(horizontal = 28.dp, vertical = 16.dp))
         if (channels.isEmpty()) {
             Text("Channels are no longer available. Return to the full guide to refresh.", style = inter(22.sp, lineHeight = 30.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(28.dp))
             // A focus target remains available even if permissions changed while opening the panel.
@@ -273,14 +273,14 @@ internal fun LiveChannelsPanel(
                         Text(channel.number, style = inter(26.sp, FontWeight.Bold), color = WmmColors.Text, modifier = Modifier.width(80.dp))
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(channel.name, style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(if (channel.available) "No listings" else liveTVError(channel.reason), style = inter(17.sp, lineHeight = 23.sp), color = WmmColors.TextMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text(if (channel.available) "No listings" else liveTVError(channel.reason), style = inter(22.sp, lineHeight = 30.sp), color = WmmColors.TextMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
-                        if (channel.id == currentId) Text("Watching", style = inter(16.sp, FontWeight.SemiBold), color = WmmColors.Accent)
+                        if (channel.id == currentId) Text("Watching", style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.Accent)
                     }
                 }
             }
         }
-        Text("OK watches the channel. Right or Back closes this list.", style = inter(17.sp, lineHeight = 24.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(horizontal = 28.dp, vertical = 20.dp))
+        Text("OK watches the channel. Right or Back closes this list.", style = inter(22.sp, lineHeight = 31.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(horizontal = 28.dp, vertical = 20.dp))
     }
 }
 
@@ -292,7 +292,7 @@ private fun OnNowPanelRow(channel: LiveChannel, watching: Boolean, focused: Bool
             ProgrammePicture(on, channel, Modifier.fillMaxWidth())
             if (on != null) Row(Modifier.align(Alignment.TopStart).padding(6.dp).background(Color.Black.copy(alpha = .72f), RoundedCornerShape(5.dp)).padding(horizontal = 6.dp, vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (channel.logo != null) ChannelLogo(channel, Modifier.width(26.dp))
-                Text(channel.number, style = inter(16.sp, FontWeight.Bold), color = WmmColors.Text)
+                Text(channel.number, style = inter(22.sp, FontWeight.Bold), color = WmmColors.Text)
             }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -304,22 +304,22 @@ private fun OnNowPanelRow(channel: LiveChannel, watching: Boolean, focused: Bool
                     on == null -> "No listings"
                     else -> "${channel.name} · ${liveMinutesLeft(now, on.endMs)}"
                 },
-                style = inter(16.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
         }
-        if (watching) Text("Watching", style = inter(16.sp, FontWeight.SemiBold), color = WmmColors.Accent)
+        if (watching) Text("Watching", style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.Accent)
     }
 }
 
 @Composable
 internal fun LiveQualityPanel(quality: StreamQuality, focus: FocusRequester, onSelect: (StreamQuality) -> Unit, modifier: Modifier = Modifier, automatic: Boolean = false) {
     Column(modifier.width(600.dp).fillMaxHeight().background(Color(0xFA0F0F10)).border(1.dp, WmmColors.Line).padding(44.dp).focusGroup(), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        Text("Quality", style = inter(30.sp, FontWeight.Bold), color = WmmColors.Text)
-        Text(if (automatic) "Automatic can adapt without retuning. Choosing another quality starts the channel at live." else "Changing quality starts the channel again at live.", style = inter(21.sp, lineHeight = 30.sp), color = WmmColors.TextMuted)
+        Text("Quality", style = inter(28.sp, FontWeight.Bold), color = WmmColors.Text)
+        Text(if (automatic) "Automatic can adapt without retuning. Choosing another quality starts the channel at live." else "Changing quality starts the channel again at live.", style = inter(22.sp, lineHeight = 31.sp), color = WmmColors.TextMuted)
         LIVE_QUALITIES.filter { it != StreamQuality.Auto || automatic }.forEach { option ->
             OptionRow(option.label, option == quality, { onSelect(option) }, modifier = if (option == quality) Modifier.focusRequester(focus) else Modifier)
         }
-        Text("Back closes this panel.", style = inter(17.sp), color = WmmColors.TextMuted)
+        Text("Back closes this panel.", style = inter(22.sp), color = WmmColors.TextMuted)
     }
 }
 
@@ -327,7 +327,7 @@ internal fun LiveQualityPanel(quality: StreamQuality, focus: FocusRequester, onS
 internal fun LivePlayerPrompt(title: String, message: String, action: String, onAction: () -> Unit, onLeave: () -> Unit, focus: FocusRequester, modifier: Modifier = Modifier, leaveLabel: String = "Back to channels") {
     Box(modifier.fillMaxSize().background(Color.Black.copy(alpha = .75f)), contentAlignment = Alignment.Center) {
         Column(Modifier.width(980.dp).background(WmmColors.Surface, RoundedCornerShape(28.dp)).padding(48.dp).focusGroup(), verticalArrangement = Arrangement.spacedBy(24.dp)) {
-            Text(title, style = inter(40.sp, FontWeight.Bold), color = WmmColors.Text)
+            Text(title, style = inter(34.sp, FontWeight.Bold), color = WmmColors.Text)
             Text(message, style = inter(24.sp, lineHeight = 34.sp), color = WmmColors.TextMuted, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive })
             Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
                 TvButton(action, onAction, Modifier.focusRequester(focus), style = TvButtonStyle.Primary)

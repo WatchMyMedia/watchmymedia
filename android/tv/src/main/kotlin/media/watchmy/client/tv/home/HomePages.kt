@@ -159,7 +159,7 @@ internal fun PrefetchNeighbours(row: ScreenRow, index: Int, channels: List<LiveC
 @Composable
 internal fun FocusPanel(panel: CardPanel, modifier: Modifier = Modifier, first: Boolean = false) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Kicker(panel.kicker, fontSize = 19.sp)
+        Kicker(panel.kicker, fontSize = 22.sp)
         Text(
             panel.title,
             style = inter(64.sp, FontWeight.ExtraBold, lineHeight = 66.sp, tracking = -0.025f),
@@ -187,7 +187,7 @@ internal fun FocusPanel(panel: CardPanel, modifier: Modifier = Modifier, first: 
         if (panel.overview.isNotBlank()) {
             Text(
                 panel.overview,
-                style = inter(21.sp, lineHeight = 31.5.sp),
+                style = inter(22.sp, lineHeight = 31.5.sp),
                 color = WmmColors.TextSoft,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -199,9 +199,9 @@ internal fun FocusPanel(panel: CardPanel, modifier: Modifier = Modifier, first: 
                 Modifier.defaultMinSize(minWidth = 34.dp).height(28.dp).border(1.dp, WmmColors.Line3, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("OK", style = inter(14.sp, FontWeight.Bold), color = WmmColors.TextSoft)
+                Text("OK", style = inter(22.sp, FontWeight.Bold), color = WmmColors.TextSoft)
             }
-            Text(panel.target.hint + if (first) MORE_FIRST else MORE, style = inter(17.sp), color = WmmColors.TextFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(panel.target.hint + if (first) MORE_FIRST else MORE, style = inter(22.sp), color = WmmColors.TextFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -219,7 +219,7 @@ internal fun PeekLine(text: String, up: Boolean, modifier: Modifier = Modifier) 
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(WmmIcons.ChevronDown, contentDescription = null, tint = WmmColors.TextMuted, modifier = Modifier.size(22.dp).rotate(if (up) 180f else 0f))
-        Text(text, style = inter(19.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(text, style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

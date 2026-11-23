@@ -158,11 +158,11 @@ internal fun RequestDialog(subject: Requestable, options: RequestOptions, onSent
             )
             Column(Modifier.offset(440.dp, 150.dp).width(580.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Kicker("Request")
-                Text(item.title, style = inter(56.sp, FontWeight.ExtraBold, lineHeight = 59.sp, tracking = -0.025f), color = WmmColors.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(item.title, style = inter(64.sp, FontWeight.ExtraBold, lineHeight = 80.sp, tracking = -0.025f), color = WmmColors.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 val meta = listOf(state.meta, if (isShow) "TV show" else "Movie").filter { it.isNotEmpty() }.joinToString(" · ")
-                Text(meta, style = inter(21.sp), color = TextBright)
+                Text(meta, style = inter(22.sp), color = TextBright)
                 if (item.overview.isNotBlank()) {
-                    Text(item.overview, style = inter(20.sp, lineHeight = 30.sp), color = WmmColors.TextSoft, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                    Text(item.overview, style = inter(22.sp, lineHeight = 33.sp), color = WmmColors.TextSoft, maxLines = 4, overflow = TextOverflow.Ellipsis)
                 }
                 Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                     TvButton(
@@ -179,18 +179,18 @@ internal fun RequestDialog(subject: Requestable, options: RequestOptions, onSent
                 options.approvalNote?.let { approvalNote ->
                     Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Icon(WmmIcons.Clock, contentDescription = null, tint = WmmColors.TextMuted, modifier = Modifier.size(22.dp))
-                        Text(approvalNote, style = inter(19.sp), color = WmmColors.TextMuted)
+                        Text(approvalNote, style = inter(22.sp), color = WmmColors.TextMuted)
                     }
                 }
-                error?.let { Text(it, style = inter(19.sp), color = WmmColors.Error) }
+                error?.let { Text(it, style = inter(22.sp), color = WmmColors.Error) }
             }
             if (isShow) {
                 Column(
                     Modifier.offset(1120.dp, 150.dp).width(680.dp).heightIn(max = 860.dp).verticalScroll(rememberScrollState()).padding(4.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Text("SEASONS", style = inter(17.sp, FontWeight.Bold, tracking = 0.1f), color = WmmColors.TextMuted, modifier = Modifier.padding(start = 18.dp, bottom = 6.dp))
-                    if (choices.isEmpty() && error == null) Text("Loading…", style = inter(19.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(start = 18.dp))
+                    Text("SEASONS", style = inter(22.sp, FontWeight.Bold, tracking = 0.1f), color = WmmColors.TextMuted, modifier = Modifier.padding(start = 18.dp, bottom = 6.dp))
+                    if (choices.isEmpty() && error == null) Text("Loading…", style = inter(22.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(start = 18.dp))
                     for ((c, s) in choices.zip(item.seasons)) {
                         val ticked = c.number in chosen
                         if (c.locked) {
@@ -239,9 +239,9 @@ private fun SeasonRow(name: String, detail: String, note: String?, icon: ImageVe
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(name, style = inter(22.sp, FontWeight.SemiBold), color = if (onClick == null) WmmColors.TextMuted else WmmColors.Text)
-                Text(detail, style = inter(17.sp), color = WmmColors.TextMuted)
+                Text(detail, style = inter(22.sp), color = WmmColors.TextMuted)
             }
-            if (note != null) Text(note, style = inter(18.sp, FontWeight.SemiBold), color = if (onClick == null) WmmColors.TextMuted else WmmColors.TextSoft)
+            if (note != null) Text(note, style = inter(22.sp, FontWeight.SemiBold), color = if (onClick == null) WmmColors.TextMuted else WmmColors.TextSoft)
         }
     }
     if (onClick == null) {

@@ -7,6 +7,8 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
@@ -27,6 +29,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -43,8 +46,8 @@ import androidx.compose.ui.zIndex
 import media.watchmy.client.ui.WmmColors
 
 /**
- * The mockups' focus ring: a gold outline [width] wide, drawn [offset]
- * outside the bounds (CSS outline-offset; negative draws inside).
+ * The focus ring: a gold outline [width] wide, drawn [offset] outside the
+ * bounds (CSS outline-offset; negative draws inside).
  */
 fun Modifier.focusRing(focused: Boolean, cornerRadius: Dp, offset: Dp = 4.dp, width: Dp = 4.dp, color: Color = WmmColors.Accent): Modifier =
     drawWithContent {
@@ -61,10 +64,28 @@ fun Modifier.focusRing(focused: Boolean, cornerRadius: Dp, offset: Dp = 4.dp, wi
         }
     }
 
+/** How much a focused thing grows: cards and people the most, list rows the least (larger things grow less). */
+object FocusGrowth {
+    const val CARD = 1.08f
+    const val BUTTON = 1.05f
+    const val ROW = 1.02f
+    const val NONE = 1f
+}
+
+/** Pressing OK sinks a focused thing a little and thickens its ring, held until the key comes up. */
+internal const val PRESSED_SCALE = 0.98f
+private val PressedRing = 6.dp
+
+/** The shadow under a focused thing, so it stands off the screen behind it. */
+private val FocusShadow = 24.dp
+
 /**
- * A D-pad target: centre (or Enter) clicks, holding it long-clicks, and
- * focus draws the 4 dp gold ring and scales by [focusedScale], as the
- * mockups' `.focus` class does. [content] gets the focused state.
+ * A D-pad target with the TV's one focus treatment: a 4 dp gold ring 4 dp
+ * outside, growth by [focusedScale] and a shadow. OK (centre or Enter)
+ * clicks, holding it long-clicks, and while the key is down the target
+ * sinks to [PRESSED_SCALE] with a thicker ring, so every press shows.
+ * [content] gets the focused state, to lift its fill ([TvPalette.Lift]).
+ * [growFrom] keeps something at the safe area's edge growing away from it.
  *
  * Not [enabled], it stays focusable and its clicks do nothing, and TalkBack
  * says it is disabled. A disabled clickable can't take focus, so a button
@@ -81,19 +102,30 @@ fun FocusableBox(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
-    cornerRadius: Dp = 12.dp,
-    focusedScale: Float = 1.06f,
+    cornerRadius: Dp = 14.dp,
+    focusedScale: Float = FocusGrowth.BUTTON,
     ringOffset: Dp = 4.dp,
     ringColor: Color = WmmColors.Accent,
     enabled: Boolean = true,
     contentAlignment: Alignment = Alignment.TopStart,
     /** What TalkBack calls it: a button for the TV's controls; null leaves it to the modifier (a switch row, a chip). */
     role: Role? = null,
+    /** Where it grows from: [TransformOrigin.Center], or the left edge for the rail and a row at the safe edge. */
+    growFrom: TransformOrigin = TransformOrigin.Center,
+    /** False for things that draw their own focus inside (a card's picture grows, not the card). */
+    ring: Boolean = true,
     content: @Composable BoxScope.(focused: Boolean) -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val scale by animateFloatAsState(if (focused) focusedScale else 1f, tween(140), label = "focusScale")
+    val pressed by interaction.collectIsPressedAsState()
+    val target = when {
+        !focused -> 1f
+        pressed -> PRESSED_SCALE
+        else -> focusedScale
+    }
+    val scale by animateFloatAsState(target, tween(if (pressed) 60 else 140), label = "focusScale")
+    val shape = remember(cornerRadius) { RoundedCornerShape(cornerRadius) }
     Box(
         modifier
             .zIndex(if (focused) 1f else 0f)
@@ -108,8 +140,13 @@ fun FocusableBox(
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
+                transformOrigin = growFrom
+                if (ring && focused) {
+                    this.shape = shape
+                    shadowElevation = FocusShadow.toPx()
+                }
             }
-            .focusRing(focused, cornerRadius, ringOffset, color = ringColor),
+            .then(if (ring) Modifier.focusRing(focused, cornerRadius, ringOffset, if (pressed) PressedRing else 4.dp, ringColor) else Modifier),
         contentAlignment = contentAlignment,
     ) { content(focused) }
 }

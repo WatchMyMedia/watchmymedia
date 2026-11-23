@@ -376,7 +376,7 @@ private fun TrailerLoading(trailer: String, movie: String, modifier: Modifier = 
         Spinner()
         Text(trailer, style = inter(48.sp, FontWeight.Bold, tracking = -0.01f), color = WmmColors.Text, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 48.dp))
         Text(movie, style = inter(26.sp), color = WmmColors.TextSoft, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 14.dp))
-        Text(TrailerText.PLAYS_FROM_YOUTUBE, style = inter(20.sp, FontWeight.Medium), color = WmmColors.TextMuted, modifier = Modifier.padding(top = 36.dp))
+        Text(TrailerText.PLAYS_FROM_YOUTUBE, style = inter(22.sp, FontWeight.Medium), color = WmmColors.TextMuted, modifier = Modifier.padding(top = 36.dp))
     }
 }
 
@@ -401,11 +401,11 @@ private fun TrailerPaused(trailer: String, movie: String, positionMs: Long, dura
         Text(movie, style = inter(26.sp), color = WmmColors.TextSoft, textAlign = TextAlign.Center, modifier = Modifier.padding(top = 14.dp))
         Text(
             TrailerText.paused(positionMs, durationMs),
-            style = inter(20.sp, FontWeight.Medium).copy(fontFeatureSettings = "tnum"),
+            style = inter(22.sp, FontWeight.Medium).copy(fontFeatureSettings = "tnum"),
             color = WmmColors.TextMuted,
             modifier = Modifier.padding(top = 36.dp).semantics { liveRegion = LiveRegionMode.Polite },
         )
-        Text(pausedKeys(), style = inter(18.sp), color = WmmColors.TextFaint, modifier = Modifier.padding(top = 56.dp))
+        Text(pausedKeys(), style = inter(22.sp), color = WmmColors.TextFaint, modifier = Modifier.padding(top = 56.dp))
     }
 }
 
@@ -442,7 +442,7 @@ private fun TrailerProblem(
     val focus = remember { FocusRequester() }
     Box(modifier.fillMaxSize().background(PlayerGround)) {
         Row(Modifier.padding(start = 58.dp, top = 52.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text(trailer, style = inter(30.sp, FontWeight.Bold), color = WmmColors.Text, modifier = Modifier.alignByBaseline())
+            Text(trailer, style = inter(28.sp, FontWeight.Bold), color = WmmColors.Text, modifier = Modifier.alignByBaseline())
             Text(movie, style = inter(22.sp), color = WmmColors.TextMuted, modifier = Modifier.alignByBaseline())
         }
         Column(

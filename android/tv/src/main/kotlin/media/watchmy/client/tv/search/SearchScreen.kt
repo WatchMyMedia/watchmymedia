@@ -1,5 +1,10 @@
 package media.watchmy.client.tv.search
 
+import media.watchmy.client.tv.components.FocusGrowth
+import media.watchmy.client.tv.components.PosterHeight
+import media.watchmy.client.tv.components.PosterWidth
+import media.watchmy.client.tv.components.WideCardHeight
+import media.watchmy.client.tv.components.WideCardWidth
 import media.watchmy.client.tv.watchlists.holdFor
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -195,7 +200,7 @@ fun SearchScreen(
             Modifier.padding(start = ContentStart, top = 56.dp).width(KeyboardWidth).onBack(enabled = listening, onBack = voice::stop),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            Text("Search", style = inter(46.sp, FontWeight.ExtraBold, tracking = -0.02f), color = WmmColors.Text)
+            Text("Search", style = inter(48.sp, FontWeight.ExtraBold, tracking = -0.02f), color = WmmColors.Text)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 // ▲ from the keyboard's top row comes here, and ▶ from here to the microphone; OK opens the TV's keyboard.
                 FocusableBox(onClick = tvKeyboard::open, modifier = Modifier.weight(1f), cornerRadius = 14.dp, focusedScale = 1f, ringOffset = 0.dp) {
@@ -342,8 +347,8 @@ private fun Results(
                                     title = e.showTitle,
                                     subtitle = e.airedLine(),
                                     imageUrl = hit.picture(library, e.stillPath ?: e.showBackdropPath, ImageSize.W780),
-                                    artWidth = 320.dp,
-                                    artHeight = 180.dp,
+                                    artWidth = WideCardWidth,
+                                    artHeight = WideCardHeight,
                                     onClick = { if (server == null) onOpenEpisode(e.showId, e.season, e.episodeId) else onOpenElsewhere(server, e.pageElsewhere()) },
                                     // Holding OK plays on the server in use; one on another server is opened there first.
                                     onLongClick = if (server == null) ({ e.playRequest()?.let(onPlay) ?: onOpenShow(e.showId) }) else null,
@@ -386,7 +391,7 @@ private fun serverLine(serverName: String?, keepRoom: Boolean): (@Composable () 
         {
             Row(Modifier.padding(top = 2.dp).height(24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 Icon(WmmIcons.Server, contentDescription = null, tint = WmmColors.TextSoft, modifier = Modifier.size(16.dp))
-                Text(serverName, style = inter(17.sp, FontWeight.SemiBold), color = Color(0xFFE5E5E5), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(serverName, style = inter(22.sp, FontWeight.SemiBold), color = Color(0xFFE5E5E5), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -411,13 +416,13 @@ private fun ServersTail(state: SearchViewModel.State, onRetry: () -> Unit, modif
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 CircularProgressIndicator(Modifier.size(22.dp), color = WmmColors.Accent, strokeWidth = 3.dp, trackColor = Color.White.copy(alpha = 0.22f))
-                Text(stillAsking(state.stillAsking), style = inter(20.sp), color = WmmColors.TextSoft)
+                Text(stillAsking(state.stillAsking), style = inter(22.sp), color = WmmColors.TextSoft)
             }
         }
         state.unlisted.forEach { server ->
             Row(Modifier.heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Icon(WmmIcons.Alert, contentDescription = null, tint = WmmColors.Warn, modifier = Modifier.size(24.dp))
-                Text(server.line, style = inter(20.sp, lineHeight = 28.sp), color = WmmColors.TextSoft, modifier = Modifier.weight(1f, fill = false).semantics { liveRegion = LiveRegionMode.Polite })
+                Text(server.line, style = inter(22.sp, lineHeight = 31.sp), color = WmmColors.TextSoft, modifier = Modifier.weight(1f, fill = false).semantics { liveRegion = LiveRegionMode.Polite })
                 if (server.retry) TvButton("Try again", onRetry, Modifier.padding(start = 8.dp), size = TvButtonSize.Settings)
             }
         }
@@ -437,10 +442,10 @@ private fun NotInLibraryCard(item: Requestable, library: LibraryRepository, memo
         title = item.title,
         subtitle = item.subtitle(),
         imageUrl = library.imageUrl(item.posterPath, ImageSize.W342),
-        artWidth = 190.dp,
-        artHeight = 285.dp,
+        artWidth = PosterWidth,
+        artHeight = PosterHeight,
         onClick = onClick,
-        focusedScale = 1.08f,
+        focusedScale = FocusGrowth.CARD,
         modifier = Modifier.focusMemory(memory, "req:${item.mediaType}:${item.tmdbId}"),
     ) {
         Row(
@@ -449,7 +454,7 @@ private fun NotInLibraryCard(item: Requestable, library: LibraryRepository, memo
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Icon(icon, contentDescription = null, tint = if (gold) WmmColors.Accent else WmmColors.Text, modifier = Modifier.size(16.dp))
-            Text(label, style = inter(14.sp, FontWeight.Bold), color = WmmColors.Text, maxLines = 1)
+            Text(label, style = inter(22.sp, FontWeight.Bold), color = WmmColors.Text, maxLines = 1)
         }
     }
 }
@@ -472,12 +477,12 @@ private fun PosterSection(
                     title = item.title,
                     subtitle = item.gridSubtitle(),
                     imageUrl = hit.picture(library, item.posterPath, ImageSize.W342),
-                    artWidth = 190.dp,
-                    artHeight = 285.dp,
+                    artWidth = PosterWidth,
+                    artHeight = PosterHeight,
                     onClick = { onOpen(hit) },
                     // Hold OK saves a result on this server to a watchlist; one on another server has nothing to hold.
                     onLongClick = if (hit.serverId == null) holdFor(item, null) else null,
-                    focusedScale = 1.08f,
+                    focusedScale = FocusGrowth.CARD,
                     modifier = Modifier.focusMemory(memory, "${item.kind}:${hit.serverId.orEmpty()}:${item.id}").onServer(item.title, hit.serverName),
                     line = serverLine(hit.serverName, several),
                 ) {
@@ -499,7 +504,7 @@ private fun MicKey(listening: Boolean, onPress: () -> Unit) {
     FocusableBox(
         onClick = onPress,
         cornerRadius = 36.dp,
-        focusedScale = 1.06f,
+        focusedScale = FocusGrowth.CARD,
         modifier = Modifier.size(72.dp).semantics { contentDescription = if (listening) "Stop listening" else "Voice typing" },
     ) { focused ->
         Box(
@@ -533,7 +538,7 @@ private fun DrawScope.drawRings() {
 private fun VoiceLine(text: String, listening: Boolean) {
     Row(Modifier.semantics { liveRegion = LiveRegionMode.Polite }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         if (listening) Box(Modifier.size(12.dp).background(WmmColors.Accent, CircleShape))
-        Text(text, style = inter(20.sp, lineHeight = 28.sp), color = if (listening) WmmColors.Accent else WmmColors.TextMuted)
+        Text(text, style = inter(22.sp, lineHeight = 31.sp), color = if (listening) WmmColors.Accent else WmmColors.TextMuted)
     }
 }
 
@@ -555,7 +560,7 @@ private fun KeyHints(mic: Boolean, modifier: Modifier = Modifier) {
 private fun KeyHint(key: String, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         KeyCap(key)
-        Text(text, style = inter(19.sp), color = WmmColors.TextSoft)
+        Text(text, style = inter(22.sp), color = WmmColors.TextSoft)
     }
 }
 
@@ -565,6 +570,6 @@ private fun KeyCap(key: String) {
         Modifier.height(34.dp).border(2.dp, WmmColors.Text.copy(alpha = 0.32f), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(key, style = inter(16.sp, FontWeight.Bold), color = WmmColors.Text)
+        Text(key, style = inter(22.sp, FontWeight.Bold), color = WmmColors.Text)
     }
 }

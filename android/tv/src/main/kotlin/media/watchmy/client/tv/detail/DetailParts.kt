@@ -60,12 +60,12 @@ fun DetailPoster(url: String?, title: String, modifier: Modifier = Modifier) {
 /** "TV Shows › Harbor Lights". */
 @Composable
 fun Breadcrumb(section: String, title: String) {
-    Text("$section › $title", style = inter(18.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Text("$section › $title", style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
 @Composable
 fun DetailTitle(title: String) {
-    Text(title, style = inter(60.sp, FontWeight.ExtraBold, lineHeight = 64.sp, tracking = -0.025f), color = WmmColors.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    Text(title, style = inter(64.sp, FontWeight.ExtraBold, lineHeight = 80.sp, tracking = -0.025f), color = WmmColors.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
 }
 
 /** The facts line: parts joined by grey dots, then [extra] (tags, the status pill). */
@@ -74,8 +74,8 @@ fun DetailTitle(title: String) {
 fun FactsLine(parts: List<String>, extra: @Composable RowScope.() -> Unit = {}) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
         parts.forEachIndexed { i, p ->
-            if (i > 0) Text("·", style = inter(21.sp), color = WmmColors.TextFaint)
-            Text(p, style = inter(21.sp), color = TextBright)
+            if (i > 0) Text("·", style = inter(22.sp), color = WmmColors.TextFaint)
+            Text(p, style = inter(22.sp), color = TextBright)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically, content = extra)
     }
@@ -85,7 +85,7 @@ fun FactsLine(parts: List<String>, extra: @Composable RowScope.() -> Unit = {}) 
 @Composable
 fun Overview(text: String) {
     if (text.isBlank()) return
-    Text(text, style = inter(20.sp, lineHeight = 30.sp), color = WmmColors.TextSoft, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 1000.dp))
+    Text(text, style = inter(22.sp, lineHeight = 33.sp), color = WmmColors.TextSoft, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 1000.dp))
 }
 
 /** "Continuing · next episode Nov 4" in a gold pill, or a grey "Ended". */
@@ -98,7 +98,7 @@ fun StatusPill(text: String, gold: Boolean) {
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Box(Modifier.size(8.dp).background(color, CircleShape))
-        Text(text, style = inter(16.sp, FontWeight.SemiBold), color = color)
+        Text(text, style = inter(22.sp, FontWeight.SemiBold), color = color)
     }
 }
 
@@ -127,8 +127,8 @@ fun CastMember(person: Person, imageUrl: String?, modifier: Modifier = Modifier,
         } else {
             Box(face.background(placeholderColor(person.name), CircleShape))
         }
-        Text(person.name, style = inter(15.sp, FontWeight.SemiBold, lineHeight = 18.sp), color = WmmColors.Text, textAlign = TextAlign.Center, maxLines = 2)
-        person.role?.let { Text(it, style = inter(13.sp, lineHeight = 16.sp), color = WmmColors.TextMuted, textAlign = TextAlign.Center, maxLines = 2) }
+        Text(person.name, style = inter(22.sp, FontWeight.SemiBold, lineHeight = 28.sp), color = WmmColors.Text, textAlign = TextAlign.Center, maxLines = 2)
+        person.role?.let { Text(it, style = inter(22.sp, lineHeight = 28.sp), color = WmmColors.TextMuted, textAlign = TextAlign.Center, maxLines = 2) }
     }
 }
 
@@ -152,12 +152,12 @@ fun DetailsSheet(title: String, overview: String, facts: List<Pair<String, Strin
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
                 Text(title, style = inter(34.sp, FontWeight.Bold, tracking = -0.02f), color = WmmColors.Text, maxLines = 2)
-                if (overview.isNotBlank()) Text(overview, style = inter(19.sp, lineHeight = 29.sp), color = WmmColors.TextSoft, maxLines = 8, overflow = TextOverflow.Ellipsis)
+                if (overview.isNotBlank()) Text(overview, style = inter(22.sp, lineHeight = 34.sp), color = WmmColors.TextSoft, maxLines = 8, overflow = TextOverflow.Ellipsis)
                 Column {
                     for ((label, value) in facts) {
                         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                            Text(label.uppercase(), style = inter(15.sp, FontWeight.SemiBold, tracking = 0.06f), color = WmmColors.TextMuted, modifier = Modifier.width(170.dp).padding(top = 3.dp))
-                            Text(value, style = inter(19.sp), color = WmmColors.Text)
+                            Text(label.uppercase(), style = inter(22.sp, FontWeight.SemiBold, tracking = 0.06f), color = WmmColors.TextMuted, modifier = Modifier.width(170.dp).padding(top = 3.dp))
+                            Text(value, style = inter(22.sp), color = WmmColors.Text)
                         }
                     }
                 }

@@ -107,7 +107,7 @@ fun OnScreenKeyboard(
     ) {
         if (extraKeys.isNotEmpty()) {
             Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-                for (k in extraKeys) Key(k, { type(k) }, Modifier.width(unit * 2.5f - gap).height(keySize), fontSize = 18.sp)
+                for (k in extraKeys) Key(k, { type(k) }, Modifier.width(unit * 2.5f - gap).height(keySize), fontSize = 22.sp)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
@@ -128,19 +128,19 @@ fun OnScreenKeyboard(
                 if (layer == Layer.Upper) "⇧ ABC" else "⇧ abc",
                 { layer = if (layer == Layer.Upper) Layer.Lower else Layer.Upper },
                 Modifier.width(unit * 1.5f - gap / 2).height(keySize),
-                fontSize = 18.sp,
+                fontSize = 22.sp,
                 on = layer == Layer.Upper,
             )
             Key(
                 if (layer == Layer.Symbols) "abc" else "#+=",
                 { layer = if (layer == Layer.Symbols) Layer.Lower else Layer.Symbols },
                 Modifier.width(unit * 1.5f - gap / 2).height(keySize),
-                fontSize = 18.sp,
+                fontSize = 22.sp,
             )
-            Key("Space", { onText(" ") }, Modifier.width(unit * 3 - gap * 2).height(keySize), fontSize = 18.sp)
+            Key("Space", { onText(" ") }, Modifier.width(unit * 3 - gap * 2).height(keySize), fontSize = 22.sp)
             Key("⌫", onBackspace, Modifier.width(unit * 1.5f - gap / 2).height(keySize), fontSize = 22.sp, onLongClick = { repeat(64) { onBackspace() } })
             if (onDone != null) {
-                Key(doneLabel, onDone, Modifier.width(unit * 2.5f - gap * 1.5f).height(keySize), fontSize = 18.sp, gold = true)
+                Key(doneLabel, onDone, Modifier.width(unit * 2.5f - gap * 1.5f).height(keySize), fontSize = 22.sp, gold = true)
             }
         }
     }
@@ -200,9 +200,9 @@ fun OnScreenKeyboard(
             "Use the TV’s keyboard",
             openTvKeyboard,
             Modifier.width((keySize + gap) * 10 - gap).height(keySize).focusRequester(tvKey),
-            fontSize = 20.sp,
+            fontSize = 22.sp,
         )
-        if (note != null) Text(note, style = inter(17.sp, lineHeight = 25.sp), color = WmmColors.TextFaint, modifier = Modifier.width((keySize + gap) * 10 - gap))
+        if (note != null) Text(note, style = inter(22.sp, lineHeight = 32.sp), color = WmmColors.TextFaint, modifier = Modifier.width((keySize + gap) * 10 - gap))
         // The system's keyboard types into the same field through an editor of its own, out of sight.
         BasicTextField(
             state = field,
@@ -249,7 +249,7 @@ private fun Key(
     onLongClick: (() -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(12.dp)
-    FocusableBox(onClick = onClick, onLongClick = onLongClick, modifier = modifier, cornerRadius = 12.dp, focusedScale = 1.08f, contentAlignment = Alignment.Center) { focused ->
+    FocusableBox(onClick = onClick, onLongClick = onLongClick, modifier = modifier, cornerRadius = 12.dp, focusedScale = FocusGrowth.CARD, contentAlignment = Alignment.Center) { focused ->
         val bg = when {
             gold || on -> WmmColors.Accent
             focused -> WmmColors.Surface3
@@ -333,9 +333,9 @@ fun KeyboardDialog(
                 verticalArrangement = Arrangement.spacedBy(22.dp),
             ) {
                 Column(Modifier.width(980.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text(title, style = inter(30.sp, FontWeight.SemiBold), color = WmmColors.Text)
+                    Text(title, style = inter(28.sp, FontWeight.SemiBold), color = WmmColors.Text)
                     KeyboardField(field.text.toString(), placeholder = placeholder, masked = masked, active = true)
-                    if (note != null) Text(note, style = inter(18.sp, lineHeight = 27.sp), color = if (noteWarns(field.text.toString())) WmmColors.Warn else WmmColors.TextFaint)
+                    if (note != null) Text(note, style = inter(22.sp, lineHeight = 33.sp), color = if (noteWarns(field.text.toString())) WmmColors.Warn else WmmColors.TextFaint)
                 }
                 OnScreenKeyboard(
                     field = field,

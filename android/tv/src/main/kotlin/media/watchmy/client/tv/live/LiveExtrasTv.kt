@@ -115,13 +115,13 @@ internal fun TvLiveMenu(title: String, subtitle: String, logo: LiveChannel?, ite
                     if (logo?.logo != null) ChannelLogo(logo, Modifier.width(56.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(title, style = inter(26.sp, FontWeight.Bold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(subtitle, style = inter(18.sp), color = WmmColors.TextMuted, maxLines = 1)
+                        Text(subtitle, style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 1)
                     }
                 }
                 items.forEachIndexed { index, item ->
                     TvButton(item.label, item.onClick, if (index == 0) Modifier.focusRequester(first) else Modifier, icon = item.icon, size = TvButtonSize.Medium, enabled = item.enabled)
                 }
-                note?.let { Text(it, style = inter(17.sp), color = WmmColors.TextMuted) }
+                note?.let { Text(it, style = inter(22.sp), color = WmmColors.TextMuted) }
             }
         }
         InitialFocus(first)
@@ -142,9 +142,9 @@ fun LiveRemindersScreenTv(channels: List<LiveChannel>, onNavigate: (Any) -> Unit
     val first = remember { FocusRequester() }
     TvScaffold(RailSection.LiveTV, onNavigate, modifier) {
         Column(Modifier.fillMaxSize().padding(start = 150.dp, end = 58.dp, top = 48.dp)) {
-            Text("Live TV › Reminders", style = inter(19.sp), color = WmmColors.TextMuted)
-            Text("Reminders", style = inter(56.sp, FontWeight.ExtraBold), color = WmmColors.Text, modifier = Modifier.padding(top = 6.dp))
-            Text(liveRemindersCountTv(state.items.size, state.leadMinutes), style = inter(21.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(top = 6.dp, bottom = 28.dp))
+            Text("Live TV › Reminders", style = inter(22.sp), color = WmmColors.TextMuted)
+            Text("Reminders", style = inter(64.sp, FontWeight.ExtraBold), color = WmmColors.Text, modifier = Modifier.padding(top = 6.dp))
+            Text(liveRemindersCountTv(state.items.size, state.leadMinutes), style = inter(22.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(top = 6.dp, bottom = 28.dp))
             if (state.items.isEmpty() && !state.loading) Text(LIVE_REMINDERS_EMPTY_TV, style = inter(22.sp), color = WmmColors.TextSoft)
             LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
                 items(state.items, key = { it.id }) { reminder ->
@@ -155,7 +155,7 @@ fun LiveRemindersScreenTv(channels: List<LiveChannel>, onNavigate: (Any) -> Unit
                     )
                 }
             }
-            Text(LIVE_REMINDERS_NOTE_TV, style = inter(18.sp, lineHeight = 26.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(bottom = 40.dp))
+            Text(LIVE_REMINDERS_NOTE_TV, style = inter(22.sp, lineHeight = 32.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(bottom = 40.dp))
         }
         if (state.items.isNotEmpty()) InitialFocus(first)
     }
@@ -170,19 +170,19 @@ private fun TvReminderRow(reminder: LiveReminder, channel: LiveChannel, now: Lon
             ProgrammePicture(null, channel, Modifier.fillMaxWidth())
             Row(Modifier.align(Alignment.TopStart).padding(8.dp).background(Color.Black.copy(alpha = .72f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (channel.logo != null) ChannelLogo(channel, Modifier.width(30.dp))
-                Text(channel.number, style = inter(17.sp, FontWeight.Bold), color = WmmColors.Text)
+                Text(channel.number, style = inter(22.sp, FontWeight.Bold), color = WmmColors.Text)
             }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(reminder.title, style = inter(26.sp, FontWeight.Bold), color = if (gone) WmmColors.TextMuted else WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(reminder.tvLine(), style = inter(19.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(reminder.tvLine(), style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Column(Modifier.width(320.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(if (gone) WmmIcons.BellOff else if (moved) WmmIcons.Moved else WmmIcons.Bell, contentDescription = null, tint = if (gone) WmmColors.TextMuted else if (moved) WmmColors.Accent else WmmColors.TextSoft, modifier = Modifier.size(22.dp))
-                Text(reminder.tvStatus(now, format), style = inter(20.sp, FontWeight.SemiBold), color = if (gone) WmmColors.TextMuted else if (moved) WmmColors.Accent else WmmColors.Text)
+                Text(reminder.tvStatus(now, format), style = inter(22.sp, FontWeight.SemiBold), color = if (gone) WmmColors.TextMuted else if (moved) WmmColors.Accent else WmmColors.Text)
             }
-            Text(reminder.tvWhen(format), style = inter(18.sp), color = WmmColors.TextMuted)
+            Text(reminder.tvWhen(format), style = inter(22.sp), color = WmmColors.TextMuted)
         }
         TvButton("Remove", onRemove, modifier.semantics { contentDescription = reminder.tvRemoveLabel(format) }, size = TvButtonSize.Medium)
     }
@@ -211,16 +211,16 @@ internal fun TvReminderBanner(reminder: LiveReminder, leadMinutes: Int, channel:
                 ProgrammePicture(null, shown, Modifier.fillMaxWidth())
                 Row(Modifier.align(Alignment.TopStart).padding(6.dp).background(Color.Black.copy(alpha = .72f), RoundedCornerShape(5.dp)).padding(horizontal = 6.dp, vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (shown.logo != null) ChannelLogo(shown, Modifier.width(26.dp))
-                    Text(reminder.number, style = inter(15.sp, FontWeight.Bold), color = WmmColors.Text)
+                    Text(reminder.number, style = inter(22.sp, FontWeight.Bold), color = WmmColors.Text)
                 }
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(WmmIcons.BellFilled, contentDescription = null, tint = WmmColors.Accent, modifier = Modifier.size(20.dp))
-                    Text(liveReminderHeadline(leadMinutes), style = inter(19.sp, FontWeight.SemiBold), color = WmmColors.Accent)
+                    Text(liveReminderHeadline(leadMinutes), style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.Accent)
                 }
-                Text(reminder.title, style = inter(30.sp, FontWeight.Bold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(reminder.bannerLine(format), style = inter(18.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(reminder.title, style = inter(28.sp, FontWeight.Bold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(reminder.bannerLine(format), style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
@@ -298,11 +298,11 @@ fun TvLiveSearchRow(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Bottom) {
-            Text("On Live TV", style = inter(30.sp, FontWeight.Bold), color = WmmColors.Text)
-            if (state.results.isNotEmpty()) Text("${state.results.size}", style = inter(20.sp), color = WmmColors.TextMuted)
+            Text("On Live TV", style = inter(28.sp, FontWeight.Bold), color = WmmColors.Text)
+            if (state.results.isNotEmpty()) Text("${state.results.size}", style = inter(22.sp), color = WmmColors.TextMuted)
         }
         if (state.nothing) {
-            Text(liveSearchNoneTv(state.searched.orEmpty(), state.listedThroughMs, format), style = inter(21.sp), color = WmmColors.TextMuted)
+            Text(liveSearchNoneTv(state.searched.orEmpty(), state.listedThroughMs, format), style = inter(22.sp), color = WmmColors.TextMuted)
             return@Column
         }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(22.dp), contentPadding = PaddingValues(vertical = 10.dp, horizontal = 4.dp)) {
@@ -317,8 +317,8 @@ fun TvLiveSearchRow(
         }
         focused?.takeIf { hasFocus || menu != null }?.let { hit ->
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(hit.programme.title, style = inter(20.sp, FontWeight.SemiBold), color = WmmColors.TextSoft, maxLines = 1)
-                Text("·", style = inter(20.sp), color = WmmColors.TextMuted)
+                Text(hit.programme.title, style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.TextSoft, maxLines = 1)
+                Text("·", style = inter(22.sp), color = WmmColors.TextMuted)
                 val airing = hit.programme.airingAt(now)
                 TvOkHint(if (airing) "Watch ${hit.channel.number}" else "Open it in the guide")
                 val reminded = state.reminderFor(hit) != null
@@ -366,19 +366,19 @@ private fun TvLiveSearchCard(hit: LiveSearchHit, now: Long, format: LiveClockFor
                 ProgrammePicture(p, hit.channel, Modifier.fillMaxWidth())
                 Row(Modifier.align(Alignment.TopStart).padding(10.dp).background(Color.Black.copy(alpha = .72f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (hit.channel.logo != null) ChannelLogo(hit.channel, Modifier.width(34.dp))
-                    Text(hit.channel.number, style = inter(20.sp, FontWeight.Bold), color = WmmColors.Text)
+                    Text(hit.channel.number, style = inter(22.sp, FontWeight.Bold), color = WmmColors.Text)
                 }
                 if (airing) Row(Modifier.align(Alignment.TopEnd).padding(10.dp).background(Color(0xFFB42318), RoundedCornerShape(5.dp)).padding(horizontal = 8.dp, vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(7.dp).background(Color.White, RoundedCornerShape(4.dp)))
-                    Text("LIVE", style = inter(14.sp, FontWeight.Bold), color = Color.White)
+                    Text("LIVE", style = inter(22.sp, FontWeight.Bold), color = Color.White)
                 } else if (reminded) Box(Modifier.align(Alignment.TopEnd).padding(10.dp).background(Color.Black.copy(alpha = .72f), RoundedCornerShape(16.dp)).padding(6.dp)) {
                     Icon(WmmIcons.BellFilled, contentDescription = null, tint = WmmColors.Accent, modifier = Modifier.size(18.dp))
                 }
                 if (airing) LiveProgress(p.progressAt(now), Modifier.align(Alignment.BottomStart).fillMaxWidth(), height = 5.dp, track = Color.Transparent)
             }
         }
-        Text(p.title, style = inter(20.sp, FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(p.episodeLine() ?: p.categories.firstOrNull().orEmpty(), style = inter(17.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(hit.whenLineTv(now, format, reminded), style = inter(17.sp), color = when { airing -> Color(0xFFFCA5A5); reminded -> WmmColors.Accent; else -> WmmColors.TextMuted }, maxLines = 1)
+        Text(p.title, style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(p.episodeLine() ?: p.categories.firstOrNull().orEmpty(), style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(hit.whenLineTv(now, format, reminded), style = inter(22.sp), color = when { airing -> Color(0xFFFCA5A5); reminded -> WmmColors.Accent; else -> WmmColors.TextMuted }, maxLines = 1)
     }
 }

@@ -371,11 +371,11 @@ private fun TvRecordingTakeover(session: media.watchmy.client.model.LiveSession,
             .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(message, style = inter(23.sp), color = WmmColors.Text)
+        Text(message, style = inter(24.sp), color = WmmColors.Text)
         Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
             if (session.takeoverCanCancel) TvOkHint(LIVE_TAKEOVER_DONT_RECORD, key = "Hold OK")
             TvOkHint("OK", key = "Back")
         }
-        state.error?.let { Text(it, style = inter(18.sp), color = WmmColors.Error) }
+        state.error?.let { Text(it, style = inter(22.sp), color = WmmColors.Error) }
     }
 }

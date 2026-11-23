@@ -117,15 +117,15 @@ fun LiveChannelsScreen(
                 onReminders = onReminders, onRecordings = onRecordings, target = target, onTargetShown = onTargetShown,
             )
             else -> Column(Modifier.fillMaxSize().padding(start = ContentStart, end = 58.dp, top = 48.dp)) {
-                Text("Live TV", style = inter(56.sp, FontWeight.ExtraBold), color = WmmColors.Text)
-                Text("Listings aren’t on this server yet. Pick a channel and press OK to watch.", style = inter(21.sp, lineHeight = 29.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(top = 10.dp))
+                Text("Live TV", style = inter(64.sp, FontWeight.ExtraBold), color = WmmColors.Text)
+                Text("Listings aren’t on this server yet. Pick a channel and press OK to watch.", style = inter(22.sp, lineHeight = 30.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(top = 10.dp))
                 Row(Modifier.fillMaxWidth().padding(top = 32.dp, bottom = 40.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                    Text("${channels.count { it.available }} channels available", style = inter(20.sp), color = WmmColors.TextMuted, modifier = Modifier.weight(1f))
+                    Text("${channels.count { it.available }} channels available", style = inter(22.sp), color = WmmColors.TextMuted, modifier = Modifier.weight(1f))
                     if (state.capabilities.canRecord) TvButton("Recordings", onRecordings, size = TvButtonSize.Medium)
                     TvButton("Reload", onRefresh, size = TvButtonSize.Medium)
                     TvButton("Go to channel", { number = "" }, size = TvButtonSize.Medium)
                 }
-                state.error?.let { Text(it, style = inter(19.sp), color = WmmColors.Error, modifier = Modifier.padding(bottom = 20.dp)) }
+                state.error?.let { Text(it, style = inter(22.sp), color = WmmColors.Error, modifier = Modifier.padding(bottom = 20.dp)) }
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(6),
                     state = grid,
@@ -208,7 +208,7 @@ private fun TvGuideContent(
             state.guide == null -> LoadingState()
             else -> LiveTvGuide(state, rows, now, format, memory, moves, onWatch, onGoTo, extras = extras)
         }
-        recordingState.notice?.let { Text(it, style = inter(19.sp), color = WmmColors.Accent, modifier = Modifier.align(Alignment.BottomStart).padding(16.dp)) }
+        recordingState.notice?.let { Text(it, style = inter(22.sp), color = WmmColors.Accent, modifier = Modifier.align(Alignment.BottomStart).padding(16.dp)) }
         recordingState.clash?.let { clash -> TvRecordingClash(clash, recordingActions) }
     }
     // Focus starts on what is on the channel watched last, or comes back to where it was.

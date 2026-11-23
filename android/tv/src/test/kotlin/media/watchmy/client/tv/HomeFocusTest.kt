@@ -16,6 +16,7 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import media.watchmy.client.fake.FakeData
 import media.watchmy.client.fake.fakeLatencyMs
+import media.watchmy.client.tv.components.ContentStart
 import media.watchmy.client.tv.components.RowStart
 import media.watchmy.client.ui.LocalAppServices
 import org.junit.Assert.assertEquals
@@ -301,7 +302,7 @@ class HomeFocusTest {
         assertTrue("The hint offers both ways along the row: ${hint()}", "◀ ▶ more in this row" in hint())
 
         // The row has scrolled back with focus: the second card sits where the row starts, whole, and the third after it.
-        val start = compose.onRoot().fetchSemanticsNode().boundsInRoot.width * 154f / 1920f
+        val start = compose.onRoot().fetchSemanticsNode().boundsInRoot.width * ContentStart.value / 1920f
         // Its title, on the screen showing: other screens' rows have the show too, clipped to nothing.
         val before = compose.onAllNodesWithText(shows[1], useUnmergedTree = true).fetchSemanticsNodes().single { it.boundsInRoot.height > 0f }.boundsInRoot
         assertEquals("${shows[1]} starts where the row does", start, before.left, 2f)

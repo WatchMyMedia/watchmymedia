@@ -85,13 +85,13 @@ internal fun About(show: ShowDetail, flags: AboutFlags, vm: ShowPageActions, lib
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text(show.title, style = inter(48.sp, FontWeight.ExtraBold, lineHeight = 52.sp, tracking = -0.02f), color = WmmColors.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
-                Text(showFacts(show), style = inter(21.sp), color = TextBright)
+                Text(showFacts(show), style = inter(22.sp), color = TextBright)
                 showStatus(show)?.let { (text, active) ->
                     val color = if (active) WmmColors.Accent else WmmColors.TextMuted
-                    Text(text, style = inter(16.sp, FontWeight.SemiBold), color = color, modifier = Modifier.border(1.dp, color, RoundedCornerShape(999.dp)).padding(horizontal = 12.dp, vertical = 5.dp))
+                    Text(text, style = inter(22.sp, FontWeight.SemiBold), color = color, modifier = Modifier.border(1.dp, color, RoundedCornerShape(999.dp)).padding(horizontal = 12.dp, vertical = 5.dp))
                 }
             }
-            if (show.overview.isNotBlank()) Text(show.overview, style = inter(20.sp, lineHeight = 30.sp), color = WmmColors.TextSoft, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 1100.dp))
+            if (show.overview.isNotBlank()) Text(show.overview, style = inter(22.sp, lineHeight = 33.sp), color = WmmColors.TextSoft, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 1100.dp))
             // Notify me, first of the show's buttons, with who notifies under the buttons while it has focus,
             // and Watchlist beside it. With Watchlist there is a second row for the rest: one row can't hold them.
             var bellFocused by remember { mutableStateOf(false) }
@@ -114,7 +114,7 @@ internal fun About(show: ShowDetail, flags: AboutFlags, vm: ShowPageActions, lib
                 if (!saves) AboutMore(flags, vm, memory, up, onAsk, onDetails)
             }
             if (saves) Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) { AboutMore(flags, vm, memory, up, onAsk, onDetails) }
-            if (bellFocused && flags.following != null) Text(FOLLOW_TV_LINE, style = inter(19.sp), color = WmmColors.TextMuted)
+            if (bellFocused && flags.following != null) Text(FOLLOW_TV_LINE, style = inter(22.sp), color = WmmColors.TextMuted)
         }
     }
 }

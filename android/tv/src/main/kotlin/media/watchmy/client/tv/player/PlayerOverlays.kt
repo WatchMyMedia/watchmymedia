@@ -131,9 +131,9 @@ internal fun NextEpisodeCard(
             modifier = Modifier.fillMaxWidth().height(270.dp),
             overlay = {
                 Box(Modifier.fillMaxSize().padding(14.dp)) {
-                    Badge("Next episode", Modifier.align(Alignment.TopStart), fontSize = 14.sp, horizontalPadding = 10.dp, verticalPadding = 5.dp)
+                    Badge("Next episode", Modifier.align(Alignment.TopStart), fontSize = 22.sp, horizontalPadding = 10.dp, verticalPadding = 5.dp)
                     next.runtimeMs?.let {
-                        Badge(formatDuration(it), Modifier.align(Alignment.BottomEnd), fontSize = 14.sp, horizontalPadding = 10.dp, verticalPadding = 5.dp, uppercase = false)
+                        Badge(formatDuration(it), Modifier.align(Alignment.BottomEnd), fontSize = 22.sp, horizontalPadding = 10.dp, verticalPadding = 5.dp, uppercase = false)
                     }
                 }
             },
