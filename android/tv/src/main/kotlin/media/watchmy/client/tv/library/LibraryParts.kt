@@ -180,8 +180,7 @@ internal fun SortFilterPanel(
                                 },
                                 modifier = Modifier.focusRequester(rowFocus.getValue(row.list)).then(if (i == 0) Modifier.focusRequester(focus) else Modifier),
                                 description = row.value,
-                                icon = null,
-                                trailing = null,
+                                chevron = true,
                             )
                         }
                         item {

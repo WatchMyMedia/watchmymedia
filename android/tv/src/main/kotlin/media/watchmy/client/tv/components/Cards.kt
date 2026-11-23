@@ -330,8 +330,8 @@ fun BoxScope.ArtWatched(watched: Boolean, size: Dp = 38.dp) {
 @Composable
 fun CardRow(modifier: Modifier = Modifier, start: Dp = ContentStart, enter: FocusRequester = FocusRequester.Default, content: LazyListScope.() -> Unit) {
     val density = LocalDensity.current
-    val leading = with(density) { 12.dp.toPx() }
-    val trailing = with(density) { (ContentEnd + 12.dp).toPx() }
+    val leading = with(density) { RowInset.toPx() }
+    val trailing = with(density) { (ContentEnd + RowInset).toPx() }
     val gap = with(density) { CardGap.toPx() }
     val spec = remember(leading, gap, trailing) { KeylineSpec(leading, gap, trailing) }
     val list = rememberLazyListState()
@@ -343,14 +343,14 @@ fun CardRow(modifier: Modifier = Modifier, start: Dp = ContentStart, enter: Focu
         LazyRow(
             modifier = modifier
                 .fillMaxWidth()
-                .padding(start = start - 12.dp)
+                .padding(start = start - RowInset)
                 .onPlaced { rowFocus.viewport = it }
                 .onFocusChanged { hasFocus = it.hasFocus }
                 .fadePassedCards(list)
                 .rowStart(rowStart)
                 .focusRestorer(enter),
             state = list,
-            contentPadding = PaddingValues(start = 12.dp, end = ContentEnd, top = 12.dp, bottom = 12.dp),
+            contentPadding = PaddingValues(start = RowInset, end = ContentEnd, top = RowInset, bottom = RowInset),
             horizontalArrangement = Arrangement.spacedBy(CardGap),
             content = content,
         )
@@ -360,6 +360,9 @@ fun CardRow(modifier: Modifier = Modifier, start: Dp = ContentStart, enter: Focu
 
 /** The space between a row's cards. */
 internal val CardGap = 40.dp
+
+/** Room around a row's cards for the focused one's growth, ring and shadow, so its row doesn't clip them. */
+internal val RowInset = 28.dp
 
 /**
  * Fades a row into the ground at its leading edge while there are cards

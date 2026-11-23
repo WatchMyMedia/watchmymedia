@@ -335,7 +335,8 @@ fun SearchScreen(
 /** Before anything is typed, or when there is nothing to show: a heading and a line, level with the box. */
 @Composable
 private fun Hint(title: String, message: String) {
-    Column(Modifier.padding(top = SafeY, end = ContentEnd).widthIn(max = 760.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    // The column's box starts ContentStart short of the results (as the results' list does), so this starts at ContentStart in it.
+    Column(Modifier.padding(start = ContentStart, top = SafeY, end = ContentEnd).widthIn(max = 760.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text(title, style = TvType.Heading, color = WmmColors.Text)
         Text(message, style = TvType.Body, color = WmmColors.TextSoft)
     }
@@ -353,7 +354,7 @@ private fun NothingMatches(title: String, line: String) {
 /** Recent searches beside the keyboard, before anything is typed: OK searches again. With a microphone, how to use it. */
 @Composable
 private fun RecentSearches(recent: List<String>, mic: Boolean, memory: FocusMemory, onPick: (String) -> Unit, entry: FocusRequester) {
-    Column(Modifier.padding(top = SafeY).width(760.dp)) {
+    Column(Modifier.padding(start = ContentStart, top = SafeY).width(760.dp)) {
         Box(Modifier.height(80.dp), contentAlignment = Alignment.CenterStart) {
             Text("Recent searches", style = TvType.CardTitle, color = WmmColors.Text)
         }

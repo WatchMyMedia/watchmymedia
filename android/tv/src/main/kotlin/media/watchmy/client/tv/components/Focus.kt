@@ -42,6 +42,7 @@ import androidx.compose.ui.relocation.bringIntoView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.zIndex
 import media.watchmy.client.ui.WmmColors
 
@@ -86,6 +87,7 @@ private val FocusShadow = 24.dp
  * sinks to [PRESSED_SCALE] with a thicker ring, so every press shows.
  * [content] gets the focused state, to lift its fill ([TvPalette.Lift]).
  * [growFrom] keeps something at the safe area's edge growing away from it.
+ * Under an open panel (a window of its own) nothing is drawn focused.
  *
  * Not [enabled], it stays focusable and its clicks do nothing, and TalkBack
  * says it is disabled. A disabled clickable can't take focus, so a button
@@ -117,7 +119,11 @@ fun FocusableBox(
     content: @Composable BoxScope.(focused: Boolean) -> Unit,
 ) {
     val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
+    val hasFocus by interaction.collectIsFocusedAsState()
+    // A panel opens in a window of its own; what had focus under it keeps it there, but only one thing on the screen
+    // may look focused, so focus is drawn only in the window that has it.
+    val windowFocused = LocalWindowInfo.current.isWindowFocused
+    val focused = hasFocus && windowFocused
     val pressed by interaction.collectIsPressedAsState()
     val target = when {
         !focused -> 1f
@@ -128,7 +134,7 @@ fun FocusableBox(
     val shape = remember(cornerRadius) { RoundedCornerShape(cornerRadius) }
     Box(
         modifier
-            .zIndex(if (focused) 1f else 0f)
+            .zIndex(if (hasFocus) 1f else 0f)
             .combinedClickable(
                 interactionSource = interaction,
                 indication = null,

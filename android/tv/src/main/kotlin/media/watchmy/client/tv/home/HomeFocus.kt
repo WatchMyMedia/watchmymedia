@@ -124,7 +124,7 @@ private fun continueFocus(c: ContinueItem, now: Long, format: LiveClockFormat): 
 private fun ScreenRowItemKicker(item: BrowseItem, index: Int, headingTitle: String, listId: Long?, style: RowStyle): String = when {
     // The server sends a list row's items in the list's order without their ranks; the row's place stands in.
     listId != null -> "#${index + 1} on the list"
-    item.isNew -> listOfNotNull("New", item.subtitle?.takeIf { it.startsWith("added") }).joinToString(" · ")
+    item.isNew -> "New · " + (item.subtitle?.takeIf { it.startsWith("added") } ?: headingTitle)
     style == RowStyle.Wide -> formatDate(item.releaseDate)?.let { "Released $it" } ?: headingTitle
     else -> headingTitle
 }
@@ -132,7 +132,8 @@ private fun ScreenRowItemKicker(item: BrowseItem, index: Int, headingTitle: Stri
 private fun ScreenRow.itemFocus(item: BrowseItem, index: Int, headingTitle: String, now: Long, format: LiveClockFormat): HomeFocus {
     val genre = item.genres.firstOrNull()
     val runtimeMs = item.runtimeMin?.let { it * 60_000L }
-    val partway = item.progress?.takeIf { it > 0f && it < 1f }
+    // Only a movie's progress is a place in it; a show's is how much of it was watched, which the episode says better.
+    val partway = item.progress?.takeIf { it > 0f && it < 1f && item.kind == ItemKind.Movie }
     val facts = mutableListOf<HomeFact>()
     var note: String? = null
     when (item.kind) {

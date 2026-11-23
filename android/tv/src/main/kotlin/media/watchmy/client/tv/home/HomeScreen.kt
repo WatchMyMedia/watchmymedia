@@ -1,8 +1,10 @@
 package media.watchmy.client.tv.home
 
+import media.watchmy.client.tv.components.FocusGrowth
 import media.watchmy.client.tv.components.PosterHeight
 import media.watchmy.client.tv.components.PosterWidth
 import media.watchmy.client.tv.components.TvClock
+import media.watchmy.client.tv.components.TvPalette
 import media.watchmy.client.tv.components.WideCardHeight
 import media.watchmy.client.tv.components.WideCardWidth
 import media.watchmy.client.tv.watchlists.holdFor
@@ -399,11 +401,11 @@ internal fun LiveRow(
             SectionHeader("On now", small = "Live TV · ${format.time(now)}", trailing = counter)
             CardRow {
                 itemsIndexed(available, key = { _, it -> it.id }) { i, channel ->
-                    TvOnNowCard(channel, now, { onWatchLive(channel) }, Modifier.width(320.dp).rowCard(memory, "live:${channel.id}", i, onFocusItem))
+                    TvOnNowCard(channel, now, { onWatchLive(channel) }, Modifier.width(WideCardWidth).rowCard(memory, "live:${channel.id}", i, onFocusItem))
                 }
                 item("guide") {
-                    FocusableBox(onClick = onLiveGuide, modifier = Modifier.width(320.dp).height(180.dp).rowCard(memory, "live:guide", available.size, onFocusItem), cornerRadius = 12.dp) { focused ->
-                        Box(Modifier.fillMaxSize().background(if (focused) WmmColors.Surface3 else WmmColors.Surface2, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                    FocusableBox(onClick = onLiveGuide, modifier = Modifier.width(WideCardWidth).height(WideCardHeight).rowCard(memory, "live:guide", available.size, onFocusItem), cornerRadius = 14.dp, focusedScale = FocusGrowth.CARD) { focused ->
+                        Box(Modifier.fillMaxSize().background(if (focused) TvPalette.Lift else WmmColors.Surface2, RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
                             Text("Full guide", style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.Text)
                         }
                     }
