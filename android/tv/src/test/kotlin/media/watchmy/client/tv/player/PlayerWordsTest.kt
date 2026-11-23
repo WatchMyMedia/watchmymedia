@@ -90,6 +90,13 @@ class PlayerWordsTest {
         assertEquals(listOf(10, 20, 30, 40, 50, 60, 60), (0..6).map(::retryDelaySeconds))
     }
 
+    @Test fun `a track named for the hard of hearing says so, though its flag isn't set`() {
+        val sdh = SubtitleOption("s5", "English (SDH)", "en", false, false, "SRT")
+        assertEquals("English", subtitleName(sdh))
+        assertEquals("For the deaf and hard of hearing", subtitleWords(sdh, grouped = true))
+        assertEquals(null, subtitleWords(SubtitleOption("s4", "English", "en", false, false, "SRT"), grouped = true))
+    }
+
     @Test fun `Skip's label is in sentence case`() {
         assertEquals("Skip intro", sentenceCase("Skip Intro"))
         assertEquals("Skip credits", sentenceCase("Skip Credits"))

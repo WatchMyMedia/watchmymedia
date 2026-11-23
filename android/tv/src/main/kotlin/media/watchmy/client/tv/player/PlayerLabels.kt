@@ -115,7 +115,7 @@ internal fun subtitleName(option: SubtitleOption): String = option.label.substri
  */
 internal fun subtitleWords(option: SubtitleOption, grouped: Boolean): String? = when {
     option.burnInOnly -> BURNED_IN
-    option.hearingImpaired -> "For the deaf and hard of hearing"
+    option.hearingImpaired || SDH.containsMatchIn(option.label) -> "For the deaf and hard of hearing"
     option.forced -> "Only the parts in another language"
     option.source == SubtitleSource.Online -> listOfNotNull("Downloaded", option.release).joinToString(SEP)
     grouped -> null
@@ -123,6 +123,9 @@ internal fun subtitleWords(option: SubtitleOption, grouped: Boolean): String? = 
 }
 
 private const val BURNED_IN = "Drawn into the picture, so the video starts again"
+
+/** A track named for the deaf and hard of hearing ("English (SDH)", "English SDH") when its flag isn't set: otherwise two rows read "English". */
+private val SDH = Regex("""\bSDH\b|hard of hearing""", RegexOption.IGNORE_CASE)
 
 /**
  * Off, the file's own subtitles and what OpenSubtitles found, as the
