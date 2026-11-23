@@ -42,6 +42,7 @@ import media.watchmy.client.tv.servers.ServersPanel
 import media.watchmy.client.ui.TestTags
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -86,7 +87,7 @@ enum class RailSection(val label: String, val icon: ImageVector, val route: Any)
     Home("Home", WmmIcons.Home, TvRoutes.Home),
     Shows("TV Shows", WmmIcons.Tv, TvRoutes.Library("tv")),
     Movies("Movies", WmmIcons.Movie, TvRoutes.Library("movie")),
-    LiveTV("Live TV", WmmIcons.Tv, TvRoutes.LiveTV),
+    LiveTV("Live TV", WmmIcons.LiveTv, TvRoutes.LiveTV),
     Settings("Settings", WmmIcons.Settings, TvRoutes.Settings),
     ;
 
@@ -150,15 +151,17 @@ private fun Rail(active: RailSection?, sectionRoot: Boolean, onNavigate: (Any) -
     }
     val activeFocus = remember { FocusRequester() }
     val avatarFocus = remember { FocusRequester() }
+    // Open, the rail dims the screen and reads as a drawer: names beside the icons, who is signed in and where at its foot.
+    if (expanded) Box(Modifier.fillMaxSize().background(TvPalette.Dim))
     val scrim = if (expanded) {
-        Brush.horizontalGradient(0f to WmmColors.Ground, 0.7f to WmmColors.Ground.copy(alpha = 0.94f), 1f to Color.Transparent)
+        Brush.horizontalGradient(0f to WmmColors.Ground, 0.78f to WmmColors.Ground, 1f to Color.Transparent)
     } else {
         Brush.horizontalGradient(listOf(Color.Transparent, Color.Transparent))
     }
     Column(
         Modifier
             .fillMaxHeight()
-            .width(if (expanded) 340.dp else 96.dp)
+            .width(if (expanded) RailOpenWidth else ContentStart)
             .background(scrim)
             .onFocusChanged { focused = it.hasFocus }
             .focusProperties {
@@ -169,8 +172,8 @@ private fun Rail(active: RailSection?, sectionRoot: Boolean, onNavigate: (Any) -
                 }
             }
             .focusGroup()
-            .padding(start = 18.dp, top = 44.dp, bottom = 44.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(start = SafeX, top = SafeY, bottom = SafeY),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         // The page's scrolling list starts under the rail, so a plain search to the right
         // never counts it as being to the right: send Right to the page.
@@ -189,31 +192,42 @@ private fun Rail(active: RailSection?, sectionRoot: Boolean, onNavigate: (Any) -
         }
         Spacer(Modifier.weight(1f))
         val name = user?.name.orEmpty()
-        // The rail has no room for the server's name: it is the button's label while it has focus, and the first row of Servers.
         val serverName = servers.current?.name
         FocusableBox(
             onClick = { serversOpen = true },
             modifier = toContent.focusRequester(avatarFocus).testTag(TestTags.ACCOUNT).semantics {
                 contentDescription = listOfNotNull(name.ifEmpty { null }, serverName).joinToString(", on ").let { who -> if (who.isEmpty()) SERVERS else "$SERVERS. $who" }
             },
-            cornerRadius = 30.dp,
-            focusedScale = 1.04f,
+            cornerRadius = 24.dp,
+            focusedScale = FocusGrowth.BUTTON,
             role = Role.Button,
+            growFrom = TransformOrigin(0f, 0.5f),
         ) { focused ->
             // The button's own words say who and where: the initial and the names under it aren't read again.
-            Row(Modifier.height(60.dp).clearAndSetSemantics {}, verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(60.dp), contentAlignment = Alignment.Center) {
+            Row(
+                Modifier
+                    .height(88.dp)
+                    .then(if (expanded) Modifier.widthIn(min = 400.dp) else Modifier)
+                    .background(if (focused) TvPalette.Lift else Color.Transparent, RoundedCornerShape(24.dp))
+                    .padding(horizontal = 8.dp)
+                    .clearAndSetSemantics {},
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                Box(Modifier.size(56.dp), contentAlignment = Alignment.Center) {
                     // Ringed in gold while its panel is open, as the control that opened it; focus is in the panel.
-                    // (Its own focus ring does that while this window still counts it focused: one ring, not two.)
-                    if (serversOpen && !focused) Box(Modifier.size(60.dp).border(3.dp, WmmColors.Accent, CircleShape))
-                    Box(Modifier.size(48.dp).background(WmmColors.Brand, CircleShape), contentAlignment = Alignment.Center) {
-                        Text(name.take(1).uppercase(), style = inter(20.sp, FontWeight.Bold), color = WmmColors.Text)
+                    if (serversOpen && !focused) Box(Modifier.size(64.dp).border(3.dp, WmmColors.Accent, CircleShape))
+                    Box(
+                        Modifier.size(56.dp).background(WmmColors.Brand, CircleShape).border(2.dp, WmmColors.BrandLine, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(name.take(1).uppercase(), style = TvType.Second.copy(fontWeight = FontWeight.Bold), color = WmmColors.Text)
                     }
                 }
                 if (expanded) {
-                    Column(Modifier.padding(start = 8.dp, end = 20.dp).widthIn(max = 220.dp)) {
-                        Text(name, style = inter(21.sp, FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        if (serverName != null && servers.several) Text(serverName, style = inter(16.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Column(Modifier.padding(end = 20.dp).widthIn(max = 300.dp)) {
+                        Text(name, style = TvType.CardTitle, color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (serverName != null) Text(serverName, style = TvType.Caption, color = TvPalette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -244,21 +258,22 @@ private fun Rail(active: RailSection?, sectionRoot: Boolean, onNavigate: (Any) -
 @Composable
 private fun RailItem(label: String, icon: ImageVector, active: Boolean, expanded: Boolean, count: Int, onClick: () -> Unit, modifier: Modifier, pulse: (() -> Float)? = null) {
     val described = if (count > 0) modifier.semantics { contentDescription = "$label, $count in the Inbox" } else modifier
-    FocusableBox(onClick = onClick, modifier = described, cornerRadius = 16.dp, focusedScale = 1.04f) { focused ->
+    FocusableBox(onClick = onClick, modifier = described, cornerRadius = 20.dp, focusedScale = FocusGrowth.BUTTON, growFrom = TransformOrigin(0f, 0.5f)) { focused ->
         val bg = when {
+            active && focused -> WmmColors.Accent.copy(alpha = 0.2f)
             active -> WmmColors.Accent.copy(alpha = 0.14f)
-            focused -> Color.White.copy(alpha = 0.10f)
+            focused -> TvPalette.Lift
             else -> Color.Transparent
         }
         val fg = when {
             active -> WmmColors.Accent
             focused -> WmmColors.Text
-            else -> WmmColors.TextMuted
+            else -> TvPalette.Muted
         }
         Row(
             Modifier
-                .height(60.dp)
-                .width(if (expanded) 250.dp else 60.dp)
+                .height(RailItemSize)
+                .width(if (expanded) 400.dp else RailItemSize)
                 .drawBehind {
                     // A gold outline that spreads from the item and fades.
                     val p = pulse?.invoke() ?: 0f
@@ -268,27 +283,31 @@ private fun RailItem(label: String, icon: ImageVector, active: Boolean, expanded
                             color = WmmColors.Accent.copy(alpha = 0.75f * p),
                             topLeft = Offset(-out, -out),
                             size = Size(size.width + 2 * out, size.height + 2 * out),
-                            cornerRadius = CornerRadius(16.dp.toPx() + out),
+                            cornerRadius = CornerRadius(20.dp.toPx() + out),
                             style = Stroke(3.dp.toPx()),
                         )
                     }
                 }
-                .background(bg, RoundedCornerShape(16.dp)),
+                .background(bg, RoundedCornerShape(20.dp)),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(22.dp),
         ) {
-            Box(Modifier.size(60.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(RailItemSize), contentAlignment = Alignment.Center) {
                 Icon(icon, contentDescription = label, tint = fg, modifier = Modifier.size(30.dp))
                 if (count > 0) {
                     // The Inbox's count for admins.
                     Box(
-                        Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 2.dp).heightIn(min = 24.dp).widthIn(min = 24.dp).background(WmmColors.Accent, CircleShape).padding(horizontal = 6.dp),
+                        Modifier.align(Alignment.TopEnd).padding(top = 2.dp, end = 2.dp).heightIn(min = 30.dp).widthIn(min = 30.dp).background(WmmColors.Accent, CircleShape).padding(horizontal = 6.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text("$count", style = inter(14.sp, FontWeight.ExtraBold), color = WmmColors.OnAccent)
+                        Text("$count", style = TvType.Caption.copy(fontWeight = FontWeight.ExtraBold), color = WmmColors.OnAccent)
                     }
                 }
             }
-            if (expanded) Text(label, style = inter(21.sp, FontWeight.SemiBold), color = fg, maxLines = 1)
+            if (expanded) Text(label, style = TvType.CardTitle.copy(fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium), color = fg, maxLines = 1)
         }
     }
 }
+
+/** The rail open, as a drawer: wide enough for the names and the person at its foot, fading into the screen. */
+private val RailOpenWidth = 640.dp

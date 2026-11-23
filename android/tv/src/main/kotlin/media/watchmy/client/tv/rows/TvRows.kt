@@ -1,5 +1,11 @@
 package media.watchmy.client.tv.rows
 
+import media.watchmy.client.tv.components.PosterHeight
+import media.watchmy.client.tv.components.PosterWidth
+import media.watchmy.client.tv.components.TvPalette
+import media.watchmy.client.tv.components.TvType
+import media.watchmy.client.tv.components.WideCardHeight
+import media.watchmy.client.tv.components.WideCardWidth
 import media.watchmy.client.tv.watchlists.holdFor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -23,7 +29,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Text
 import media.watchmy.client.model.BrowseItem
@@ -57,10 +62,8 @@ import media.watchmy.client.tv.components.CardRow
 import media.watchmy.client.tv.components.FocusMemory
 import media.watchmy.client.tv.components.MediaCard
 import media.watchmy.client.tv.components.RowArtCard
-import media.watchmy.client.tv.components.PlayMark
 import media.watchmy.client.tv.components.SectionHeader
 import media.watchmy.client.tv.components.focusMemory
-import media.watchmy.client.tv.components.inter
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.BadgeStyle
 import media.watchmy.client.ui.components.WmmIcons
@@ -163,6 +166,8 @@ internal fun TvArrangedRow(
     seeAll: TvSeeAll? = null,
     enter: FocusRequester = FocusRequester.Default,
     named: Boolean = false,
+    /** False on Home, whose row screen says the rest above the row: a poster then carries its title alone. */
+    posterLines: Boolean = true,
 ) {
     val (title, small) = row.heading()
     Column(modifier) {
@@ -174,13 +179,12 @@ internal fun TvArrangedRow(
                         title = c.title,
                         subtitle = c.remainingLine,
                         imageUrl = library.imageUrl(c.stillPath ?: c.backdropPath, ImageSize.W780),
-                        artWidth = 320.dp,
-                        artHeight = 180.dp,
+                        artWidth = WideCardWidth,
+                        artHeight = WideCardHeight,
                         onClick = { actions.onPlay(c.playRequest()) },
                         onLongClick = { c.openPage(actions) },
                         modifier = Modifier.rowCard(memory, "cw:${c.fileId}", i, onFocusItem),
                     ) {
-                        PlayMark()
                         ArtProgress(c.progress)
                     }
                 }
@@ -189,8 +193,8 @@ internal fun TvArrangedRow(
                         title = e.showTitle,
                         subtitle = e.airedLine(),
                         imageUrl = library.imageUrl(e.stillPath ?: e.showBackdropPath, ImageSize.W780),
-                        artWidth = 320.dp,
-                        artHeight = 180.dp,
+                        artWidth = WideCardWidth,
+                        artHeight = WideCardHeight,
                         seed = e.showTitle,
                         // Select opens the episode on its show, focused on Play; holding it plays at once.
                         onClick = { actions.onOpenEpisode(e.showId, e.season, e.episodeId) },
@@ -206,16 +210,17 @@ internal fun TvArrangedRow(
                 RowStyle.Poster -> itemsIndexed(row.items, key = { _, it -> "${it.kind}${it.id}" }) { i, item ->
                     MediaCard(
                         title = item.title,
-                        subtitle = item.subtitle ?: item.year?.toString(),
+                        subtitle = if (posterLines) item.subtitle ?: item.year?.toString() else null,
                         imageUrl = library.imageUrl(item.posterPath, ImageSize.W342),
-                        artWidth = 160.dp,
-                        artHeight = 240.dp,
+                        artWidth = PosterWidth,
+                        artHeight = PosterHeight,
                         onClick = { item.open(actions.onOpenShow, actions.onOpenMovie, actions.onPlay, actions.onNotMatched, actions.onOpenEpisode) },
                         onLongClick = holdFor(item, actions.onToggleWatched),
                         modifier = Modifier.rowCard(memory, "${row.id}:${item.kind}${item.id}", i, onFocusItem),
+                        subtitleLine = posterLines,
                     ) {
                         if (item.isNew) ArtBadge("New", Modifier.align(Alignment.TopStart).padding(8.dp), BadgeStyle.Gold)
-                        ArtWatched(item.watched, size = 24.dp)
+                        ArtWatched(item.watched)
                         ArtProgress(item.progress)
                     }
                 }
@@ -224,8 +229,8 @@ internal fun TvArrangedRow(
                         title = m.title,
                         subtitle = null,
                         imageUrl = library.imageUrl(m.backdropPath, ImageSize.W780),
-                        artWidth = 320.dp,
-                        artHeight = 180.dp,
+                        artWidth = WideCardWidth,
+                        artHeight = WideCardHeight,
                         onClick = { if (m.kind == ItemKind.Movie) actions.onOpenMovie(m.id) else m.open(actions.onOpenShow, actions.onOpenMovie, actions.onPlay, actions.onNotMatched) },
                         onLongClick = holdFor(m, actions.onToggleWatched),
                         modifier = Modifier.rowCard(memory, "${row.id}:${m.kind}${m.id}", i, onFocusItem),
@@ -260,23 +265,23 @@ private fun ContinueItem.openPage(actions: TvRowActions) {
 @Composable
 private fun SeeAllCard(seeAll: TvSeeAll, wide: Boolean, modifier: Modifier = Modifier) {
     RowArtCard(
-        width = if (wide) 320.dp else 160.dp,
-        height = if (wide) 180.dp else 240.dp,
+        width = if (wide) WideCardWidth else PosterWidth,
+        height = if (wide) WideCardHeight else PosterHeight,
         onClick = seeAll.onClick,
         modifier = modifier.semantics { contentDescription = seeAll.words.spoken },
     ) { focused ->
         Column(
             Modifier
                 .fillMaxSize()
-                .background(if (focused) WmmColors.Surface3 else WmmColors.Surface2, RoundedCornerShape(12.dp))
-                .padding(horizontal = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
+                .background(if (focused) TvPalette.Lift else WmmColors.Surface2, RoundedCornerShape(14.dp))
+                .padding(horizontal = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Icon(if (seeAll.list) WmmIcons.ListBullets else WmmIcons.Grid, contentDescription = null, tint = WmmColors.Accent, modifier = Modifier.size(36.dp))
-            Text(seeAll.words.title, style = inter(21.sp, FontWeight.Bold, lineHeight = 26.sp), color = WmmColors.Text, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(seeAll.words.title, style = TvType.Body.copy(fontWeight = FontWeight.SemiBold), color = WmmColors.Text, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
             seeAll.words.detail?.let { detail ->
-                Text(detail, style = inter(17.sp, lineHeight = 23.sp), color = WmmColors.TextMuted, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(detail, style = TvType.Caption, color = TvPalette.Muted, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
     }

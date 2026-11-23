@@ -1,22 +1,23 @@
 package media.watchmy.client.tv.detail
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,153 +25,280 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
+import media.watchmy.client.model.ImageSize
+import media.watchmy.client.model.LibraryRepository
 import media.watchmy.client.model.Person
-import media.watchmy.client.tv.components.InitialFocus
-import media.watchmy.client.tv.components.TextBright
-import media.watchmy.client.tv.components.TvButton
-import media.watchmy.client.tv.components.TvButtonStyle
-import media.watchmy.client.tv.components.TvDialog
-import media.watchmy.client.tv.components.focusRing
-import media.watchmy.client.tv.components.inter
+import media.watchmy.client.tv.components.CardRow
+import media.watchmy.client.tv.components.ContentEnd
+import media.watchmy.client.tv.components.ContentStart
+import media.watchmy.client.tv.components.FocusMemory
+import media.watchmy.client.tv.components.FocusableBox
+import media.watchmy.client.tv.components.FocusedArt
+import media.watchmy.client.tv.components.SafeY
+import media.watchmy.client.tv.components.TvPalette
+import media.watchmy.client.tv.components.TvTag
+import media.watchmy.client.tv.components.TvType
+import media.watchmy.client.tv.components.focusMemory
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.Artwork
 import media.watchmy.client.ui.components.placeholderColor
 
-/** The 240×360 poster beside a detail header. */
-@Composable
-fun DetailPoster(url: String?, title: String, modifier: Modifier = Modifier) {
-    Artwork(url, seed = title, contentDescription = title, modifier = modifier.size(240.dp, 360.dp), shape = RoundedCornerShape(14.dp))
+/** One fact in a title's facts line: words, words in bold (the runtime), or an outlined tag (a rating, "4K"). */
+internal sealed interface Fact {
+    data class Words(val text: String, val bold: Boolean = false) : Fact
+    data class Tag(val text: String, val gold: Boolean = false) : Fact
 }
 
-/** "TV Shows › Harbor Lights". */
-@Composable
-fun Breadcrumb(section: String, title: String) {
-    Text("$section › $title", style = inter(18.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-}
-
-@Composable
-fun DetailTitle(title: String) {
-    Text(title, style = inter(60.sp, FontWeight.ExtraBold, lineHeight = 64.sp, tracking = -0.025f), color = WmmColors.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
-}
-
-/** The facts line: parts joined by grey dots, then [extra] (tags, the status pill). */
+/**
+ * A title's facts in a line, a grey dot between them (`.facts`): "2025 ·
+ * PG-13 · 1 h 58 min · Thriller · ★ 7.8 · 4K HDR 5.1". Tags that follow one
+ * another sit together, without dots.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun FactsLine(parts: List<String>, extra: @Composable RowScope.() -> Unit = {}) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
-        parts.forEachIndexed { i, p ->
-            if (i > 0) Text("·", style = inter(21.sp), color = WmmColors.TextFaint)
-            Text(p, style = inter(21.sp), color = TextBright)
+internal fun FactsLine(facts: List<Fact>, modifier: Modifier = Modifier) {
+    if (facts.isEmpty()) return
+    FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp), itemVerticalAlignment = Alignment.CenterVertically) {
+        facts.forEachIndexed { i, f ->
+            val tagRun = i > 0 && f is Fact.Tag && facts[i - 1] is Fact.Tag
+            if (i > 0 && !tagRun) Text("·", style = TvType.Body, color = TvPalette.Muted)
+            when (f) {
+                is Fact.Words -> Text(
+                    f.text,
+                    style = if (f.bold) TvType.BodyStrong else TvType.Body,
+                    color = if (f.bold) WmmColors.Text else WmmColors.TextSoft,
+                    maxLines = 1,
+                )
+                is Fact.Tag -> TvTag(f.text, gold = f.gold, modifier = if (tagRun) Modifier.padding(start = 0.dp) else Modifier)
+            }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically, content = extra)
     }
 }
 
-/** The overview under the facts, two lines at most. */
+/**
+ * When it ends, in the viewer's words: [lead] in bold ("46 min in", "29 min
+ * left", "Not watched yet") and [rest] after it (" · ends 9:24 PM").
+ */
 @Composable
-fun Overview(text: String) {
-    if (text.isBlank()) return
-    Text(text, style = inter(20.sp, lineHeight = 30.sp), color = WmmColors.TextSoft, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 1000.dp))
+internal fun WhenLine(lead: String, rest: String?, modifier: Modifier = Modifier) {
+    Text(
+        buildAnnotatedString {
+            withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = WmmColors.Text)) { append(lead) }
+            if (!rest.isNullOrEmpty()) withStyle(SpanStyle(color = WmmColors.TextSoft)) { append(rest) }
+        },
+        style = TvType.Body,
+        modifier = modifier,
+        maxLines = 2,
+    )
 }
 
-/** "Continuing · next episode Nov 4" in a gold pill, or a grey "Ended". */
+/** How far through it is (`.meter`): a gold bar on a grey track, [width] wide and 8 high. */
 @Composable
-fun StatusPill(text: String, gold: Boolean) {
-    val color = if (gold) WmmColors.Accent else WmmColors.TextMuted
-    Row(
-        Modifier.padding(start = 8.dp).border(1.dp, if (gold) WmmColors.Accent else WmmColors.Line3, RoundedCornerShape(999.dp)).padding(horizontal = 12.dp, vertical = 5.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+internal fun Meter(progress: Float, modifier: Modifier = Modifier, width: Dp = 560.dp, spoken: String? = null) {
+    val shape = RoundedCornerShape(4.dp)
+    Box(
+        modifier
+            .width(width)
+            .height(8.dp)
+            .background(Color.White.copy(alpha = 0.22f), shape)
+            .then(if (spoken != null) Modifier.semantics { contentDescription = spoken } else Modifier),
     ) {
-        Box(Modifier.size(8.dp).background(color, CircleShape))
-        Text(text, style = inter(16.sp, FontWeight.SemiBold), color = color)
+        Box(Modifier.fillMaxHeight().fillMaxWidth(progress.coerceIn(0f, 1f)).background(WmmColors.Accent, shape))
+    }
+}
+
+/** An overview of [lines] lines at most (three on a movie, two on an episode), short enough to read across a room. */
+@Composable
+internal fun Overview(text: String, lines: Int, modifier: Modifier = Modifier, width: Dp = 780.dp) {
+    if (text.isBlank()) return
+    Text(text, style = TvType.Body, color = WmmColors.TextSoft, maxLines = lines, overflow = TextOverflow.Ellipsis, modifier = modifier.widthIn(max = width))
+}
+
+/**
+ * A title page's picture: the backdrop across the whole screen, faded into
+ * the ground from the left and towards the foot ([solidFrom] of the height
+ * is plain ground), so the words over it read and the rows under it sit on
+ * the ground.
+ */
+@Composable
+internal fun PageBackdrop(url: String?, seed: String, modifier: Modifier = Modifier, solidFrom: Float = 0.62f) {
+    Box(modifier) {
+        Artwork(url, seed = seed, contentDescription = null, modifier = Modifier.matchParentSize(), shape = RoundedCornerShape(0.dp))
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(
+                    Brush.horizontalGradient(
+                        0f to WmmColors.Ground,
+                        0.3f to WmmColors.Ground.copy(alpha = 0.94f),
+                        0.62f to WmmColors.Ground.copy(alpha = 0.5f),
+                        1f to Color.Transparent,
+                    ),
+                )
+                .background(
+                    Brush.verticalGradient(
+                        (solidFrom - 0.28f).coerceAtLeast(0f) to Color.Transparent,
+                        (solidFrom - 0.08f).coerceAtLeast(0f) to WmmColors.Ground.copy(alpha = 0.92f),
+                        solidFrom to WmmColors.Ground,
+                    ),
+                ),
+        )
     }
 }
 
 /**
- * A cast member: a 72 dp circle, the name and the role. [focusable] lets
- * focus stop on it (the movie page's cast): the
- * circle takes the gold ring and grows, and TalkBack reads the name and the
- * role as one. OK does nothing.
+ * A cast member (`.who`): a round picture 150 across, the name and the part
+ * they play. It takes focus with the picture growing in the gold ring, and
+ * TalkBack reads the name and the part as one (the clickable merges them;
+ * clearing its semantics would clear its focused state with them). [onClick] is for opening the
+ * person's titles; until the server can say which titles a person is in, a
+ * press only shows that it was taken.
  */
 @Composable
-fun CastMember(person: Person, imageUrl: String?, modifier: Modifier = Modifier, focusable: Boolean = false) {
-    val interaction = remember { MutableInteractionSource() }
-    val focused by interaction.collectIsFocusedAsState()
-    val scale by animateFloatAsState(if (focused) 1.12f else 1f, tween(140), label = "castFocus")
-    val stop = if (focusable) Modifier.focusable(interactionSource = interaction).semantics(mergeDescendants = true) {} else Modifier
-    Column(modifier.then(stop).width(96.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        val face = Modifier
-            .size(72.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
+internal fun PersonCard(person: Person, imageUrl: String?, modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
+    FocusableBox(
+        onClick = onClick,
+        modifier = modifier.width(PersonWidth),
+        cornerRadius = 75.dp,
+        ring = false,
+    ) { focused ->
+        Column(Modifier.width(PersonWidth), horizontalAlignment = Alignment.CenterHorizontally) {
+            FocusedArt(focused, cornerRadius = 75.dp) {
+                val face = Modifier.size(150.dp)
+                if (imageUrl != null) {
+                    Artwork(imageUrl, seed = person.name, contentDescription = null, modifier = face, shape = CircleShape)
+                } else {
+                    Box(face.background(placeholderColor(person.name), CircleShape).border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape))
+                }
             }
-            .focusRing(focused, cornerRadius = 36.dp, offset = 0.dp)
-        if (imageUrl != null) {
-            Artwork(imageUrl, seed = person.name, contentDescription = person.name.takeIf { !focusable }, modifier = face, shape = CircleShape)
-        } else {
-            Box(face.background(placeholderColor(person.name), CircleShape))
+            // The picture grows 6 dp into the gap when focused; the name moves down with it.
+            Spacer(Modifier.height(if (focused) 26.dp else 18.dp))
+            Text(person.name, style = TvType.Second.copy(fontWeight = FontWeight.SemiBold), color = WmmColors.Text, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            person.role?.let { Text(it, style = TvType.Caption, color = TvPalette.Muted, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis) }
         }
-        Text(person.name, style = inter(15.sp, FontWeight.SemiBold, lineHeight = 18.sp), color = WmmColors.Text, textAlign = TextAlign.Center, maxLines = 2)
-        person.role?.let { Text(it, style = inter(13.sp, lineHeight = 16.sp), color = WmmColors.TextMuted, textAlign = TextAlign.Center, maxLines = 2) }
     }
 }
 
+private val PersonWidth = 200.dp
+
 /**
- * Cast & details: a side sheet with the full overview, [facts] as label and
- * value rows, and the cast. Back or Close dismisses it.
+ * The cast as a row of people (`Cast` and its cards), up to twelve, each
+ * registered with [memory] as "cast:i". [trailing] is a line at the
+ * heading's right ("Imogen Vale as Tess Arden").
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun DetailsSheet(title: String, overview: String, facts: List<Pair<String, String>>, cast: List<Person>, castImage: (Person) -> String?, onDismiss: () -> Unit) {
-    val close = remember { FocusRequester() }
-    TvDialog(onDismiss) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)), contentAlignment = Alignment.CenterEnd) {
-            Column(
-                Modifier
-                    .width(760.dp)
-                    .fillMaxHeight()
-                    .background(WmmColors.Surface)
-                    .border(1.dp, WmmColors.Line)
-                    .padding(start = 48.dp, end = 48.dp, top = 64.dp, bottom = 44.dp),
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-            ) {
-                Text(title, style = inter(34.sp, FontWeight.Bold, tracking = -0.02f), color = WmmColors.Text, maxLines = 2)
-                if (overview.isNotBlank()) Text(overview, style = inter(19.sp, lineHeight = 29.sp), color = WmmColors.TextSoft, maxLines = 8, overflow = TextOverflow.Ellipsis)
-                Column {
-                    for ((label, value) in facts) {
-                        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                            Text(label.uppercase(), style = inter(15.sp, FontWeight.SemiBold, tracking = 0.06f), color = WmmColors.TextMuted, modifier = Modifier.width(170.dp).padding(top = 3.dp))
-                            Text(value, style = inter(19.sp), color = WmmColors.Text)
-                        }
-                    }
-                }
-                if (cast.isNotEmpty()) {
-                    Text("Cast", style = inter(24.sp, FontWeight.SemiBold), color = WmmColors.Text)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(18.dp), maxLines = 2) {
-                        for (p in cast.take(12)) CastMember(p, castImage(p))
-                    }
-                }
-                Box(Modifier.weight(1f))
-                TvButton("Close", onDismiss, Modifier.focusRequester(close), style = TvButtonStyle.Ghost)
+internal fun CastRow(
+    cast: List<Person>,
+    library: LibraryRepository,
+    memory: FocusMemory,
+    modifier: Modifier = Modifier,
+    enter: FocusRequester = FocusRequester.Default,
+    onFocusPerson: (Int) -> Unit = {},
+) {
+    if (cast.isEmpty()) return
+    Column(modifier) {
+        Text("Cast", style = TvType.CardTitle, color = WmmColors.Text, modifier = Modifier.padding(start = ContentStart, end = ContentEnd, bottom = 12.dp))
+        CardRow(enter = enter) {
+            items(cast.take(12).size) { i ->
+                val p = cast[i]
+                PersonCard(
+                    p,
+                    library.imageUrl(p.profilePath, ImageSize.W185),
+                    Modifier.focusMemory(memory, "cast:$i").onFocused { onFocusPerson(i) },
+                )
             }
         }
-        InitialFocus(close)
     }
+}
+
+/** Calls [action] when this element takes focus. */
+internal fun Modifier.onFocused(action: () -> Unit): Modifier = onFocusChanged { if (it.isFocused) action() }
+
+/** A key and what it does, at the foot of a panel or a screen (`.hints`): only where a key does what no button shows. */
+@Composable
+internal fun KeyHints(hints: List<Pair<String, String>>, modifier: Modifier = Modifier) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(40.dp), verticalAlignment = Alignment.CenterVertically) {
+        for ((key, what) in hints) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(
+                    Modifier
+                        .heightIn(min = 40.dp)
+                        .widthIn(min = 44.dp)
+                        .border(2.dp, TvPalette.Line3, RoundedCornerShape(10.dp))
+                        .padding(horizontal = 10.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(key, style = TvType.Caption.copy(fontWeight = FontWeight.Bold), color = WmmColors.TextSoft, maxLines = 1)
+                }
+                Text(what, style = TvType.Caption, color = TvPalette.Muted, maxLines = 1)
+            }
+        }
+    }
+}
+
+
+/**
+ * Once a title page has scrolled past its top, a line stays at the top of
+ * the screen saying whose rows these are ([content], in a row), with what
+ * Back does, since Back leaves the title rather than scrolling up.
+ */
+@Composable
+internal fun ScrolledHeading(scroll: ScrollState, back: String, content: @Composable RowScope.() -> Unit) {
+    // Read as a yes or no, so the page doesn't compose again for every pixel it scrolls.
+    val scrolled by remember(scroll) { derivedStateOf { scroll.value > ScrolledFrom } }
+    AnimatedVisibility(scrolled, enter = fadeIn(), exit = fadeOut()) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .background(Brush.verticalGradient(0f to WmmColors.Ground, 0.75f to WmmColors.Ground, 1f to Color.Transparent))
+                .padding(start = ContentStart, end = ContentEnd, top = SafeY, bottom = 40.dp),
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                content()
+                Spacer(Modifier.weight(1f))
+                // Clear of the clock at the top right.
+                KeyHints(listOf("Back" to "Leaves $back"), Modifier.padding(end = 170.dp))
+            }
+        }
+    }
+}
+
+/** How far a title page scrolls before [ScrolledHeading] shows. */
+private const val ScrolledFrom = 420
+
+/**
+ * ▲ goes to the first of [keys] still on screen (the button focus was last
+ * on, then the others in order), else on as a plain focus search. A key
+ * handler rather than `focusProperties { up = … }`, since a button can leave
+ * the page (From the start, once watched) and a requester whose button is
+ * gone can't take focus.
+ */
+internal fun Modifier.upTo(memory: FocusMemory, keys: () -> List<String>): Modifier = onPreviewKeyEvent { e ->
+    if (e.key != Key.DirectionUp || e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+    keys().distinct().any { memory.focus(it) }
 }

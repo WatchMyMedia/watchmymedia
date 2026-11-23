@@ -29,7 +29,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** A channel cast to this TV (Cast Connect, the LiveCastConnect board), on the fakes. */
+/** A channel cast to this TV (Cast Connect), on the fakes. */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], qualifiers = "w960dp-h540dp-land-television-xhdpi")
@@ -57,6 +57,9 @@ class CastLivePlayerTest {
         compose.onNodeWithText("Cast from Pixel 9").assertExists()
         compose.onNodeWithText("Quality and the channel list are on the phone.").assertExists()
         compose.onNodeWithText("▲ ▼ Change channel · OK Controls").assertExists()
+        // It opens on the banner, as every player does; OK brings the controls.
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.waitForIdle()
         compose.onNodeWithText("Stop casting").assertExists()
         compose.onNodeWithText("Ch + 4.2").assertExists()
         compose.onNodeWithText("Full guide").assertDoesNotExist()
@@ -91,7 +94,7 @@ class CastLivePlayerTest {
         controller.nextFailure = "tuners_busy"
         show()
         compose.onNodeWithText("All tuners are in use").assertExists()
-        compose.onNodeWithText("Pixel 9 asked for 4.1, but the HDHomeRun’s tuners are all busy. Try again when someone stops watching, or pick another channel on the phone.").assertExists()
+        compose.onNodeWithText("Pixel 9 asked for 4.1, but every tuner is in use. Try again when one comes free, or pick another channel on the phone.").assertExists()
         compose.onNodeWithText("Try again").performClick()
         compose.runOnIdle { assertEquals(PlayerStatus.Playing, controller.state.value.status) }
     }

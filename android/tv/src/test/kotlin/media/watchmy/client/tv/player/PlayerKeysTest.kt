@@ -15,9 +15,24 @@ class PlayerKeysTest {
     fun leftAndRightSeekUnlessFocusIsInTheButtonRow() {
         assertEquals(KeyAction.Seek(forward = false), routeKey(PlayerKey.Left, Overlay.None, controlsVisible = false, FocusArea.Root))
         assertEquals(KeyAction.Seek(forward = true), routeKey(PlayerKey.Right, Overlay.None, controlsVisible = true, FocusArea.Scrubber))
-        assertEquals(KeyAction.Seek(forward = true), routeKey(PlayerKey.Right, Overlay.None, controlsVisible = true, FocusArea.Skip))
         assertEquals(KeyAction.PassThrough, routeKey(PlayerKey.Right, Overlay.None, controlsVisible = true, FocusArea.Buttons))
-        assertEquals(KeyAction.PassThrough, routeKey(PlayerKey.Left, Overlay.None, controlsVisible = true, FocusArea.Back))
+    }
+
+    @Test
+    fun skipTakesOkAndDownToTheScrubberAndNothingElse() {
+        for (shown in listOf(false, true)) {
+            assertEquals(KeyAction.PassThrough, routeKey(PlayerKey.Centre, Overlay.None, controlsVisible = shown, FocusArea.Skip))
+            assertEquals(KeyAction.ToScrubber, routeKey(PlayerKey.Down, Overlay.None, controlsVisible = shown, FocusArea.Skip))
+            assertEquals(KeyAction.Swallow, routeKey(PlayerKey.Up, Overlay.None, controlsVisible = shown, FocusArea.Skip))
+            assertEquals(KeyAction.Swallow, routeKey(PlayerKey.Left, Overlay.None, controlsVisible = shown, FocusArea.Skip))
+            assertEquals(KeyAction.Swallow, routeKey(PlayerKey.Right, Overlay.None, controlsVisible = shown, FocusArea.Skip))
+        }
+        // Back from Skip goes to the scrubber, and from there hides the controls.
+        assertEquals(BackAction.ToScrubber, backAction(Overlay.None, controlsVisible = false, FocusArea.Skip))
+        assertEquals(BackAction.HideControls, backAction(Overlay.None, controlsVisible = true, FocusArea.Scrubber))
+        // The remote's media keys still seek and play from Skip.
+        assertEquals(KeyAction.Seek(forward = true), routeKey(PlayerKey.FastForward, Overlay.None, controlsVisible = false, FocusArea.Skip))
+        assertEquals(KeyAction.TogglePlayPause, routeKey(PlayerKey.PlayPause, Overlay.None, controlsVisible = false, FocusArea.Skip))
     }
 
     @Test
@@ -31,7 +46,7 @@ class PlayerKeysTest {
     @Test
     fun upAndDownBringTheControlsBackThenMoveFocus() {
         assertEquals(KeyAction.ShowControls, routeKey(PlayerKey.Up, Overlay.None, controlsVisible = false, FocusArea.Root))
-        assertEquals(KeyAction.ShowControls, routeKey(PlayerKey.Down, Overlay.None, controlsVisible = false, FocusArea.Skip))
+        assertEquals(KeyAction.ShowControls, routeKey(PlayerKey.Down, Overlay.None, controlsVisible = false, FocusArea.Root))
         assertEquals(KeyAction.PassThrough, routeKey(PlayerKey.Down, Overlay.None, controlsVisible = true, FocusArea.Scrubber))
     }
 
@@ -77,7 +92,8 @@ class PlayerKeysTest {
     fun backClosesTheSheetOrCardThenHidesTheControlsThenLeaves() {
         assertEquals(BackAction.ClosePicker, backAction(Overlay.Picker, controlsVisible = false))
         assertEquals(BackAction.WatchCredits, backAction(Overlay.UpNext, controlsVisible = false))
-        assertEquals(BackAction.KeepWatching, backAction(Overlay.StillWatching, controlsVisible = true))
+        // A problem screen's Back does what its last button does: Stop.
+        assertEquals(BackAction.StopWatching, backAction(Overlay.StillWatching, controlsVisible = true))
         assertEquals(BackAction.HideControls, backAction(Overlay.None, controlsVisible = true))
         assertEquals(BackAction.Leave, backAction(Overlay.None, controlsVisible = false))
         assertEquals(BackAction.Leave, backAction(Overlay.Message, controlsVisible = true))

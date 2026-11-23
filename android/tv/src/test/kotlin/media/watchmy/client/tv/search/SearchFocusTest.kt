@@ -116,12 +116,15 @@ class SearchFocusTest {
     @Test
     fun `right from the microphone reaches the results`() {
         installRecognizer()
+        // With a microphone Search may open on it: type from q.
+        compose.onAllNodesWithText("q").onFirst().performSemanticsAction(SemanticsActions.RequestFocus)
+        compose.waitForIdle()
         typeHar()
         compose.onAllNodesWithText("1").onFirst().performSemanticsAction(SemanticsActions.RequestFocus)
         compose.waitForIdle()
         press(Key.DirectionUp)
         press(Key.DirectionRight)
-        assertEquals("Voice typing", focused())
+        assertEquals("Speak instead of typing", focused())
         press(Key.DirectionRight)
         assertTrue("right from the microphone reached ${focused()}, not a result", focused() in RESULTS)
     }
@@ -136,9 +139,9 @@ class SearchFocusTest {
     fun `each key hint has a line of its own under the keyboard`() {
         installRecognizer()
         val keyboard = compose.onNodeWithText("Use the TV’s keyboard").fetchSemanticsNode().boundsInRoot
-        val top = compose.onNodeWithText("From the top row: the search box, and ▶ from there the microphone").fetchSemanticsNode().boundsInRoot
-        val bottom = compose.onNodeWithText("From the bottom row: the TV’s keyboard").fetchSemanticsNode().boundsInRoot
-        assertTrue("the ▼ hint, from ${bottom.top}, is not under the ▲ hint, which ends at ${top.bottom}", bottom.top >= top.bottom)
+        val top = compose.onNodeWithText("from the last key in a row: the results").fetchSemanticsNode().boundsInRoot
+        val bottom = compose.onNodeWithText("clears what you typed").fetchSemanticsNode().boundsInRoot
+        assertTrue("the ⌫ hint, from ${bottom.top}, is not under the ▶ hint, which ends at ${top.bottom}", bottom.top >= top.bottom)
         assertEquals("the hints' texts start in one column", top.left, bottom.left)
         for (hint in listOf(top, bottom)) {
             assertTrue("a hint runs from ${hint.left} to ${hint.right}, outside the keyboard's ${keyboard.left} to ${keyboard.right}", hint.left >= keyboard.left && hint.right <= keyboard.right)
@@ -182,13 +185,15 @@ class SearchFocusTest {
     @Test
     fun `up from the keyboard's top row reaches the search box, and right from there the microphone`() {
         installRecognizer()
+        compose.onAllNodesWithText("q").onFirst().performSemanticsAction(SemanticsActions.RequestFocus)
+        compose.waitForIdle()
         assertEquals("q", focused())
         press(Key.DirectionUp)
         assertEquals("the top row", "1", focused())
         press(Key.DirectionUp)
-        assertTrue("${focused()} is the search box", focused().startsWith("Titles of shows"))
+        assertTrue("${focused()} is the search box", focused().startsWith("Search your library"))
         press(Key.DirectionRight)
-        assertEquals("Voice typing", focused())
+        assertEquals("Speak instead of typing", focused())
     }
 
     /** A speech recognizer on the TV, for the microphone key; the screen is shown again to see it. */

@@ -1,18 +1,19 @@
 package media.watchmy.client.tv.home
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -29,6 +30,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.unit.Dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -47,12 +50,16 @@ import media.watchmy.client.model.LibraryType
 import media.watchmy.client.model.LiveChannel
 import media.watchmy.client.model.RowStyle
 import media.watchmy.client.model.ScreenRow
-import media.watchmy.client.model.cardPanelAt
 import media.watchmy.client.model.headingLine
 import media.watchmy.client.model.pictureUrl
 import media.watchmy.client.model.drawn
 import media.watchmy.client.model.episodeCards
 import media.watchmy.client.model.seeAllType
+import media.watchmy.client.tv.components.ContentEnd
+import media.watchmy.client.tv.components.SafeY
+import media.watchmy.client.tv.components.TvButtonStyle
+import media.watchmy.client.tv.components.TvPalette
+import media.watchmy.client.tv.components.TvType
 import media.watchmy.client.tv.rows.OnFocusItem
 import media.watchmy.client.tv.rows.TvArrangedRow
 import media.watchmy.client.tv.rows.TvRowActions
@@ -64,7 +71,6 @@ import media.watchmy.client.tv.components.ContentStart
 import media.watchmy.client.tv.components.FocusMemory
 import media.watchmy.client.tv.components.TvButton
 import media.watchmy.client.tv.components.focusMemory
-import media.watchmy.client.tv.components.inter
 import media.watchmy.client.tv.components.stopBringIntoView
 import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.TestTags
@@ -76,15 +82,15 @@ import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.onBack
 
 /**
- * Home in the person's order as screens:
- * page 0 is the hero and the
- * first row drawn, every later row fills a page with the focused card's
- * picture, kicker, title, facts and overview above it, and the last page is
- * Edit rows and the totals. ▼ at a row pages down and ▲ pages up (the D-pad
- * pages, never a fling); each row comes back to the card it had focus on;
- * Back from a row page goes to page 0 first. Live TV sits in its place.
- * A row with somewhere to go ends in See all: a list's page, or its
- * library's grid sorted the row's way ([onOpenLibrary]).
+ * Home in the person's order as screens, one row each: the focused card's
+ * picture fills the screen, with its title, how long is left and when it
+ * ends, and two lines about it above the row; the next row's name sits along
+ * the foot. Home opens on the first row (Continue watching, for most), and
+ * the last screen is Edit rows and the totals. ▼ at a row pages down and ▲
+ * pages up (the D-pad pages, never a fling); each row comes back to the
+ * card it had focus on; Back from a later row goes to the first row first.
+ * Live TV sits in its place. A row with somewhere to go ends in See all: a
+ * list's page, or its library's grid sorted the row's way ([onOpenLibrary]).
  *
  * Focus moves first and the pager follows it: ▼ puts focus on the next
  * row's card at once and the screen slides after, so a key pressed during
@@ -198,7 +204,7 @@ internal fun ArrangedHomeContent(
         else {
             // Kept across focus moves, which redraw the page, so the card's click stays the same one.
             val seeAll = remember(row, home, actions, onOpenLibrary) { tvHomeSeeAll(row, home, requests, actions, onOpenLibrary) }
-            TvArrangedRow(row, library, memory, actions, modifier, counter, onFocusItem, seeAll = seeAll)
+            TvArrangedRow(row, library, memory, actions, modifier, counter, onFocusItem, seeAll = seeAll, posterLines = false)
         }
     }
 
@@ -220,49 +226,91 @@ internal fun ArrangedHomeContent(
         Box(Modifier.fillMaxSize().onFocusChanged { if (it.hasFocus) goal = PageGoal(page.key, focus = false) }.stopBringIntoView()) {
             when (page) {
                 is HomePage.Start -> Box(Modifier.fillMaxSize()) {
-                    Column {
-                        home.hero?.let { hero ->
-                            val episode = hero.episodeId?.takeIf { hero.kind == Hero.Kind.Episode }?.let { id -> home.episodeCards.firstOrNull { it.episodeId == id } }
-                            val openEpisode = episode?.let { e -> { actions.onOpenEpisode(e.showId, e.season, e.episodeId) } }
-                            HeroSection(hero, home, library, memory, actions.onPlay, actions.onOpenShow, actions.onOpenMovie, openEpisode)
-                        }
-                        page.row?.let { row ->
-                            Spacer(Modifier.height(80.dp))
-                            // ▲ from the row reaches the hero's buttons by itself; ▼ goes to the first row screen.
-                            RowBlock(row, Modifier.pageKeys(up = null, down = { pageTo(index + 1) }))
-                        }
+                    // Only when there are no rows: the server's pick on its own.
+                    home.hero?.let { hero ->
+                        val episode = hero.episodeId?.takeIf { hero.kind == Hero.Kind.Episode }?.let { id -> home.episodeCards.firstOrNull { it.episodeId == id } }
+                        val openEpisode = episode?.let { e -> { actions.onOpenEpisode(e.showId, e.season, e.episodeId) } }
+                        HeroSection(hero, home, library, memory, actions.onPlay, actions.onOpenShow, actions.onOpenMovie, openEpisode)
                     }
                     PeekLine(nextName(index), up = false, Modifier.align(Alignment.BottomStart))
                 }
                 is HomePage.Row -> {
                     val row = page.row
                     var focused by rememberSaveable(row.id) { mutableIntStateOf(0) }
-                    val panel = remember(row, focused, available, now) { row.cardPanelAt(focused, available, now, format, home.seeAllType(row)) }
+                    val focus = remember(row, focused, available, now) { row.homeFocusAt(focused, available, now, format, home.seeAllType(row)) }
+                    val place = RowPlace.of(row.style)
                     Box(Modifier.fillMaxSize()) {
-                        RowBackdrop(panel?.pictureUrl(library, liveRepository, ImageSize.W1280), panel?.seed ?: row.title)
-                        if (panel != null) FocusPanel(panel, Modifier.padding(start = ContentStart, top = 96.dp).width(940.dp), first = focused == 0)
+                        RowBackdrop(focus?.pictureUrl(library, liveRepository, ImageSize.W1280), focus?.seed ?: row.title, posters = row.style == RowStyle.Poster)
+                        if (focus != null) HomeFocusPanel(focus, Modifier.padding(start = ContentStart, top = place.panelTop).width(900.dp))
                         PrefetchNeighbours(row, focused, available, library, liveRepository, now, format)
-                        Box(Modifier.padding(top = 556.dp)) {
+                        Box(Modifier.padding(top = place.rowTop)) {
                             RowBlock(row, Modifier.pageKeys(up = { pageTo(index - 1) }, down = { pageTo(index + 1) })) { focused = it }
                         }
-                        PeekLine(nextName(index), up = false, Modifier.align(Alignment.BottomStart))
+                        if (row.style == RowStyle.Live) LiveKeyHints(Modifier.align(Alignment.BottomEnd))
+                        else PeekLine(nextName(index), up = false, Modifier.align(Alignment.BottomStart))
                     }
                 }
                 HomePage.End -> Box(Modifier.fillMaxSize()) {
-                    Column(Modifier.padding(start = ContentStart, top = 300.dp).width(1000.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
-                        Text("That's everything on Home", style = inter(44.sp, FontWeight.Bold, tracking = -0.02f), color = WmmColors.Text)
-                        Text("Move, hide and add rows. Your order follows you to every device.", style = inter(22.sp, lineHeight = 33.sp), color = WmmColors.TextSoft, modifier = Modifier.widthIn(max = 760.dp))
-                        Row(Modifier.padding(top = 6.dp).pageKeys(up = { pageTo(index - 1) }, down = null), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                            TvButton("Edit rows", onEditRows, Modifier.focusMemory(memory, "end:edit"), icon = WmmIcons.Sliders)
+                    Column(Modifier.padding(start = ContentStart, top = 304.dp).width(1100.dp)) {
+                        Text("That's everything on Home", style = TvType.Title, color = WmmColors.Text)
+                        Text("Move, hide and add rows. Your order follows you to every device.", style = TvType.Body, color = WmmColors.TextSoft, modifier = Modifier.padding(top = 20.dp).widthIn(max = 820.dp))
+                        Row(Modifier.padding(top = 32.dp).pageKeys(up = { pageTo(index - 1) }, down = null), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                            TvButton("Edit rows", onEditRows, Modifier.focusMemory(memory, "end:edit"), style = TvButtonStyle.Primary, icon = WmmIcons.Sliders, growFrom = TransformOrigin(0f, 0.5f))
                             TvButton("Back to the top", { pageTo(0) }, Modifier.focusMemory(memory, "end:top"))
                         }
-                        Text(home.totalsLine(), style = inter(17.sp), color = WmmColors.TextFaint, modifier = Modifier.padding(top = 18.dp))
+                        Text(home.totalsLine(), style = TvType.Second, color = TvPalette.Muted, modifier = Modifier.padding(top = 28.dp))
                     }
                     val before = pages.getOrNull(index - 1)?.row?.headingLine(liveListings) ?: "Home"
                     PeekLine(before, up = true, Modifier.align(Alignment.BottomStart))
                 }
             }
         }
+    }
+}
+
+/**
+ * Where a row screen puts the focused card's panel and the row under it: a
+ * wide row's panel has room for the episode and two lines about it; a poster
+ * row is taller, so both sit higher.
+ */
+private class RowPlace(val panelTop: Dp, val rowTop: Dp) {
+    companion object {
+        private val Wide = RowPlace(panelTop = 146.dp, rowTop = 570.dp)
+        private val Posters = RowPlace(panelTop = 94.dp, rowTop = 482.dp)
+        private val Live = RowPlace(panelTop = 94.dp, rowTop = 540.dp)
+
+        fun of(style: RowStyle): RowPlace = when (style) {
+            RowStyle.Poster -> Posters
+            RowStyle.Live -> Live
+            else -> Wide
+        }
+    }
+}
+
+/** On the Live row, what OK and Hold OK do, since Hold OK's choices are a shortcut a button doesn't show here. */
+@Composable
+private fun LiveKeyHints(modifier: Modifier = Modifier) {
+    Row(modifier.padding(end = ContentEnd, bottom = SafeY), horizontalArrangement = Arrangement.spacedBy(40.dp), verticalAlignment = Alignment.CenterVertically) {
+        KeyHint("OK", "Watch")
+        KeyHint("Hold OK", "Record, or see the guide")
+    }
+}
+
+/** A key cap and what it does (`.kc`), at 22 sp. */
+@Composable
+internal fun KeyHint(key: String, does: String, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier
+                .padding(end = 12.dp)
+                .defaultMinSize(minWidth = 44.dp, minHeight = 40.dp)
+                .border(2.dp, TvPalette.Line3, RoundedCornerShape(10.dp))
+                .padding(horizontal = 10.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(key, style = TvType.Caption.copy(fontWeight = FontWeight.Bold), color = WmmColors.TextSoft)
+        }
+        Text(does, style = TvType.Caption, color = TvPalette.Muted, maxLines = 1)
     }
 }
 

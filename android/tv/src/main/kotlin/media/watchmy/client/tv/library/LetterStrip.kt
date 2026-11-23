@@ -1,6 +1,8 @@
 package media.watchmy.client.tv.library
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.withFrameNanos
@@ -26,6 +28,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -34,20 +37,24 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import media.watchmy.client.presentation.library.LibraryViewModel
+import media.watchmy.client.tv.components.FocusGrowth
 import media.watchmy.client.tv.components.FocusMemory
 import media.watchmy.client.model.LetterOffset
 import media.watchmy.client.model.plural
 import media.watchmy.client.tv.components.ContentStart
 import media.watchmy.client.tv.components.FocusableBox
-import media.watchmy.client.tv.components.inter
+import media.watchmy.client.tv.components.SafeY
+import media.watchmy.client.tv.components.TvPalette
+import media.watchmy.client.tv.components.TvType
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.onBack
 
@@ -98,9 +105,7 @@ internal fun LetterStrip(
         Column(
             Modifier
                 .align(Alignment.TopEnd)
-                .background(if (focused != null) WmmColors.Surface else WmmColors.Ground, RoundedCornerShape(34.dp))
-                .border(1.dp, if (focused != null) WmmColors.Line2 else WmmColors.Ground, RoundedCornerShape(34.dp))
-                .padding(vertical = 8.dp)
+                .padding(vertical = 4.dp)
                 .focusProperties { onEnter = { entry?.let { requesters[it]?.requestFocus() } } }
                 .onPreviewKeyEvent { e ->
                     if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -131,10 +136,10 @@ internal fun LetterStrip(
                 FocusableBox(
                     onClick = { onPick(letter) },
                     enabled = count > 0,
-                    cornerRadius = 8.dp,
-                    focusedScale = 1.15f,
+                    cornerRadius = 12.dp,
+                    focusedScale = FocusGrowth.BUTTON,
                     modifier = Modifier
-                        .size(52.dp, 27.dp)
+                        .size(StripCell.width, StripCell.height)
                         .focusRequester(requesters.getValue(letter))
                         .then(if (letter == entry && entryRequester != null) Modifier.focusRequester(entryRequester) else Modifier)
                         .onFocusChanged {
@@ -148,40 +153,49 @@ internal fun LetterStrip(
                         .semantics { contentDescription = label },
                 ) { isFocused ->
                     Box(
-                        Modifier.size(52.dp, 27.dp).background(if (isFocused) WmmColors.Accent else WmmColors.Ground.copy(alpha = 0f), RoundedCornerShape(8.dp)),
+                        Modifier
+                            .size(StripCell.width, StripCell.height)
+                            .background(if (isFocused) TvPalette.Lift else Color.Transparent, RoundedCornerShape(12.dp))
+                            .alpha(if (count == 0) 0.4f else 1f),
                         contentAlignment = Alignment.Center,
                     ) {
-                        val color = when {
-                            isFocused -> WmmColors.OnAccent
-                            count == 0 -> WmmColors.TextFaint
-                            letter == current -> WmmColors.Accent
-                            else -> WmmColors.TextSoft
-                        }
-                        Text(letter, style = inter(17.sp, FontWeight.Bold), color = color)
+                        val here = letter == current
+                        val color = if (isFocused || here) WmmColors.Accent else TvPalette.Muted
+                        Text(
+                            letter,
+                            style = (if (isFocused) TvType.Body else TvType.Caption).copy(
+                                fontWeight = if (isFocused || here) FontWeight.Bold else FontWeight.SemiBold,
+                                // The letter showing in the grid is underlined in gold, so it reads apart from focus.
+                                textDecoration = if (here && !isFocused) TextDecoration.Underline else null,
+                            ),
+                            color = color,
+                        )
                     }
                 }
             }
         }
         focused?.let { letter ->
-            // The bubble beside the strip: the letter large, and how many shows start with it.
+            // The bubble beside the strip: the letter large, how many titles start with it, and what OK does.
             val index = Alphabet.indexOf(letter)
-            Column(
+            Row(
                 Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = (8 + index * 27 - 42).coerceAtLeast(0).dp)
-                    .padding(end = 84.dp)
-                    .size(104.dp, 112.dp)
-                    .background(WmmColors.Surface2, RoundedCornerShape(20.dp))
-                    .border(2.dp, WmmColors.Accent, RoundedCornerShape(20.dp)),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+                    .padding(top = (4 + index * StripCell.height.value.toInt() - 24).coerceAtLeast(0).dp, end = StripCell.width + 24.dp)
+                    .background(WmmColors.Surface2, RoundedCornerShape(18.dp))
+                    .border(2.dp, TvPalette.Line, RoundedCornerShape(18.dp))
+                    .padding(horizontal = 24.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(letter, style = inter(58.sp, FontWeight.ExtraBold), color = WmmColors.Accent)
-                Text(plural(counts[letter] ?: 0, noun), style = inter(15.sp), color = WmmColors.TextSoft)
+                Text(letter, style = TvType.Title, color = WmmColors.Text)
+                Text("${plural(counts[letter] ?: 0, noun)} · OK goes to the first", style = TvType.Second, color = WmmColors.TextSoft, maxLines = 1)
             }
         }
     }
 }
+
+/** A letter's place in the strip: wide enough for the focused letter at 26, 27 of them in 810. */
+private val StripCell = DpSize(56.dp, 30.dp)
 
 /**
  * The TV grid's ways to move a long way: the A–Z strip's previews,
@@ -321,21 +335,20 @@ internal fun Modifier.pageKeys(jumps: GridJumps): Modifier = onPreviewKeyEvent {
 /** A screenful of the grid: two rows. */
 private const val PAGE_ROWS = 2
 
-/** The key hints at the foot of a grid sorted by title. */
+/** The key hints at the foot of a grid: only what no button shows (the strip's keys, and CH+ CH− for a screen at a time). */
 @Composable
 internal fun JumpHints(onStrip: Boolean, letter: String?, byTitle: Boolean, modifier: Modifier = Modifier) {
     val text = when {
-        onStrip -> "▲ ▼ Letter, skipping empty ones    OK ◀ First show under ${letter.orEmpty()}    Back  Back to the show you were on"
-        byTitle -> "▶ From the last column: A–Z    CH+ CH−  A screen up or down    PgUp PgDn  The same on a keyboard"
-        else -> "CH+ CH−  A screen up or down    A–Z appears when the list is sorted by title"
+        onStrip -> "▲ ▼ Letter    OK First title under ${letter.orEmpty()}    Back The title you were on"
+        byTitle -> "▶ from the last column: A–Z    CH+ CH− A screen up or down"
+        else -> "CH+ CH− A screen up or down"
     }
-    // Over the grid's foot, on a fade to the page's ground, as drawn.
     Box(
         modifier
             .fillMaxWidth()
             .background(Brush.verticalGradient(listOf(WmmColors.Ground.copy(alpha = 0f), WmmColors.Ground.copy(alpha = 0.94f), WmmColors.Ground)))
-            .padding(start = ContentStart, top = 48.dp, bottom = 24.dp),
+            .padding(start = ContentStart, top = 40.dp, bottom = SafeY),
     ) {
-        Text(text, style = inter(19.sp), color = WmmColors.TextSoft)
+        Text(text, style = TvType.Caption, color = TvPalette.Muted)
     }
 }

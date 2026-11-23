@@ -61,6 +61,7 @@ import media.watchmy.client.presentation.watchlists.WatchlistsViewModel
 import media.watchmy.client.tv.components.ContentEnd
 import media.watchmy.client.tv.components.ContentStart
 import media.watchmy.client.tv.components.ErrorState
+import media.watchmy.client.tv.components.FocusGrowth
 import media.watchmy.client.tv.components.FocusableBox
 import media.watchmy.client.tv.components.Kicker
 import media.watchmy.client.tv.components.LoadingState
@@ -102,16 +103,16 @@ internal fun WatchlistHeader(
     Column(Modifier.padding(start = ContentStart, end = ContentEnd, top = 56.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(28.dp)) {
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(40.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Kicker(WatchlistWords.KICKER, fontSize = 19.sp)
-                Text(list.name, style = inter(56.sp, FontWeight.ExtraBold, lineHeight = 59.sp, tracking = -0.02f), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (list.entries > 0) Text(list.summaryLine(), style = inter(20.sp), color = WmmColors.TextMuted)
+                Kicker(WatchlistWords.KICKER, fontSize = 22.sp)
+                Text(list.name, style = inter(64.sp, FontWeight.ExtraBold, lineHeight = 80.sp, tracking = -0.02f), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (list.entries > 0) Text(list.summaryLine(), style = inter(22.sp), color = WmmColors.TextMuted)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.Top) {
                 TvButton(WatchlistWords.RENAME, onRename, Modifier.focusMemory(memory, "wl:rename"), size = TvButtonSize.Medium, icon = WmmIcons.Pencil)
                 TvButton(WatchlistWords.DELETE, onDelete, Modifier.focusMemory(memory, "wl:delete"), size = TvButtonSize.Medium, icon = WmmIcons.Trash)
                 Column(Modifier.width(420.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     SwitchButton(WatchlistWords.SWITCH, list.removeWatched, { onRemoveWatched(!list.removeWatched) }, Modifier.focusMemory(memory, "wl:switch"))
-                    Text(WatchlistWords.SWITCH_NOTE, style = inter(17.sp, lineHeight = 24.sp), color = WmmColors.TextMuted)
+                    Text(WatchlistWords.SWITCH_NOTE, style = inter(22.sp, lineHeight = 31.sp), color = WmmColors.TextMuted)
                 }
             }
         }
@@ -120,12 +121,12 @@ internal fun WatchlistHeader(
                 ListShown.entries.forEach { chip -> TvChip(chip.label, chip == shown, { onShow(chip) }, Modifier.focusMemory(memory, "wl:chip:${chip.name}")) }
                 Box(Modifier.weight(1f))
                 if (hint != null) {
-                    Text(hint, style = inter(19.sp), color = WmmColors.TextFaint, maxLines = 1)
-                    Text("·", style = inter(19.sp), color = WmmColors.TextFaint)
-                    Text("Hold OK", style = inter(16.sp, FontWeight.Bold), color = WmmColors.TextSoft, modifier = Modifier.border(1.dp, WmmColors.Line2, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp))
-                    Text(WatchlistWords.removeFrom(list.name), style = inter(19.sp), color = WmmColors.TextFaint, maxLines = 1)
+                    Text(hint, style = inter(22.sp), color = WmmColors.TextFaint, maxLines = 1)
+                    Text("·", style = inter(22.sp), color = WmmColors.TextFaint)
+                    Text("Hold OK", style = inter(22.sp, FontWeight.Bold), color = WmmColors.TextSoft, modifier = Modifier.border(1.dp, WmmColors.Line2, RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp))
+                    Text(WatchlistWords.removeFrom(list.name), style = inter(22.sp), color = WmmColors.TextFaint, maxLines = 1)
                 }
-                Text("Sort", style = inter(19.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(start = 12.dp))
+                Text("Sort", style = inter(22.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(start = 12.dp))
                 TvChip(sort.label, selected = false, onClick = onSort, modifier = Modifier.focusMemory(memory, "wl:sort"), trailingIcon = WmmIcons.ChevronDown)
             }
         }
@@ -142,14 +143,14 @@ private fun SwitchButton(text: String, on: Boolean, onClick: () -> Unit, modifie
             toggleableState = ToggleableState(on)
         },
         cornerRadius = 12.dp,
-        focusedScale = 1.04f,
+        focusedScale = FocusGrowth.BUTTON,
     ) { focused ->
         Row(
             Modifier.height(TvButtonSize.Medium.height).background(Color.White.copy(alpha = if (focused) 0.16f else 0.10f), RoundedCornerShape(12.dp)).padding(start = 22.dp, end = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(text, style = inter(19.sp, FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1)
+            Text(text, style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1)
             Toggle(on)
         }
     }
@@ -166,7 +167,7 @@ internal fun RenamePanel(naming: Naming, onCancel: () -> Unit, onSave: (String) 
                     .semantics { paneTitle = WatchlistWords.RENAME },
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-                Text(WatchlistWords.RENAME, style = inter(30.sp, FontWeight.SemiBold), color = WmmColors.Text, modifier = Modifier.semantics { heading() })
+                Text(WatchlistWords.RENAME, style = inter(28.sp, FontWeight.SemiBold), color = WmmColors.Text, modifier = Modifier.semantics { heading() })
                 NamingTv(naming, onCancel, onSave, onChanged, confirm = WatchlistWords.SAVE)
             }
         }
@@ -194,8 +195,8 @@ fun WatchlistsTv(onNavigate: (Any) -> Unit, onOpenList: (Long) -> Unit, modifier
             lists == null -> LoadingState()
             else -> {
                 Column(Modifier.padding(start = ContentStart, top = 56.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(WatchlistWords.WATCHLISTS, style = inter(56.sp, FontWeight.ExtraBold, tracking = -0.02f), color = WmmColors.Text, modifier = Modifier.semantics { heading() })
-                    if (lists.isNotEmpty()) Text(plural(lists.size, "watchlist"), style = inter(21.sp), color = WmmColors.TextMuted)
+                    Text(WatchlistWords.WATCHLISTS, style = inter(64.sp, FontWeight.ExtraBold, tracking = -0.02f), color = WmmColors.Text, modifier = Modifier.semantics { heading() })
+                    if (lists.isNotEmpty()) Text(plural(lists.size, "watchlist"), style = inter(22.sp), color = WmmColors.TextMuted)
                 }
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(4),
@@ -209,8 +210,8 @@ fun WatchlistsTv(onNavigate: (Any) -> Unit, onOpenList: (Long) -> Unit, modifier
                     if (lists.isEmpty()) {
                         item(key = "none", span = { GridItemSpan(maxLineSpan) }) {
                             Column(Modifier.padding(top = 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Text(WatchlistWords.NONE_TITLE, style = inter(30.sp, FontWeight.SemiBold), color = WmmColors.Text)
-                                Text(WatchlistWords.NONE_BODY, style = inter(21.sp), color = WmmColors.TextMuted)
+                                Text(WatchlistWords.NONE_TITLE, style = inter(28.sp, FontWeight.SemiBold), color = WmmColors.Text)
+                                Text(WatchlistWords.NONE_BODY, style = inter(22.sp), color = WmmColors.TextMuted)
                             }
                         }
                     }
@@ -232,7 +233,7 @@ fun WatchlistsTv(onNavigate: (Any) -> Unit, onOpenList: (Long) -> Unit, modifier
                         .semantics { paneTitle = WatchlistWords.NEW_BUTTON },
                     verticalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
-                    Text(WatchlistWords.NEW_BUTTON, style = inter(30.sp, FontWeight.SemiBold), color = WmmColors.Text, modifier = Modifier.semantics { heading() })
+                    Text(WatchlistWords.NEW_BUTTON, style = inter(28.sp, FontWeight.SemiBold), color = WmmColors.Text, modifier = Modifier.semantics { heading() })
                     NamingTv(naming, vm::cancelNaming, vm::create, vm::nameChanged)
                 }
             }
@@ -243,7 +244,7 @@ fun WatchlistsTv(onNavigate: (Any) -> Unit, onOpenList: (Long) -> Unit, modifier
 /** New watchlist's tile: a bookmark with a plus. */
 @Composable
 private fun NewTile(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    FocusableBox(onClick = onClick, modifier = modifier.fillMaxWidth(), cornerRadius = 16.dp, focusedScale = 1.04f, role = Role.Button) { focused ->
+    FocusableBox(onClick = onClick, modifier = modifier.fillMaxWidth(), cornerRadius = 16.dp, focusedScale = FocusGrowth.BUTTON, role = Role.Button) { focused ->
         Column(
             // About as tall as a watchlist's tile beside it: four posters and two lines.
             Modifier.fillMaxWidth().aspectRatio(1.73f).background(if (focused) WmmColors.Surface2 else WmmColors.Surface, RoundedCornerShape(16.dp))
@@ -261,7 +262,7 @@ private fun NewTile(onClick: () -> Unit, modifier: Modifier = Modifier) {
 @Composable
 private fun WatchlistTile(watchlist: Watchlist, imageUrl: (String?, ImageSize) -> String?, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val spoken = listOfNotNull(watchlist.name, WatchlistWords.titles(watchlist.titles), "${watchlist.inLibrary} in your library", WatchlistWords.KEEPS.lowercase().takeIf { !watchlist.removeWatched }).joinToString(", ")
-    FocusableBox(onClick = onClick, modifier = modifier.fillMaxWidth(), cornerRadius = 16.dp, focusedScale = 1.04f, role = Role.Button) { focused ->
+    FocusableBox(onClick = onClick, modifier = modifier.fillMaxWidth(), cornerRadius = 16.dp, focusedScale = FocusGrowth.BUTTON, role = Role.Button) { focused ->
         Column(
             Modifier.fillMaxWidth().background(WmmColors.Surface, RoundedCornerShape(16.dp)).border(1.dp, WmmColors.Line, RoundedCornerShape(16.dp)).padding(16.dp)
                 .clearAndSetSemantics {
@@ -277,9 +278,9 @@ private fun WatchlistTile(watchlist: Watchlist, imageUrl: (String?, ImageSize) -
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(watchlist.name, style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false).widthIn(max = 260.dp))
-                if (!watchlist.removeWatched) Text(WatchlistWords.KEEPS, style = inter(15.sp, FontWeight.SemiBold), color = WmmColors.Accent, maxLines = 1)
+                if (!watchlist.removeWatched) Text(WatchlistWords.KEEPS, style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.Accent, maxLines = 1)
             }
-            Text(WatchlistWords.line(watchlist.titles, watchlist.inLibrary), style = inter(18.sp), color = WmmColors.TextMuted)
+            Text(WatchlistWords.line(watchlist.titles, watchlist.inLibrary), style = inter(22.sp), color = WmmColors.TextMuted)
         }
     }
 }

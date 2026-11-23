@@ -13,6 +13,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -30,27 +35,39 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.Text
 import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.WmmColors
+import media.watchmy.client.ui.components.WmmIcons
 
-/** #E5E5E5: the mockups' text on chips, tags and fact lines, between Text and TextSoft. */
+/** #E5E5E5: text on tags and fact lines, between Text and TextSoft. */
 val TextBright = Color(0xFFE5E5E5)
 
-/** `.btn.danger`: Delete episode. */
-private val Danger = Color(0xFFB42318)
-private val DangerFocused = Color(0xFFC92A1D)
-private val DangerRim = Color(0xFFE5484D)
+/** The outline of a button that deletes: the warning orange, since red isn't one of the TV's colours. */
+private val DangerLine = WmmColors.Warn
 
-/** Burgundy fill with the rim (primary), translucent white (ghost), or red for deleting, as `.btn.primary`, `.btn.ghost` and `.btn.danger`. */
+/**
+ * Burgundy fill with its rim (the screen's one main button), a dark fill
+ * (every other button), or a dark fill outlined in the warning orange for
+ * one that deletes.
+ */
 enum class TvButtonStyle { Primary, Ghost, Danger }
 
-/** The mockups' button sizes: hero (64), detail (60), version rows (50), settings (56) and settings rows (44). */
+/**
+ * Button sizes. Every button on a screen's own surface is 72 high with
+ * 26 sp words ([Large], [Medium]); [Small] and [Settings] are for a row of
+ * secondary actions inside a panel or a list.
+ */
 enum class TvButtonSize(val height: Dp, val fontSize: TextUnit, val padding: Dp, val icon: Dp, val radius: Dp) {
-    Large(64.dp, 22.sp, 30.dp, 26.dp, 14.dp),
-    Medium(60.dp, 21.sp, 26.dp, 24.dp, 14.dp),
-    Small(50.dp, 19.sp, 22.dp, 22.dp, 14.dp),
-    Settings(56.dp, 19.sp, 24.dp, 22.dp, 12.dp),
-    Compact(44.dp, 17.sp, 16.dp, 20.dp, 12.dp),
+    Large(72.dp, 26.sp, 32.dp, 30.dp, 16.dp),
+    Medium(72.dp, 26.sp, 32.dp, 30.dp, 16.dp),
+    Small(64.dp, 24.sp, 26.dp, 26.dp, 14.dp),
+    Settings(64.dp, 24.sp, 26.dp, 26.dp, 14.dp),
+    Compact(56.dp, 22.sp, 20.dp, 24.dp, 12.dp),
 }
 
+/**
+ * A button. Focused, it takes the gold ring, grows and casts a shadow; the
+ * main button keeps its burgundy and the others lift to [TvPalette.Lift].
+ * Not [enabled], it dims and stays focusable, so people can find out why.
+ */
 @Composable
 fun TvButton(
     text: String,
@@ -60,35 +77,40 @@ fun TvButton(
     size: TvButtonSize = TvButtonSize.Large,
     icon: ImageVector? = null,
     enabled: Boolean = true,
-    /** The icon's colour: gold for a state that is on (a show's Notifications on). */
+    /** The icon's colour: gold for a state that is on (a show's Notifications on, On Watchlist). */
     iconTint: Color = Color.White,
+    /** The left edge for the first button at the safe edge, so it grows away from it. */
+    growFrom: TransformOrigin = TransformOrigin.Center,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val shape = RoundedCornerShape(size.radius)
     FocusableBox(
         onClick = onClick,
-        modifier = modifier.alpha(if (enabled) 1f else 0.5f),
+        modifier = modifier.alpha(if (enabled) 1f else 0.45f),
+        onLongClick = onLongClick,
         cornerRadius = size.radius,
-        focusedScale = 1.04f,
+        focusedScale = FocusGrowth.BUTTON,
         enabled = enabled,
         role = Role.Button,
+        growFrom = growFrom,
     ) { focused ->
-        // At least the mockup's height; taller when the TV's text size is larger.
+        // At least the button's height; taller when the TV's text size is larger.
         val base = Modifier.heightIn(min = size.height)
         val styled = when (style) {
             TvButtonStyle.Primary -> base
-                .background(if (focused) WmmColors.BrandHover else WmmColors.Brand, shape)
-                .border(1.dp, WmmColors.BrandLine, shape)
+                .background(WmmColors.Brand, shape)
+                .border(2.dp, WmmColors.BrandLine, shape)
             TvButtonStyle.Ghost -> base
-                .background(Color.White.copy(alpha = if (focused) 0.16f else 0.10f), shape)
-                .border(1.dp, Color.White.copy(alpha = 0.14f), shape)
+                .background(if (focused) TvPalette.Lift else TvPalette.ButtonFill, shape)
+                .border(2.dp, if (focused) TvPalette.Lift else Color.White.copy(alpha = 0.2f), shape)
             TvButtonStyle.Danger -> base
-                .background(if (focused) DangerFocused else Danger, shape)
-                .border(1.dp, DangerRim, shape)
+                .background(if (focused) TvPalette.Lift else TvPalette.ButtonFill, shape)
+                .border(2.dp, DangerLine, shape)
         }
         Row(
             styled.padding(horizontal = size.padding, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             if (icon != null) Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(size.icon))
             Text(
@@ -103,9 +125,10 @@ fun TvButton(
 }
 
 /**
- * A filter chip (`.chip`): gold when [selected]. TalkBack hears [role] (a
- * checkbox for a filter, a drop-down list for one that opens a picker) and
- * whether it is selected.
+ * A choice that stays chosen (`.tab`): a filter, a day. Chosen, it is
+ * marked by a gold tick and brighter words, never a fill or a ring, so it
+ * can't be taken for focus. TalkBack hears [role] (a checkbox for a filter,
+ * a drop-down list for one that opens a picker) and whether it is selected.
  */
 @Composable
 fun TvChip(
@@ -117,52 +140,99 @@ fun TvChip(
     role: Role = if (trailingIcon != null) Role.DropdownList else Role.Checkbox,
     leadingIcon: ImageVector? = null,
 ) {
-    val shape = RoundedCornerShape(24.dp)
+    val shape = RoundedCornerShape(16.dp)
     val described = modifier.semantics { this.selected = selected }
-    FocusableBox(onClick = onClick, modifier = described, cornerRadius = 24.dp, focusedScale = 1.04f, role = role) { focused ->
-        val bg = when {
-            selected -> WmmColors.Accent
-            focused -> WmmColors.Surface3
-            else -> WmmColors.Surface2
-        }
+    FocusableBox(onClick = onClick, modifier = described, cornerRadius = 16.dp, focusedScale = FocusGrowth.BUTTON, role = role) { focused ->
         Row(
             Modifier
-                .heightIn(min = 48.dp)
-                .background(bg, shape)
-                .border(1.dp, if (selected) WmmColors.Accent else WmmColors.Line2, shape)
-                .padding(horizontal = 20.dp),
+                .heightIn(min = 64.dp)
+                .background(if (focused) TvPalette.Lift else TvPalette.ButtonFill, shape)
+                .border(2.dp, if (focused) TvPalette.Lift else Color.White.copy(alpha = 0.14f), shape)
+                .padding(horizontal = 24.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            val fg = if (selected) WmmColors.OnAccent else TextBright
-            if (leadingIcon != null) Icon(leadingIcon, contentDescription = null, tint = fg, modifier = Modifier.size(20.dp))
-            Text(text, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 19.sp), color = fg, maxLines = 1)
-            if (trailingIcon != null) Icon(trailingIcon, contentDescription = null, tint = fg, modifier = Modifier.size(20.dp))
+            val fg = if (selected || focused) WmmColors.Text else TvPalette.Muted
+            when {
+                selected -> Icon(WmmIcons.Check, contentDescription = null, tint = WmmColors.Accent, modifier = Modifier.size(26.dp))
+                leadingIcon != null -> Icon(leadingIcon, contentDescription = null, tint = fg, modifier = Modifier.size(26.dp))
+            }
+            Text(text, style = TvType.BodyStrong, color = fg, maxLines = 1)
+            if (trailingIcon != null) Icon(trailingIcon, contentDescription = null, tint = fg, modifier = Modifier.size(26.dp))
         }
     }
 }
 
-/** An outlined tag (`.tag`): "4K", "HEVC", "EAC3 5.1". Gold fills it ("Default"). */
+/**
+ * A tab (`.tab`): the words alone at rest, a gold underline when it is the
+ * one showing ([selected]), and the focus treatment when focused.
+ */
 @Composable
-fun TvTag(text: String, modifier: Modifier = Modifier, gold: Boolean = false, fontSize: TextUnit = 15.sp) {
-    val shape = RoundedCornerShape(6.dp)
-    val m = if (gold) modifier.background(WmmColors.Accent, shape) else modifier.border(1.dp, WmmColors.Line3, shape)
+fun TvTab(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    trailing: String? = null,
+    enabled: Boolean = true,
+    growFrom: TransformOrigin = TransformOrigin.Center,
+) {
+    val shape = RoundedCornerShape(16.dp)
+    FocusableBox(
+        onClick = onClick,
+        modifier = modifier.semantics {
+            this.selected = selected
+            role = Role.Tab
+        }.alpha(if (enabled) 1f else 0.45f),
+        cornerRadius = 16.dp,
+        focusedScale = FocusGrowth.BUTTON,
+        enabled = enabled,
+        growFrom = growFrom,
+    ) { focused ->
+        Row(
+            Modifier
+                .heightIn(min = 64.dp)
+                .background(if (focused) TvPalette.Lift else Color.Transparent, shape)
+                .padding(horizontal = 26.dp)
+                .drawBehind {
+                    // Inside the padding, so the underline is as wide as the words, 6 dp above the tab's foot.
+                    if (selected) {
+                        val h = 4.dp.toPx()
+                        drawRoundRect(WmmColors.Accent, topLeft = Offset(0f, size.height - 6.dp.toPx() - h), size = Size(size.width, h), cornerRadius = CornerRadius(h / 2))
+                    }
+                },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(text, style = TvType.BodyStrong, color = if (selected || focused) WmmColors.Text else TvPalette.Muted, maxLines = 1)
+            if (trailing != null) Text(trailing, style = TvType.Second, color = TvPalette.Muted, maxLines = 1)
+        }
+    }
+}
+
+/** An outlined tag (`.tag`): "4K", "HDR", "TV-14". [gold] outlines it in gold (New). */
+@Composable
+fun TvTag(text: String, modifier: Modifier = Modifier, gold: Boolean = false, @Suppress("UNUSED_PARAMETER") fontSize: TextUnit = 22.sp) {
+    val shape = RoundedCornerShape(8.dp)
     Text(
         text.uppercase(),
-        modifier = m.padding(horizontal = 10.dp, vertical = 4.dp),
-        style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Bold, fontSize = fontSize, letterSpacing = fontSize * 0.04f),
-        color = if (gold) WmmColors.OnAccent else TextBright,
+        modifier = modifier
+            .border(2.dp, if (gold) WmmColors.Accent else TvPalette.Line3, shape)
+            .heightIn(min = 38.dp)
+            .padding(horizontal = 10.dp, vertical = 3.dp),
+        style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Bold, fontSize = 22.sp, lineHeight = 30.sp, letterSpacing = 0.66.sp),
+        color = if (gold) WmmColors.Accent else WmmColors.TextSoft,
         maxLines = 1,
     )
 }
 
-/** The gold upper-case kicker above a big title ("SIGN IN", "NEW EPISODE · AIRED YESTERDAY"). */
+/** The gold upper-case kicker above a big title ("CONTINUE WATCHING", "NEW EPISODE · AIRED YESTERDAY"). */
 @Composable
-fun Kicker(text: String, modifier: Modifier = Modifier, fontSize: TextUnit = 20.sp) {
+fun Kicker(text: String, modifier: Modifier = Modifier, @Suppress("UNUSED_PARAMETER") fontSize: TextUnit = 22.sp) {
     Text(
         text.uppercase(),
         modifier = modifier,
-        style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = fontSize, letterSpacing = fontSize * 0.14f),
+        style = TvType.Kicker,
         color = WmmColors.Accent,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,

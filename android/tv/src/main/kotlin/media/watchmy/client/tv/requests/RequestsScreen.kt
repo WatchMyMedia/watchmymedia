@@ -64,6 +64,7 @@ import media.watchmy.client.tv.components.ContentEnd
 import media.watchmy.client.tv.components.ContentStart
 import media.watchmy.client.tv.components.EmptyState
 import media.watchmy.client.tv.components.ErrorState
+import media.watchmy.client.tv.components.FocusGrowth
 import media.watchmy.client.tv.components.FocusableBox
 import media.watchmy.client.tv.components.KeepInViewSpec
 import media.watchmy.client.tv.components.KeyboardDialog
@@ -106,14 +107,14 @@ fun RequestsScreen(onNavigate: (Any) -> Unit, onOpenShow: (Long) -> Unit, onOpen
 
     TvScaffold(RailSection.Settings, onNavigate, sectionRoot = false) {
         Column(Modifier.padding(start = ContentStart, top = 56.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Settings › ${if (showingInbox) "Inbox" else "Your requests"}", style = inter(18.sp), color = WmmColors.TextMuted)
-            Text(if (showingInbox) "Inbox" else "Your requests", style = inter(46.sp, FontWeight.ExtraBold, tracking = -0.02f), color = WmmColors.Text)
+            Text("Settings › ${if (showingInbox) "Inbox" else "Your requests"}", style = inter(22.sp), color = WmmColors.TextMuted)
+            Text(if (showingInbox) "Inbox" else "Your requests", style = inter(48.sp, FontWeight.ExtraBold, tracking = -0.02f), color = WmmColors.Text)
             val sub = if (showingInbox) {
                 (inboxState?.inbox as? Load.Ready)?.data?.let { i -> listOf("${i.requests.size} request${if (i.requests.size == 1) "" else "s"}", "${i.problems.size} problem${if (i.problems.size == 1) "" else "s"}").joinToString(" · ") }
             } else {
                 (state.mine as? Load.Ready)?.data?.let { "${it.size} request${if (it.size == 1) "" else "s"} · newest first" }
             }
-            Text(sub.orEmpty(), style = inter(20.sp), color = WmmColors.TextMuted)
+            Text(sub.orEmpty(), style = inter(22.sp), color = WmmColors.TextMuted)
         }
         if (state.options.canOpenInbox) {
             Row(Modifier.align(Alignment.TopEnd).padding(top = 96.dp, end = ContentEnd), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -136,11 +137,11 @@ fun RequestsScreen(onNavigate: (Any) -> Unit, onOpenShow: (Long) -> Unit, onOpen
                                     item(key = "seerr") {
                                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                             Text("Requests are approved in Seerr", style = inter(24.sp, FontWeight.SemiBold), color = WmmColors.Text)
-                                            seerr.pending?.let { Text("$it waiting in Seerr", style = inter(20.sp), color = WmmColors.TextSoft) }
+                                            seerr.pending?.let { Text("$it waiting in Seerr", style = inter(22.sp), color = WmmColors.TextSoft) }
                                             seerr.safeRequestsUrl?.let { url ->
                                                 TvButton("Open Seerr", { runCatching { uriHandler.openUri(url) }.onFailure { inboxVm?.openSeerrFailed() } })
                                             }
-                                            if (i.data.requests.isNotEmpty()) Text("Asked for before Seerr was connected", style = inter(20.sp), color = WmmColors.TextSoft)
+                                            if (i.data.requests.isNotEmpty()) Text("Asked for before Seerr was connected", style = inter(22.sp), color = WmmColors.TextSoft)
                                         }
                                     }
                                 }
@@ -160,7 +161,7 @@ fun RequestsScreen(onNavigate: (Any) -> Unit, onOpenShow: (Long) -> Unit, onOpen
                         } else {
                             LazyColumn(contentPadding = PaddingValues(start = ContentStart, end = ContentEnd, bottom = 60.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                                 if (state.options.viaSeerr) item(key = "seerr-note") {
-                                    Text(SEERR_APPROVAL_NOTE, style = inter(20.sp), color = WmmColors.TextSoft)
+                                    Text(SEERR_APPROVAL_NOTE, style = inter(22.sp), color = WmmColors.TextSoft)
                                 }
                                 items(m.data, key = { it.id }) { r ->
                                     MyRequestRow(
@@ -210,16 +211,16 @@ fun RequestsScreen(onNavigate: (Any) -> Unit, onOpenShow: (Long) -> Unit, onOpen
 /** A tab at the top right (`.tab`): gold when on, with the Inbox's count. */
 @Composable
 private fun Tab(label: String, count: Int?, on: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    FocusableBox(onClick = onClick, modifier = modifier, cornerRadius = 12.dp, focusedScale = 1.04f) { focused ->
+    FocusableBox(onClick = onClick, modifier = modifier, cornerRadius = 12.dp, focusedScale = FocusGrowth.BUTTON) { focused ->
         Row(
             Modifier.height(50.dp).background(if (on) WmmColors.Accent else if (focused) WmmColors.Surface3 else Color.Transparent, RoundedCornerShape(12.dp)).padding(horizontal = 20.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(label, style = inter(20.sp, FontWeight.SemiBold), color = if (on) WmmColors.OnAccent else WmmColors.TextSoft)
+            Text(label, style = inter(22.sp, FontWeight.SemiBold), color = if (on) WmmColors.OnAccent else WmmColors.TextSoft)
             if (count != null) {
                 Box(Modifier.heightIn(min = 26.dp).background(if (on) WmmColors.OnAccent else WmmColors.Accent, RoundedCornerShape(13.dp)).padding(horizontal = 8.dp), contentAlignment = Alignment.Center) {
-                    Text("$count", style = inter(15.sp, FontWeight.ExtraBold), color = if (on) WmmColors.Accent else WmmColors.OnAccent)
+                    Text("$count", style = inter(22.sp, FontWeight.ExtraBold), color = if (on) WmmColors.Accent else WmmColors.OnAccent)
                 }
             }
         }
@@ -244,8 +245,8 @@ private fun MyRequestRow(r: MediaRequest, busy: Boolean, onCancel: () -> Unit, o
         ) {
             Artwork(library.imageUrl(r.posterPath, ImageSize.W154), seed = r.title, contentDescription = null, modifier = Modifier.size(64.dp, 96.dp), shape = RoundedCornerShape(8.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(r.title, style = inter(23.sp, FontWeight.Bold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(listOfNotNull(requestedWhat(r.mediaType, r.seasons), requestAge(r.createdAtMs)).joinToString(" · "), style = inter(18.sp), color = WmmColors.TextMuted)
+                Text(r.title, style = inter(24.sp, FontWeight.Bold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(listOfNotNull(requestedWhat(r.mediaType, r.seasons), requestAge(r.createdAtMs)).joinToString(" · "), style = inter(22.sp), color = WmmColors.TextMuted)
             }
             Column(Modifier.width(640.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 StateLine(listOfNotNull(line.label, line.note).joinToString(" · "), line.tone.tvIcon(), line.tone.tvTone())
@@ -267,7 +268,7 @@ private fun MyRequestRow(r: MediaRequest, busy: Boolean, onCancel: () -> Unit, o
 private fun StateLine(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(24.dp))
-        Text(text, style = inter(20.sp, FontWeight.SemiBold), color = color, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(text, style = inter(22.sp, FontWeight.SemiBold), color = color, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -352,8 +353,8 @@ private fun ProblemRow(p: Problem, busy: Boolean, onResolve: () -> Unit) {
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (p.note.isNotBlank()) Text("“${p.note}”", style = inter(20.sp), color = WmmColors.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (p.details.isNotBlank()) Text(p.details, style = inter(16.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (p.note.isNotBlank()) Text("“${p.note}”", style = inter(22.sp), color = WmmColors.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (p.details.isNotBlank()) Text(p.details, style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         TvButton(if (busy) "Resolving…" else "Mark resolved", onResolve, size = TvButtonSize.Settings, enabled = !busy)
     }

@@ -4,9 +4,12 @@ import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.awaitCancellation
@@ -77,6 +80,8 @@ class SecondVisitTest {
         }
         compose.waitForIdle()
         assertEquals(1, looking.get())
+        // The found servers and the typed address are one list: bring the server into view first.
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Office Mac mini"))
         compose.onNodeWithText("Office Mac mini").performClick()
         compose.waitUntil(5_000) { chosen == 1 }
         compose.waitForIdle()
@@ -95,11 +100,11 @@ class SecondVisitTest {
         var shown by mutableStateOf(true)
         compose.setContent { ProvideAppServices(services) { TvTheme { if (shown) SignInScreen(onSwitchServer = {}) } } }
         compose.waitForIdle()
-        compose.onNodeWithText("Waiting for the code", substring = true).assertExists()
+        compose.onNodeWithText("Waiting for your phone", substring = true).assertExists()
         // The fake approves the code after 8 s.
         shadowOf(Looper.getMainLooper()).idleFor(9, TimeUnit.SECONDS)
         compose.waitForIdle()
-        compose.onNodeWithText("Code accepted. Signing in…").assertExists()
+        compose.onNodeWithText("Signed in as", substring = true).assertExists()
         assertEquals("Sam", services.auth.user.value?.name)
 
         // Signed in, the app moves on; then signs out and comes back here.
@@ -108,7 +113,7 @@ class SecondVisitTest {
         runBlocking { services.auth.signOut() }
         compose.runOnIdle { shown = true }
         compose.waitForIdle()
-        compose.onNodeWithText("Code accepted. Signing in…").assertDoesNotExist()
-        compose.onNodeWithText("Waiting for the code", substring = true).assertExists()
+        compose.onNodeWithText("Signed in as", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("Waiting for your phone", substring = true).assertExists()
     }
 }

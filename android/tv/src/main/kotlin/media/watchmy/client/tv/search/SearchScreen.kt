@@ -1,5 +1,32 @@
 package media.watchmy.client.tv.search
 
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.runtime.Immutable
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import media.watchmy.client.model.plural
+import media.watchmy.client.tv.components.ContentEnd
+import media.watchmy.client.tv.components.FocusGrowth
+import media.watchmy.client.tv.components.PanelRow
+import media.watchmy.client.tv.components.SafeY
+import media.watchmy.client.tv.components.TvPalette
+import media.watchmy.client.tv.components.TvType
+import media.watchmy.client.tv.components.WideCardHeight
+import media.watchmy.client.tv.components.WideCardWidth
+import media.watchmy.client.tv.components.tryFocus
+import media.watchmy.client.tv.home.FactsLine
+import media.watchmy.client.tv.home.HomeFact
+import media.watchmy.client.tv.library.gridFacts
 import media.watchmy.client.tv.watchlists.holdFor
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -66,10 +93,8 @@ import media.watchmy.client.tv.components.ArtProgress
 import media.watchmy.client.tv.components.ArtWatched
 import media.watchmy.client.tv.components.CardRow
 import media.watchmy.client.tv.components.ContentStart
-import media.watchmy.client.tv.components.EmptyState
 import media.watchmy.client.tv.components.ErrorState
 import media.watchmy.client.tv.components.FocusMemory
-import media.watchmy.client.tv.components.InitialFocus
 import media.watchmy.client.tv.components.KeepInViewSpec
 import media.watchmy.client.tv.components.KeyboardField
 import media.watchmy.client.tv.components.LoadingState
@@ -82,7 +107,6 @@ import media.watchmy.client.tv.components.TvScaffold
 import media.watchmy.client.tv.components.focusMemory
 import media.watchmy.client.tv.components.inter
 import media.watchmy.client.tv.components.rememberFocusMemory
-import media.watchmy.client.presentation.library.gridSubtitle
 import media.watchmy.client.tv.requests.RequestDialog
 import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.ReportShown
@@ -118,8 +142,12 @@ import media.watchmy.client.ui.onBack
 /** How wide the keyboard is: ten keys and the gaps between them. Its box, its note and the key hints keep to it. */
 private val KeyboardWidth = 712.dp
 
-/** Where the results start: right of the keyboard (154 + 712 + 60). */
-private val ResultsStart = 926.dp
+/** Where the results start: right of the keyboard (216 + 712 + 64). */
+private val ResultsStart = 992.dp
+
+/** Search's posters: a little narrower than the library's, so four fit beside the keyboard with the fifth peeking. */
+private val SearchPosterWidth = 200.dp
+private val SearchPosterHeight = 300.dp
 
 /**
  * How far inside their list the results start. The list's own left edge has
@@ -132,10 +160,13 @@ private val ResultsStart = 926.dp
 private val ResultsInset = 40.dp
 
 /**
- * Search (no mockup; it follows the Library's cards): the on-screen keyboard
- * on the left, and shows, movies and episodes matching the title on the
- * right as the viewer types. An episode opens its page; holding centre on
- * one plays it.
+ * Search: the box and the microphone over the on-screen keyboard on the
+ * left; on the right, recent searches before anything is typed, then shows,
+ * movies and episodes matching the title as the viewer types, with the
+ * focused result's facts in one line above them. Focus starts on the
+ * microphone where the TV offers speech, else on q. Back from a result or a
+ * recent search goes to the keyboard; from the keyboard, Home. An episode
+ * opens its page; holding OK on one plays it.
  *
  * With two or more servers signed in it looks in all of them: the server in
  * use's cards first, then each other server's at the end of its row, with
@@ -189,50 +220,83 @@ fun SearchScreen(
     val listening = voice.state == Voice.Listening
     val tvKeyboard = remember { TvKeyboardOpener() }
 
+    val micFocus = remember { FocusRequester() }
+    val resultsFocus = remember { FocusRequester() }
+    // The first result, or the first recent search: where ▶ from the microphone lands.
+    val resultsEntry = remember { FocusRequester() }
+    // The line above the results: the focused result's title and facts, or how many there are.
+    var focusedLine by remember { mutableStateOf<ResultLine?>(null) }
+    var resultsFocused by remember { mutableStateOf(false) }
+
     TvScaffold(RailSection.Search, onNavigate) {
         // Back while listening stops it now, before anything else takes Back.
         Column(
-            Modifier.padding(start = ContentStart, top = 56.dp).width(KeyboardWidth).onBack(enabled = listening, onBack = voice::stop),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
+            Modifier.padding(start = ContentStart, top = SafeY).width(KeyboardWidth).onBack(enabled = listening, onBack = voice::stop),
         ) {
-            Text("Search", style = inter(46.sp, FontWeight.ExtraBold, tracking = -0.02f), color = WmmColors.Text)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                // ▲ from the keyboard's top row comes here, and ▶ from here to the microphone; OK opens the TV's keyboard.
-                FocusableBox(onClick = tvKeyboard::open, modifier = Modifier.weight(1f), cornerRadius = 14.dp, focusedScale = 1f, ringOffset = 0.dp) {
+                // ▲ from the keyboard's top row comes here; OK opens the TV's keyboard.
+                FocusableBox(onClick = tvKeyboard::open, modifier = Modifier.weight(1f), cornerRadius = 16.dp, focusedScale = FocusGrowth.ROW) {
                     KeyboardField(
                         query.text.toString(),
-                        placeholder = if (withLive) "Titles of shows, movies, episodes or Live TV programmes" else "Titles of shows, movies or episodes",
-                        active = true,
+                        placeholder = if (withLive) "Search your library and live TV" else "Search your library",
+                        active = query.text.isNotEmpty(),
                         dim = listening,
+                        icon = WmmIcons.Search,
                     )
                 }
-                if (voice.available) MicKey(listening, pressMic)
+                // ▶ from the microphone goes to the results (or the recent searches) beside it, not to whatever is nearest.
+                if (voice.available) {
+                    MicKey(
+                        listening,
+                        pressMic,
+                        Modifier.focusRequester(micFocus).onPreviewKeyEvent { e ->
+                            if (e.key != Key.DirectionRight) return@onPreviewKeyEvent false
+                            if (e.type == KeyEventType.KeyDown) resultsEntry.tryFocus() || resultsFocus.tryFocus()
+                            true
+                        },
+                    )
+                }
             }
-            voiceLine(voice.state)?.let { line -> VoiceLine(line, listening) }
+            voiceLine(voice.state)?.let { line -> VoiceLine(line, listening, Modifier.padding(top = 16.dp)) }
             OnScreenKeyboard(
                 field = query,
-                modifier = Modifier.alpha(if (listening) 0.4f else 1f),
+                modifier = Modifier.padding(top = 28.dp).alpha(if (listening) 0.4f else 1f),
                 onDone = vm::clear,
                 doneLabel = "Clear",
                 firstKey = firstKey,
-                note = (if (voice.available) "" else "No microphone key: this TV doesn’t offer speech recognition to apps. ") +
-                    "Accents and other alphabets come from the TV’s keyboard. Back or its Done returns here. Every field that uses this keyboard gets the same key, passwords included.",
                 opener = tvKeyboard,
             )
+            if (!listening) KeyHints(Modifier.padding(top = 30.dp))
         }
-        if (!listening) KeyHints(voice.available, Modifier.align(Alignment.BottomStart).padding(start = ContentStart, bottom = 40.dp))
-        Box(Modifier.fillMaxSize().padding(start = ResultsStart - ContentStart)) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(start = ResultsStart - ContentStart)
+                .focusRequester(resultsFocus)
+                .focusRestorer()
+                .onFocusChanged { resultsFocused = it.hasFocus }
+                // Back from the results or a recent search: the keyboard, not Home.
+                .onBack(enabled = resultsFocused) { firstKey.tryFocus() },
+        ) {
             val results = state.results
             when {
                 state.error != null -> ErrorState(state.error!!, vm::retry, title = "Search didn't work")
+                state.query.isBlank() && state.recentQueries.isNotEmpty() -> RecentSearches(state.recentQueries, voice.available, memory, vm::selectRecentQuery, resultsEntry)
                 state.query.isBlank() ->
                     if (state.several) Hint(SEARCH_YOUR_SERVERS, searchYourServersLine(state.searched))
-                    else Hint("Find anything in your library", "Type part of a title. Shows, movies and episodes appear here as you type.")
+                    else Hint("Find anything in your library", if (voice.available) "Type part of a title, or press the microphone and say it. Shows, movies and episodes appear here as you type." else "Type part of a title. Shows, movies and episodes appear here as you type.")
                 results == null -> LoadingState()
-                state.noResults && (liveRow == null || live.results.isEmpty()) && state.unlisted.none { it.retry } ->
-                    if (state.several) Hint(noMatchesOnServers(state.searched), noMatchesOnServersLine(state.resultsFor))
-                    else Hint("Nothing matches", "No titles in your library match “${state.resultsFor}”.")
-                else -> Results(state, results, services.library, memory, onOpenShow, onOpenMovie, onPlay, onAsk = { asking = it }, onOpenEpisode = onOpenEpisode, onOpenElsewhere = elsewhere, onRetry = vm::retry, liveRow = liveRow)
+                state.noResults && (liveRow == null || live.results.isEmpty()) && state.unlisted.none { it.retry } -> {
+                    val title = if (state.several) noMatchesOnServers(state.searched) else "Nothing in your library${if (withLive) " or on live TV" else ""} matches “${state.resultsFor}”"
+                    val line = if (state.several) noMatchesOnServersLine(state.resultsFor) else "Try fewer letters." + if (state.requestable.isNotEmpty()) " Titles below aren’t in your library yet; you can ask for them." else ""
+                    Results(state, results, services.library, memory, onOpenShow, onOpenMovie, onPlay, onAsk = { asking = it }, onOpenEpisode = onOpenEpisode, onOpenElsewhere = elsewhere, onRetry = vm::retry, liveRow = null, onFocusLine = { focusedLine = it }, entry = resultsEntry) {
+                        NothingMatches(title, line)
+                    }
+                }
+                else -> Results(state, results, services.library, memory, onOpenShow, onOpenMovie, onPlay, onAsk = { asking = it }, onOpenEpisode = onOpenEpisode, onOpenElsewhere = elsewhere, onRetry = vm::retry, liveRow = liveRow, onFocusLine = { focusedLine = it }, entry = resultsEntry) {
+                    // The focused result's facts, or how many results there are while focus is on the keyboard.
+                    ResultsLine(focusedLine.takeIf { resultsFocused } ?: ResultLine(resultsCount(state, live.results.size.takeIf { liveRow != null } ?: 0, state.resultsFor), emptyList()))
+                }
             }
         }
         Notice(state.message, vm::messageShown)
@@ -248,7 +312,11 @@ fun SearchScreen(
             runCatching { firstKey.requestFocus() }
         }
     } else {
-        InitialFocus(firstKey)
+        // A first visit starts on the microphone where the TV offers speech, else on q.
+        LaunchedEffect(Unit) {
+            withFrameNanos { }
+            if (!(voice.available && micFocus.tryFocus())) firstKey.tryFocus()
+        }
     }
 
     asking?.let { item ->
@@ -264,11 +332,65 @@ fun SearchScreen(
     }
 }
 
+/** Before anything is typed, or when there is nothing to show: a heading and a line, level with the box. */
 @Composable
 private fun Hint(title: String, message: String) {
-    Box(Modifier.fillMaxSize().padding(start = ContentStart, end = 58.dp), contentAlignment = Alignment.Center) {
-        EmptyState(title, message)
+    // The column's box starts ContentStart short of the results (as the results' list does), so this starts at ContentStart in it.
+    Column(Modifier.padding(start = ContentStart, top = SafeY, end = ContentEnd).widthIn(max = 760.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text(title, style = TvType.Heading, color = WmmColors.Text)
+        Text(message, style = TvType.Body, color = WmmColors.TextSoft)
     }
+}
+
+/** "Nothing in your library matches “harq”", and what to try, over the titles that could be asked for. */
+@Composable
+private fun NothingMatches(title: String, line: String) {
+    Column(Modifier.padding(start = ResultsInset, end = ContentEnd, bottom = 20.dp).widthIn(max = 760.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text(title, style = TvType.Heading, color = WmmColors.Text)
+        Text(line, style = TvType.Body, color = WmmColors.TextSoft)
+    }
+}
+
+/** Recent searches beside the keyboard, before anything is typed: OK searches again. With a microphone, how to use it. */
+@Composable
+private fun RecentSearches(recent: List<String>, mic: Boolean, memory: FocusMemory, onPick: (String) -> Unit, entry: FocusRequester) {
+    Column(Modifier.padding(start = ContentStart, top = SafeY).width(760.dp)) {
+        Box(Modifier.height(80.dp), contentAlignment = Alignment.CenterStart) {
+            Text("Recent searches", style = TvType.CardTitle, color = WmmColors.Text)
+        }
+        Column(Modifier.padding(top = 28.dp).offset(x = (-24).dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            recent.take(6).forEachIndexed { i, q ->
+                PanelRow(q, { onPick(q) }, Modifier.focusMemory(memory, "recent:$q").then(if (i == 0) Modifier.focusRequester(entry) else Modifier), icon = WmmIcons.Clock, iconTint = TvPalette.Muted)
+            }
+        }
+        if (mic) {
+            Row(Modifier.padding(top = 36.dp), horizontalArrangement = Arrangement.spacedBy(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(WmmIcons.Microphone, contentDescription = null, tint = TvPalette.Muted, modifier = Modifier.size(28.dp))
+                Text("Press OK on the microphone and say a title or a channel. It stops when you stop talking.", style = TvType.Second, color = WmmColors.TextSoft)
+            }
+        }
+    }
+}
+
+/** The line above the results: a title and its facts, or a count. */
+@Immutable
+private data class ResultLine(val title: String, val facts: List<HomeFact>)
+
+@Composable
+private fun ResultsLine(line: ResultLine) {
+    Row(Modifier.padding(start = ResultsInset, end = ContentEnd).heightIn(min = 64.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(line.title, style = TvType.CardTitle, color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        if (line.facts.isNotEmpty()) {
+            Text("·", style = TvType.Body, color = TvPalette.Muted)
+            FactsLine(line.facts)
+        }
+    }
+}
+
+/** "5 results for “har”". */
+private fun resultsCount(state: SearchViewModel.State, live: Int, words: String): String {
+    val n = state.shows.size + state.movies.size + state.episodes.size + live
+    return "${plural(n, "result")} for “$words”"
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -286,6 +408,9 @@ private fun Results(
     onOpenElsewhere: (serverId: String, page: DeepLink) -> Unit,
     onRetry: () -> Unit,
     liveRow: (@Composable () -> Unit)? = null,
+    onFocusLine: (ResultLine) -> Unit = {},
+    entry: FocusRequester? = null,
+    top: @Composable () -> Unit = {},
 ) {
     val notMatched = rememberNotMatchedNotice()
     val requestable = state.requestable
@@ -300,15 +425,16 @@ private fun Results(
         else hit.item.pageElsewhere()?.let { onOpenElsewhere(server, it) } ?: notMatched()
     }
     val density = LocalDensity.current
-    val spec = remember(density) { with(density) { KeepInViewSpec(leading = 90.dp.toPx(), trailing = 40.dp.toPx()) } }
+    val spec = remember(density) { with(density) { KeepInViewSpec(leading = 130.dp.toPx(), trailing = 40.dp.toPx()) } }
     CompositionLocalProvider(LocalBringIntoViewSpec provides spec) {
         // The list starts right of the keyboard, so ▶ from the last key of any of its rows comes here (ResultsInset).
-        LazyColumn(Modifier.fillMaxSize().padding(start = ContentStart - ResultsInset), state = rememberLazyListState(), contentPadding = PaddingValues(top = 60.dp, bottom = 60.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        LazyColumn(Modifier.fillMaxSize().padding(start = ContentStart - ResultsInset), state = rememberLazyListState(), contentPadding = PaddingValues(top = SafeY, bottom = 60.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+            item("top") { top() }
             if (shows.isNotEmpty()) {
-                item("shows") { PosterSection("TV Shows", shows, library, memory, state.several, open) }
+                item("shows") { PosterSection("TV Shows", shows, library, memory, state.several, open, onFocusLine, entry) }
             }
             if (movies.isNotEmpty()) {
-                item("movies") { PosterSection("Movies", movies, library, memory, state.several, open) }
+                item("movies") { PosterSection("Movies", movies, library, memory, state.several, open, onFocusLine, entry.takeIf { shows.isEmpty() }) }
             }
             if (liveRow != null) item("live") { liveRow() }
             val notInLibrary = requestable.besides(results)
@@ -342,12 +468,15 @@ private fun Results(
                                     title = e.showTitle,
                                     subtitle = e.airedLine(),
                                     imageUrl = hit.picture(library, e.stillPath ?: e.showBackdropPath, ImageSize.W780),
-                                    artWidth = 320.dp,
-                                    artHeight = 180.dp,
+                                    artWidth = WideCardWidth,
+                                    artHeight = WideCardHeight,
                                     onClick = { if (server == null) onOpenEpisode(e.showId, e.season, e.episodeId) else onOpenElsewhere(server, e.pageElsewhere()) },
                                     // Holding OK plays on the server in use; one on another server is opened there first.
                                     onLongClick = if (server == null) ({ e.playRequest()?.let(onPlay) ?: onOpenShow(e.showId) }) else null,
-                                    modifier = Modifier.focusMemory(memory, "ep:${server.orEmpty()}:${e.episodeId}").onServer(e.showTitle, hit.serverName),
+                                    modifier = Modifier
+                                        .focusMemory(memory, "ep:${server.orEmpty()}:${e.episodeId}")
+                                        .onFocusChanged { if (it.isFocused) onFocusLine(ResultLine(e.showTitle, listOf(HomeFact("${e.codeBadge} · ${e.title}")))) }
+                                        .onServer(e.showTitle, hit.serverName),
                                     line = serverLine(hit.serverName, state.several),
                                 ) {
                                     if (e.isNew) ArtBadge("New", Modifier.align(Alignment.TopStart).padding(10.dp), BadgeStyle.Gold)
@@ -384,14 +513,14 @@ private fun Modifier.onServer(title: String, serverName: String?): Modifier =
 private fun serverLine(serverName: String?, keepRoom: Boolean): (@Composable () -> Unit)? = when {
     serverName != null -> {
         {
-            Row(Modifier.padding(top = 2.dp).height(24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                Icon(WmmIcons.Server, contentDescription = null, tint = WmmColors.TextSoft, modifier = Modifier.size(16.dp))
-                Text(serverName, style = inter(17.sp, FontWeight.SemiBold), color = Color(0xFFE5E5E5), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(Modifier.padding(top = 2.dp).height(30.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Icon(WmmIcons.Server, contentDescription = null, tint = WmmColors.TextSoft, modifier = Modifier.size(22.dp))
+                Text(serverName, style = TvType.Caption.copy(fontWeight = FontWeight.SemiBold), color = WmmColors.TextSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
     keepRoom -> {
-        { Box(Modifier.padding(top = 2.dp).height(24.dp)) }
+        { Box(Modifier.padding(top = 2.dp).height(30.dp)) }
     }
     else -> null
 }
@@ -411,13 +540,13 @@ private fun ServersTail(state: SearchViewModel.State, onRetry: () -> Unit, modif
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 CircularProgressIndicator(Modifier.size(22.dp), color = WmmColors.Accent, strokeWidth = 3.dp, trackColor = Color.White.copy(alpha = 0.22f))
-                Text(stillAsking(state.stillAsking), style = inter(20.sp), color = WmmColors.TextSoft)
+                Text(stillAsking(state.stillAsking), style = inter(22.sp), color = WmmColors.TextSoft)
             }
         }
         state.unlisted.forEach { server ->
             Row(Modifier.heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 Icon(WmmIcons.Alert, contentDescription = null, tint = WmmColors.Warn, modifier = Modifier.size(24.dp))
-                Text(server.line, style = inter(20.sp, lineHeight = 28.sp), color = WmmColors.TextSoft, modifier = Modifier.weight(1f, fill = false).semantics { liveRegion = LiveRegionMode.Polite })
+                Text(server.line, style = inter(22.sp, lineHeight = 31.sp), color = WmmColors.TextSoft, modifier = Modifier.weight(1f, fill = false).semantics { liveRegion = LiveRegionMode.Polite })
                 if (server.retry) TvButton("Try again", onRetry, Modifier.padding(start = 8.dp), size = TvButtonSize.Settings)
             }
         }
@@ -435,21 +564,29 @@ private fun NotInLibraryCard(item: Requestable, library: LibraryRepository, memo
     }
     MediaCard(
         title = item.title,
-        subtitle = item.subtitle(),
+        subtitle = null,
         imageUrl = library.imageUrl(item.posterPath, ImageSize.W342),
-        artWidth = 190.dp,
-        artHeight = 285.dp,
+        artWidth = SearchPosterWidth,
+        artHeight = SearchPosterHeight,
         onClick = onClick,
-        focusedScale = 1.08f,
         modifier = Modifier.focusMemory(memory, "req:${item.mediaType}:${item.tmdbId}"),
+        subtitleLine = false,
     ) {
+        // The poster dims: it isn't in the library. What OK does is a pill along its foot (`.pill`).
+        Box(Modifier.fillMaxSize().background(WmmColors.Ground.copy(alpha = 0.45f)))
         Row(
-            Modifier.align(Alignment.BottomStart).padding(start = 8.dp, bottom = 14.dp).background(Color.Black.copy(alpha = 0.72f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 4.dp),
+            Modifier
+                .align(Alignment.BottomCenter)
+                .padding(start = 10.dp, end = 10.dp, bottom = 14.dp)
+                .fillMaxWidth()
+                .height(44.dp)
+                .background(WmmColors.Ground.copy(alpha = 0.9f), RoundedCornerShape(10.dp))
+                .border(2.dp, TvPalette.Line3, RoundedCornerShape(10.dp)),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         ) {
-            Icon(icon, contentDescription = null, tint = if (gold) WmmColors.Accent else WmmColors.Text, modifier = Modifier.size(16.dp))
-            Text(label, style = inter(14.sp, FontWeight.Bold), color = WmmColors.Text, maxLines = 1)
+            Icon(icon, contentDescription = null, tint = if (gold) WmmColors.Accent else WmmColors.Text, modifier = Modifier.size(22.dp))
+            Text(label, style = TvType.Caption.copy(fontWeight = FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1)
         }
     }
 }
@@ -462,24 +599,30 @@ private fun PosterSection(
     memory: FocusMemory,
     several: Boolean,
     onOpen: (SearchViewModel.Hit<BrowseItem>) -> Unit,
+    onFocusLine: (ResultLine) -> Unit,
+    entry: FocusRequester? = null,
 ) {
     Column {
         SectionHeader(title, small = "${items.size}", start = ResultsInset)
         CardRow(start = ResultsInset) {
-            items(items, key = { "${it.serverId.orEmpty()}:${it.item.id}" }) { hit ->
+            itemsIndexed(items, key = { _, it -> "${it.serverId.orEmpty()}:${it.item.id}" }) { i, hit ->
                 val item = hit.item
                 MediaCard(
                     title = item.title,
-                    subtitle = item.gridSubtitle(),
+                    subtitle = null,
                     imageUrl = hit.picture(library, item.posterPath, ImageSize.W342),
-                    artWidth = 190.dp,
-                    artHeight = 285.dp,
+                    artWidth = SearchPosterWidth,
+                    artHeight = SearchPosterHeight,
                     onClick = { onOpen(hit) },
                     // Hold OK saves a result on this server to a watchlist; one on another server has nothing to hold.
                     onLongClick = if (hit.serverId == null) holdFor(item, null) else null,
-                    focusedScale = 1.08f,
-                    modifier = Modifier.focusMemory(memory, "${item.kind}:${hit.serverId.orEmpty()}:${item.id}").onServer(item.title, hit.serverName),
+                    modifier = Modifier
+                        .focusMemory(memory, "${item.kind}:${hit.serverId.orEmpty()}:${item.id}")
+                        .then(if (i == 0 && entry != null) Modifier.focusRequester(entry) else Modifier)
+                        .onFocusChanged { if (it.isFocused) onFocusLine(ResultLine(item.title, item.gridFacts())) }
+                        .onServer(item.title, hit.serverName),
                     line = serverLine(hit.serverName, several),
+                    subtitleLine = several,
                 ) {
                     if (item.isNew) ArtBadge("New", Modifier.align(Alignment.TopStart).padding(8.dp), BadgeStyle.Gold)
                     ArtWatched(item.watched)
@@ -495,12 +638,12 @@ private fun PosterSection(
  * with "Stop listening" while it listens (`.mic.live`).
  */
 @Composable
-private fun MicKey(listening: Boolean, onPress: () -> Unit) {
+private fun MicKey(listening: Boolean, onPress: () -> Unit, modifier: Modifier = Modifier) {
     FocusableBox(
         onClick = onPress,
-        cornerRadius = 36.dp,
-        focusedScale = 1.06f,
-        modifier = Modifier.size(72.dp).semantics { contentDescription = if (listening) "Stop listening" else "Voice typing" },
+        cornerRadius = 40.dp,
+        focusedScale = FocusGrowth.BUTTON,
+        modifier = modifier.size(80.dp).semantics { contentDescription = if (listening) "Stop listening" else "Speak instead of typing" },
     ) { focused ->
         Box(
             Modifier
@@ -509,12 +652,12 @@ private fun MicKey(listening: Boolean, onPress: () -> Unit) {
                 .background(
                     when {
                         listening -> WmmColors.Accent
-                        focused -> WmmColors.Surface3
-                        else -> WmmColors.Surface2
+                        focused -> TvPalette.Lift
+                        else -> TvPalette.ButtonFill
                     },
                     CircleShape,
                 )
-                .border(1.dp, if (listening) WmmColors.Accent else WmmColors.Line2, CircleShape),
+                .border(2.dp, if (listening) WmmColors.Accent else if (focused) TvPalette.Lift else WmmColors.Text.copy(alpha = 0.2f), CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(WmmIcons.Microphone, contentDescription = null, tint = if (listening) WmmColors.OnAccent else WmmColors.Text, modifier = Modifier.size(30.dp))
@@ -530,24 +673,23 @@ private fun DrawScope.drawRings() {
 
 /** Under the box: listening (gold, with a dot), or why the microphone can't listen. */
 @Composable
-private fun VoiceLine(text: String, listening: Boolean) {
-    Row(Modifier.semantics { liveRegion = LiveRegionMode.Polite }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (listening) Box(Modifier.size(12.dp).background(WmmColors.Accent, CircleShape))
-        Text(text, style = inter(20.sp, lineHeight = 28.sp), color = if (listening) WmmColors.Accent else WmmColors.TextMuted)
+private fun VoiceLine(text: String, listening: Boolean, modifier: Modifier = Modifier) {
+    Row(modifier.semantics { liveRegion = LiveRegionMode.Polite }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (listening) Box(Modifier.size(14.dp).background(WmmColors.Accent, CircleShape))
+        Text(text, style = TvType.Second, color = if (listening) WmmColors.Accent else TvPalette.Muted)
     }
 }
 
 /**
- * The key hints at the foot of the keyboard, while typing: one a line, and
- * no wider than the keyboard. On one line, the two a TV with a microphone
- * gets ran out across the results, and a third row of results (On Live TV)
- * drew over them.
+ * The key hints under the keyboard, while typing: only what no key shows,
+ * one a line and no wider than the keyboard. On one line, they ran out
+ * across the results.
  */
 @Composable
-private fun KeyHints(mic: Boolean, modifier: Modifier = Modifier) {
-    Column(modifier.width(KeyboardWidth), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (mic) KeyHint("▲", "From the top row: the search box, and ▶ from there the microphone")
-        KeyHint("▼", "From the bottom row: the TV’s keyboard")
+private fun KeyHints(modifier: Modifier = Modifier) {
+    Column(modifier.width(KeyboardWidth), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        KeyHint("▶", "from the last key in a row: the results")
+        KeyHint("Hold ⌫", "clears what you typed")
     }
 }
 
@@ -555,16 +697,16 @@ private fun KeyHints(mic: Boolean, modifier: Modifier = Modifier) {
 private fun KeyHint(key: String, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         KeyCap(key)
-        Text(text, style = inter(19.sp), color = WmmColors.TextSoft)
+        Text(text, style = TvType.Caption, color = TvPalette.Muted)
     }
 }
 
 @Composable
 private fun KeyCap(key: String) {
     Box(
-        Modifier.height(34.dp).border(2.dp, WmmColors.Text.copy(alpha = 0.32f), RoundedCornerShape(8.dp)).padding(horizontal = 12.dp),
+        Modifier.height(40.dp).defaultMinSize(minWidth = 44.dp).border(2.dp, TvPalette.Line3, RoundedCornerShape(10.dp)).padding(horizontal = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(key, style = inter(16.sp, FontWeight.Bold), color = WmmColors.Text)
+        Text(key, style = TvType.Caption.copy(fontWeight = FontWeight.Bold), color = WmmColors.TextSoft)
     }
 }

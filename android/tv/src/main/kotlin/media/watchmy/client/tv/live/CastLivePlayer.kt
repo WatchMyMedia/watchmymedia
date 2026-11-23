@@ -52,7 +52,7 @@ import media.watchmy.client.ui.onBack
 import media.watchmy.client.ui.components.WmmIcons
 
 /**
- * A channel cast to this TV (Cast Connect, the LiveCastConnect board): the
+ * A channel cast to this TV (Cast Connect): the
  * TV's own live player, with the caster's channels and pictures, and none of
  * what the phone does (On now, Quality, Full guide). When the phone stops
  * casting the TV says so for [STOPPED_SHOWN_MS], then goes back.
@@ -91,7 +91,7 @@ internal fun CastFromBox(sender: String, modifier: Modifier = Modifier) {
         }
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("Cast from $sender", style = inter(24.sp, FontWeight.Bold), color = WmmColors.Text)
-            Text("Quality and the channel list are on the phone.", style = inter(18.sp), color = WmmColors.TextMuted)
+            Text("Quality and the channel list are on the phone.", style = inter(22.sp), color = WmmColors.TextMuted)
         }
     }
 }
@@ -104,7 +104,7 @@ internal fun CastPill(label: String, modifier: Modifier = Modifier) {
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Icon(WmmIcons.Cast, contentDescription = null, tint = WmmColors.Accent, modifier = Modifier.size(22.dp))
-        Text(label, style = inter(18.sp, FontWeight.SemiBold), color = WmmColors.Text)
+        Text(label, style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.Text)
     }
 }
 
@@ -133,9 +133,9 @@ internal fun CastProblem(
             Box(Modifier.size(76.dp).background(WmmColors.Surface2, CircleShape), contentAlignment = Alignment.Center) {
                 Icon(WmmIcons.Cast, contentDescription = null, tint = WmmColors.TextSoft, modifier = Modifier.size(38.dp))
             }
-            Text(title, style = inter(44.sp, FontWeight.Bold), color = WmmColors.Text)
+            Text(title, style = inter(48.sp, FontWeight.Bold), color = WmmColors.Text)
             Text(body, style = inter(24.sp, lineHeight = 34.sp), color = WmmColors.TextMuted, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive })
-            small?.let { Text(it, style = inter(19.sp), color = WmmColors.TextFaint) }
+            small?.let { Text(it, style = inter(22.sp), color = WmmColors.TextFaint) }
             Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) { actions() }
         }
     }
@@ -171,7 +171,7 @@ internal fun castPausedNote(sender: LiveCastSender): String =
     if (sender.pausedThere) "Paused on ${sender.name}. After 5 minutes the tuner is given back." else "Paused. After 5 minutes the tuner is given back."
 
 /**
- * A cast channel's prompts, in the LiveCastConnect board's words: Still
+ * A cast channel's prompts: Still
  * watching (which counts down the minute before the tuner goes back), all
  * tuners busy, and any other stop, each with Stop casting.
  */
@@ -197,8 +197,8 @@ internal fun CastPrompt(
             }
             Box(modifier.fillMaxSize().background(Color.Black.copy(alpha = .75f)), contentAlignment = Alignment.Center) {
                 Column(Modifier.width(980.dp).background(WmmColors.Surface, RoundedCornerShape(28.dp)).padding(48.dp).focusGroup(), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                    Text("${channel.number} ${channel.name} · on for 4 hours · cast from $sender", style = inter(19.sp), color = WmmColors.TextMuted)
-                    Text("Still watching?", style = inter(40.sp, FontWeight.Bold), color = WmmColors.Text)
+                    Text("${channel.number} ${channel.name} · on for 4 hours · cast from $sender", style = inter(22.sp), color = WmmColors.TextMuted)
+                    Text("Still watching?", style = inter(34.sp, FontWeight.Bold), color = WmmColors.Text)
                     Text(
                         "Nothing has been pressed here or on $sender for 4 hours. Live TV stops in 0:${left.toString().padStart(2, '0')} so the tuner is free for someone else. Any press here or on the phone counts as an answer.",
                         style = inter(24.sp, lineHeight = 34.sp), color = WmmColors.TextMuted, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
@@ -214,22 +214,21 @@ internal fun CastPrompt(
             pill = "Cast from $sender",
             channel = "${channel.number}  ${channel.name}",
             title = "All tuners are in use",
-            body = "$sender asked for ${channel.number}, but the HDHomeRun’s tuners are all busy. Try again when someone stops watching, or pick another channel on the phone.",
+            body = "$sender asked for ${channel.number}, but every tuner is in use. Try again when one comes free, or pick another channel on the phone.",
             focus = focus,
             modifier = modifier,
         ) {
             TvButton("Try again", onRetry, Modifier.focusRequester(focus), style = TvButtonStyle.Primary)
             TvButton("Stop casting", onStop)
         }
-        else -> LivePlayerPrompt(
-            title = state.error?.substringBefore('.')?.takeIf { it.isNotBlank() } ?: "Live TV stopped",
-            message = state.error ?: "The tuner was released. Tune again to watch live.",
-            action = "Tune again",
+        else -> LivePlayerProblem(
+            // The phone chooses what plays next, so the TV only tunes again or stops.
+            liveProblem(state, channel).let { it.copy(actionLabel = if (it.action == ProblemAction.Retry) it.actionLabel else "Tune again", leaveLabel = "Stop casting") },
+            channel,
             onAction = onRetry,
             onLeave = onStop,
             focus = focus,
             modifier = modifier,
-            leaveLabel = "Stop casting",
         )
     }
 }

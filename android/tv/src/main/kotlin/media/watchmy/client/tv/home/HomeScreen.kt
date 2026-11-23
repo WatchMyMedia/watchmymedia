@@ -1,5 +1,12 @@
 package media.watchmy.client.tv.home
 
+import media.watchmy.client.tv.components.FocusGrowth
+import media.watchmy.client.tv.components.PosterHeight
+import media.watchmy.client.tv.components.PosterWidth
+import media.watchmy.client.tv.components.TvClock
+import media.watchmy.client.tv.components.TvPalette
+import media.watchmy.client.tv.components.WideCardHeight
+import media.watchmy.client.tv.components.WideCardWidth
 import media.watchmy.client.tv.watchlists.holdFor
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -77,7 +84,6 @@ import media.watchmy.client.tv.components.FocusMemory
 import media.watchmy.client.tv.components.MediaCard
 import media.watchmy.client.tv.components.Notice
 import media.watchmy.client.tv.components.PivotSpec
-import media.watchmy.client.tv.components.PlayMark
 import media.watchmy.client.tv.components.RailSection
 import media.watchmy.client.tv.components.SectionHeader
 import media.watchmy.client.tv.components.TvButton
@@ -181,6 +187,8 @@ fun HomeScreen(
                 }
             }
         }
+        // The time, so "ends 8:41 PM" has something to be read against.
+        TvClock()
         Notice(state.message, vm::messageShown)
     }
 }
@@ -189,10 +197,10 @@ private fun HomeData.isEmpty() =
     hero == null && continueWatching.isEmpty() && recentlyAddedShows.isEmpty() && recentlyAired.isEmpty() && recentlyAddedMovies.isEmpty() && recentlyReleased.isEmpty() &&
         rows.orEmpty().none { it.style != RowStyle.Live && it.hasContent }
 
-/** Arranged Home's first focus: the hero, else the first card of the first row drawn. */
+/** Arranged Home's first focus: the first card of the first row drawn, else the hero (shown only when there are no rows). */
 internal fun HomeData.arrangedFirstFocusKey(liveChannels: List<LiveChannel>): String? {
-    hero?.let { return if (it.fileId != null) "hero:play" else "hero:open" }
-    val first = rows.orEmpty().drawn(live = liveChannels.any { it.available }).firstOrNull() ?: return null
+    val first = rows.orEmpty().drawn(live = liveChannels.any { it.available }).firstOrNull()
+        ?: return hero?.let { if (it.fileId != null) "hero:play" else "hero:open" }
     if (first.style == RowStyle.Live) return liveChannels.firstOrNull { it.available }?.let { "live:${it.id}" }
     return first.cardKey()
 }
@@ -252,13 +260,12 @@ private fun HomeContent(
                                     title = c.title,
                                     subtitle = c.remainingLine,
                                     imageUrl = library.imageUrl(c.stillPath ?: c.backdropPath, ImageSize.W780),
-                                    artWidth = 320.dp,
-                                    artHeight = 180.dp,
+                                    artWidth = WideCardWidth,
+                                    artHeight = WideCardHeight,
                                     onClick = { onPlay(c.playRequest()) },
                                     onLongClick = { c.open(onOpenShow, onOpenMovie) },
                                     modifier = Modifier.focusMemory(memory, "cw:${c.fileId}"),
                                 ) {
-                                    PlayMark()
                                     ArtProgress(c.progress)
                                 }
                             }
@@ -294,8 +301,8 @@ private fun HomeContent(
                                     title = e.showTitle,
                                     subtitle = e.airedLine(),
                                     imageUrl = library.imageUrl(e.stillPath ?: e.showBackdropPath, ImageSize.W780),
-                                    artWidth = 320.dp,
-                                    artHeight = 180.dp,
+                                    artWidth = WideCardWidth,
+                                    artHeight = WideCardHeight,
                                     seed = e.showTitle,
                                     // Select opens the episode on its show, focused on Play; holding it plays at once.
                                     onClick = { onOpenEpisode(e.showId, e.season, e.episodeId) },
@@ -342,8 +349,8 @@ private fun HomeContent(
                                     title = m.title,
                                     subtitle = null,
                                     imageUrl = library.imageUrl(m.backdropPath, ImageSize.W780),
-                                    artWidth = 320.dp,
-                                    artHeight = 180.dp,
+                                    artWidth = WideCardWidth,
+                                    artHeight = WideCardHeight,
                                     onClick = { onOpenMovie(m.id) },
                                     onLongClick = holdFor(m, onToggleWatched),
                                     modifier = Modifier.focusMemory(memory, "released:${m.id}"),
@@ -366,7 +373,7 @@ private fun HomeContent(
                         .drawBehind { drawLine(WmmColors.Line, Offset(0f, 0f), Offset(size.width, 0f), 1.dp.toPx()) },
                     contentAlignment = Alignment.CenterStart,
                 ) {
-                    Text(home.totalsLine(), style = inter(17.sp), color = WmmColors.TextFaint)
+                    Text(home.totalsLine(), style = inter(22.sp), color = WmmColors.TextFaint)
                 }
             }
         }
@@ -394,11 +401,11 @@ internal fun LiveRow(
             SectionHeader("On now", small = "Live TV · ${format.time(now)}", trailing = counter)
             CardRow {
                 itemsIndexed(available, key = { _, it -> it.id }) { i, channel ->
-                    TvOnNowCard(channel, now, { onWatchLive(channel) }, Modifier.width(320.dp).rowCard(memory, "live:${channel.id}", i, onFocusItem))
+                    TvOnNowCard(channel, now, { onWatchLive(channel) }, Modifier.width(WideCardWidth).rowCard(memory, "live:${channel.id}", i, onFocusItem))
                 }
                 item("guide") {
-                    FocusableBox(onClick = onLiveGuide, modifier = Modifier.width(320.dp).height(180.dp).rowCard(memory, "live:guide", available.size, onFocusItem), cornerRadius = 12.dp) { focused ->
-                        Box(Modifier.fillMaxSize().background(if (focused) WmmColors.Surface3 else WmmColors.Surface2, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                    FocusableBox(onClick = onLiveGuide, modifier = Modifier.width(WideCardWidth).height(WideCardHeight).rowCard(memory, "live:guide", available.size, onFocusItem), cornerRadius = 14.dp, focusedScale = FocusGrowth.CARD) { focused ->
+                        Box(Modifier.fillMaxSize().background(if (focused) TvPalette.Lift else WmmColors.Surface2, RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
                             Text("Full guide", style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.Text)
                         }
                     }
@@ -437,8 +444,8 @@ private fun PosterCard(
         title = item.title,
         subtitle = item.subtitle,
         imageUrl = library.imageUrl(item.posterPath, ImageSize.W342),
-        artWidth = 160.dp,
-        artHeight = 240.dp,
+        artWidth = PosterWidth,
+        artHeight = PosterHeight,
         onClick = onClick,
         onLongClick = onLongClick,
         modifier = modifier,

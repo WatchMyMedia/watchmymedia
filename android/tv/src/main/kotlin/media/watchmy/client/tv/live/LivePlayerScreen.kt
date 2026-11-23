@@ -2,23 +2,14 @@ package media.watchmy.client.tv.live
 
 import android.view.KeyEvent as AndroidKey
 import androidx.annotation.OptIn
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.border
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.width
-import androidx.compose.ui.unit.sp
-import androidx.tv.material3.Text
-import media.watchmy.client.tv.components.TvButton
-import media.watchmy.client.tv.components.TvButtonSize
-import media.watchmy.client.tv.components.inter
-import media.watchmy.client.ui.WmmColors
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -31,41 +22,53 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
+import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
-import media.watchmy.client.model.LiveCastSender
 import media.watchmy.client.model.LIVE_TAKEOVER_DONT_RECORD
-import media.watchmy.client.model.takeoverKey
-import media.watchmy.client.model.takeoverMessage
+import media.watchmy.client.model.LiveCastSender
 import media.watchmy.client.model.LiveChannel
 import media.watchmy.client.model.LivePlaybackController
 import media.watchmy.client.model.LiveTarget
 import media.watchmy.client.model.PlayerStatus
+import media.watchmy.client.model.liveSwitchMessage
 import media.watchmy.client.model.liveTVError
 import media.watchmy.client.model.onAt
-import media.watchmy.client.model.liveSwitchMessage
+import media.watchmy.client.model.takeoverKey
+import media.watchmy.client.model.takeoverMessage
 import media.watchmy.client.presentation.live.editLiveNumber
 import media.watchmy.client.presentation.live.nextLiveChannel
+import media.watchmy.client.tv.components.TvClock
+import media.watchmy.client.tv.components.TvPalette
+import media.watchmy.client.tv.components.TvType
 import media.watchmy.client.tv.components.rememberFocusMemory
 import media.watchmy.client.tv.player.PlayerShell
 import media.watchmy.client.tv.player.rememberPlayerShellState
 import media.watchmy.client.ui.LocalAppServices
+import media.watchmy.client.ui.ShowsLiveChannels
+import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.rememberLiveClockFormat
 import media.watchmy.client.ui.components.rememberLiveNow
-import media.watchmy.client.ui.ShowsLiveChannels
 
 /**
  * A dedicated TV live surface: no file timeline, progress or next episode.
- * With [cast] it plays a channel cast to this TV (Cast Connect, the
- * LiveCastConnect board): no On now, Quality, Go to channel or Full guide,
- * which are on the phone, and Stop casting in Full guide's place.
+ * With [cast] it plays a channel cast to this TV (Cast Connect): no On now,
+ * Quality or Guide, which are on the phone, and Stop casting in Guide's place.
+ *
+ * It opens with the channel's banner and nothing focused, as a player does.
+ * With the controls hidden, ▲ ▼ change channel, ◀ opens On now and OK shows
+ * the controls with focus on Pause; Back hides the controls, then leaves.
  */
 @Composable
 fun LivePlayerScreen(
@@ -93,9 +96,9 @@ fun LivePlayerScreen(
 
 private class LiveFocus(val root: FocusRequester) {
     val playPause = FocusRequester()
+    val record = FocusRequester()
     val channels = FocusRequester()
     val quality = FocusRequester()
-    val number = FocusRequester()
     val panel = FocusRequester()
     val prompt = FocusRequester()
 }
@@ -129,19 +132,21 @@ private fun LivePlayerContent(
     val shell = rememberPlayerShellState()
     val focus = remember { LiveFocus(shell.root) }
     val channelMemory = rememberFocusMemory()
-    var controls by remember { mutableStateOf(true) }
+    // The player opens with the banner and nothing focused; OK brings the controls.
+    var controls by remember { mutableStateOf(false) }
     var banner by remember { mutableStateOf(true) }
     var panel by remember { mutableStateOf<LivePanel?>(null) }
     var numeric by remember { mutableStateOf("") }
     var channelProblem by remember { mutableStateOf<LiveChannel?>(null) }
     // The channel watched before this one, for the remote's Last key.
     var lastChannel by remember { mutableStateOf<LiveChannel?>(null) }
-    // A programme the remote's Record asked to record: its choices are open.
-    var recording by remember { mutableStateOf<media.watchmy.client.model.LiveProgramme?>(null) }
+    // A recording under way that Record was pressed on: its choices are open.
+    var stopping by remember { mutableStateOf<media.watchmy.client.model.RecordingMark?>(null) }
     val consumed = remember { mutableSetOf<Int>() }
     val terminal = state.status in listOf(PlayerStatus.Error, PlayerStatus.Ended)
     // The takeover warning never takes focus, like the reminder banner: Hold OK is Don't record it, Back dismisses it.
     val recorder = rememberTvRecordingActions()
+    val recording by recorder.state.collectAsStateWithLifecycle()
     var dismissedTakeover by remember { mutableStateOf<String?>(null) }
     val takeover = state.session?.takeIf { cast == null && it.takeoverAtMs != null && !it.state.terminal && !terminal && it.takeoverKey() != dismissedTakeover }
     val takeoverKeys = remember(takeover?.takeoverKey(), takeover?.takeoverCanCancel) {
@@ -150,6 +155,24 @@ private fun LivePlayerContent(
             holdsOk = takeover?.takeoverCanCancel == true,
         )
     }
+    // How far behind live a paused or rewound channel is, read from the player while it is.
+    var behindMs by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(player, state.atLiveEdge) {
+        val p = player
+        if (state.atLiveEdge || p == null) {
+            behindMs = null
+            return@LaunchedEffect
+        }
+        while (true) {
+            behindMs = p.currentLiveOffset.takeIf { it != C.TIME_UNSET && it > 0 }
+            delay(1_000)
+        }
+    }
+    // What is on, and whether it records: the mark the polled list carries, or the press just made.
+    val onNow = shown.onAt(now)
+    val mark = onNow?.recording?.takeIf { it.active }
+    val recordable = cast == null && onNow != null && recording.canRecord && onNow.endMs > now
+    val recordedHere = onNow != null && recording.noticeProgrammeId == onNow.id
 
     fun leave(toGuide: Boolean = false) {
         if (!shell.leave()) return
@@ -175,8 +198,7 @@ private fun LivePlayerContent(
         shell.wanted = if (!controls) focus.root else when (closed) {
             LivePanel.Channels -> focus.channels
             LivePanel.Quality -> focus.quality
-            LivePanel.Number -> focus.number
-            null -> focus.playPause
+            LivePanel.Number, null -> focus.playPause
         }
     }
     fun watch(channel: LiveChannel) {
@@ -190,6 +212,14 @@ private fun LivePlayerContent(
         shell.wanted = if (controls) focus.playPause else focus.root
     }
     fun step(direction: Int) { nextLiveChannel(channels, controller.state.value.target?.channel?.id ?: current.id, direction)?.let(::watch) }
+    /** Record: this programme from now, once; on one that records, its choices. */
+    fun record() {
+        interact()
+        val on = shown.onAt(now) ?: return
+        if (!recordable) return
+        val set = on.recording?.takeIf { it.active }
+        if (set != null) stopping = set else if (recording.noticeProgrammeId != on.id) recorder.record(on)
+    }
     fun back() {
         val action = liveBackAction(panel, controls, terminal, state.askStillWatching)
         interact()
@@ -197,7 +227,8 @@ private fun LivePlayerContent(
             LiveBackAction.ClosePanel -> closePanel()
             LiveBackAction.KeepWatching -> { controller.answerStillWatching(true); controls = true; shell.wanted = focus.playPause }
             LiveBackAction.HideControls -> hideControls()
-            LiveBackAction.Leave -> leave()
+            // A channel that stopped goes back to the guide, where another can be chosen.
+            LiveBackAction.Leave -> leave(toGuide = terminal && cast == null)
         }
     }
     fun perform(action: LiveAction) {
@@ -214,10 +245,7 @@ private fun LivePlayerContent(
             LiveAction.LastChannel -> lastChannel?.let(::watch)
             // A cast channel's guide is on the phone that cast it.
             LiveAction.Guide -> if (cast == null) leave(toGuide = true)
-            LiveAction.Record -> {
-                val on = shown.onAt(now)
-                if (cast == null && on != null && recorder.state.value.canRecord) recording = on
-            }
+            LiveAction.Record -> record()
             LiveAction.Pass, LiveAction.Swallow -> Unit
         }
     }
@@ -292,34 +320,41 @@ private fun LivePlayerContent(
             if (wanted != null || !shell.treeHasFocus || shell.rootFocused) when {
                 terminal || state.askStillWatching -> focus.prompt
                 panel != null -> focus.panel
-                controls -> wanted?.takeIf { it in listOf(focus.playPause, focus.channels, focus.quality, focus.number) } ?: focus.playPause
+                controls -> wanted?.takeIf { it in listOf(focus.playPause, focus.record, focus.channels, focus.quality) } ?: focus.playPause
                 else -> focus.root
             } else null
         },
         focusKeys = arrayOf<Any?>(controls, panel, terminal, state.askStillWatching),
-        // Go to channel and an unavailable channel's message are dialogs that hold focus themselves.
-        arbitrate = panel != LivePanel.Number && channelProblem == null && recording == null,
+        // Go to channel, an unavailable channel's message and a recording's choices are dialogs that hold focus themselves.
+        arbitrate = panel != LivePanel.Number && channelProblem == null && stopping == null,
         modifier = modifier,
     ) {
         player?.let { LiveVideo(it) }
         if (player == null) LiveFakeBackdrop(current)
         if (!terminal && !state.askStillWatching) {
-            if ((banner || controls) && panel == null) LiveChannelBanner(state, shown, controls, Modifier.align(Alignment.BottomStart), listings = listings, now = now, format = format, cast = cast)
+            val chrome = (banner || controls) && panel == null
+            if (chrome) {
+                LiveChromeScrim(Modifier.align(Alignment.BottomStart))
+                TvClock()
+                LiveChannelBanner(state, shown, controls, Modifier.align(Alignment.BottomStart), listings = listings, now = now, format = format, cast = cast, behindMs = behindMs)
+            }
             if (state.status in listOf(PlayerStatus.Loading, PlayerStatus.Buffering)) LiveTuning(state, current, Modifier.align(Alignment.Center))
             if (controls && panel == null) LiveControls(
                 state = state, channels = channels, current = current,
-                playFocus = focus.playPause, channelFocus = focus.channels, qualityFocus = focus.quality, numberFocus = focus.number,
+                playFocus = focus.playPause, channelFocus = focus.channels, qualityFocus = focus.quality,
                 onToggle = { interact(); controller.togglePlayPause() }, onLive = { interact(); controller.goLive() },
                 onPrevious = { step(-1) }, onNext = { step(1) }, onChannels = { openPanel(LivePanel.Channels) },
-                onQuality = { openPanel(LivePanel.Quality) }, onNumber = { numeric = ""; openPanel(LivePanel.Number) },
+                onQuality = { openPanel(LivePanel.Quality) },
                 onGuide = { leave(toGuide = cast == null) }, modifier = Modifier.align(Alignment.BottomCenter), listings = listings, cast = cast != null,
+                record = if (recordable) LiveRecordButton(recording = mark != null || recordedHere, busy = recording.busy, onClick = ::record) else null,
+                recordFocus = focus.record,
             )
             val notice = if (cast != null && state.status == PlayerStatus.Paused) castPausedNote(cast) else state.message ?: state.liveSwitchMessage()
             notice?.let { LiveNotice(it, Modifier.align(Alignment.TopCenter).padding(top = 110.dp)) }
-            if (panel == LivePanel.Channels) LiveChannelsPanel(channels, current.id, focus.panel, channelMemory, ::watch, ::closePanel, Modifier.align(Alignment.CenterStart), listings = listings, now = now, format = format)
+            if (panel == LivePanel.Channels) LiveChannelsPanel(channels, current.id, focus.panel, channelMemory, ::watch, ::closePanel, listings = listings, now = now, format = format)
             if (panel == LivePanel.Quality) LiveQualityPanel(state.quality, focus.panel, onSelect = {
                 interact(); controller.selectQuality(it); closePanel()
-            }, modifier = Modifier.align(Alignment.CenterEnd), automatic = state.automaticAvailable)
+            }, automatic = state.automaticAvailable)
         }
         if (cast != null && (terminal || state.askStillWatching)) CastPrompt(
             state = state, channel = current, sender = cast.name, focus = focus.prompt,
@@ -336,21 +371,37 @@ private fun LivePlayerContent(
                 shell.wanted = focus.playPause
             },
             onStop = { leave() },
-        ) else if (terminal || state.askStillWatching) LivePlayerPrompt(
-            title = if (state.askStillWatching) "Are you still watching?" else state.error?.substringBefore('.')?.takeIf { it.isNotBlank() } ?: "Live TV stopped",
-            message = if (state.askStillWatching) "Nothing has been pressed for four hours. Choose Keep watching, or Stop to release the tuner." else state.error ?: "The tuner was released. Tune again to watch live.",
-            action = if (state.askStillWatching) "Keep watching" else if (state.takeoverRecording != null) "Watch from the start" else if (state.reason == "recording") "Open Recordings" else "Tune again",
-            onAction = {
-                val answering = controller.state.value.askStillWatching
-                interact()
-                if (state.takeoverRecording != null) state.takeoverRecording?.let(onPlayRecording) else if (state.reason == "recording") onRecordings() else if (answering) controller.answerStillWatching(true) else controller.retry()
-                controls = true
-                shell.wanted = focus.playPause
-            },
-            onLeave = { leave(toGuide = true) }, focus = focus.prompt, leaveLabel = if (state.askStillWatching) "Stop" else "Back to channels",
-        )
+        ) else if (terminal || state.askStillWatching) {
+            val problem = liveProblem(state, current, state.session?.takeoverTitle)
+            LivePlayerProblem(
+                problem, current,
+                onAction = {
+                    interact()
+                    when (problem.action) {
+                        ProblemAction.WatchRecording -> state.takeoverRecording?.let(onPlayRecording)
+                        ProblemAction.OpenRecordings -> onRecordings()
+                        ProblemAction.KeepWatching -> controller.answerStillWatching(true)
+                        ProblemAction.Retry -> controller.retry()
+                    }
+                    controls = true
+                    shell.wanted = focus.playPause
+                },
+                onLeave = { leave(toGuide = !state.askStillWatching) },
+                focus = focus.prompt,
+            )
+        }
         takeover?.let { session -> TvRecordingTakeover(session, recorder, format, Modifier.align(Alignment.TopCenter).padding(top = 100.dp)) }
-        recording?.let { programme -> TvRecordingChoice(programme, recorder, onDismiss = { recording = null }) }
+        stopping?.let { set ->
+            TvLiveMenu(
+                title = onNow?.title ?: "Recording", subtitle = "Recording now on ${shown.number}", logo = null,
+                items = listOfNotNull(
+                    TvMenuItem("Keep recording", media.watchmy.client.ui.components.WmmIcons.Record) { stopping = null },
+                    if (set.canCancel) TvMenuItem("Stop recording · keep what’s recorded", media.watchmy.client.ui.components.WmmIcons.Close) { recorder.cancel(set.id); stopping = null } else null,
+                ),
+                onDismiss = { stopping = null; shell.wanted = focus.record },
+                note = if (set.canCancel) null else "Someone else set this recording, so only they or an admin can stop it.",
+            )
+        }
         if (panel == LivePanel.Number) ChannelNumberDialog(channels, numeric, ::watch, ::closePanel, onStop = { leave() }, onInteraction = ::interact)
         channelProblem?.let { channel -> LiveMessageDialog("${channel.number} · ${channel.name}", liveTVError(channel.reason), onDismiss = { channelProblem = null; shell.wanted = focus.panel }, onStop = { leave() }) }
     }
@@ -367,15 +418,14 @@ private fun TvRecordingTakeover(session: media.watchmy.client.model.LiveSession,
     val state by recorder.state.collectAsStateWithLifecycle()
     val message = session.takeoverMessage(format).orEmpty()
     Column(
-        modifier.width(1000.dp).background(Color(0xF2141416), RoundedCornerShape(20.dp)).border(1.dp, WmmColors.Line2, RoundedCornerShape(20.dp)).padding(24.dp)
+        modifier.width(1100.dp).background(Color(0xF2141416), RoundedCornerShape(22.dp)).border(2.dp, WmmColors.Warn, RoundedCornerShape(22.dp)).padding(28.dp)
             .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(message, style = inter(23.sp), color = WmmColors.Text)
+        Text(message, style = TvType.Body, color = WmmColors.Text)
         Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
-            if (session.takeoverCanCancel) TvOkHint(LIVE_TAKEOVER_DONT_RECORD, key = "Hold OK")
-            TvOkHint("OK", key = "Back")
+            KeyHints(listOfNotNull(KeyHint("Hold OK", LIVE_TAKEOVER_DONT_RECORD).takeIf { session.takeoverCanCancel }, KeyHint("Back", "OK")))
         }
-        state.error?.let { Text(it, style = inter(18.sp), color = WmmColors.Error) }
+        state.error?.let { Text(it, style = TvType.Second, color = TvPalette.Muted) }
     }
 }

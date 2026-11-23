@@ -16,6 +16,8 @@ object WmmIcons {
     val Search = stroke("M18 11a7 7 0 1 1-14 0a7 7 0 1 1 14 0", "m20 20-3.5-3.5")
     val Home = stroke("M3 11 12 3l9 8", "M5 10v10h14V10")
     val Tv = stroke("M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z", "M8 21h8")
+    /** Live TV: a set with its aerial, so it reads apart from TV Shows. */
+    val LiveTv = stroke("m8 3 4 4 4-4", "M5 7h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z", "M8 13.5h5", "M16.5 13.5h.01")
     val Movie = stroke("M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z", "M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4")
     val Settings = stroke("M15.5 12a3.5 3.5 0 1 1-7 0a3.5 3.5 0 1 1 7 0", "M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1")
     /** Voice typing. */

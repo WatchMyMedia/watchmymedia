@@ -416,8 +416,9 @@ library's Movies or TV screen come in the person's order
 Rows are drawn by their style (`poster`, `wide`, `episode`, `continue`,
 `live`); a style the app doesn't know is skipped, and `live` is the app's
 own Live TV row in that place. The tablet keeps Continue beside the hero only
-while it is the first row drawn; the TV's first focus is the hero, else the
-first row's first card. Movies and TV get their rows above the grid.
+while it is the first row drawn; the TV opens on the first row's first
+card, each row a screen of its own, and shows the hero only when there are
+no rows. Movies and TV get their rows above the grid.
 
 - **Edit Home** (end of Home, and Settings › Home rows) and a
   library's **Edit rows**: a page on the phone, a dialog on the tablet.
@@ -532,8 +533,9 @@ rows; either way the page ends as before. The rows are Home's poster rows:
   puts them in its right pane, its show page across the bottom under the
   season's row. A card opens its title on top; its long-press has no menu.
 - **TV** (`tv/detail/RelatedRows.kt`, `TvArrangedRow`): the page's last rows,
-  the collection with "In release order" beside its name. The movie page's
-  cast takes focus (OK does nothing), and ▼ from the cast or About the show
+  the collection with "In release order" beside its name. The cast is a row of
+  people cards that take focus (OK opens nothing until the server says which
+  titles a person is in), and ▼ from the cast or About the show
   comes to the row's first card (`CardRow`'s `enter`); ▲ goes back. The row is
   kept whole in view as it grows, Hold OK marks nothing, and Back from the
   title a card opened puts focus back on that card. For TalkBack the heading
@@ -1168,8 +1170,16 @@ minutes of playing a file, before and after a change.
 - **Images**: `services.library.imageUrl(path, ImageSize.W342)` into
   `Artwork(url, seed = title, …)`, which draws the mockups' gradient when the
   URL is null or loading. The app's image loader adds the sign-in.
-- **TV focus**: the focused card gets a 4 dp gold ring and a slight scale;
-  rows remember their focused item; a screen's remembered item survives
+- **TV focus**: one treatment everywhere (`FocusableBox`): a 4 dp gold ring
+  4 dp out, growth (`FocusGrowth`: 1.08 cards and people, 1.05 buttons,
+  1.02 panel rows) and a shadow; while OK is held the target sinks and its
+  ring thickens. A card's picture grows rather than the card (`FocusedArt`),
+  so its words stay sharp; the main button keeps its burgundy and other
+  controls lift to `TvPalette.Lift`. A choice that stays chosen is a gold
+  tick (`OptionRow`, `PanelRow`, `TvChip`) or a gold underline (`TvTab`),
+  never a gold fill or a ring, so it can't be taken for focus. Panels come
+  from the right (`TvSidePanel`, 736 wide, 900 for detail); rows remember
+  their focused item; a screen's remembered item survives
   navigation (`rememberFocusMemory`, and `rememberSaveable` for anything
   else focus depends on); a button busy with its work stays focusable and
   ignores OK (`FocusableBox`'s `enabled`). A row of cards shows where it
@@ -1193,8 +1203,13 @@ minutes of playing a file, before and after a change.
   `overlay = true`, so it also comes before a page opened after it. A
   `TvDialog` gets Back from its own window.
 - **TV sizes**: a 1080p Google TV is 960×540 dp, so `TvTheme` sets the
-  density to make the window 1920 dp wide. Inside it, a mockup px is a dp
-  on every TV and on the tablet emulator. `Dialog`, `Popup` and
+  density to make the window 1920 dp wide. Inside it, a 1080p pixel is a dp
+  on every TV and on the tablet emulator. Text uses `TvType`'s seven sizes
+  (64, 48, 34, 28, 26, 24, 22); nothing outside Settings is under 22.
+  Text and anything focusable stays inside the safe area, `SafeX` (96) from
+  the sides and `SafeY` (54) from the top and bottom; pictures run to the
+  edges. The rail's icons sit at x 96 and content starts at `ContentStart`
+  (216); wide cards are 360×202 and posters 216×324, 40 apart. `Dialog`, `Popup` and
   `ModalBottomSheet` start a new window at the real density: re-provide
   the outer `LocalDensity` inside them, as `TvDialog` does.
 - **Libraries** go in `gradle/libs.versions.toml`, alphabetically, never as

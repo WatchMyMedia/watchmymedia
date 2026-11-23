@@ -99,7 +99,8 @@ class PlayerEpisodesTest {
         val request = PlayRequest(episode.versions.first().fileId, title = "Harbor Lights")
         fakeLatencyMs = 200
         compose.setContent { ProvideAppServices(FakeAppServices(tv = true)) { TvTheme { PlayerScreen(request, onExit = {}) } } }
-        compose.waitUntil(10_000) { compose.onAllNodes(hasText(episodeCode(3, episode.number))).fetchSemanticsNodes().isNotEmpty() }
+        // Episodes shows once the list is in.
+        compose.waitUntil(10_000) { compose.onAllNodes(hasText("Episodes") and hasClickAction()).fetchSemanticsNodes().isNotEmpty() }
 
         compose.onNode(hasText("Episodes") and hasClickAction()).performClick()
         compose.waitUntil(10_000) { compose.onAllNodes(hasText("PLAYING")).fetchSemanticsNodes().isNotEmpty() }

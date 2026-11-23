@@ -63,7 +63,8 @@ class TrailerTest {
                 TvTheme { MovieScreen(id, onPlay = onPlay, onBack = {}, onOpenTrailer = onOpenTrailer) }
             }
         }
-        compose.waitUntil(5_000) { compose.onAllNodes(hasText("Mark watched")).fetchSemanticsNodes().isNotEmpty() }
+        // The page has drawn: its More (Mark watched is in it) is there.
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("More")).fetchSemanticsNodes().isNotEmpty() }
     }
 
     /** A WebView provider, as far as WebView can tell. */

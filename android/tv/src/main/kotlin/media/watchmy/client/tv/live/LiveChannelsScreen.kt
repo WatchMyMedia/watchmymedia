@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -19,16 +21,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.Text
@@ -38,28 +40,32 @@ import media.watchmy.client.presentation.live.LiveChannelsViewModel
 import media.watchmy.client.presentation.live.LiveGuideViewModel
 import media.watchmy.client.presentation.live.editLiveNumber
 import media.watchmy.client.tv.components.ContentStart
-import media.watchmy.client.tv.components.EmptyState
-import media.watchmy.client.tv.components.ErrorState
 import media.watchmy.client.tv.components.FocusMemory
 import media.watchmy.client.tv.components.InitialFocus
-import media.watchmy.client.tv.components.LoadingState
+import media.watchmy.client.tv.components.Notice
+import media.watchmy.client.tv.components.OptionsDialog
 import media.watchmy.client.tv.components.RailSection
+import media.watchmy.client.tv.components.SafeY
 import media.watchmy.client.tv.components.TvButton
 import media.watchmy.client.tv.components.TvButtonSize
+import media.watchmy.client.tv.components.TvButtonStyle
 import media.watchmy.client.tv.components.TvScaffold
+import media.watchmy.client.tv.components.TvType
 import media.watchmy.client.tv.components.focusMemory
-import media.watchmy.client.tv.components.inter
 import media.watchmy.client.tv.components.rememberFocusMemory
+import media.watchmy.client.tv.components.tryFocus
+import media.watchmy.client.tv.navigation.TvRoutes
 import media.watchmy.client.ui.LocalAppServices
+import media.watchmy.client.ui.ShowsLiveChannels
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.rememberLiveClockFormat
 import media.watchmy.client.ui.components.rememberLiveNow
-import media.watchmy.client.ui.ShowsLiveChannels
 
 /**
- * LiveGuide: with listings (API level 13 and `capabilities.guide`) the guide
- * with its hero; without them (listings=none) every available channel remains
- * watchable without programme data.
+ * Live TV's Guide tab: with listings (API level 13 and `capabilities.guide`)
+ * the guide; without them, every available channel as a tile that plays.
+ * Recordings and Reminders are tabs beside it, opened as sections so Back
+ * from them goes Home. The number keys open Go to channel anywhere here.
  */
 @Composable
 fun LiveChannelsScreen(
@@ -69,19 +75,20 @@ fun LiveChannelsScreen(
     onRefresh: () -> Unit,
     onNavigate: (Any) -> Unit,
     modifier: Modifier = Modifier,
-    onReminders: () -> Unit = {},
-    onRecordings: () -> Unit = {},
+    // The tabs open Recordings and Reminders as sections, so Back from them goes Home; these stay for the callers.
+    @Suppress("UNUSED_PARAMETER") onReminders: () -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") onRecordings: () -> Unit = {},
     target: LiveGuideViewModel.Target? = null,
     onTargetShown: () -> Unit = {},
 ) {
     ShowsLiveChannels()
     val memory = rememberFocusMemory()
-    val grid = rememberLazyGridState()
-    val reload = remember { FocusRequester() }
+    val guideTab = remember { FocusRequester() }
     var number by remember { mutableStateOf<String?>(null) }
     var navigating by remember { mutableStateOf(false) }
     var unavailable by remember { mutableStateOf<LiveChannel?>(null) }
     val channels = state.channels
+    val tabs = liveTabs(recordings = state.capabilities.recording || state.capabilities.canRecord, reminders = state.extras)
     fun watch(channel: LiveChannel) {
         if (!channel.available) unavailable = channel else {
             number = null
@@ -97,54 +104,45 @@ fun LiveChannelsScreen(
             true
         }
     }) {
+        val content = Modifier.fillMaxSize().padding(start = ContentStart, top = SafeY)
         when {
-            state.loading && channels.isEmpty() -> LoadingState()
-            state.error != null && channels.isEmpty() -> ErrorState(state.error.orEmpty(), onRefresh, title = "Couldn't load Live TV")
-            !state.available -> {
-                EmptyState("Live TV isn't available", "This server or account cannot watch Live TV. An admin manages tuners and access in the web app.") {
-                    TvButton("Check again", onRefresh, Modifier.focusRequester(reload))
-                }
-                InitialFocus(reload)
-            }
-            channels.isEmpty() -> {
-                EmptyState("No channels yet", "An admin can refresh the tuner’s lineup and enable channels in the web app.") {
-                    TvButton("Reload channels", onRefresh, Modifier.focusRequester(reload))
-                }
-                InitialFocus(reload)
-            }
-            state.listings -> TvGuideContent(
-                state, memory, onSelect, ::watch, onGoTo = { number = "" }, navigating = navigating, modifier = Modifier.padding(start = ContentStart - 8.dp),
-                onReminders = onReminders, onRecordings = onRecordings, target = target, onTargetShown = onTargetShown,
+            state.listings && channels.isNotEmpty() -> TvGuideContent(
+                state, memory, tabs, guideTab, onSelect, ::watch, onGoTo = { number = "" }, onNavigate = onNavigate, navigating = navigating, modifier = content,
+                target = target, onTargetShown = onTargetShown,
             )
-            else -> Column(Modifier.fillMaxSize().padding(start = ContentStart, end = 58.dp, top = 48.dp)) {
-                Text("Live TV", style = inter(56.sp, FontWeight.ExtraBold), color = WmmColors.Text)
-                Text("Listings aren’t on this server yet. Pick a channel and press OK to watch.", style = inter(21.sp, lineHeight = 29.sp), color = WmmColors.TextMuted, modifier = Modifier.padding(top = 10.dp))
-                Row(Modifier.fillMaxWidth().padding(top = 32.dp, bottom = 40.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                    Text("${channels.count { it.available }} channels available", style = inter(20.sp), color = WmmColors.TextMuted, modifier = Modifier.weight(1f))
-                    if (state.capabilities.canRecord) TvButton("Recordings", onRecordings, size = TvButtonSize.Medium)
-                    TvButton("Reload", onRefresh, size = TvButtonSize.Medium)
-                    TvButton("Go to channel", { number = "" }, size = TvButtonSize.Medium)
-                }
-                state.error?.let { Text(it, style = inter(19.sp), color = WmmColors.Error, modifier = Modifier.padding(bottom = 20.dp)) }
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(6),
-                    state = grid,
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 58.dp),
-                    horizontalArrangement = Arrangement.spacedBy(22.dp),
-                    verticalArrangement = Arrangement.spacedBy(22.dp),
-                ) {
-                    items(channels, key = { it.id }) { channel ->
-                        LiveChannelCard(channel, { watch(channel) }, Modifier.focusMemory(memory, channel.id))
+            else -> Column(content) {
+                LiveTabsHeader(LiveTab.Guide, tabs, onNavigate, first = guideTab)
+                when {
+                    state.loading && channels.isEmpty() -> {
+                        GuideSkeleton()
+                        InitialFocus(guideTab)
                     }
-                }
-                LaunchedEffect(channels.map { it.id }, state.selectedId, navigating) {
-                    if (navigating) return@LaunchedEffect
-                    val id = (state.selectedId ?: memory.key)?.takeIf { candidate -> channels.any { it.id == candidate } } ?: channels.firstOrNull()?.id
-                    val index = channels.indexOfFirst { it.id == id }
-                    if (index >= 0 && id != memory.key) grid.scrollToItem(index)
-                    withFrameNanos { }
-                    if (id != null) memory.requester(id).requestFocus()
+                    state.error != null && channels.isEmpty() -> {
+                        val retry = remember { FocusRequester() }
+                        LiveStateMessage(
+                            "Live TV isn’t answering", state.error.orEmpty(), Modifier.padding(top = 150.dp),
+                            note = if (LiveTab.Recordings in tabs) "Recordings you already have still play." else null,
+                        ) {
+                            TvButton("Try again", onRefresh, Modifier.focusRequester(retry), style = TvButtonStyle.Primary, growFrom = TransformOrigin(0f, 0.5f))
+                            if (LiveTab.Recordings in tabs) TvButton("Recordings", { onNavigate(TvRoutes.LiveRecordings) })
+                        }
+                        InitialFocus(retry)
+                    }
+                    !state.available -> {
+                        val retry = remember { FocusRequester() }
+                        LiveStateMessage("Live TV isn’t available", "This server or account can’t watch Live TV. An admin looks after tuners and who may watch in the web app.", Modifier.padding(top = 150.dp)) {
+                            TvButton("Check again", onRefresh, Modifier.focusRequester(retry), style = TvButtonStyle.Primary, growFrom = TransformOrigin(0f, 0.5f))
+                        }
+                        InitialFocus(retry)
+                    }
+                    channels.isEmpty() -> {
+                        val retry = remember { FocusRequester() }
+                        LiveStateMessage("No channels yet", "An admin can scan the tuner for channels and turn them on in the web app.", Modifier.padding(top = 150.dp)) {
+                            TvButton("Check again", onRefresh, Modifier.focusRequester(retry), style = TvButtonStyle.Primary, growFrom = TransformOrigin(0f, 0.5f))
+                        }
+                        InitialFocus(retry)
+                    }
+                    else -> ChannelTiles(state, memory, navigating, ::watch)
                 }
             }
         }
@@ -153,17 +151,75 @@ fun LiveChannelsScreen(
     }
 }
 
+/** The tabs a server and person have: Guide always, Recordings where it records, Reminders where it keeps them. */
+internal fun liveTabs(recordings: Boolean, reminders: Boolean): List<LiveTab> =
+    listOfNotNull(LiveTab.Guide, LiveTab.Recordings.takeIf { recordings }, LiveTab.Reminders.takeIf { reminders })
+
+/** Without listings: every channel as a tile, five across, that plays on OK. */
+@Composable
+private fun ChannelTiles(state: LiveChannelsViewModel.State, memory: FocusMemory, navigating: Boolean, onWatch: (LiveChannel) -> Unit) {
+    val channels = state.channels
+    val grid = rememberLazyGridState()
+    Column(Modifier.fillMaxSize().padding(top = 36.dp)) {
+        Text("Channels", style = TvType.Title, color = WmmColors.Text)
+        Text(
+            "There are no programme listings yet, so this is a list of channels. They all play.",
+            style = TvType.Body, color = WmmColors.TextSoft, modifier = Modifier.padding(top = 10.dp).widthIn(max = 900.dp),
+        )
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(5),
+            state = grid,
+            modifier = Modifier.weight(1f).padding(end = TvSafeEnd - 12.dp),
+            // Room for the focused tile's growth and ring; none at the foot, so the next row peeks.
+            contentPadding = PaddingValues(start = 12.dp, top = 40.dp, end = 12.dp, bottom = 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(28.dp),
+            verticalArrangement = Arrangement.spacedBy(28.dp),
+        ) {
+            items(channels, key = { it.id }) { channel ->
+                LiveChannelCard(channel, { onWatch(channel) }, Modifier.focusMemory(memory, channel.id))
+            }
+        }
+        KeyHints(listOf(KeyHint("OK", "Watch")), Modifier.padding(top = 16.dp, bottom = SafeY))
+    }
+    LaunchedEffect(channels.map { it.id }, state.selectedId, navigating) {
+        if (navigating) return@LaunchedEffect
+        val id = (state.selectedId ?: memory.key)?.takeIf { candidate -> channels.any { it.id == candidate } } ?: channels.firstOrNull()?.id
+        val index = channels.indexOfFirst { it.id == id }
+        if (index >= 0 && id != memory.key) grid.scrollToItem(index)
+        withFrameNanos { }
+        if (id != null) memory.requester(id).tryFocus()
+    }
+}
+
+/** The guide while its listings load: grey where the hero and the rows will be, the Guide tab focused meanwhile. */
+@Composable
+private fun GuideSkeleton() {
+    Column(Modifier.fillMaxWidth().padding(top = 36.dp, end = TvSafeEnd)) {
+        Skeleton(260.dp, 26.dp)
+        Skeleton(560.dp, 52.dp, Modifier.padding(top = 16.dp))
+        Skeleton(820.dp, 28.dp, Modifier.padding(top = 18.dp))
+        Skeleton(700.dp, 28.dp, Modifier.padding(top = 12.dp))
+        Column(Modifier.padding(top = 96.dp, start = ChannelColumn + ChannelGap), verticalArrangement = Arrangement.spacedBy(RowGap)) {
+            repeat(6) { Skeleton(null, RowHeight) }
+        }
+    }
+}
+
+/** Which picker the guide's buttons have open. */
+private enum class GuidePicker { Channels, Day }
+
 @Composable
 private fun TvGuideContent(
     channels: LiveChannelsViewModel.State,
     memory: FocusMemory,
+    tabs: List<LiveTab>,
+    guideTab: FocusRequester,
     onSelect: (LiveChannel) -> Unit,
     onWatch: (LiveChannel) -> Unit,
     onGoTo: () -> Unit,
+    onNavigate: (Any) -> Unit,
     navigating: Boolean,
     modifier: Modifier = Modifier,
-    onReminders: () -> Unit = {},
-    onRecordings: () -> Unit = {},
     target: LiveGuideViewModel.Target? = null,
     onTargetShown: () -> Unit = {},
 ) {
@@ -174,7 +230,12 @@ private fun TvGuideContent(
     val recordingState by recordingActions.state.collectAsStateWithLifecycle()
     val now = rememberLiveNow()
     val format = rememberLiveClockFormat()
-    val extras = remember(model, channels.capabilities.canRecord) { TvGuideExtras(model::toggleFavourite, model::remind, model::forget, onReminders, onRecordings, channels.capabilities.canRecord) }.takeIf { state.personal && channels.extras }
+    val personal = state.personal && channels.extras
+    val canRecord = recordingState.canRecord
+    var picker by remember { mutableStateOf<GuidePicker?>(null) }
+    var choices by remember { mutableStateOf<Pair<LiveChannel, media.watchmy.client.model.LiveProgramme>?>(null) }
+    // Pressed a key in the tabs while the listings loaded: focus stays where the person put it.
+    var moved by remember { mutableStateOf(false) }
     // A search card's or reminder's programme: open the guide there and put focus on it once it is in.
     var focusOn by remember { mutableStateOf<LiveGuideViewModel.Target?>(null) }
     LaunchedEffect(Unit) {
@@ -193,7 +254,7 @@ private fun TvGuideContent(
         if (selection.channel.id != t.channelId || selection.programme.id != t.programmeId && selection.programme.startMs != t.startMs) return@LaunchedEffect
         focusOn = null
         withFrameNanos { }
-        runCatching { memory.requester(cellKey(selection.channel.id, selection.programme.id)).requestFocus() }
+        memory.requester(cellKey(selection.channel.id, selection.programme.id)).tryFocus()
     }
     val moves = remember(model) {
         TvGuideMoves(model::earlier, model::later, model::pickDay, model::filter) { channel, programme ->
@@ -202,21 +263,94 @@ private fun TvGuideContent(
         }
     }
     val rows = state.rows
-    Box(modifier.fillMaxSize()) {
-        when {
-            state.guide == null && state.error != null -> ErrorState(state.error.orEmpty(), model::refresh, title = "Couldn’t load listings")
-            state.guide == null -> LoadingState()
-            else -> LiveTvGuide(state, rows, now, format, memory, moves, onWatch, onGoTo, extras = extras)
-        }
-        recordingState.notice?.let { Text(it, style = inter(19.sp), color = WmmColors.Accent, modifier = Modifier.align(Alignment.BottomStart).padding(16.dp)) }
-        recordingState.clash?.let { clash -> TvRecordingClash(clash, recordingActions) }
-    }
-    // Focus starts on what is on the channel watched last, or comes back to where it was.
-    LaunchedEffect(state.guide != null, navigating) {
-        if (state.guide == null || navigating || focusOn != null) return@LaunchedEffect
-        withFrameNanos { }
+    fun toGrid(): Boolean {
         val selection = state.selection
-        val fallback = selection?.let { cellKey(it.channel.id, it.programme.id) } ?: rows.firstOrNull()?.let { channelKey(it.channel.id) }
-        memory.restore(fallback)
+        val fallback = selection?.let { cellKey(it.channel.id, it.programme.id) } ?: rows.firstOrNull()?.let { r -> r.programmes.firstOrNull { it.airingAt(now) }?.let { cellKey(r.channel.id, it.id) } ?: channelKey(r.channel.id) }
+        return memory.restore(fallback)
+    }
+    Column(modifier) {
+        LiveTabsHeader(
+            LiveTab.Guide, tabs, onNavigate,
+            modifier = Modifier.onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                moved = true
+                // ▼ from the tabs and buttons goes back to the programme the grid had focused.
+                event.key == Key.DirectionDown && state.guide != null && toGrid()
+            },
+            first = guideTab,
+            onShowing = { toGrid() },
+        ) {
+            TvButton(state.filterLabel(), { picker = GuidePicker.Channels }, size = TvButtonSize.Small)
+            TvButton(state.dayLabel(), { picker = GuidePicker.Day }, size = TvButtonSize.Small, enabled = state.days.size > 1)
+            TvButton("Go to channel", onGoTo, size = TvButtonSize.Small)
+        }
+        Box(Modifier.fillMaxSize()) {
+            when {
+                state.guide == null && state.error != null -> {
+                    val retry = remember { FocusRequester() }
+                    LiveStateMessage("The listings didn’t load", state.error.orEmpty(), Modifier.padding(top = 150.dp), note = "Channels still play: choose one with Go to channel.") {
+                        TvButton("Try again", model::refresh, Modifier.focusRequester(retry), style = TvButtonStyle.Primary, growFrom = TransformOrigin(0f, 0.5f))
+                    }
+                    InitialFocus(retry)
+                }
+                state.guide == null -> {
+                    GuideSkeleton()
+                    LaunchedEffect(Unit) {
+                        withFrameNanos { }
+                        if (!moved) guideTab.tryFocus()
+                    }
+                }
+                else -> LiveTvGuide(
+                    state, rows, now, format, memory, moves, onWatch,
+                    onChoices = { channel, programme -> choices = channel to programme },
+                    guideTab = guideTab,
+                    personal = personal,
+                    canRecord = canRecord,
+                )
+            }
+            Notice(recordingState.notice, recordingActions::clearError)
+        }
+    }
+    picker?.let { open ->
+        when (open) {
+            GuidePicker.Channels -> OptionsDialog(
+                title = "Channels",
+                options = if (personal) state.filters else media.watchmy.client.model.LiveGuideFilter.offered(false),
+                selected = state.shownFilter,
+                label = { it.label },
+                onSelect = { moves.onFilter(it); picker = null },
+                onDismiss = { picker = null },
+                context = "Which channels the guide shows",
+            )
+            GuidePicker.Day -> OptionsDialog(
+                title = "Day",
+                options = state.days.indices.toList(),
+                selected = state.dayIndex,
+                label = { state.days[it].label },
+                onSelect = { moves.onDay(it); picker = null },
+                onDismiss = { picker = null },
+                context = "The guide starts at this day’s first listing",
+            )
+        }
+    }
+    choices?.let { (channel, programme) ->
+        TvProgrammeChoices(
+            channel, programme, state, now, format, recordingActions,
+            ProgrammeChoiceActions(
+                onRemind = model::remind,
+                onForget = model::forget,
+                onStar = model::toggleFavourite,
+                onWatch = onWatch,
+                onRecordings = { onNavigate(TvRoutes.LiveRecordings) },
+            ),
+            onDismiss = { choices = null },
+        )
+    }
+    recordingState.clash?.let { clash -> TvRecordingClash(clash, recordingActions) }
+    // Focus starts on what is on the channel watched last, or comes back to where it was, unless the person has moved since.
+    LaunchedEffect(state.guide != null, navigating) {
+        if (state.guide == null || navigating || focusOn != null || moved) return@LaunchedEffect
+        withFrameNanos { }
+        toGrid()
     }
 }

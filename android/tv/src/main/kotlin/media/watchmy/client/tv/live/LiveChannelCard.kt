@@ -19,30 +19,41 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
 import media.watchmy.client.model.LiveChannel
 import media.watchmy.client.tv.components.FocusableBox
-import media.watchmy.client.tv.components.inter
+import media.watchmy.client.tv.components.TvPalette
+import media.watchmy.client.tv.components.TvType
 import media.watchmy.client.ui.WmmColors
 
-/** LiveGuide's channel-only tile; unavailable entries remain focusable so their explanation can be read. */
+/**
+ * A channel as a tile, for a server without listings: its number large and
+ * its name under it. OK watches it. One that can't play stays focusable, so
+ * its explanation can be read, and says so.
+ */
 @Composable
 fun LiveChannelCard(channel: LiveChannel, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(18.dp)
     FocusableBox(
         onClick = onClick,
         modifier = modifier.height(150.dp).semantics {
             contentDescription = "${channel.number} ${channel.name}, ${if (channel.available) "Watch live" else "Unavailable"}"
         },
-        cornerRadius = 14.dp,
-        focusedScale = 1.04f,
+        cornerRadius = 18.dp,
+        focusedScale = TileGrowth,
     ) { focused ->
         Column(
-            Modifier.fillMaxSize().background(if (focused) WmmColors.Surface2 else WmmColors.Surface, RoundedCornerShape(14.dp))
-                .border(1.dp, WmmColors.Line, RoundedCornerShape(14.dp)).padding(horizontal = 20.dp, vertical = 18.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
+            Modifier.fillMaxSize()
+                .background(if (focused) TvPalette.Lift else WmmColors.Surface2, shape)
+                .border(2.dp, TvPalette.Lift, shape)
+                .padding(horizontal = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp, androidx.compose.ui.Alignment.CenterVertically),
         ) {
-            Text(channel.number, style = inter(40.sp, FontWeight.Bold), color = if (channel.available) WmmColors.Text else WmmColors.TextMuted)
-            Column {
-                Text(channel.name, style = inter(20.sp, FontWeight.SemiBold), color = if (channel.available) WmmColors.Text else WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(if (channel.available) "No listings" else "Unavailable", style = inter(16.sp), color = WmmColors.TextMuted)
-            }
+            Text(channel.number, style = TvType.Title.copy(fontSize = 44.sp, lineHeight = 48.sp, fontWeight = FontWeight.Bold), color = if (channel.available) WmmColors.Text else TvPalette.Muted, maxLines = 1)
+            Text(
+                if (channel.available) channel.name else "${channel.name} · unavailable",
+                style = TvType.Second, color = TvPalette.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
+
+/** A tile grows a little more than a button: it is smaller than a card and has only numerals and a name. */
+private const val TileGrowth = 1.06f

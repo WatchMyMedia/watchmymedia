@@ -53,7 +53,7 @@ class PlayerRecompositionTest {
         audio = listOf(AudioOption(1, "English · EAC3 5.1 (Default)", "en", true), AudioOption(2, "Spanish · AAC 2.0", "es", false)),
         selectedAudio = 1,
     )
-    private val actions = ChromeActions({}, {}, {}, {}, {}, {})
+    private val actions = ChromeActions({}, {}, {}, {})
 
     @Before fun trace() = Composer.setTracer(runs)
 
@@ -64,7 +64,7 @@ class PlayerRecompositionTest {
         compose.setContent {
             val p = progress.collectAsState()
             val focus = remember {
-                ChromeFocus(FocusRequester(), null, FocusRequester(), FocusRequester(), PickerSection.entries.associateWith { FocusRequester() })
+                ChromeFocus(null, FocusRequester(), FocusRequester(), PickerSection.entries.associateWith { FocusRequester() })
             }
             Box(Modifier.fillMaxSize()) {
                 PlayerChrome(state, positionMs = { p.value.positionMs }, progress = { p.value }, focus = focus, actions = actions)
@@ -90,7 +90,7 @@ class PlayerRecompositionTest {
         val seeking = state.copy(trickplay = FakeData.trickplay)
         compose.setContent {
             val focus = remember {
-                ChromeFocus(FocusRequester(), null, FocusRequester(), FocusRequester(), PickerSection.entries.associateWith { FocusRequester() })
+                ChromeFocus(null, FocusRequester(), FocusRequester(), PickerSection.entries.associateWith { FocusRequester() })
             }
             ProvideAppServices(FakeAppServices(tv = true)) {
                 Box(Modifier.fillMaxSize()) {
@@ -121,7 +121,7 @@ class PlayerRecompositionTest {
         compose.setContent {
             val s = shown.collectAsState()
             val focus = remember { PickerSection.entries.associateWith { FocusRequester() } }
-            PickerSheet(s.value.tracks, focus, onChoose = {})
+            PickerSheet(s.value.tracks, PickerSection.Audio, focus, onChoose = {})
         }
         compose.waitForIdle()
         runs.clear()

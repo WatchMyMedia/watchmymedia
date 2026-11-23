@@ -1,158 +1,177 @@
 package media.watchmy.client.tv.player
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
+import media.watchmy.client.model.PlaybackProgress
 import media.watchmy.client.model.PlayerTracks
-import media.watchmy.client.model.modeLabel
+import media.watchmy.client.tv.components.OptionRow
+import media.watchmy.client.tv.components.PanelGroup
+import media.watchmy.client.tv.components.TvButton
+import media.watchmy.client.tv.components.TvPalette
+import media.watchmy.client.tv.components.TvSidePanel
+import media.watchmy.client.tv.components.TvType
+import media.watchmy.client.tv.components.WidePanelWidth
 import media.watchmy.client.ui.WmmColors
 
 /**
  * Whether the player offers subtitles: the file has its own (or downloaded)
- * tracks, or the server's OpenSubtitles search has answered. The Subtitles
- * button and the picker's section both follow it, so a file with none of its
+ * tracks, or the server's OpenSubtitles search has answered. The Audio &
+ * subtitles panel's Subtitles group follows it, so a file with none of its
  * own still reaches what was found online. Until the search answers, or when
  * the server has no provider, [PlayerTracks.online] is null.
  */
 internal fun offersSubtitles(tracks: PlayerTracks): Boolean = tracks.subtitles.isNotEmpty() || tracks.online != null
 
-/** The picker's sections in order, each with its rows. Empty sections (no audio tracks listed, say) are left out. */
+/** The panels' sections in order, each with its rows. Empty sections (no audio tracks listed, say) are left out; Playback info has no rows. */
 internal fun pickerSections(tracks: PlayerTracks): List<Pair<PickerSection, List<PickerRow>>> = listOf(
     PickerSection.Audio to audioRows(tracks),
     PickerSection.Subtitles to if (offersSubtitles(tracks)) subtitleRows(tracks) else emptyList(),
     PickerSection.Quality to qualityRows(tracks),
 ).filter { it.second.isNotEmpty() }
 
+/** Whether the Audio & subtitles panel has anything to pick. */
+internal fun offersTracks(tracks: PlayerTracks): Boolean = tracks.audio.isNotEmpty() || offersSubtitles(tracks)
+
 /**
- * PlayerPicker: one side sheet with the Audio, Subtitles and Quality
- * sections, the selection marked in gold. Each section's selected row (or
- * its first) carries that section's requester in [focus], so the screen can
- * open the sheet on the section asked for. Choosing applies at once and
- * keeps the sheet open; Back closes it. The rows are built when [tracks]
- * change, not while the countdowns and the Skip button run.
+ * The panel a section is in: Audio and Subtitles share Audio & subtitles;
+ * Quality and Playback info have their own.
+ */
+internal val PickerSection.panel: PickerSection
+    get() = if (this == PickerSection.Subtitles) PickerSection.Audio else this
+
+/**
+ * Audio & subtitles (Audio and Subtitles groups in one panel), or Quality
+ * ([section]), from the right. Each section's selected row (or its first)
+ * carries that section's requester in [focus], so the screen can open the
+ * panel on the row asked for. Choosing applies at once and keeps the panel
+ * open; Back closes it. The rows are built when [tracks] change, not while
+ * the countdowns and the Skip button run.
  */
 @Composable
 internal fun PickerSheet(
     tracks: PlayerTracks,
+    section: PickerSection,
     focus: Map<PickerSection, FocusRequester>,
     onChoose: (PickerChoice) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier
-            .fillMaxHeight()
-            .width(600.dp)
-            .shadow(60.dp, ambientColor = Color.Black, spotColor = Color.Black)
-            .background(WmmColors.Surface)
-            .drawBehind { drawLine(WmmColors.Line, Offset(0f, 0f), Offset(0f, size.height), 1.dp.toPx()) }
-            .padding(horizontal = 40.dp, vertical = 48.dp),
+    val quality = section.panel == PickerSection.Quality
+    TvSidePanel(
+        title = if (quality) "Quality" else "Audio & subtitles",
+        modifier = modifier,
+        context = if (quality) "Lower it if the picture keeps stopping." else null,
     ) {
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(30.dp)) {
-            val sections = remember(tracks) { pickerSections(tracks) }
-            for ((section, rows) in sections) {
+        val sections = remember(tracks) { pickerSections(tracks) }
+        Column(
+            Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            for ((s, rows) in sections) {
+                if ((s == PickerSection.Quality) != quality) continue
                 val focusAt = rows.indexOfFirst { it.selected }.coerceAtLeast(0)
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        section.name.uppercase(),
-                        Modifier.padding(horizontal = 18.dp),
-                        style = playerText(17, FontWeight.Bold, WmmColors.TextMuted, tracking = 0.1),
-                    )
-                    // Why the server is not sending the original as is, under the Quality heading.
-                    val mode = tracks.mode
-                    if (section == PickerSection.Quality && mode != null && tracks.reasons.isNotEmpty()) {
-                        Text(
-                            "${modeLabel(mode)}: ${tracks.reasons.joinToString("; ")}",
-                            Modifier.padding(horizontal = 18.dp),
-                            style = playerText(17, color = WmmColors.TextFaint),
-                        )
-                    }
-                    rows.forEachIndexed { i, row ->
-                        key(row.choice) {
-                            row.heading?.let {
-                                Text(it, Modifier.padding(start = 18.dp, end = 18.dp, top = 10.dp), style = playerText(17, FontWeight.SemiBold, WmmColors.Accent))
-                            }
-                            val m = if (i == focusAt) Modifier.focusRequester(focus.getValue(section)) else Modifier
-                            PickerOption(row, onClick = { onChoose(row.choice) }, modifier = m)
-                            row.footer?.let {
-                                Text(it, Modifier.padding(horizontal = 18.dp), style = playerText(17, color = WmmColors.TextFaint))
-                            }
+                if (!quality) PanelGroup(if (s == PickerSection.Audio) "Audio" else "Subtitles", Modifier.semantics { heading() })
+                rows.forEachIndexed { i, row ->
+                    key(row.choice) {
+                        row.heading?.let {
+                            Text(it, Modifier.padding(start = 24.dp, top = 12.dp), style = TvType.Caption.copy(fontWeight = FontWeight.SemiBold), color = WmmColors.TextSoft)
+                        }
+                        val m = if (i == focusAt) Modifier.focusRequester(focus.getValue(s)) else Modifier
+                        PickerOption(row, onClick = { onChoose(row.choice) }, modifier = m)
+                        row.footer?.let {
+                            Text(it, Modifier.padding(horizontal = 24.dp), style = TvType.Caption, color = TvPalette.Muted)
                         }
                     }
                 }
             }
         }
-        Text(
-            "Back closes this panel. Changes apply at once; a burned-in subtitle restarts the stream from here.",
-            Modifier.padding(start = 18.dp, end = 18.dp, top = 30.dp),
-            style = playerText(17, color = WmmColors.TextFaint),
-        )
+        if (quality) {
+            // Every choice here is kept for this TV, as the TV's own Settings keep it.
+            Text("Your choice becomes this TV’s default.", Modifier.padding(horizontal = 24.dp), style = TvType.Second, color = TvPalette.Muted)
+        }
     }
 }
 
-/**
- * A picker row: the label, its detail fainter beside it, and the gold mark
- * when selected. Focus fills it and rings it inside. A row that is not
- * enabled is drawn faint and focus passes it by.
- */
+/** A row of a panel: the choice and its words under it, a gold tick when it is the one in use. Dimmed when it can't be chosen. */
 @Composable
 private fun PickerOption(row: PickerRow, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(12.dp)
-    Row(
-        modifier
-            .onFocusChanged { focused = it.isFocused }
-            .clip(shape)
-            .background(if (focused) WmmColors.Surface3 else Color.Transparent)
-            .focusRing(focused, 12.dp, outset = (-4).dp)
-            .clickable(remember { MutableInteractionSource() }, indication = null, enabled = row.enabled, onClick = onClick)
-            .heightIn(min = 62.dp)
-            .padding(horizontal = 18.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        val text = buildAnnotatedString {
-            append(row.label)
-            if (row.detail != null) {
-                withStyle(SpanStyle(fontSize = 17.sp, fontWeight = FontWeight.Normal, color = WmmColors.TextMuted)) {
-                    append(" ")
-                    append(row.detail)
-                }
-            }
+    OptionRow(
+        text = row.label,
+        selected = row.selected,
+        onClick = { if (row.enabled) onClick() },
+        modifier = modifier,
+        description = row.detail,
+        enabled = row.enabled,
+    )
+}
+
+/**
+ * Playback info, from the right and wider than the other panels: what is
+ * happening in one sentence ([playbackStory]), then the video, the sound,
+ * the subtitles, the quality, the stream, how far ahead it has loaded and
+ * the server. Close has the focus; Back closes it too.
+ */
+@Composable
+internal fun PlaybackInfoPanel(
+    tracks: PlayerTracks,
+    serverName: String?,
+    progress: () -> PlaybackProgress,
+    closeFocus: FocusRequester,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    TvSidePanel(title = "Playback info", modifier = modifier, width = WidePanelWidth) {
+        Text(playbackStory(tracks), style = TvType.CardTitle.copy(fontWeight = FontWeight.Medium), color = WmmColors.Text)
+        val lines = remember(tracks, serverName) { playbackInfo(tracks, serverName) }
+        Column(
+            Modifier
+                .weight(1f, fill = false)
+                .fillMaxWidth()
+                .drawBehind { drawLine(TvPalette.Lift, Offset(0f, 0f), Offset(size.width, 0f), 2.dp.toPx()) }
+                .padding(top = 24.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            for (line in lines) InfoRow(line.what, line.value)
+            Buffered(progress)
         }
-        Text(text, Modifier.weight(1f), style = playerText(21, FontWeight.SemiBold, if (row.enabled) WmmColors.Text else WmmColors.TextFaint))
-        if (row.selected) SelectedMark()
+        TvButton("Close", onClose, Modifier.padding(top = 12.dp).focusRequester(closeFocus))
     }
 }
+
+/** How far ahead the player has loaded, read here alone, so the panel's other rows stay put as it moves. */
+@Composable
+private fun Buffered(progress: () -> PlaybackProgress) {
+    val seconds = progress().bufferedMs / 1_000
+    InfoRow("Buffered", "$seconds s ahead")
+}
+
+@Composable
+private fun InfoRow(what: String, value: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(28.dp), verticalAlignment = Alignment.Top) {
+        Text(what, Modifier.width(InfoKeyWidth), style = TvType.Second, color = TvPalette.Muted)
+        Text(value, Modifier.weight(1f), style = TvType.Second, color = WmmColors.Text)
+    }
+}
+
+/** The width of Playback info's left column ("Subtitles", "Buffered"). */
+private val InfoKeyWidth = 150.dp

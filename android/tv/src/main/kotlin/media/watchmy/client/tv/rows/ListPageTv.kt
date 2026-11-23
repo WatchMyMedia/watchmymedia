@@ -59,7 +59,10 @@ import media.watchmy.client.model.deleteBody
 import media.watchmy.client.model.deleteQuestion
 import media.watchmy.client.model.gridKey
 import media.watchmy.client.model.watchlistTitle
+import media.watchmy.client.tv.components.FocusGrowth
 import media.watchmy.client.tv.components.OptionsDialog
+import media.watchmy.client.tv.components.PosterHeight
+import media.watchmy.client.tv.components.PosterWidth
 import media.watchmy.client.tv.settings.ConfirmDialog
 import media.watchmy.client.tv.settings.ConfirmPart
 import media.watchmy.client.tv.settings.ConfirmWords
@@ -190,10 +193,10 @@ fun ListPageTv(
                     horizontalArrangement = Arrangement.spacedBy(40.dp),
                 ) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Kicker(list.kicker(), fontSize = 19.sp)
-                        Text(list.name, style = inter(56.sp, FontWeight.ExtraBold, lineHeight = 59.sp, tracking = -0.02f), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        list.sourceLine()?.let { Text(it, style = inter(21.sp), color = WmmColors.TextSoft) }
-                        Text(list.summaryLine(), style = inter(20.sp), color = WmmColors.TextMuted)
+                        Kicker(list.kicker(), fontSize = 22.sp)
+                        Text(list.name, style = inter(64.sp, FontWeight.ExtraBold, lineHeight = 80.sp, tracking = -0.02f), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        list.sourceLine()?.let { Text(it, style = inter(22.sp), color = WmmColors.TextSoft) }
+                        Text(list.summaryLine(), style = inter(22.sp), color = WmmColors.TextMuted)
                     }
                     val failed = list.errorLine()
                     if (failed != null) {
@@ -207,11 +210,11 @@ fun ListPageTv(
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
                         ) {
                             Icon(WmmIcons.Warning, contentDescription = null, tint = WmmColors.Warn, modifier = Modifier.size(26.dp))
-                            Text(failed, style = inter(19.sp, lineHeight = 27.sp), color = WmmColors.Text)
+                            Text(failed, style = inter(22.sp, lineHeight = 31.sp), color = WmmColors.Text)
                         }
                     } else {
                         val hint = focusedEntry?.okHint(state.options.canRequest)
-                        if (hint != null) Text(hint, style = inter(19.sp), color = WmmColors.TextFaint, maxLines = 1)
+                        if (hint != null) Text(hint, style = inter(22.sp), color = WmmColors.TextFaint, maxLines = 1)
                     }
                 }
                 val density = LocalDensity.current
@@ -233,11 +236,11 @@ fun ListPageTv(
                                     title = item.title,
                                     subtitle = item.year?.toString(),
                                     imageUrl = services.library.imageUrl(item.posterPath, ImageSize.W342),
-                                    artWidth = 190.dp,
-                                    artHeight = 285.dp,
+                                    artWidth = PosterWidth,
+                                    artHeight = PosterHeight,
                                     onClick = { item.open(onOpenShow, onOpenMovie, onPlay, notMatched) },
                                     onLongClick = hold(entry),
-                                    focusedScale = 1.08f,
+                                    focusedScale = FocusGrowth.CARD,
                                     modifier = watch,
                                 ) {
                                     if (!watchlist) RankBadge(entry.rank)
@@ -258,8 +261,8 @@ fun ListPageTv(
                         if (state.entries.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
                             if (watchlist) {
                                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    Text(WatchlistWords.EMPTY_TITLE, style = inter(30.sp, FontWeight.SemiBold), color = WmmColors.Text)
-                                    Text(WatchlistWords.EMPTY_BODY, style = inter(21.sp), color = WmmColors.TextMuted)
+                                    Text(WatchlistWords.EMPTY_TITLE, style = inter(28.sp, FontWeight.SemiBold), color = WmmColors.Text)
+                                    Text(WatchlistWords.EMPTY_BODY, style = inter(22.sp), color = WmmColors.TextMuted)
                                 }
                             } else {
                                 Text("Nothing on this list yet.", style = inter(22.sp), color = WmmColors.TextMuted)
@@ -316,7 +319,7 @@ private fun BoxScope.RankBadge(rank: Int) {
         Modifier.align(Alignment.TopStart).padding(8.dp).heightIn(min = 32.dp).background(WmmColors.Ground.copy(alpha = 0.85f), RoundedCornerShape(16.dp)).padding(horizontal = 10.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(rank.toString(), style = inter(16.sp, FontWeight.ExtraBold), color = WmmColors.Text)
+        Text(rank.toString(), style = inter(22.sp, FontWeight.ExtraBold), color = WmmColors.Text)
     }
 }
 
@@ -333,7 +336,7 @@ private fun MissingCardTv(entry: MediaListEntry, imageUrl: String?, onClick: () 
         entry.requestable -> "not in your library, OK to request"
         else -> status ?: "not in your library"
     }
-    FocusableBox(onClick = onClick, onLongClick = onLongClick, modifier = modifier.width(190.dp).semantics(mergeDescendants = true) { contentDescription = description }, cornerRadius = 12.dp, focusedScale = 1.08f) {
+    FocusableBox(onClick = onClick, onLongClick = onLongClick, modifier = modifier.width(190.dp).semantics(mergeDescendants = true) { contentDescription = description }, cornerRadius = 12.dp, focusedScale = FocusGrowth.CARD) {
         Column {
             Box(Modifier.size(190.dp, 285.dp)) {
                 if (!entry.found) {
@@ -343,8 +346,8 @@ private fun MissingCardTv(entry: MediaListEntry, imageUrl: String?, onClick: () 
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Icon(WmmIcons.NotFound, contentDescription = null, tint = WmmColors.TextMuted, modifier = Modifier.size(36.dp))
-                        Text("Not found", style = inter(19.sp, FontWeight.Bold), color = WmmColors.TextSoft)
-                        Text(entry.title, style = inter(16.sp, lineHeight = 22.sp), color = WmmColors.TextMuted, textAlign = TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                        Text("Not found", style = inter(22.sp, FontWeight.Bold), color = WmmColors.TextSoft)
+                        Text(entry.title, style = inter(22.sp, lineHeight = 30.sp), color = WmmColors.TextMuted, textAlign = TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis)
                     }
                 } else {
                     Artwork(imageUrl, seed = entry.title, contentDescription = null, modifier = Modifier.fillMaxSize().alpha(0.32f), shape = RoundedCornerShape(12.dp))
@@ -356,21 +359,21 @@ private fun MissingCardTv(entry: MediaListEntry, imageUrl: String?, onClick: () 
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(WmmIcons.Plus, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                            Text("Request", style = inter(17.sp, FontWeight.SemiBold), color = Color.White)
+                            Text("Request", style = inter(22.sp, FontWeight.SemiBold), color = Color.White)
                         }
                         status != null -> Box(
                             Modifier.align(Alignment.BottomCenter).padding(10.dp).fillMaxWidth().heightIn(min = 48.dp).background(WmmColors.Surface2.copy(alpha = 0.92f), RoundedCornerShape(12.dp)).padding(horizontal = 10.dp, vertical = 6.dp),
                             contentAlignment = Alignment.Center,
                         ) {
                             val tone = if (entry.requestState == RequestableState.Downloading) WmmColors.Accent else if (entry.requestState == null) WmmColors.TextMuted else WmmColors.TextSoft
-                            Text(status, style = inter(17.sp, FontWeight.SemiBold), color = tone, textAlign = TextAlign.Center)
+                            Text(status, style = inter(22.sp, FontWeight.SemiBold), color = tone, textAlign = TextAlign.Center)
                         }
                     }
                 }
                 if (ranked) RankBadge(entry.rank)
             }
-            Text(entry.title, style = inter(20.sp, FontWeight.SemiBold), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 10.dp))
-            Text(if (ranked) entry.missingLine else WatchlistWords.NOT_IN_LIBRARY, style = inter(17.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+            Text(entry.title, style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 10.dp))
+            Text(if (ranked) entry.missingLine else WatchlistWords.NOT_IN_LIBRARY, style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
         }
     }
 }

@@ -67,6 +67,7 @@ import media.watchmy.client.tv.components.TvButton
 import media.watchmy.client.tv.components.TvButtonSize
 import media.watchmy.client.tv.components.TvButtonStyle
 import media.watchmy.client.tv.components.TvDialog
+import media.watchmy.client.tv.components.TvSidePanel
 import media.watchmy.client.tv.components.inter
 import media.watchmy.client.ui.LocalWatchlistControls
 import media.watchmy.client.ui.WmmColors
@@ -133,8 +134,8 @@ internal fun WatchlistPanelTv(
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(WatchlistWords.PICKER, style = inter(30.sp, FontWeight.SemiBold), color = WmmColors.Text, modifier = Modifier.semantics { heading() })
-                    Text(title.title, style = inter(19.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(WatchlistWords.PICKER, style = inter(28.sp, FontWeight.SemiBold), color = WmmColors.Text, modifier = Modifier.semantics { heading() })
+                    Text(title.title, style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 if (naming == null) Listing(rows, atLimit, max, actions) else NamingTv(naming, onCancel = actions::cancelNaming, onConfirm = actions::create, onChanged = actions::nameChanged)
             }
@@ -151,9 +152,9 @@ private fun ColumnScope.Listing(rows: List<Pair<Watchlist, Boolean>>, atLimit: B
         }
         if (!atLimit) item("new") { PanelRow(WatchlistWords.NEW_ONE, null, WmmIcons.Plus, actions::startNaming, gold = true, modifier = if (rows.isEmpty()) Modifier.focusRequester(first) else Modifier) }
     }
-    if (atLimit) Text(WatchlistWords.limit(max), style = inter(19.sp, lineHeight = 27.sp), color = WmmColors.TextMuted)
+    if (atLimit) Text(WatchlistWords.limit(max), style = inter(22.sp, lineHeight = 31.sp), color = WmmColors.TextMuted)
     TvButton(WatchlistWords.DONE, actions::closePicker, size = TvButtonSize.Medium)
-    Text(WatchlistWords.BACK_CLOSES, style = inter(17.sp), color = WmmColors.TextFaint)
+    Text(WatchlistWords.BACK_CLOSES, style = inter(22.sp), color = WmmColors.TextFaint)
     InitialFocus(first)
 }
 
@@ -176,8 +177,8 @@ private fun CheckOption(name: String, count: String, checked: Boolean, onToggle:
             horizontalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             CheckBoxTv(checked)
-            Text(name, style = inter(21.sp, FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            Text(count, style = inter(18.sp), color = WmmColors.TextMuted)
+            Text(name, style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Text(count, style = inter(22.sp), color = WmmColors.TextMuted)
         }
     }
 }
@@ -209,8 +210,8 @@ internal fun PanelRow(label: String, line: String?, icon: ImageVector, onClick: 
             }
             Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) { Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(26.dp)) }
             Column(Modifier.weight(1f)) {
-                Text(label, style = inter(21.sp, FontWeight.SemiBold), color = tint, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (line != null) Text(line, style = inter(17.sp), color = WmmColors.TextMuted, maxLines = 2)
+                Text(label, style = inter(22.sp, FontWeight.SemiBold), color = tint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (line != null) Text(line, style = inter(22.sp), color = WmmColors.TextMuted, maxLines = 2)
             }
         }
     }
@@ -228,12 +229,12 @@ internal fun ColumnScope.NamingTv(naming: Naming, onCancel: () -> Unit, onConfir
         var first = true
         snapshotFlow { field.text.toString() }.collect { if (!first) onChanged(); first = false }
     }
-    Text(WatchlistWords.NAME, style = inter(19.sp, FontWeight.SemiBold), color = WmmColors.TextMuted)
+    Text(WatchlistWords.NAME, style = inter(22.sp, FontWeight.SemiBold), color = WmmColors.TextMuted)
     KeyboardField(field.text.toString(), active = true)
     naming.error?.let {
         Row(Modifier.semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Assertive }, horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(WmmIcons.Alert, contentDescription = null, tint = WmmColors.Warn, modifier = Modifier.size(22.dp))
-            Text(it, style = inter(19.sp, lineHeight = 27.sp), color = WmmColors.Warn)
+            Text(it, style = inter(22.sp, lineHeight = 31.sp), color = WmmColors.Warn)
         }
     }
     OnScreenKeyboard(field = field, firstKey = firstKey, keySize = 58.dp)
@@ -289,24 +290,21 @@ internal fun holdFor(item: BrowseItem, toggleWatched: ((BrowseItem) -> Unit)?): 
     }
 }
 
-/** The open card menu, centred over the screen; focus starts on its first entry, and Back closes it. */
+/** The open card menu, a panel from the right; focus starts on its first entry, and Back closes it. */
 @Composable
 internal fun CardMenuDialog(host: CardMenuHost) {
     val menu = host.open ?: return
     val first = remember(menu) { FocusRequester() }
     TvDialog(onDismiss = { host.open = null }) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)), contentAlignment = Alignment.Center) {
-            Column(
-                Modifier.width(560.dp).background(WmmColors.Surface, RoundedCornerShape(24.dp)).border(1.dp, WmmColors.Line, RoundedCornerShape(24.dp)).padding(28.dp)
-                    .semantics { paneTitle = menu.title },
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Column(Modifier.padding(start = 18.dp, bottom = 10.dp)) {
-                    Text(menu.title, style = inter(26.sp, FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
-                    menu.line?.let { Text(it, style = inter(18.sp), color = WmmColors.TextMuted) }
-                }
+        TvSidePanel(menu.title, Modifier.semantics { paneTitle = menu.title }, context = menu.line) {
+            Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 menu.entries.forEachIndexed { i, e ->
-                    PanelRow(e.label, null, e.icon, { host.open = null; e.onClick() }, if (i == 0) Modifier.focusRequester(first) else Modifier)
+                    media.watchmy.client.tv.components.PanelRow(
+                        e.label,
+                        onClick = { host.open = null; e.onClick() },
+                        modifier = if (i == 0) Modifier.focusRequester(first) else Modifier,
+                        icon = e.icon,
+                    )
                 }
             }
         }

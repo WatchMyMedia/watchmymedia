@@ -6,10 +6,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,7 +23,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -43,7 +40,6 @@ import media.watchmy.client.model.formatBytes
 import media.watchmy.client.model.otherEpisodesLine
 import media.watchmy.client.model.unreachableLines
 import media.watchmy.client.presentation.detail.ShowPageViewModel
-import media.watchmy.client.tv.components.FocusableBox
 import media.watchmy.client.tv.components.InitialFocus
 import media.watchmy.client.tv.components.TextBright
 import media.watchmy.client.tv.components.TvButton
@@ -53,92 +49,8 @@ import media.watchmy.client.tv.components.TvDialog
 import media.watchmy.client.tv.components.inter
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
-
-/** One of More's rows beyond the episode's own (the movie page has none). */
-internal class MoreItem(val label: String, val icon: ImageVector, val onClick: () -> Unit)
-
-/**
- * More (`aside`): what the viewer may do with the episode or movie, then
- * [showItems] under [showTitle] (the episode page's show group), Delete
- * episode… last in red. Back closes it.
- */
-@Composable
-internal fun MorePanel(
-    kicker: String,
-    title: String,
-    onReport: (() -> Unit)?,
-    onReplace: (() -> Unit)?,
-    onDelete: (() -> Unit)?,
-    onDismiss: () -> Unit,
-    showTitle: String? = null,
-    showItems: List<MoreItem> = emptyList(),
-) {
-    val first = remember { FocusRequester() }
-    TvDialog(onDismiss) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)), contentAlignment = Alignment.CenterEnd) {
-            Column(
-                Modifier
-                    .width(600.dp)
-                    .fillMaxHeight()
-                    .background(WmmColors.Surface)
-                    .border(1.dp, WmmColors.Line)
-                    .padding(start = 40.dp, end = 40.dp, top = 64.dp, bottom = 48.dp),
-                verticalArrangement = Arrangement.spacedBy(32.dp),
-            ) {
-                Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(kicker.uppercase(), style = inter(17.sp, FontWeight.Bold, tracking = 0.1f), color = WmmColors.TextMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(title, style = inter(34.sp, FontWeight.ExtraBold, lineHeight = 39.sp, tracking = -0.015f), color = WmmColors.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    var firstUsed = false
-                    fun Modifier.firstOne(): Modifier = if (firstUsed) this else this.focusRequester(first).also { firstUsed = true }
-                    onReport?.let { MenuRow("Report a problem", WmmIcons.Flag, it, Modifier.firstOne()) }
-                    onReplace?.let { MenuRow("Replace file", WmmIcons.Replace, it, Modifier.firstOne()) }
-                    if (showItems.isNotEmpty()) {
-                        if (onReport != null || onReplace != null) MenuDivider()
-                        showTitle?.let {
-                            Text(
-                                it.uppercase(),
-                                style = inter(15.sp, FontWeight.Bold, tracking = 0.1f),
-                                color = WmmColors.TextMuted,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 2.dp),
-                            )
-                        }
-                        showItems.forEach { item -> MenuRow(item.label, item.icon, item.onClick, Modifier.firstOne()) }
-                    }
-                    onDelete?.let {
-                        if (onReport != null || onReplace != null || showItems.isNotEmpty()) MenuDivider()
-                        MenuRow("Delete episode…", WmmIcons.Trash, it, Modifier.firstOne(), danger = true)
-                    }
-                }
-                Box(Modifier.weight(1f))
-                Text("Back closes this panel.", style = inter(17.sp), color = WmmColors.TextFaint, modifier = Modifier.padding(horizontal = 20.dp))
-            }
-        }
-        InitialFocus(first)
-    }
-}
-
-@Composable
-private fun MenuDivider() {
-    Box(Modifier.padding(horizontal = 20.dp, vertical = 4.dp).fillMaxWidth().height(1.dp).background(WmmColors.Line))
-}
-
-@Composable
-private fun MenuRow(text: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier = Modifier, danger: Boolean = false) {
-    FocusableBox(onClick = onClick, modifier = modifier.fillMaxWidth(), cornerRadius = 12.dp, focusedScale = 1f, ringOffset = (-4).dp) { focused ->
-        Row(
-            Modifier.fillMaxWidth().height(72.dp).background(if (focused) WmmColors.Surface3 else Color.Transparent, RoundedCornerShape(12.dp)).padding(horizontal = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(20.dp),
-        ) {
-            Icon(icon, contentDescription = null, tint = if (danger) WmmColors.Error else WmmColors.TextMuted, modifier = Modifier.size(28.dp))
-            Text(text, style = inter(22.sp, FontWeight.SemiBold), color = if (danger) WmmColors.Error else WmmColors.Text)
-        }
-    }
-}
+import media.watchmy.client.tv.components.TvType
+import media.watchmy.client.tv.components.TvPalette
 
 /**
  * Delete episode: what Sonarr will do, as
@@ -201,18 +113,18 @@ internal fun ConfirmDialog(
 ) {
     val cancel = remember { FocusRequester() }
     TvDialog(onDismiss = { if (!busy) onDismiss() }) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.66f)), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxSize().background(TvPalette.Dim), contentAlignment = Alignment.Center) {
             Column(
                 Modifier
                     .width(1000.dp)
-                    .background(WmmColors.Surface2, RoundedCornerShape(18.dp))
-                    .border(1.dp, WmmColors.Line2, RoundedCornerShape(18.dp))
-                    .padding(start = 56.dp, end = 56.dp, top = 48.dp, bottom = 52.dp),
+                    .background(WmmColors.Surface, RoundedCornerShape(28.dp))
+                    .border(2.dp, TvPalette.Line, RoundedCornerShape(28.dp))
+                    .padding(56.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(title, style = inter(44.sp, FontWeight.ExtraBold, lineHeight = 48.sp, tracking = -0.02f), color = WmmColors.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(kicker, style = inter(21.sp), color = WmmColors.TextMuted)
+                    Text(title, style = TvType.Title, color = WmmColors.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(kicker, style = TvType.Second, color = TvPalette.Muted)
                 }
                 if (file != null) {
                     Row(
@@ -221,8 +133,8 @@ internal fun ConfirmDialog(
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
                         Icon(WmmIcons.File, contentDescription = null, tint = WmmColors.TextMuted, modifier = Modifier.size(24.dp))
-                        Text(file.first, style = inter(19.sp).copy(fontFamily = FontFamily.Monospace), color = WmmColors.TextSoft, modifier = Modifier.weight(1f))
-                        Text(file.second, style = inter(19.sp), color = WmmColors.TextMuted)
+                        Text(file.first, style = inter(22.sp).copy(fontFamily = FontFamily.Monospace), color = WmmColors.TextSoft, modifier = Modifier.weight(1f))
+                        Text(file.second, style = inter(22.sp), color = WmmColors.TextMuted)
                     }
                 }
                 body()
@@ -238,5 +150,5 @@ internal fun ConfirmDialog(
 
 @Composable
 internal fun Body(text: String, color: Color = TextBright) {
-    Text(text, style = inter(22.sp, lineHeight = 33.sp), color = color)
+    Text(text, style = TvType.Body, color = color)
 }
