@@ -95,7 +95,7 @@ private struct RequestRow: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
         .background(focused ? Color.white.opacity(0.10) : .white.opacity(0.04), in: RoundedRectangle(cornerRadius: 18))
-        .focusRim(focused, cornerRadius: 18, scale: 1.015)
+        .focusLift(focused, scale: 1.015)
         .accessibilityElement(children: .combine)
     }
 }

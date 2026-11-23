@@ -134,7 +134,7 @@ struct TVLiveChannelCard: View {
         .frame(maxWidth: width == nil ? .infinity : nil)
         .foregroundStyle(focused ? Palette.ground : Palette.text)
         .background(focused ? Palette.text : Palette.surface, in: RoundedRectangle(cornerRadius: 16))
-        .focusRim(focused, cornerRadius: 16, scale: 1.08)
+        .focusLift(focused, scale: 1.08)
         .accessibilityElement(children: .combine)
     }
 }
@@ -219,7 +219,7 @@ private struct LiveAllChannelsCard: View {
             .frame(width: width, height: height)
             .foregroundStyle(focused ? Palette.ground : Palette.text)
             .background(focused ? Palette.text : Palette.surface, in: RoundedRectangle(cornerRadius: 16))
-            .focusRim(focused, cornerRadius: 16, scale: 1.08)
+            .focusLift(focused, scale: 1.08)
     }
 }
 
@@ -326,7 +326,7 @@ struct TVLiveOnNowCard: View {
                 .padding(12)
             }
             .clipShape(RoundedRectangle(cornerRadius: 14))
-            .focusRim(focused, cornerRadius: 14, scale: 1.08)
+            .focusLift(focused, scale: 1.08)
             VStack(alignment: .leading, spacing: 4) {
                 Text(reminder.title).font(.system(size: 22, weight: .semibold)).lineLimit(1)
                 Text(liveReminderCardLine(reminder, now: now)).font(.system(size: 17)).foregroundStyle(Palette.muted).lineLimit(1)
@@ -365,7 +365,7 @@ struct TVLiveOnNowCard: View {
                     if let programme { LiveProgressBar(progress: programme.progress(at: now), height: 6, track: .black.opacity(0.6)) }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                .focusRim(focused, cornerRadius: 14, scale: 1.08)
+                .focusLift(focused, scale: 1.08)
             VStack(alignment: .leading, spacing: 4) {
                 Text(programme?.title ?? channel.name).font(.system(size: 22, weight: .semibold)).lineLimit(1)
                 Text("\(subtitle(programme))\(nextReminded && programme != nil ? Text(" \(Image(systemName: "bell.fill"))").foregroundStyle(Palette.gold) : Text(""))")

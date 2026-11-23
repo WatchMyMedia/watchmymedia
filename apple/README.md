@@ -1446,11 +1446,17 @@ brand views and the QR code in `WMMUI`. The two targets share no files.
   failed as a message, and the newest wins.
 - **Concurrency**: Swift 6 language mode. Repositories, models and the
   controller are `@MainActor`; network work suspends off it.
-- **Apple TV**: every page is a `TabPage` (a scroll view from the screen's
-  edges, the artboards' 90 pt gutter, the lockup beside the tab bar, whose
-  last tab is the account). Buttons, cards and rows draw the focus themselves from
-  `isFocused` (`TVButtonStyle`, `TVChipStyle`, `focusRim`): the system's
-  lift and shadow plus the gold rim. A row of cards is a `ShelfRow`, a
+- **Apple TV**: tvOS's own numbers (`TV/Components/TVStyle.swift`): text
+  and controls inside the safe area, 80 pt at the sides and 60 pt at the top
+  and bottom (`TVLayout`), pictures to the edges, and only tvOS's text styles,
+  76 pt down to 23 pt (`TVText`, `Font.tv`). Every page is a `TabPage` (a
+  scroll view from the screen's edges, the lockup beside the tab bar, whose
+  last tab is the account). Focus is the system's look with nothing drawn
+  around it: buttons, chips and rows grow and turn white (`TVButtonStyle`,
+  `TVChipStyle`, `TVListRowStyle`) and cards lift and catch the light
+  (`focusLift`, `FocusSheen`), drawn from `isFocused`. Gold marks what is
+  chosen (a chip's edge, a tick, the selected tab's title), progress and
+  badges; burgundy fills the main button. A row of cards is a `ShelfRow`, a
   focus section that remembers its focused card. Every row of cards shows
   where it starts (`RowStartScrolling`, as Android TV's rows do): moving
   back, the card before the focused one stays whole in view, so at the

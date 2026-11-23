@@ -208,7 +208,7 @@ private struct TVLiveReminderRow: View {
         .padding(.leading, 10).padding(.trailing, 18)
         .frame(height: 100)
         .background(focused ? Palette.text : .white.opacity(0.05), in: RoundedRectangle(cornerRadius: 18))
-        .focusRim(focused, cornerRadius: 18, scale: 1.03)
+        .focusLift(focused, scale: 1.03)
     }
 
     private var whenColour: Color {
@@ -422,7 +422,7 @@ private struct TVLiveSearchCard: View {
                     if onNow { LiveProgressBar(progress: p.progress(at: now), height: 6, track: .black.opacity(0.6)) }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                .focusRim(focused, cornerRadius: 14, scale: 1.08)
+                .focusLift(focused, scale: 1.08)
             VStack(alignment: .leading, spacing: 3) {
                 Text(p.title).font(.system(size: 22, weight: .semibold)).lineLimit(1)
                 if let line = liveSearchLine(p) { Text(line).font(.system(size: 17)).foregroundStyle(Palette.muted).lineLimit(1) }

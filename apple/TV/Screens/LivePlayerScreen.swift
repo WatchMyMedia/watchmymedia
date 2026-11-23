@@ -466,7 +466,7 @@ private struct LiveChannelOption: View {
         .foregroundStyle(focused ? Palette.ground : Palette.text)
         .padding(20).frame(width: 330, height: 180)
         .background(focused ? Palette.text : Palette.surfaceRaised, in: RoundedRectangle(cornerRadius: 16))
-        .focusRim(focused, scale: 1.05)
+        .focusLift(focused, scale: 1.05)
     }
 }
 

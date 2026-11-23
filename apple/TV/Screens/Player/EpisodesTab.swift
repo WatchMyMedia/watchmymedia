@@ -226,7 +226,7 @@ private struct EpisodeCard: View {
                     }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 14))
-                .focusRim(focused, cornerRadius: 14, scale: 1.08)
+                .focusLift(focused, scale: 1.08)
                 .zIndex(focused ? 2 : 0)
             VStack(alignment: .leading, spacing: 2) {
                 Text(episodes.numberLabel(episode))

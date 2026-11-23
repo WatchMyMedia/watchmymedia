@@ -197,7 +197,7 @@ private struct MatchStyle: ButtonStyle {
                 .padding(.horizontal, 20)
                 .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
                 .background(focused ? Palette.text : .white.opacity(first ? 0.10 : 0), in: RoundedRectangle(cornerRadius: 14))
-                .focusRim(focused, cornerRadius: 14, scale: 1.02)
+                .focusLift(focused, scale: 1.02)
         }
     }
 }
@@ -217,7 +217,7 @@ private struct KeyStyle: ButtonStyle {
                 .foregroundStyle(focused ? Palette.ground : Palette.text)
                 .frame(width: 96, height: 80)
                 .background(focused ? Palette.text : .white.opacity(0.10), in: RoundedRectangle(cornerRadius: 16))
-                .focusRim(focused, cornerRadius: 16, scale: 1.08)
+                .focusLift(focused, scale: 1.08)
                 .scaleEffect(configuration.isPressed ? 0.95 : 1)
         }
     }

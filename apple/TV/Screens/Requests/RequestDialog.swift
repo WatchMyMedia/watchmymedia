@@ -172,6 +172,6 @@ private struct SeasonRow: View {
         .padding(.horizontal, 20)
         .frame(height: 64)
         .background(focused ? Palette.text : .white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
-        .focusRim(focused, cornerRadius: 14, scale: 1.02)
+        .focusLift(focused, scale: 1.02)
     }
 }

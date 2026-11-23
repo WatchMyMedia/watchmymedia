@@ -109,7 +109,7 @@ private struct NewTile: View {
                                 Image(systemName: "plus.circle.fill").font(.system(size: 26)).foregroundStyle(focused ? Palette.ground : Palette.gold).offset(x: 14, y: 6)
                             }
                     }
-                    .focusRim(focused, cornerRadius: 18)
+                    .focusLift(focused)
                 Text(WatchlistWords.newWatchlist).font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text)
             }
         }
@@ -139,7 +139,7 @@ private struct WatchlistTile: View {
                         }
                     }
                 }
-                .focusRim(focused, cornerRadius: 18)
+                .focusLift(focused)
             VStack(alignment: .leading, spacing: 4) {
                 Text(list.name).font(.system(size: 24, weight: .semibold)).foregroundStyle(Palette.text).lineLimit(1)
                 Text(WatchlistWords.counts(titles: list.titles, inLibrary: list.inLibrary)).font(.system(size: 19)).foregroundStyle(Palette.muted)

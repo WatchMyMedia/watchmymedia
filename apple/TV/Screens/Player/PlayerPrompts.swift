@@ -90,7 +90,7 @@ private struct CountdownButtonStyle: ButtonStyle {
                     .animation(.linear(duration: 0.25), value: progress)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 16))
-                .focusRim(focused, cornerRadius: 16, scale: 1.06)
+                .focusLift(focused, scale: 1.06)
                 .scaleEffect(configuration.isPressed ? 0.96 : 1)
         }
     }

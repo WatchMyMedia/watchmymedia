@@ -200,7 +200,7 @@ private struct OptionRowStyle: ButtonStyle {
                 .padding(.horizontal, 16)
                 .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
                 .background(focused ? Palette.text : .clear, in: RoundedRectangle(cornerRadius: 14))
-                .focusRim(focused, cornerRadius: 14, scale: 1.04)
+                .focusLift(focused, scale: 1.04)
                 .scaleEffect(configuration.isPressed ? 0.98 : 1)
         }
     }

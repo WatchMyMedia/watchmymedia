@@ -264,7 +264,7 @@ private struct EntryFace: View {
                 .overlay(alignment: .topLeading) { if ranked { rank.padding(10) } }
                 .overlay { FocusSheen(focused: focused) }
                 .clipShape(RoundedRectangle(cornerRadius: 16))
-                .focusRim(focused, cornerRadius: 16)
+                .focusLift(focused)
             VStack(alignment: .leading, spacing: 4) {
                 Text(entry.title)
                     .font(.system(size: 20, weight: .semibold))

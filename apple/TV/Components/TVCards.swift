@@ -15,17 +15,21 @@ func cardPixels(width: CGFloat, height: CGFloat, scale: CGFloat, lift: CGFloat =
 
 /// A 2:3 poster (Home's rows, the grids, Search): the New badge, the watched
 /// check or how far it was watched, then the title and a line. No quality
-/// badge: quality is a fact on the hero, the row screens'
-/// panel and the detail pages. Focused, the artwork lifts with the gold rim
-/// and the text moves down out of its way.
+/// badge: the file's detail is a press away on the title's page. Focused,
+/// the artwork lifts and catches the light and the text moves down out of
+/// its way. Where the screen's words are the focused card's (Home's rows,
+/// the grid), `caption` is false and the poster carries no words of its
+/// own; with no picture, its title is drawn on the placeholder.
 struct PosterCard: View {
     let item: BrowseItem
     let imageURL: URL?
-    var width: CGFloat = 160
+    var width: CGFloat = TVCardWidth.poster
     /// The line under the title; the grid's by default.
     var line: String?
     /// The server the title is on, when that isn't the one in use (a search result): named under the title.
     var server: String?
+    /// The title and line under the poster.
+    var caption = true
     @Environment(\.isFocused) private var focused
     @Environment(\.displayScale) private var scale
 
@@ -34,11 +38,14 @@ struct PosterCard: View {
         VStack(alignment: .leading, spacing: 0) {
             Artwork(url: imageURL, seed: item.title, maxPixel: cardPixels(width: width, height: height, scale: scale))
                 .frame(width: width, height: height)
+                .overlay { if imageURL == nil { PlaceholderTitle(title: item.title) } }
                 .overlay { badges }
                 .overlay { FocusSheen(focused: focused) }
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                .focusRim(focused, cornerRadius: 16)
-            CardCaption(title: item.title, line: line ?? item.gridSubtitle, focused: focused, server: server)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .focusLift(focused)
+            if caption {
+                CardCaption(title: item.title, line: line ?? item.gridSubtitle, focused: focused, server: server)
+            }
         }
         .frame(width: width, alignment: .leading)
         .accessibilityElement(children: .ignore)
@@ -48,9 +55,9 @@ struct PosterCard: View {
     @ViewBuilder private var badges: some View {
         if item.isNew { TVBadge("New", style: .gold).pinned(.topLeading) }
         if item.watched {
-            WatchedCheck(size: 28).pinned(.bottomTrailing)
+            WatchedCheck(size: 40).pinned(.topTrailing)
         } else if let progress = item.progress, progress > 0 {
-            ProgressStrip(progress: progress, height: 6).pinned(.bottom, padding: 0)
+            TVProgressBar(progress: progress).pinned(.bottom, padding: 14)
         }
     }
 }
@@ -62,7 +69,7 @@ struct WideCard<Overlay: View>: View {
     var line: String?
     let imageURL: URL?
     let seed: String
-    var width: CGFloat = 320
+    var width: CGFloat = TVCardWidth.wide
     /// An episode not in the library: a dashed box instead of artwork.
     var missing = false
     /// The server the card's title is on, when that isn't the one in use (a search result).
@@ -75,9 +82,9 @@ struct WideCard<Overlay: View>: View {
         VStack(alignment: .leading, spacing: 0) {
             Group {
                 if missing {
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: 14)
                         .fill(Palette.surface)
-                        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Palette.outlineStrong, style: StrokeStyle(lineWidth: 1, dash: [6, 4])))
+                        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Palette.outlineStrong, style: StrokeStyle(lineWidth: 2, dash: [8, 6])))
                 } else {
                     Artwork(url: imageURL, seed: seed, maxPixel: cardPixels(width: width, height: width * 9 / 16, scale: scale))
                 }
@@ -85,8 +92,8 @@ struct WideCard<Overlay: View>: View {
             .frame(width: width, height: (width * 9 / 16).rounded())
             .overlay { ZStack { overlay() } }
             .overlay { FocusSheen(focused: focused) }
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .focusRim(focused, cornerRadius: 16)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .focusLift(focused)
             CardCaption(title: title, line: line, focused: focused, server: server)
         }
         .frame(width: width, alignment: .leading)
@@ -105,23 +112,23 @@ struct CardCaption: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.system(size: 20, weight: .semibold))
+                .font(.tv(.caption1, .semibold))
                 .foregroundStyle(focused ? .white : Color.tvTitle)
                 .lineLimit(1)
             if let server {
                 // The icon inside the text: a focused borderless button enlarges an Image of its own (apple/AGENTS.md).
                 Text("\(Text(Image(systemName: "server.rack")).foregroundStyle(Palette.gold)) \(server)")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.tv(.caption2, .semibold))
                     .foregroundStyle(Color.tvTitle)
                     .lineLimit(1)
                     .padding(.top, 2)
             }
             if let line {
-                Text(line).font(.system(size: 17)).foregroundStyle(Palette.muted).lineLimit(1)
+                Text(line).font(.tv(.caption2)).foregroundStyle(Palette.muted).lineLimit(1)
             }
         }
-        .padding(.top, 12)
-        .offset(y: focused ? 12 : 0)
+        .padding(.top, 16)
+        .offset(y: focused ? 10 : 0)
         .animation(.easeOut(duration: 0.18), value: focused)
     }
 }
@@ -131,8 +138,56 @@ struct FocusSheen: View {
     let focused: Bool
 
     var body: some View {
-        LinearGradient(colors: [.white.opacity(focused ? 0.14 : 0), .clear], startPoint: .topLeading, endPoint: UnitPoint(x: 0.6, y: 0.6))
+        LinearGradient(colors: [.white.opacity(focused ? 0.24 : 0), .clear], startPoint: .topLeading, endPoint: UnitPoint(x: 0.46, y: 0.46))
             .allowsHitTesting(false)
+            .animation(.easeOut(duration: 0.18), value: focused)
+    }
+}
+
+/// A title drawn on a poster's placeholder while the title has no picture,
+/// so a grid of posters without artwork still says what each one is.
+struct PlaceholderTitle: View {
+    let title: String
+
+    var body: some View {
+        Text(title.uppercased())
+            .font(.tv(.caption1, .bold))
+            .tracking(0.5)
+            .foregroundStyle(.white.opacity(0.9))
+            .lineLimit(4)
+            .minimumScaleFactor(0.8)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 22)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            .accessibilityHidden(true)
+    }
+}
+
+/// How far along something is, on a card or a page: a gold bar on a dark
+/// track, 8 pt high with rounded ends. A row's bars fill as the screen opens,
+/// unless the system asks for less motion.
+struct TVProgressBar: View {
+    let progress: Double
+    var height: CGFloat = 8
+    var track: Color = .black.opacity(0.55)
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var shown = false
+
+    var body: some View {
+        let value = min(max(progress, 0), 1)
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(track)
+                Capsule().fill(Palette.gold).frame(width: geo.size.width * (shown || reduceMotion ? value : 0))
+            }
+        }
+        .frame(height: height)
+        .onAppear {
+            guard !shown else { return }
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.6).delay(0.1)) { shown = true }
+        }
+        .accessibilityElement()
+        .accessibilityLabel("\(Int((value * 100).rounded()))% watched")
     }
 }
 
@@ -147,7 +202,7 @@ struct ShelfRow<Item: Identifiable, Card: View>: View {
     let title: String
     var detail: String?
     let items: [Item]
-    var spacing: CGFloat = 24
+    var spacing: CGFloat = TVLayout.cardSpacing
     var counter: String?
     var focusedItem: Binding<Item.ID?>?
     @ViewBuilder var card: (Item) -> Card
@@ -170,7 +225,8 @@ struct ShelfRow<Item: Identifiable, Card: View>: View {
                             .rowStartBump(first: item.id == items.first?.id) { bumps += 1 }
                     }
                 }
-                .padding(.vertical, 30)
+                .padding(.top, 28)
+                .padding(.bottom, 40)
             }
             .contentMargins(.horizontal, TVLayout.gutter, for: .scrollContent)
             .scrollClipDisabled()
@@ -237,7 +293,7 @@ struct DetailPoster: View {
         // Not focusable, so no room for a lift.
         Artwork(url: url, seed: seed, maxPixel: cardPixels(width: width, height: width * 1.5, scale: scale, lift: 1))
             .frame(width: width, height: width * 1.5)
-            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
             .shadow(color: .black.opacity(0.6), radius: 30, y: 24)
             .accessibilityHidden(true)
     }
@@ -249,20 +305,20 @@ struct CastRow: View {
     @Environment(AppServices.self) private var services
 
     var body: some View {
-        HStack(alignment: .top, spacing: 18) {
+        HStack(alignment: .top, spacing: 24) {
             ForEach(cast.prefix(8), id: \.self) { person in
-                VStack(spacing: 8) {
-                    Artwork(url: services.library.imageURL(person.profilePath, size: .w185), seed: person.name, maxPixel: 200)
-                        .frame(width: 72, height: 72)
+                VStack(spacing: 10) {
+                    Artwork(url: services.library.imageURL(person.profilePath, size: .w185), seed: person.name, maxPixel: 240)
+                        .frame(width: 120, height: 120)
                         .clipShape(Circle())
-                    Text(person.name).font(.system(size: 15, weight: .semibold)).foregroundStyle(Palette.text)
+                    Text(person.name).font(.tv(.caption1, .semibold)).foregroundStyle(Palette.text)
                     if let role = person.role {
-                        Text(role).font(.system(size: 13)).foregroundStyle(Palette.muted)
+                        Text(role).font(.tv(.caption2)).foregroundStyle(Palette.muted)
                     }
                 }
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
-                .frame(width: 96)
+                .frame(width: 160)
                 .accessibilityElement(children: .combine)
             }
         }

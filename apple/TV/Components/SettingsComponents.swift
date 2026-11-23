@@ -134,7 +134,7 @@ struct SettingsRowStyle: ButtonStyle {
             configuration.label
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(focused ? Palette.text : .white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
-                .focusRim(focused, cornerRadius: 14, scale: 1.03)
+                .focusLift(focused, scale: 1.03)
                 .scaleEffect(configuration.isPressed ? 0.98 : 1)
         }
     }
@@ -176,7 +176,7 @@ struct SettingsNavStyle: ButtonStyle {
                 .padding(.horizontal, 24)
                 .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
                 .background(focused ? Palette.text : chosen ? .white.opacity(0.10) : .clear, in: RoundedRectangle(cornerRadius: 16))
-                .focusRim(focused, cornerRadius: 16, scale: 1.04)
+                .focusLift(focused, scale: 1.04)
                 .accessibilityAddTraits(chosen ? .isSelected : [])
         }
     }
@@ -370,7 +370,7 @@ struct TVGridChipStyle: ButtonStyle {
                 .padding(.horizontal, 26)
                 .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
                 .background(focused ? Palette.text : .white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
-                .focusRim(focused, cornerRadius: 16, scale: 1.04)
+                .focusLift(focused, scale: 1.04)
                 .scaleEffect(configuration.isPressed ? 0.97 : 1)
         }
     }

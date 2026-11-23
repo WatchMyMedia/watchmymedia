@@ -162,7 +162,7 @@ private struct ServerRow: View {
         .padding(.horizontal, 28)
         .frame(width: 820, height: 124, alignment: .leading)
         .background(focused ? Palette.text : .white.opacity(0.08), in: RoundedRectangle(cornerRadius: 20))
-        .focusRim(focused, cornerRadius: 20, scale: 1.04)
+        .focusLift(focused, scale: 1.04)
         .accessibilityElement(children: .combine)
     }
 }

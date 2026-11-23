@@ -334,7 +334,7 @@ private struct SearchTile: ViewModifier {
                     RoundedRectangle(cornerRadius: 16).strokeBorder(Palette.outlineStrong, style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
                 }
             }
-            .focusRim(focused, cornerRadius: 16, scale: 1.05)
+            .focusLift(focused, scale: 1.05)
     }
 }
 
@@ -367,7 +367,7 @@ private struct RequestCard: View {
                 .frame(width: 200, height: 300)
                 .overlay { FocusSheen(focused: focused) }
                 .clipShape(RoundedRectangle(cornerRadius: 16))
-                .focusRim(focused, cornerRadius: 16)
+                .focusLift(focused)
             CardCaption(title: item.title, line: item.searchLine, focused: focused)
             pill.padding(.top, 10).offset(y: focused ? 12 : 0)
         }
