@@ -24,6 +24,8 @@ public final class ServerPickerModel {
         public var current: Bool
         /// This device is signed in there, so choosing it needs no password.
         public var signedIn: Bool = false
+        /// Who signed in there from this device, signed in still or not; nil when nobody has.
+        public var userName: String? = nil
     }
 
     /// What the connecting spinner sits on: a row's ID, or ``addressKey``.
@@ -74,7 +76,8 @@ public final class ServerPickerModel {
             return Row(
                 id: d.id, kind: .found, name: d.name, address: d.baseURL.absoluteString,
                 detail: [d.displayAddress, versionLabel(d.version), tooOld ? "too old for this app" : accountLabel(saved[d.id])].joined(separator: " · "),
-                tooOld: tooOld, current: servers.current?.server.id == d.id, signedIn: saved[d.id]?.signedIn == true
+                tooOld: tooOld, current: servers.current?.server.id == d.id, signedIn: saved[d.id]?.signedIn == true,
+                userName: saved[d.id]?.userName
             )
         }
     }
@@ -89,7 +92,8 @@ public final class ServerPickerModel {
                 : "Last used \(formatAgo(s.lastUsedAt, now: now())) · \(accountLabel(s))"
             return Row(
                 id: s.server.id, kind: .remembered, name: s.server.name, address: s.server.baseURL.absoluteString,
-                detail: detail, tooOld: s.server.tooOld, current: servers.current?.server.id == s.server.id, signedIn: s.signedIn
+                detail: detail, tooOld: s.server.tooOld, current: servers.current?.server.id == s.server.id, signedIn: s.signedIn,
+                userName: s.userName
             )
         }
     }

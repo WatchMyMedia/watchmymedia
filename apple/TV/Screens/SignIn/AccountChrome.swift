@@ -3,12 +3,10 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// What the server picker and the sign-in screens share:
-/// the burgundy light, the lockup at the top left
-/// and the footer line along the bottom.
+/// What the server picker and the sign-in screens share: the burgundy light
+/// and the lockup at the top left, inside the safe area. Nothing technical
+/// runs along the foot: the server is called by its name on the screen itself.
 struct AccountChrome<Content: View>: View {
-    var footerLeading: String?
-    var footerTrailing: String?
     @ViewBuilder var content: () -> Content
 
     var body: some View {
@@ -18,25 +16,15 @@ struct AccountChrome<Content: View>: View {
                 Wordmark(size: 26)
             }
             .padding(.leading, TVLayout.gutter)
-            .padding(.top, 56)
+            .padding(.top, TVLayout.safeTop)
+            .accessibilityHidden(true)
             content()
-            HStack {
-                if let footerLeading { Text(footerLeading) }
-                Spacer()
-                if let footerTrailing { Text(footerTrailing) }
-            }
-            .font(.system(size: 18))
-            .foregroundStyle(Palette.faint)
-            .padding(.horizontal, TVLayout.gutter)
-            .padding(.bottom, 48)
-            .frame(maxHeight: .infinity, alignment: .bottom)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background {
             ZStack {
                 Palette.ground
-                RadialGradient(colors: [Palette.burgundy.opacity(0.42), .clear], center: UnitPoint(x: 0.86, y: 0.14), startRadius: 0, endRadius: 1000)
-                RadialGradient(colors: [Palette.gold.opacity(0.07), .clear], center: UnitPoint(x: 0.06, y: 0.96), startRadius: 0, endRadius: 760)
+                RadialGradient(colors: [Palette.burgundy.opacity(0.5), .clear], center: UnitPoint(x: 0.82, y: 0.3), startRadius: 0, endRadius: 760)
             }
             .ignoresSafeArea()
         }
@@ -49,10 +37,7 @@ struct Kicker: View {
     let text: String
 
     var body: some View {
-        Text(text.uppercased())
-            .font(.system(size: 20, weight: .semibold))
-            .tracking(2.8)
-            .foregroundStyle(Palette.gold)
+        TVKicker(text: text)
     }
 }
 
@@ -62,7 +47,7 @@ struct WarningLine: View {
 
     var body: some View {
         Label(text, systemImage: "exclamationmark.circle.fill")
-            .font(.system(size: 20))
+            .font(.tv(.caption1))
             .foregroundStyle(Palette.warning)
             .fixedSize(horizontal: false, vertical: true)
     }

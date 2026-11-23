@@ -528,9 +528,12 @@ server on an iPad across a rotation.
 
 On Apple TV the account is the tab bar's last tab (`TV/Shell/MainTabs.swift`):
 the person's name, or the server in use when there are several. Right from
-Settings reaches it and its page is Servers (`TV/Screens/Servers/`), a panel
-at the right; Down lands on the first server that can be chosen, the foot of
-the panel says what Select does, and Menu closes it for Home. It is a tab
+Settings reaches it and its page is Servers (`TV/Screens/Servers/`): who is
+signed in and where, then one list of the servers by name (where each is, or
+who is signed in there, never an address), Add a server, Manage servers and
+Watchlists. Down lands on the server in use, a switch and a server that
+didn't answer show on its row (Select there tries again), and Menu closes it
+for Home. It is a tab
 because nothing beside the system tab bar takes focus from it. After a switch
 a banner at the top right says "Now on Cabin server", and the Top Shelf is
 published again for that server, whichever screen the switch lands on.

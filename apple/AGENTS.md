@@ -350,7 +350,7 @@ server, and on iPad in both a regular and a compact width.
     A `Menu`'s own label isn't read out either, so a row that is a `Menu`
     sets its `accessibilityLabel` and `accessibilityValue`.
   - On Apple TV, when a focused button's content is replaced (sign-in's
-    "Sign in with a password instead"), focus goes to the new content's
+    "Use a password instead"), focus goes to the new content's
     `defaultFocus` only if what was replaced was built in the same body.
     With the pairing pieces moved into views of their own, nothing had
     focus after the switch (tvOS 27.2 simulator, `BusyFocusTests`), so the

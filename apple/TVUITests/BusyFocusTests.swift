@@ -39,13 +39,14 @@ final class BusyFocusTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-fakesSignedOut"]
         app.launch()
-        let usePassword = app.buttons["Sign in with a password instead"]
+        let usePassword = app.buttons["Use a password instead"]
         XCTAssertTrue(usePassword.waitUntilExists(timeout: 15), "sign-in opens on the pairing code")
-        for _ in 0..<3 where !usePassword.hasFocus { remote.press(.down) }
-        XCTAssertTrue(focused(usePassword))
+        XCTAssertTrue(focused(app.buttons["signIn-newCode"]), "with focus on New code, where a stray press does no harm")
+        for _ in 0..<3 where !usePassword.hasFocus { remote.press(.right) }
+        XCTAssertTrue(focused(usePassword), "Use a password instead is beside it")
         remote.press(.select)
 
-        let name = app.textFields["Username"]
+        let name = app.textFields["Name"]
         XCTAssertTrue(name.waitUntilExists(timeout: 10), "the password form is up")
         XCTAssertTrue(focused(name), "on the name")
         type("sam")
@@ -60,7 +61,7 @@ final class BusyFocusTests: XCTestCase {
         // Down reaches the buttons (a press just after the keyboard goes can be
         // lost) on the one nearest the field; Left then reaches Sign in.
         let signIn = app.buttons["signInButton"]
-        let row = [signIn, app.buttons["Use a pairing code instead"], app.buttons["Switch server"]]
+        let row = [signIn, app.buttons["Use a code instead"], app.buttons["Another server"]]
         for _ in 0..<4 where !row.contains(where: \.hasFocus) {
             remote.press(.down)
             _ = eventually(timeout: 1) { row.contains(where: \.hasFocus) }
@@ -72,7 +73,7 @@ final class BusyFocusTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Wrong name or password."].waitUntilExists(timeout: 10), "the server refuses the password")
         XCTAssertTrue(signIn.hasFocus, "focus stays on Sign in while it works and after")
         remote.press(.right)
-        XCTAssertTrue(focused(app.buttons["Use a pairing code instead"]), "and the remote moves on from there")
+        XCTAssertTrue(focused(app.buttons["Use a code instead"]), "and the remote moves on from there")
     }
 
     @MainActor
