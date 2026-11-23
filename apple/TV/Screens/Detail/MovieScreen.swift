@@ -123,7 +123,10 @@ private struct MovieView: View {
                 header(movie)
                     .padding(.horizontal, TVLayout.gutter)
                     .padding(.top, 36)
-                if !movie.cast.isEmpty {
+                let people = CastPerson.row(cast: movie.cast, crew: movie.crew)
+                if !people.isEmpty {
+                    PeopleRow(title: "Cast and crew", people: people).padding(.top, 30)
+                } else if !movie.cast.isEmpty {
                     TitleCast(cast: movie.cast)
                         .padding(.horizontal, TVLayout.gutter)
                         .padding(.top, 44)
@@ -261,8 +264,55 @@ struct EndsLine: View {
     }
 }
 
-/// A title's cast, quietly: faces, names and parts in a line. Nobody here
-/// takes focus yet, so it is drawn as words beside faces, not as cards.
+/// A title's people as a row of faces that take focus, each opening their
+/// movies and shows in the library (``PersonScreen``). Up goes back to the
+/// buttons and Down to the shelves below; the row remembers who was focused.
+struct PeopleRow: View {
+    let title: String
+    let people: [CastPerson]
+    @Environment(Navigator.self) private var navigator
+
+    var body: some View {
+        ShelfRow(title: title, items: people) { person in
+            Button { navigator.open(person.route) } label: { PersonCard(person: person) }
+                .buttonStyle(.borderless)
+                .accessibilityLabel(person.accessibilityLabel)
+                .accessibilityIdentifier("cast-person-\(person.personID)")
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("title-people")
+    }
+}
+
+/// A face, a name and the part under it; focused, the face lifts.
+private struct PersonCard: View {
+    let person: CastPerson
+    @Environment(AppServices.self) private var services
+    @Environment(\.isFocused) private var focused
+
+    var body: some View {
+        VStack(spacing: 14) {
+            PersonFace(name: person.name, url: services.library.imageURL(person.profilePath, size: .w185), size: 160)
+                .overlay { FocusSheen(focused: focused).clipShape(Circle()) }
+                .focusLift(focused)
+            VStack(spacing: 2) {
+                Text(person.name).font(.tv(.caption1, .semibold)).foregroundStyle(focused ? .white : Color.tvTitle)
+                if let role = person.role {
+                    Text(role).font(.tv(.caption2)).foregroundStyle(Palette.muted)
+                }
+            }
+            .lineLimit(1)
+            .offset(y: focused ? 10 : 0)
+            .animation(.easeOut(duration: 0.18), value: focused)
+        }
+        .frame(width: 200)
+        .multilineTextAlignment(.center)
+    }
+}
+
+/// A title's cast, quietly: faces, names and parts in a line, from a server
+/// that doesn't say who the people are (below API level 34), so nobody
+/// takes focus: it is drawn as words beside faces, not as cards.
 struct TitleCast: View {
     let cast: [Person]
     @Environment(AppServices.self) private var services

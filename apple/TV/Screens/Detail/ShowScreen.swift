@@ -669,7 +669,12 @@ private struct AboutShow: View, Equatable {
                     .foregroundStyle(Palette.muted)
                     .accessibilityIdentifier("show-notify-line")
             }
-            if !show.cast.isEmpty {
+            let people = CastPerson.row(cast: show.cast)
+            if !people.isEmpty {
+                PeopleRow(title: "Cast", people: people)
+                    .padding(.horizontal, -TVLayout.gutter)
+                    .padding(.top, 20)
+            } else if !show.cast.isEmpty {
                 TitleCast(cast: show.cast).padding(.top, 30)
             }
         }

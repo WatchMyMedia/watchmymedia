@@ -63,6 +63,9 @@ public enum Route: Hashable, Sendable, Codable {
     case mediaList(id: Int)
     /// The person's watchlists, from the account menu.
     case watchlists
+    /// A person's movies and shows in the library, from a cast row
+    /// (Apple TV); `name` heads the page while it loads.
+    case person(id: Int, name: String)
 }
 
 /// One player presentation, with separate domain targets and lifecycles.

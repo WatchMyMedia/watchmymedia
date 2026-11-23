@@ -153,6 +153,8 @@ struct MainTabView: View {
         case .liveSearch: LiveListingsSearchScreen()
         case .mediaList(let id): MediaListScreen(id: id)
         case .watchlists: WatchlistsScreen()
+        // People open from Apple TV's cast rows; the iPhone's and iPad's cast takes no taps.
+        case .person: EmptyView()
         }
     }
 }

@@ -178,6 +178,7 @@ struct MainTabs: View {
         case .liveSearch: SearchScreen()
         case .mediaList(let id): TVMediaListScreen(id: id)
         case .watchlists: TVWatchlistsScreen()
+        case .person(let id, let name): PersonScreen(id: id, name: name)
         }
     }
 }
