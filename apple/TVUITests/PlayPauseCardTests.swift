@@ -19,7 +19,7 @@ final class PlayPauseCardTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-fakes"] + arguments
         app.launch()
-        XCTAssertTrue(app.buttons["Play"].waitUntilExists(timeout: 15), "Home shows the hero")
+        XCTAssertTrue(app.homeFirstScreen.waitUntilExists(timeout: 15), "Home shows its first row")
         return app
     }
 
@@ -51,15 +51,12 @@ final class PlayPauseCardTests: XCTestCase {
     @MainActor
     func testPlayPauseOnAContinueWatchingCardResumesIt() {
         let app = launch()
-        remote.press(.down)
-        XCTAssertTrue(focused(app.buttons["Play"]), "Down from the tab bar lands on the hero's Play")
-        remote.press(.down)
-        let card = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "S02 E04 · 23 min left")).firstMatch
-        XCTAssertTrue(focused(card), "Down from Play lands on the first Continue watching card")
+        let card = app.homeFirstCard
+        XCTAssertTrue(focused(card, timeout: 15), "Home opens on the first Continue watching card")
         remote.press(.playPause)
         XCTAssertTrue(playerIsUp(app), "Play/Pause resumes it")
         remote.press(.menu)
-        XCTAssertTrue(app.buttons["Play"].waitUntilExists(timeout: 10), "Menu leaves the player for Home")
+        XCTAssertTrue(app.homeFirstScreen.waitUntilExists(timeout: 10), "Menu leaves the player for Home")
     }
 
     @MainActor

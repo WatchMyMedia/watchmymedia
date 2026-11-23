@@ -178,7 +178,7 @@ final class LiveTVPlayerTests: XCTestCase {
     @MainActor
     func testOlderServerPreservesSettingsAndHasNoLiveNavigation() {
         let app = launch(live: false)
-        XCTAssertTrue(app.buttons["Play"].waitUntilExists(timeout: 15))
+        XCTAssertTrue(app.homeFirstScreen.waitUntilExists(timeout: 15))
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Settings")).firstMatch.exists)
         XCTAssertFalse(app.buttons["Live TV"].exists)
         XCTAssertFalse(app.buttons["home-live-all-channels"].exists)

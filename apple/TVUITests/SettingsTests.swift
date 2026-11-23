@@ -286,6 +286,6 @@ final class SettingsTests: XCTestCase {
         shot("Add a server, added")
         remote.press(.select)
         XCTAssertTrue(home.waitUntilGone(timeout: 10))
-        XCTAssertTrue(app.buttons["Go to episode"].waitUntilExists(timeout: 10), "Go to Home goes to Home")
+        XCTAssertTrue(app.homeFirstScreen.waitUntilExists(timeout: 10), "Go to Home goes to Home")
     }
 }

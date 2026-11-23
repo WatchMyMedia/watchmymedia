@@ -31,20 +31,15 @@ final class RemoteTests: XCTestCase {
     }
 
     @MainActor
-    func testDownFromTheTabBarLandsOnTheHerosPlay() {
+    func testHomeOpensOnItsFirstCard() {
         let app = launch()
-        let play = app.buttons["Play"]
-        XCTAssertTrue(play.waitUntilExists(timeout: 15), "Home shows the hero")
-        remote.press(.down)
-        XCTAssertTrue(focused(play), "Down from the tab bar lands on Play")
+        XCTAssertTrue(focused(app.homeFirstCard, timeout: 20), "Home opens on the first Continue watching card: \(app.focusedButton.label)")
     }
 
     @MainActor
     func testALongPressOpensTheCardsMenuAndMenuClosesIt() {
         let app = launch()
-        XCTAssertTrue(app.buttons["Play"].waitUntilExists(timeout: 15))
-        remote.press(.down)
-        remote.press(.down)
+        XCTAssertTrue(focused(app.homeFirstCard, timeout: 20), "Home opens on the first Continue watching card")
         remote.press(.select, forDuration: 1.5)
         // The menu's items are not buttons to XCUI.
         let mark = app.descendants(matching: .any)["Mark watched"]
@@ -52,7 +47,7 @@ final class RemoteTests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["Go to show"].exists, "and Go to show")
         remote.press(.menu)
         XCTAssertTrue(mark.waitUntilGone(timeout: 5), "Menu closes the menu")
-        XCTAssertTrue(app.buttons["Play"].exists, "and stays on Home")
+        XCTAssertTrue(app.homeFirstScreen.exists, "and stays on Home")
     }
 
     @MainActor
@@ -79,7 +74,7 @@ final class RemoteTests: XCTestCase {
         XCTAssertTrue(focused(play), "Select goes back up to Play")
         XCTAssertNil(app.staticTexts["Playing"].exists ? true : nil, "and never plays")
         remote.press(.menu)
-        XCTAssertTrue(app.buttons["Go to episode"].waitUntilExists(timeout: 10), "Menu leaves the show in one step, for Home")
+        XCTAssertTrue(app.homeFirstScreen.waitUntilExists(timeout: 10), "Menu leaves the show in one step, for Home")
     }
 
     @MainActor
@@ -160,7 +155,7 @@ final class RemoteTests: XCTestCase {
         XCTAssertTrue(sort.waitUntilExists(timeout: 10), "Menu goes back to the Movies grid")
         remote.press(.down)
         remote.press(.menu)
-        XCTAssertTrue(app.buttons["Go to episode"].waitUntilExists(timeout: 10), "Menu at the grid goes to Home")
+        XCTAssertTrue(app.homeFirstScreen.waitUntilExists(timeout: 10), "Menu at the grid goes to Home")
     }
 
     @MainActor
@@ -168,6 +163,6 @@ final class RemoteTests: XCTestCase {
         let app = launch(["-open", "watchmymedia://play/9101"])
         XCTAssertTrue(app.staticTexts["Playing"].waitUntilExists(timeout: 15) || app.staticTexts["Paused"].exists, "the player is up")
         remote.press(.menu)
-        XCTAssertTrue(app.buttons["Go to episode"].waitUntilExists(timeout: 10), "Menu leaves the player for Home")
+        XCTAssertTrue(app.homeFirstScreen.waitUntilExists(timeout: 10), "Menu leaves the player for Home")
     }
 }
