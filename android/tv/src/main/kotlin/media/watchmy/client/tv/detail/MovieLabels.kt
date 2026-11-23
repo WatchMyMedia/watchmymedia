@@ -9,8 +9,8 @@ import media.watchmy.client.model.formatRemaining
 /** Partway through (not finished, past the start). */
 val MovieDetail.partway: WatchProgress? get() = watch?.takeIf { !it.completed && it.positionMs > 0 && it.durationMs > 0 }
 
-/** "Resume · 1 h 12 min left", or "Play". */
-fun MovieDetail.mainLabel(): String = partway?.let { "Resume · ${formatRemaining(it.durationMs - it.positionMs)}" } ?: "Play"
+/** "Resume · 1 h 12 min left", "Play again" once it has been watched, or "Play". */
+fun MovieDetail.mainLabel(): String = partway?.let { "Resume · ${formatRemaining(it.durationMs - it.positionMs)}" } ?: if (watch?.completed == true) "Play again" else "Play"
 
 /** "direct play", or "remux to fMP4, audio to AAC 5.1 on this device", after a version's file name. */
 fun PlaybackPlan.versionLine(): String {

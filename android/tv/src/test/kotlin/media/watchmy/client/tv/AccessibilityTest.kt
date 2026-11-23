@@ -94,7 +94,7 @@ class AccessibilityTest {
                 TvTheme { MovieScreen(500, onPlay = {}, onBack = {}) }
             }
         }
-        compose.onNodeWithContentDescription("More").performClick()
+        compose.onNode(hasText("More") and hasClickAction()).performClick()
         compose.onNode(hasText("Report a problem") and hasClickAction()).performClick()
         compose.onNode(hasText("Audio") and hasClickAction()).performClick()
         compose.waitUntil(5_000) { compose.onAllNodes(hasText(REPORT_SENT, substring = true)).fetchSemanticsNodes().isNotEmpty() }

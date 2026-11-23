@@ -95,8 +95,8 @@ class RelatedRowsTest {
     @Test fun `down from the cast reaches the collection's first card, then More like this, and up goes back`() {
         movie()
         assertEquals("Play", focused())
-        repeat(3) { press(Key.DirectionDown) }
-        assertEquals("the cast takes focus", "Hollis Kade", focused())
+        press(Key.DirectionDown)
+        assertEquals("the cast, in sight under the buttons, takes focus", "Hollis Kade", focused())
         press(Key.DirectionDown)
         assertEquals("Cold Harbour Road", focused())
         compose.onNode(isFocused()).assertIsDisplayed()
@@ -114,6 +114,8 @@ class RelatedRowsTest {
         press(Key.DirectionUp)
         press(Key.DirectionUp)
         assertTrue("${focused()} is in the cast", focused() in listOf("Hollis Kade", "Mira Okonjo"))
+        press(Key.DirectionUp)
+        assertEquals("up from the cast goes back to the button focus was on", "Play", focused())
     }
 
     @Test fun `down from About the show reaches More like this, and up goes back to About`() {
@@ -138,13 +140,13 @@ class RelatedRowsTest {
         }
         compose.waitForIdle()
         assertEquals("Play", focused())
-        repeat(5) { press(Key.DirectionDown) }
+        repeat(3) { press(Key.DirectionDown) }
         assertEquals("The Paper Kite", focused())
         press(Key.DirectionRight)
         press(Key.DirectionRight)
         assertEquals("An Honest Winter", focused())
         press(Key.DirectionCenter)
-        compose.onNode(hasText("Movies › An Honest Winter")).assertExists()
+        compose.waitUntil(5_000) { compose.onAllNodes(hasText("An Honest Winter") and hasClickAction().not()).fetchSemanticsNodes().isNotEmpty() }
 
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         compose.waitForIdle()
@@ -155,14 +157,14 @@ class RelatedRowsTest {
     @Test fun `an older server's pages end as before`() {
         runBlocking { services.servers.select(LivingRoom.copy(apiLevel = RELATED_API_LEVEL - 1)) }
         movie()
-        compose.onNodeWithText("Versions").assertExists()
+        compose.onNode(hasText("More") and hasClickAction()).assertExists()
         compose.onNodeWithText("More like this").assertDoesNotExist()
         compose.onNodeWithText(FakeData.COLLECTION_NAME).assertDoesNotExist()
     }
 
     @Test fun `a title nothing is like ends as before`() {
         movie(FakeData.unlike.first { it >= 500 })
-        compose.onNodeWithText("Versions").assertExists()
+        compose.onNode(hasText("More") and hasClickAction()).assertExists()
         compose.onNode(hasText("More like this")).assertDoesNotExist()
     }
 
