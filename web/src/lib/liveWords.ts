@@ -234,3 +234,110 @@ export function ruleWords(rule: Pick<RecordingRule, 'kind' | 'newOnly' | 'anyCha
       : [manual ?? 'Repeats', rule.number]
   return [...parts.filter(Boolean), who ? `set by ${who}` : ''].filter(Boolean).join(' · ')
 }
+
+// What each person has watched of a recording, what kind it is, and the
+// storage it fills (API level 34).
+
+type Airing = components['schemas']['LiveTVAiring']
+type SectionCounts = components['schemas']['LiveTVSectionCounts']
+
+/** How far the signed-in person is into a recording, 0 to 100; 0 when they haven't started or have finished. */
+export function recordingPct(r: Pick<Recording, 'progress' | 'watched'>): number {
+  const p = r.progress
+  if (r.watched || !p || p.durationMs <= 0 || p.positionMs <= 0) return 0
+  return Math.min(100, Math.max(1, Math.round((p.positionMs / p.durationMs) * 100)))
+}
+
+/** Where the person is: "Watched", "18 min left", or nothing. */
+export function recordingLeftWords(r: Pick<Recording, 'progress' | 'watched'>): string {
+  if (r.watched) return 'Watched'
+  const p = r.progress
+  if (!p || p.durationMs <= 0 || p.positionMs <= 0) return ''
+  const left = Math.max(1, Math.round((p.durationMs - p.positionMs) / 60_000))
+  return `${minutesWords(left)} left`
+}
+
+const minutesWords = (min: number) => {
+  const h = Math.floor(min / 60)
+  const m = min % 60
+  return h ? `${h} h${m ? ` ${m} min` : ''}` : `${m} min`
+}
+
+/** A show's group line: "3 episodes · 2 unwatched", "1 episode · watched". */
+export function groupLine(items: readonly Pick<Recording, 'watched'>[], hasWatchState: boolean): string {
+  const n = items.length
+  const count = `${n} ${n === 1 ? 'episode' : 'episodes'}`
+  if (!hasWatchState) return count
+  const unwatched = items.filter((r) => !r.watched).length
+  return [count, unwatched === 0 ? (n === 1 ? 'watched' : 'all watched') : `${unwatched} unwatched`].join(' · ')
+}
+
+/**
+ * Whether the recordings carry the person's watch state: servers from API
+ * level 34, whose first page counts each section. watched is sent only when
+ * true, so a recording can't say it on its own.
+ */
+export function hasWatchState(first: { counts?: unknown } | undefined): boolean {
+  return !!first?.counts
+}
+
+/** The Recorded tab's chips. */
+export type RecordedChip = '' | 'unwatched' | 'shows' | 'movies' | 'sports'
+
+const isSports = (r: Pick<Recording, 'categories'>) => (r.categories ?? []).some((c) => /sport/i.test(c))
+
+/** Whether a recording is in a chip: one not watched, a show's episode, a film, or sport. */
+export function inRecordedChip(r: Pick<Recording, 'kind' | 'categories' | 'watched' | 'season' | 'episode' | 'episodeTitle' | 'series'>, chip: RecordedChip): boolean {
+  switch (chip) {
+    case 'unwatched':
+      return !r.watched
+    case 'movies':
+      return r.kind === 'movie'
+    case 'sports':
+      return isSports(r)
+    case 'shows':
+      return r.kind === 'episode' || r.kind === 'show' || (r.kind === undefined && (r.season != null || r.episode != null || !!r.episodeTitle || !!r.series))
+    default:
+      return true
+  }
+}
+
+/** The chips worth showing: All, Unwatched where the server says what was watched, and the kinds only when some recording is one. */
+export function recordedChips(items: readonly Recording[], watchState: boolean): { value: RecordedChip; label: string; count?: number }[] {
+  const out: { value: RecordedChip; label: string; count?: number }[] = [{ value: '', label: 'All' }]
+  if (watchState) out.push({ value: 'unwatched', label: 'Unwatched', count: items.filter((r) => inRecordedChip(r, 'unwatched')).length })
+  for (const [value, label] of [['shows', 'Shows'], ['movies', 'Movies'], ['sports', 'Sports']] as const) {
+    if (items.some((r) => inRecordedChip(r, value))) out.push({ value, label })
+  }
+  return out
+}
+
+/** A film's or a one-off's line: "Movie · 1949 · 1 h 31 min", "Documentary · 52 min". */
+export function oneOffWords(r: Pick<Recording, 'kind' | 'year' | 'categories' | 'start' | 'end' | 'startedAt' | 'endedAt' | 'episodeTitle'>): string {
+  const minutes = recordingMinutes(r)
+  const length = minutes ? minutesWords(minutes) : ''
+  if (r.kind === 'movie') return ['Movie', r.year ? String(r.year) : '', length].filter(Boolean).join(' · ')
+  const category = (r.categories ?? []).find((c) => !/^(series|movie|special)$/i.test(c))
+  return [r.episodeTitle || category || '', length].filter(Boolean).join(' · ')
+}
+
+/** "Also on Thu 2:00 AM": the next airing of a repeat that won't record, so it can be recorded then. */
+export function alsoOnWords(a: Airing | undefined, now: number, locale?: string): string {
+  if (!a) return ''
+  const at = Date.parse(a.start)
+  if (!Number.isFinite(at)) return ''
+  const day = dayWords(at, now, locale, true)
+  const when = day === 'Tonight' || day === 'Today' ? day.toLowerCase() : day.startsWith('Tomorrow') ? 'tomorrow' : new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(at)
+  return `Also on ${when} ${timeOfDay(at, locale)} on ${a.number}`
+}
+
+/** The storage panel's figures: room left as hours, how full the disk is, and the recordings' share. */
+export function storageFacts(
+  first: { freeBytes?: number; totalBytes?: number; reserveBytes?: number; counts?: SectionCounts } | undefined,
+): { usable?: number; usedPct?: number; recordings?: { items: number; bytes: number } } {
+  if (!first) return {}
+  const usable = first.freeBytes !== undefined ? Math.max(0, first.freeBytes - (first.reserveBytes ?? 0)) : undefined
+  const total = first.totalBytes
+  const usedPct = total && first.freeBytes !== undefined ? Math.min(100, Math.max(0, Math.round(((total - first.freeBytes) / total) * 100))) : undefined
+  return { usable, usedPct, recordings: first.counts?.recorded }
+}
