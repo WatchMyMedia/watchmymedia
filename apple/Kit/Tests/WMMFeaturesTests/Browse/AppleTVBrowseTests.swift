@@ -5,7 +5,7 @@ import WMMFakes
 import WMMModel
 
 /// The browse screens as the Apple TV app uses them: the season tabs, the library's
-/// Decade menu and header, and Menu on the Siri Remote.
+/// Decade menu, and Menu on the Siri Remote.
 @MainActor
 @Suite struct AppleTVBrowseTests {
     let library = TestLibrary()
@@ -59,18 +59,6 @@ import WMMModel
         #expect(model.state.value?.items.allSatisfy { ($0.year ?? 0) / 10 == 201 } == true)
         await model.toggleDecade(2010)
         #expect(model.decadeChipLabel == "Decade")
-    }
-
-    @Test func theHeaderCountsTheShowsStillRunning() async {
-        let model = LibraryModel(library: library, navigator: navigator, type: .tv)
-        await model.retry()
-        #expect(model.overviewLine == "16 shows · 312 episodes · 12 continuing")
-        await model.toggleGenre("Sci-Fi")
-        #expect(model.overviewLine == "3 shows in Sci-Fi")
-
-        let movies = LibraryModel(library: library, navigator: navigator, type: .movie)
-        await movies.retry()
-        #expect(movies.overviewLine == "10 movies")
     }
 
     // MARK: Menu

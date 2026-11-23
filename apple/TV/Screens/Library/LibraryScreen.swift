@@ -3,18 +3,21 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// The TV Shows or Movies grid: the title and the
-/// library's counts, Sort as a menu, the filter and genre chips with a
-/// Decade menu, and seven posters a row, a page at a time. Long press marks
-/// a poster watched. From API level 22 the library's rows come first, then
-/// Edit rows, then the grid as All movies or All shows.
-/// Sorted by title, the letter index runs down the right edge:
-/// right from the last column enters it at the
-/// focused poster's letter, the grid follows the letters up and down, Select
-/// or left lands on the letter's first title, and Menu goes back to the
-/// poster. Page Up and Page Down move two rows in any sort. A row's See all,
-/// on Home or in the rows above, opens the grid
-/// sorted the row's way, with focus on its first poster.
+/// The TV Shows or Movies grid: the heading with its count and four
+/// controls on one line (Sort, Unwatched, Genre and More filters, which
+/// holds the rest of the filters and the decade), then seven posters a row,
+/// a page at a time, the third row's top in sight. Only the focused poster
+/// carries words, under it. Long press marks a poster watched. From API
+/// level 22 the library's rows come first, then Edit rows, then the grid as
+/// All movies or All shows.
+/// Sorted by title, the letter index runs down the right edge, inside the
+/// safe area: right from the last column enters it at the focused poster's
+/// letter, the grid follows the letters up and down, Select or left lands on
+/// the letter's first title, and Menu goes back to the poster. Page Up and
+/// Page Down move two rows in any sort. Down from the controls lands on the
+/// poster focused last, or the first. A row's See all, on Home or in the
+/// rows above, opens the grid sorted the row's way, with focus on its first
+/// poster.
 struct LibraryScreen: View {
     let type: LibraryType
     @Environment(AppServices.self) private var services
@@ -32,6 +35,8 @@ private struct LibraryView: View {
     @FocusState private var focus: GridFocus?
     /// The poster focus left for the letter index; Menu there goes back to it.
     @State private var returnID: Int?
+    /// The poster focused last, where focus lands coming back into the grid.
+    @State private var lastItem: Int?
     /// Focus the screen moved itself, which the index's rules leave alone.
     @State private var placedFocus: GridFocus?
     /// A letter's jump, waiting for focus to rest on it.
@@ -40,7 +45,14 @@ private struct LibraryView: View {
     @State private var drawn = DrawnPosters()
 
     private static let columnCount = 7
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 24, alignment: .top), count: LibraryView.columnCount)
+    /// Between the grid's rows: room for the focused poster to grow and its words to sit under it.
+    private static let rowSpacing: CGFloat = 100
+
+    /// Seven posters at tvOS's seven-across width; a little closer beside the letter index, to make room for it.
+    private var columns: [GridItem] {
+        let spacing = model.letterIndex == nil ? TVLayout.cardSpacing : 32
+        return Array(repeating: GridItem(.fixed(TVCardWidth.gridPoster), spacing: spacing, alignment: .top), count: Self.columnCount)
+    }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -69,18 +81,12 @@ private struct LibraryView: View {
             VStack(alignment: .leading, spacing: 0) {
                 if model.canEditRows {
                     arrangedTop(proxy)
-                } else {
-                    header
-                        .padding(.leading, TVLayout.gutter)
-                        .padding(.trailing, trailingGutter)
-                        .padding(.top, 16)
                 }
-                if !model.noLibrary {
-                    chips.padding(.top, 20)
-                }
+                controls
+                    .padding(.top, model.canEditRows ? 40 : 16)
                 grid
             }
-            .padding(.bottom, 60)
+            .padding(.bottom, TVLayout.safeBottom)
         }
         .task { await model.run() }
         .messagePill($model.message)
@@ -90,19 +96,15 @@ private struct LibraryView: View {
         }
     }
 
-    /// From API level 22: the title and count, the rows, Edit rows, then All movies with Sort.
+    /// From API level 22: the tab's name, its rows and Edit rows, above the grid.
     private func arrangedTop(_ proxy: ScrollViewProxy) -> some View {
-        VStack(alignment: .leading, spacing: 34) {
-            HStack(alignment: .firstTextBaseline, spacing: 20) {
-                Text(model.title)
-                    .font(.system(size: 46, weight: .heavy))
-                    .tracking(-0.9)
-                    .foregroundStyle(Palette.text)
-                    .accessibilityAddTraits(.isHeader)
-                Text(model.headerCount ?? " ").font(.system(size: 20)).foregroundStyle(Palette.muted)
-            }
-            .padding(.horizontal, TVLayout.gutter)
-            .padding(.top, 16)
+        VStack(alignment: .leading, spacing: 40) {
+            Text(model.title)
+                .font(.tv(.title3))
+                .foregroundStyle(Palette.text)
+                .accessibilityAddTraits(.isHeader)
+                .padding(.horizontal, TVLayout.gutter)
+                .padding(.top, 16)
             ForEach(model.shownRows) { row in
                 TVArrangedRow(row: row, actions: rowActions(proxy))
             }
@@ -110,20 +112,6 @@ private struct LibraryView: View {
                 .padding(.horizontal, TVLayout.gutter)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .focusSection()
-            HStack(alignment: .bottom) {
-                HStack(alignment: .firstTextBaseline, spacing: 20) {
-                    Text(model.allTitle)
-                        .font(.system(size: 40, weight: .heavy))
-                        .tracking(-0.8)
-                        .foregroundStyle(Palette.text)
-                        .accessibilityAddTraits(.isHeader)
-                    Text(model.overviewLine ?? " ").font(.system(size: 20)).foregroundStyle(Palette.muted)
-                }
-                Spacer()
-                if !model.noLibrary { sort }
-            }
-            .padding(.leading, TVLayout.gutter)
-            .padding(.trailing, trailingGutter)
         }
     }
 
@@ -148,112 +136,119 @@ private struct LibraryView: View {
         )
     }
 
-    private var header: some View {
-        HStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(model.title)
-                    .font(.system(size: 46, weight: .heavy))
-                    .tracking(-0.9)
-                    .foregroundStyle(Palette.text)
-                    .accessibilityAddTraits(.isHeader)
-                Text(model.overviewLine ?? " ")
-                    .font(.system(size: 20))
-                    .foregroundStyle(Palette.muted)
+    /// The grid's heading and count, then Sort, Unwatched, Genre and More
+    /// filters, on one line: across the width, so Up from any poster of the
+    /// first row reaches the control nearest above it.
+    private var controls: some View {
+        HStack(alignment: .center, spacing: 16) {
+            Text(model.gridHeading)
+                .font(.tv(.title3))
+                .foregroundStyle(Palette.text)
+                .lineLimit(1)
+                .fixedSize()
+                .accessibilityAddTraits(.isHeader)
+                .padding(.trailing, 8)
+            Text(model.gridCountLine ?? " ")
+                .font(.tv(.body))
+                .foregroundStyle(Palette.muted)
+                .lineLimit(1)
+                .layoutPriority(-1)
+                .padding(.trailing, 20)
+            if !model.noLibrary {
+                // Each control whole: the count gives way first.
+                sort.fixedSize()
+                if model.filters.contains(.unwatched) { unwatched.fixedSize() }
+                if !model.genres.isEmpty { genre.fixedSize() }
+                if !model.moreFilters.isEmpty || !model.decades(includingShows: true).isEmpty { moreFilters.fixedSize() }
             }
-            Spacer()
-            if !model.noLibrary { sort }
         }
+        .padding(.horizontal, TVLayout.gutter)
+        .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+        .focusSection()
     }
 
     private var sort: some View {
-        HStack(spacing: 16) {
-            Text("Sort").font(.system(size: 19)).foregroundStyle(Palette.muted)
-            Menu {
-                Picker("Sort by", selection: Binding(get: { model.sort }, set: { sort in Task { await model.setSort(sort) } })) {
-                    ForEach(model.sorts, id: \.self) { Text($0.label).tag($0) }
-                }
-            } label: {
-                ChipMenuLabel(title: model.sort.label)
+        Menu {
+            Picker("Sort by", selection: Binding(get: { model.sort }, set: { sort in Task { await model.setSort(sort) } })) {
+                ForEach(model.sorts, id: \.self) { Text($0.label).tag($0) }
             }
-            .buttonStyle(TVChipStyle(selected: false))
-            .accessibilityLabel("Sort by")
-            .accessibilityValue(model.sort.label)
+        } label: {
+            MenuChipLabel(title: model.sortLabel)
         }
-        .focusSection()
+        .buttonStyle(TVChipStyle(selected: false))
+        .accessibilityLabel("Sort by")
+        .accessibilityValue(model.sort.label)
     }
 
-    private var chips: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 12) {
-                ForEach(model.filters, id: \.self) { filter in
-                    Button(filter.label) { Task { await model.setFilter(filter) } }
-                        .buttonStyle(TVChipStyle(selected: model.filter == filter))
-                }
-                if !model.genres.isEmpty {
-                    divider
-                    ForEach(model.genres, id: \.self) { genre in
-                        Button(genre) { Task { await model.toggleGenre(genre) } }
-                            .buttonStyle(TVChipStyle(selected: model.genre == genre))
-                    }
-                }
-                if !model.decades(includingShows: true).isEmpty {
-                    Menu {
-                        Button("Any decade") {
-                            if let decade = model.decade { Task { await model.toggleDecade(decade) } }
-                        }
-                        ForEach(model.decades(includingShows: true), id: \.self) { decade in
-                            Button {
-                                if model.decade != decade { Task { await model.toggleDecade(decade) } }
-                            } label: {
-                                if model.decade == decade {
-                                    Label(decadeLabel(decade), systemImage: "checkmark")
-                                } else {
-                                    Text(decadeLabel(decade))
-                                }
-                            }
-                        }
-                    } label: {
-                        ChipMenuLabel(title: model.decadeChipLabel)
-                    }
-                    .buttonStyle(TVChipStyle(selected: model.decade != nil))
-                    .accessibilityLabel("Decade")
-                    .accessibilityValue(model.decade.map(decadeLabel) ?? "Any")
-                }
-            }
-            .padding(.vertical, 12)
-        }
-        .contentMargins(.leading, TVLayout.gutter, for: .scrollContent)
-        .contentMargins(.trailing, model.letterIndex == nil ? TVLayout.gutter : 0, for: .scrollContent)
-        .scrollClipDisabled()
-        .scrollIndicators(.hidden)
-        // Beside the letter index the chips stop where the grid does, with room above and below for the focus lift.
-        .mask { Rectangle().padding(.vertical, -40) }
-        .padding(.trailing, model.letterIndex == nil ? 0 : trailingGutter)
-        .focusSection()
+    private var unwatched: some View {
+        Button(TVLibraryWords.unwatched) { Task { await model.setUnwatchedOnly(!model.unwatchedOnly) } }
+            .buttonStyle(TVChipStyle(selected: model.unwatchedOnly))
+            .accessibilityIdentifier("library-unwatched")
     }
 
-    private var divider: some View {
-        Rectangle().fill(Palette.outline).frame(width: 1, height: 32).padding(.horizontal, 10).accessibilityHidden(true)
+    private var genre: some View {
+        Menu {
+            Picker(TVLibraryWords.genre, selection: Binding(get: { model.genre }, set: { genre in Task { await model.chooseGenre(genre) } })) {
+                Text(TVLibraryWords.anyGenre).tag(String?.none)
+                ForEach(model.genres, id: \.self) { Text($0).tag(Optional($0)) }
+            }
+        } label: {
+            MenuChipLabel(title: model.genreChipLabel)
+        }
+        .buttonStyle(TVChipStyle(selected: model.genre != nil))
+        .accessibilityLabel(TVLibraryWords.genre)
+        .accessibilityValue(model.genre ?? TVLibraryWords.anyGenre)
+    }
+
+    /// The filters that aren't Unwatched, as switches, then the decade.
+    private var moreFilters: some View {
+        Menu {
+            ForEach(model.moreFilters, id: \.self) { filter in
+                Toggle(filter.label, isOn: Binding(get: { model.filter == filter }, set: { on in Task { await model.setMoreFilter(filter, on: on) } }))
+            }
+            let decades = model.decades(includingShows: true)
+            if !decades.isEmpty {
+                Section(TVLibraryWords.decade) {
+                    Picker(TVLibraryWords.decade, selection: Binding(get: { model.decade }, set: { decade in Task { await model.chooseDecade(decade) } })) {
+                        Text(TVLibraryWords.anyDecade).tag(Int?.none)
+                        ForEach(decades, id: \.self) { Text(decadeLabel($0)).tag(Optional($0)) }
+                    }
+                }
+            }
+        } label: {
+            Text(TVLibraryWords.moreFilters).font(.tv(.body, .semibold))
+        }
+        .buttonStyle(TVChipStyle(selected: model.moreFiltersOn))
+        .accessibilityLabel(TVLibraryWords.moreFilters)
+        .accessibilityValue(moreFiltersValue)
+        .accessibilityIdentifier("library-more-filters")
+    }
+
+    /// What More filters has on, for VoiceOver: "Continuing, 2010s", or "None".
+    private var moreFiltersValue: String {
+        let on = (model.moreFilters.contains(model.filter) ? [model.filter.label] : []) + [model.decade.map(decadeLabel)].compactMap { $0 }
+        return on.isEmpty ? "None" : on.joined(separator: ", ")
     }
 
     @ViewBuilder private var grid: some View {
         switch model.state {
         case .loading:
-            ProgressView().frame(maxWidth: .infinity).padding(.top, 160)
+            TVSpinner().frame(maxWidth: .infinity).padding(.top, 160)
         case .failed(let message):
-            TVErrorState(message: message, retry: model.retry).padding(.top, 80)
+            TVErrorState(message: message, retry: model.retry).padding(.top, 60)
         case .loaded(let grid):
             if grid.items.isEmpty {
                 empty
             } else {
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 36) {
+                LazyVGrid(columns: columns, alignment: .leading, spacing: Self.rowSpacing) {
                     ForEach(grid.items) { item in
                         Button { model.open(item) } label: {
-                            PosterCard(item: item, imageURL: services.library.imageURL(item.posterPath, size: .w500), width: 218)
+                            GridPoster(item: item, imageURL: services.library.imageURL(item.posterPath, size: .w500))
                                 .overlay(alignment: .top) {
-                                    // Where Select on the focused letter lands (the board's `.card.land`).
+                                    // Where Select on the focused letter lands.
                                     if item.id == landingID {
-                                        RoundedRectangle(cornerRadius: 16).stroke(Palette.gold.opacity(0.55), lineWidth: 3).frame(height: 327)
+                                        RoundedRectangle(cornerRadius: 14).stroke(Palette.gold.opacity(0.55), lineWidth: 3)
+                                            .frame(height: (TVCardWidth.gridPoster * 1.5).rounded())
                                     }
                                 }
                         }
@@ -274,8 +269,10 @@ private struct LibraryView: View {
                     }
                 }
                 .padding(.leading, TVLayout.gutter)
-                .padding(.trailing, trailingGutter)
-                .padding(.top, 28)
+                .padding(.top, 46)
+                // The grid's own width, not the screen's: as a focus section it then lies left of
+                // the letter index, so Left from a letter level with the gap between two rows
+                // still finds the grid.
                 .focusSection()
                 more
             }
@@ -284,21 +281,18 @@ private struct LibraryView: View {
 
     @ViewBuilder private var more: some View {
         if let error = model.moreError {
-            VStack(spacing: 14) {
-                Text(error).font(.system(size: 20)).foregroundStyle(Palette.muted)
+            VStack(spacing: 20) {
+                Text(error).font(.tv(.body)).foregroundStyle(Palette.textSecondary)
                 Button("Try again") { Task { await model.retryMore() } }.buttonStyle(TVButtonStyle())
             }
             .frame(maxWidth: .infinity)
-            .padding(30)
+            .padding(.top, 100)
         } else if model.loadingMore {
-            ProgressView().frame(maxWidth: .infinity).padding(30)
+            TVSpinner().frame(maxWidth: .infinity).padding(.top, 100)
         }
     }
 
     // MARK: The letter index
-
-    /// Beside the index the page is 1,670 wide, else 1,740.
-    private var trailingGutter: CGFloat { model.letterIndex == nil ? TVLayout.gutter : 160 }
 
     private var gridFocused: Bool {
         if case .item = focus { return true }
@@ -347,9 +341,12 @@ private struct LibraryView: View {
     }
 
     /// Focus moved by the remote: into the index it starts at the poster's
-    /// letter, along it the grid follows, and out of it to the left it lands
-    /// on the letter's first title.
+    /// letter, along it the grid follows, out of it to the left it lands on
+    /// the letter's first title, and coming into the grid from above it lands
+    /// on the poster focused last.
     private func focusMoved(from old: GridFocus?, to new: GridFocus?, _ proxy: ScrollViewProxy) {
+        let previous = lastItem
+        if case .item(let id) = new { lastItem = id }
         if let new, new == placedFocus {
             placedFocus = nil
             return
@@ -379,6 +376,13 @@ private struct LibraryView: View {
             }
         case (.letter(let letter), .item):
             if let entry = model.letterIndex?.entry(letter) { land(on: entry, proxy) }
+        case (nil, .item(let id)):
+            // Coming down from the controls (or the rows above): the poster focused last,
+            // where the focus engine would pick the one nearest the way it came.
+            if let previous, previous != id, drawn.ids.contains(previous), items.contains(where: { $0.id == previous }) {
+                lastItem = previous
+                place(.item(previous))
+            }
         default:
             break
         }
@@ -451,15 +455,26 @@ private struct LibraryView: View {
         focus = target
     }
 
+    /// Nothing in the grid: why, and Clear filters when filters hid it all.
     private var empty: some View {
         let words = model.emptyMessage
-        return VStack(spacing: 24) {
-            TVEmptyState(systemImage: model.isFiltered ? "line.3.horizontal.decrease" : (model.type == .tv ? "tv" : "film"), title: words.title, message: words.message)
+        return VStack(alignment: .leading, spacing: 24) {
+            Text(words.title).font(.tv(.title3)).foregroundStyle(Palette.text)
+            Text(words.message).font(.tv(.body)).foregroundStyle(Palette.textSecondary).frame(maxWidth: 860, alignment: .leading)
             if model.isFiltered && !model.noLibrary {
-                Button("Clear filters") { Task { await model.clearFilters() } }.buttonStyle(TVButtonStyle())
+                Button(TVLibraryWords.clearFilters) { Task { await model.clearFilters() } }
+                    .buttonStyle(TVButtonStyle(kind: .primary))
+                    .padding(.top, 16)
+                    .accessibilityIdentifier("library-clear-filters")
             }
         }
-        .padding(.top, 100)
+        .padding(.horizontal, TVLayout.gutter)
+        .padding(.top, 80)
+        // Across the width, so Down from any control lands on Clear filters.
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .focusSection()
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("library-empty")
     }
 }
 

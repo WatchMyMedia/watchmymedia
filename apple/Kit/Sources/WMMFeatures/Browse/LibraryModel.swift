@@ -168,14 +168,6 @@ public final class LibraryModel {
         return parts.joined(separator: " ")
     }
 
-    /// Under the title on Apple TV: the whole library with the shows still
-    /// running ("142 shows · 3,418 episodes · 12 continuing"), or what matches.
-    public var overviewLine: String? {
-        guard let line = resultLine else { return nil }
-        guard !isFiltered, type == .tv, let continuing = state.value?.summary?.continuing, continuing > 0 else { return line }
-        return "\(line) · \(formatCount(continuing)) continuing"
-    }
-
     /// The empty grid's words: no library, nothing matching, or nothing yet.
     public var emptyMessage: (title: String, message: String) {
         if noLibrary {

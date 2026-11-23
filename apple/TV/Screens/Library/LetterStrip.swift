@@ -10,11 +10,11 @@ enum GridFocus: Hashable {
     case letter(String)
 }
 
-/// The letter index at the grid's right edge: # and A
+/// The letter index at the grid's right edge, inside the safe area: # and A
 /// to Z, the letters with no title dimmed and passed over. The letter of the
-/// focused poster is gold; with focus on the index, the focused letter lifts
-/// and a bubble beside it says how many titles it holds. The rules are
-/// `LetterIndex`'s; the screen moves focus (`LibraryScreen`).
+/// focused poster is gold; with focus on the index, the focused letter grows
+/// and turns white and a bubble beside it says how many titles it holds.
+/// The rules are `LetterIndex`'s; the screen moves focus (`LibraryScreen`).
 struct LetterStrip: View {
     let index: LetterIndex
     let noun: String
@@ -26,9 +26,13 @@ struct LetterStrip: View {
     let select: (LetterIndex.Entry) -> Void
     let back: () -> Void
 
-    static let letterHeight: CGFloat = 27
-    static let top: CGFloat = 250
+    static let letterHeight: CGFloat = 28
+    /// From the top of the screen: under the grid's controls once the tab bar has scrolled away.
+    static let top: CGFloat = 190
     private static let padding: CGFloat = 10
+    /// The strip's width: a 40 pt letter with 6 pt either side.
+    private static let width: CGFloat = 52
+    private static let bubbleHeight: CGFloat = 110
 
     private var focusedLetter: String? {
         if case .letter(let letter) = focus.wrappedValue { return letter }
@@ -40,14 +44,15 @@ struct LetterStrip: View {
             if let letter = focusedLetter, let entry = index.entry(letter),
                let place = index.entries.firstIndex(where: { $0.letter == letter }) {
                 bubble(entry)
-                    .padding(.top, Self.padding + CGFloat(place) * Self.letterHeight + Self.letterHeight / 2 - 50)
-                    .padding(.trailing, 120 - 44)
+                    .padding(.top, Self.padding + CGFloat(place) * Self.letterHeight + Self.letterHeight / 2 - Self.bubbleHeight / 2)
+                    .padding(.trailing, Self.width + 16)
                     .allowsHitTesting(false)
             }
             strip
         }
         .padding(.top, Self.top)
-        .padding(.trailing, 44)
+        // The letters end at the safe area's edge, 80 pt in.
+        .padding(.trailing, TVLayout.gutter - 6)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         .ignoresSafeArea()
     }
@@ -74,31 +79,35 @@ struct LetterStrip: View {
             }
         }
         .onExitCommand(perform: back)
+        // Left lands on the letter's first title. The focus engine usually moves there itself;
+        // where it finds nothing level with the letter (a gap between rows), this does.
+        .onMoveCommand { direction in
+            guard direction == .left, let letter = focusedLetter, let entry = index.entry(letter) else { return }
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(150))
+                if focusedLetter == letter { select(entry) }
+            }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Jump to a letter")
         .accessibilityIdentifier("letter-index")
     }
 
+    /// The letter in gold and how many titles it holds: "B · 42 movies".
     private func bubble(_ entry: LetterIndex.Entry) -> some View {
         HStack(spacing: 22) {
             Text(entry.letter)
-                .font(.system(size: 64, weight: .heavy))
+                .font(.tv(.title2))
                 .foregroundStyle(Palette.gold)
-                .frame(width: 56)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(index.countLine(entry, noun: noun))
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(Palette.text)
-                Text("Select or swipe left to go there")
-                    .font(.system(size: 17))
-                    .foregroundStyle(Palette.muted)
-            }
-            .fixedSize()
+                .frame(minWidth: 56)
+            Text(index.countLine(entry, noun: noun))
+                .font(.tv(.body, .semibold))
+                .foregroundStyle(Palette.text)
+                .fixedSize()
         }
-        .padding(.leading, 22)
-        .padding(.trailing, 30)
-        .padding(.vertical, 18)
-        .frame(height: 100)
+        .padding(.leading, 26)
+        .padding(.trailing, 34)
+        .frame(height: Self.bubbleHeight)
         .background(Color(red: 28 / 255, green: 28 / 255, blue: 31 / 255).opacity(0.96), in: RoundedRectangle(cornerRadius: 24))
         .shadow(color: .black.opacity(0.7), radius: 35, y: 30)
         .accessibilityElement(children: .combine)
@@ -106,9 +115,8 @@ struct LetterStrip: View {
     }
 }
 
-/// A letter of the index (the board's `.lt`): grey, gold for the focused
-/// poster's letter, dim when it has no titles; focused, white and lifted
-/// with the gold rim.
+/// A letter of the index: light grey, gold for the focused poster's letter,
+/// dim when it has no titles; focused, it grows and turns white.
 private struct LetterStyle: ButtonStyle {
     let empty: Bool
     let current: Bool
@@ -125,15 +133,12 @@ private struct LetterStyle: ButtonStyle {
 
         var body: some View {
             configuration.label
-                .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(focused ? Palette.ground : empty ? Color(hex: 0x4A4A4F) : current ? Palette.gold : Color(hex: 0xBDBDBD))
+                .font(.tv(.caption2, .bold))
+                .foregroundStyle(focused ? Palette.ground : empty ? Color(hex: 0x6F6F75) : current ? Palette.gold : Palette.textSecondary)
                 .frame(width: 40, height: LetterStrip.letterHeight)
                 .background(focused ? Palette.text : .clear, in: RoundedRectangle(cornerRadius: 8))
-                .overlay {
-                    if focused { RoundedRectangle(cornerRadius: 8).stroke(Palette.gold, lineWidth: 3) }
-                }
                 .shadow(color: .black.opacity(focused ? 0.6 : 0), radius: 15, y: 10)
-                .scaleEffect(focused ? 1.25 : 1)
+                .scaleEffect(focused ? 1.2 : 1)
                 .zIndex(focused ? 1 : 0)
                 .animation(.easeOut(duration: 0.12), value: focused)
         }

@@ -223,7 +223,13 @@ server, and on iPad in both a regular and a compact width.
     the app keeps running.
 - **Layout traps.** On Apple TV a focused `.borderless` button lifts and
   enlarges any `Image` in its label, so put a small icon inside the `Text`
-  (`Text("\(Image(systemName: …)) …")`). On iPad a `.presentationSizing(.fitted)`
+  (`Text("\(Image(systemName: …)) …")`). A `Menu`'s label does the same
+  with an `Image` beside its words: drawn larger than the label was
+  measured, it cut the words short ("Sort: Date add…", tvOS 27.2), so the
+  library's chips put the chevron in the text (`MenuChipLabel`). The
+  library grid's focus section is the grid's own width: stretched under the
+  letter index, Left from a letter level with the 100 pt gap between two
+  rows found nothing. On iPad a `.presentationSizing(.fitted)`
   form sheet keeps the height it opened at, so open it once its content has
   loaded (`RequestSheet.presented`). On iOS 27 a `ForEach` of card rows (each a
   horizontal `ScrollView` of a `LazyHStack`) inside a `LazyVStack` draws the

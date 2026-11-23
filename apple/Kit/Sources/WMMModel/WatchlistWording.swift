@@ -58,7 +58,7 @@ public enum WatchlistWords {
     public static let create = "Create"
     public static let done = "Done"
     /// Apple TV's line over the checks.
-    public static let tvPickerHint = "Each watchlist is saved as you choose it · Menu closes this list"
+    public static let tvPickerHint = "Each watchlist is saved as you choose it."
     /// Apple TV's line under the Name field.
     public static func tvCreateHint(_ title: String) -> String { "Create makes the watchlist and saves \(title) to it" }
 
