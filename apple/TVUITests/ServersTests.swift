@@ -136,7 +136,7 @@ final class ServersTests: XCTestCase {
         XCTAssertTrue(note.wait(until: NSPredicate(format: "label == %@", "Now on Cabin server"), timeout: 15), "the banner says where this Apple TV is now")
         XCTAssertTrue(app.descendants(matching: .any)["servers-panel"].waitUntilGone(timeout: 10), "Servers closes")
         XCTAssertTrue(app.staticTexts["Harbour Run"].waitUntilExists(timeout: 15), "Home is Cabin server's")
-        XCTAssertFalse(app.staticTexts["The Long Dark"].exists, "and not Living room server's")
+        XCTAssertFalse(app.homeFirstCard.exists, "and not Living room server's")
         XCTAssertTrue(accountTab(app, on: "Cabin server").waitUntilExists(timeout: 10), "the account tab names Cabin server now")
         shot("Now on Cabin server")
         // The banner takes no focus: the remote still drives Home.
@@ -339,7 +339,7 @@ final class ServersTests: XCTestCase {
         remote.press(.select)
         XCTAssertTrue(home.waitUntilGone(timeout: 10))
         XCTAssertTrue(accountTab(app, on: "Living room server").waitUntilExists(timeout: 15), "Home, on the server signed in to again")
-        XCTAssertTrue(app.staticTexts["The Long Dark"].waitUntilExists(timeout: 15))
+        XCTAssertTrue(app.homeFirstScreen.waitUntilExists(timeout: 15), "Living room server's Home")
     }
 
     @MainActor

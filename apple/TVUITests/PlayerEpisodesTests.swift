@@ -103,7 +103,8 @@ final class PlayerEpisodesTests: XCTestCase {
         XCTAssertFalse(playing.label.contains("now playing"))
         remote.press(.menu)
         XCTAssertTrue(next.waitUntilGone(timeout: 5), "Back closes the tab")
-        XCTAssertTrue(app.staticTexts["S03 E08 · Squall Line"].waitUntilExists(timeout: 10), "and the chosen episode plays")
+        // The line under the title goes on with when it ends.
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "S03 E08 · Squall Line")).firstMatch.waitUntilExists(timeout: 10), "and the chosen episode plays")
     }
 
     @MainActor
