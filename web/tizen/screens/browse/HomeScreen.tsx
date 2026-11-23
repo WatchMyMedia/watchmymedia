@@ -7,7 +7,7 @@ import type { LiveChannel } from '../../../src/api/liveTV'
 import { showListings } from '../../../src/lib/liveGuide'
 import type { ScreenRow } from '../../../src/lib/screenRows'
 import { scopeName } from '../../app/focus'
-import { useBack, useEntry, useFocus, useKeys, useMediaUrls, useNav, useSession } from '../../app/hooks'
+import { useBack, useEntry, useFocus, useKeys, useLevel34, useMediaUrls, useNav, useSession } from '../../app/hooks'
 import { Button } from '../../ui/Button'
 import { Icon } from '../../ui/Icon'
 import { ProblemScreen, Skeleton, SkeletonRow, SkeletonText } from '../../ui/States'
@@ -21,7 +21,7 @@ import {
   type HomeData, type HomePage,
 } from './homePages'
 import { episodeCode, seeAllRoute, type RowCard, type RowContext } from './rowCards'
-import { toneStyle, useFocusOnArrival, useRowCards } from './browseHooks'
+import { toneStyle, useCardActions, useFocusOnArrival, useRowCards } from './browseHooks'
 import { Glyph, RowView } from './RowView'
 import { useWatchlistsOn } from '../watchlists/useWatchlistsOn'
 import { useApp } from '../../app/hooks'
@@ -106,6 +106,9 @@ function PickHero({ hero, rows }: { hero: Hero; rows: readonly ScreenRow[] }) {
 function ResumeHero({ item }: { item: ContinueItem }) {
   const nav = useNav()
   const media = useMediaUrls()
+  const { run } = useCardActions()
+  // Hold OK on Resume opens the card's actions, as it does on the row's cards (API level 34).
+  const menu = useLevel34() ? () => run({ kind: 'continueMenu', item }) : undefined
   const now = useNow()
   const line = resumeLine(item)
   const left = Math.max(0, item.durationMs - item.positionMs)
@@ -125,7 +128,7 @@ function ResumeHero({ item }: { item: ContinueItem }) {
         <b>{leftWords(left)}</b><span className="tv-muted">{endsAtWords(now, left)}</span>
       </div>}
       <div className="tv-actions home-hero__actions" data-group="home/hero">
-        <Button id={HERO_PLAY} variant="primary" icon="play" autoFocus onPress={() => nav.play({ ...request, startMs: item.positionMs })}>Resume</Button>
+        <Button id={HERO_PLAY} variant="primary" icon="play" autoFocus onPress={() => nav.play({ ...request, startMs: item.positionMs })} onHold={menu}>Resume</Button>
         <Button id={HERO_RESTART} variant="glass" onPress={() => nav.play({ ...request, startMs: 0 })}>Start over</Button>
         {open && <Button id={HERO_OPEN} variant="glass" onPress={() => nav.push(open.route)}>{open.label}</Button>}
       </div>
@@ -343,13 +346,14 @@ export function HomeScreen() {
   const live = useLive()
   const libs = libraries.data?.items
   const menu = useWatchlistsOn()
+  const continueMenu = useLevel34()
   const base = useMemo<Omit<RowContext, 'now'>>(() => {
     const refs = libs ?? []
     return {
-      libraries: refs, channels: live.channels, listings: live.listings, menu,
+      libraries: refs, channels: live.channels, listings: live.listings, menu, continueMenu,
       seeAll: (target, row) => { const route = seeAllRoute(target, row, refs); return route && { kind: 'open', route } },
     }
-  }, [libs, live.channels, live.listings, menu])
+  }, [libs, live.channels, live.listings, menu, continueMenu])
   const rows = useMemo(() => (home.data ? homeScreenRows(home.data, live.channels.length > 0) : []), [home.data, live.channels.length])
 
   const resume = useMemo(() => resumeHero(rows), [rows])

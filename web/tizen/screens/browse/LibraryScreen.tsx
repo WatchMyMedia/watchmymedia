@@ -5,7 +5,7 @@ import type { components } from '../../../src/api/schema'
 import { itemsQuery, librariesQuery, rowsQuery, useLibraryByType } from '../../../src/api/queries'
 import { sortOptions, type LibraryType } from '../../../src/lib/browseOptions'
 import { drawable, isListRow, libraryRows, type ScreenRow } from '../../../src/lib/screenRows'
-import { useBack, useFocus, useKeys, useMediaUrls, useNav, useSession } from '../../app/hooks'
+import { useBack, useFocus, useKeys, useLevel34, useMediaUrls, useNav, useSession } from '../../app/hooks'
 import type { ScreenProps } from '../../app/routes'
 import { Button } from '../../ui/Button'
 import { Card } from '../../ui/Card'
@@ -322,8 +322,9 @@ function LibraryView({ library, type, initial, toGrid }: { library: Library; typ
   const root = useRef<HTMLDivElement>(null)
   const refs = libraries.data?.items
   const menu = useWatchlistsOn()
+  const continueMenu = useLevel34()
   const base = useMemo<Omit<RowContext, 'now'>>(() => ({
-    libraries: refs ?? [], channels: [], listings: false, menu, screenType: type,
+    libraries: refs ?? [], channels: [], listings: false, menu, continueMenu, screenType: type,
     // A list's page, or the grid below sorted the row's way; a link to another library has none here.
     seeAll: (target, row): CardAction | undefined => {
       const route = seeAllRoute(target, row, refs ?? [])
@@ -332,7 +333,7 @@ function LibraryView({ library, type, initial, toGrid }: { library: Library; typ
       const { sort, filter, genre, decade } = target.search
       return { kind: 'grid', sort, filter, genre, decade }
     },
-  }), [refs, library.id, menu, type])
+  }), [refs, library.id, menu, continueMenu, type])
   const drawn = useMemo(() => (rows.data ? libraryRows(rows.data, type).filter(drawable) : []), [rows.data, type])
   const onGrid = useCallback((a: Extract<CardAction, { kind: 'grid' }>) => { setChoices(choicesFrom(a)); setGridFocus(true) }, [setChoices])
   const onFocused = useCallback(() => setGridFocus(false), [])

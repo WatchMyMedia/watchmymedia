@@ -30,6 +30,8 @@ export type CardAction =
   | { kind: 'grid'; sort?: ItemSort; filter?: ItemFilter; genre?: string; decade?: number }
   /** The card's actions (open it, Mark watched, its watchlist item), where the server keeps watchlists. */
   | { kind: 'menu'; item: BrowseItem }
+  /** A Continue watching card's actions: its page, Start over, and Remove from Continue watching (API level 34). */
+  | { kind: 'continueMenu'; item: ContinueItem }
 
 export type RowCard = {
   /** Unique in the row: the card's focus id is `<row group>/<key>`. */
@@ -65,6 +67,8 @@ export type RowContext = {
   seeAll?: (target: SeeAllTarget, row: ScreenRow) => CardAction | undefined
   /** Hold OK on a title opens its actions, with its watchlist item: the server keeps watchlists. */
   menu?: boolean
+  /** Hold OK on a Continue watching card opens its actions, Remove from Continue watching among them (API level 34); else it opens the page. */
+  continueMenu?: boolean
   /** A Movies or TV screen's type: a list's See all opens its page on it. */
   screenType?: 'movie' | 'tv'
 }
@@ -163,7 +167,7 @@ export function itemCard(row: Pick<ScreenRow, 'id' | 'style'>, item: BrowseItem,
   }
 }
 
-export function continueCard(c: ContinueItem): RowCard {
+export function continueCard(c: ContinueItem, menu = false): RowCard {
   // "S02 E04 · 23 min left", "1 h 12 min left": where you are and what is left, whatever the server's own line says.
   const code = c.kind === 'episode' && c.seasonNumber && c.episodeNumber ? episodeCode(c.seasonNumber, c.episodeNumber) : ''
   const subtitle = c.durationMs ? [code, timeLeft(c.durationMs - c.positionMs)].filter(Boolean).join(' · ') : c.subtitle || code
@@ -178,7 +182,7 @@ export function continueCard(c: ContinueItem): RowCard {
     progress: c.durationMs ? c.positionMs / c.durationMs : 0,
     label: spoken(c.title, subtitle),
     press: { kind: 'play', request: { kind: 'file', fileId: c.fileId, startMs: c.positionMs, title: c.title, subtitle: resumeLine(c) || undefined, backdropPath: c.backdropPath ?? c.stillPath } },
-    hold: page ? { kind: 'open', route: page } : undefined,
+    hold: menu ? { kind: 'continueMenu', item: c } : page ? { kind: 'open', route: page } : undefined,
   }
 }
 
@@ -242,7 +246,7 @@ export function seeAllCard(row: ScreenRow, ctx: RowContext): RowCard | undefined
 export function rowCards(row: ScreenRow, ctx: RowContext): RowCard[] {
   let cards: RowCard[]
   switch (row.style) {
-    case 'continue': cards = (row.continue ?? []).map(continueCard); break
+    case 'continue': cards = (row.continue ?? []).map((c) => continueCard(c, ctx.continueMenu)); break
     case 'episode': cards = (row.episodes ?? []).map(episodeCard); break
     case 'live':
       cards = ctx.channels.map((c) => channelCard(c, ctx.listings, ctx.now))
@@ -277,7 +281,7 @@ export function holdWords(action: CardAction | undefined): string | undefined {
     case 'watched': return action.watched ? 'marks it watched' : 'marks it unwatched'
     case 'play': return 'plays it'
     case 'open': return 'opens its page'
-    case 'menu': return 'for its menu'
+    case 'menu': case 'continueMenu': return 'for its menu'
     default: return undefined
   }
 }
@@ -307,7 +311,7 @@ export function holdHint(action: CardAction | undefined): string | undefined {
     case 'watched': return action.watched ? 'Mark watched' : 'Mark unwatched'
     case 'play': return 'Play it'
     case 'open': return 'Its page'
-    case 'menu': return 'Its menu'
+    case 'menu': case 'continueMenu': return 'Its menu'
     default: return undefined
   }
 }

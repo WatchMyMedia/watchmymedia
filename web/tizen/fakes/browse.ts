@@ -1,6 +1,6 @@
 import type { components } from '../../src/api/schema'
 import { FakeServer, problem } from './server'
-import { AIRED, CONTINUE, LIBRARIES, MOVIE_ITEMS, SHOW_ITEMS } from './data'
+import { AIRED, continueWatching, HIDDEN, LIBRARIES, MOVIE_ITEMS, SHOW_ITEMS } from './data'
 import { markWatchlisted, watchlistEntries, watchlistList, watchlistLists, watchlistRows } from './watchlists'
 
 // Home, the libraries, See all and list pages on the fictional server, and
@@ -201,7 +201,7 @@ const FOLLOWED: EpisodeCard[] = AIRED.slice(0, 3).map((e, i) => ({ ...e, episode
 
 function fakeHome(): HomeData {
   const rows: ScreenRow[] = [
-    { id: 'continue', style: 'continue', title: 'Continue watching', continue: CONTINUE },
+    { id: 'continue', style: 'continue', title: 'Continue watching', continue: continueWatching() },
     { id: 'followed', style: 'episode', title: 'New from shows you follow', episodes: FOLLOWED },
     ...watchlistRows(),
     { id: 'live', style: 'live', title: 'Live TV' },
@@ -273,6 +273,9 @@ export function registerBrowse(server: FakeServer, mode = '') {
   server.route('GET', '/api/libraries', () => ({ items: libraries(mode) }))
   server.route('GET', '/api/libraries/:id', ({ params }) => libraries(mode).find((l) => l.id === Number(params.id)) ?? problem(404, 'no such library'))
   server.route('GET', '/api/home', () => (emptyHome ? EMPTY_HOME : markWatchlisted(fakeHome())))
+  // Remove from Continue watching and its Undo (API level 34): the place is kept.
+  server.route('PUT', '/api/watch/:type/:id/hidden', ({ params }) => { HIDDEN.add(`${params.type}:${params.id}`); return new Response(null, { status: 204 }) })
+  server.route('DELETE', '/api/watch/:type/:id/hidden', ({ params }) => { HIDDEN.delete(`${params.type}:${params.id}`); return new Response(null, { status: 204 }) })
   server.route('GET', '/api/libraries/:id/rows', ({ params }) => markWatchlisted(libraryRowsReply(emptyHome ? 0 : Number(params.id))))
   server.route('GET', '/api/libraries/:id/items', ({ params, url }) => markWatchlisted(itemsReply(emptyHome ? 0 : Number(params.id), url.searchParams)))
   server.route('GET', '/api/lists', () => ({ items: [...LISTS, ...watchlistLists()] }))
