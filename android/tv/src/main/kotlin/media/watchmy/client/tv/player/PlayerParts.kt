@@ -4,54 +4,45 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.Text
+import media.watchmy.client.tv.components.FocusGrowth
+import media.watchmy.client.tv.components.FocusableBox
+import media.watchmy.client.tv.components.TvPalette
+import media.watchmy.client.tv.components.TvType
 import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.WmmColors
 
@@ -90,27 +81,6 @@ internal fun playerText(
     fontFeatureSettings = if (tabular) "tnum" else null,
 )
 
-private val RingWidth = 4.dp
-
-/**
- * The mockups' focus outline: a 4 dp gold ring [outset] beyond the edge
- * (CSS outline-offset; negative draws it inside, as the picker rows do).
- */
-internal fun Modifier.focusRing(focused: Boolean, corner: Dp, outset: Dp = 4.dp): Modifier = drawWithContent {
-    drawContent()
-    if (focused) {
-        val w = RingWidth.toPx()
-        val o = outset.toPx() + w / 2
-        drawRoundRect(
-            color = WmmColors.Accent,
-            topLeft = Offset(-o, -o),
-            size = Size(size.width + 2 * o, size.height + 2 * o),
-            cornerRadius = CornerRadius((corner.toPx() + o).coerceAtLeast(0f)),
-            style = Stroke(w),
-        )
-    }
-}
-
 /** Requests focus once the target is attached (a frame after it is composed, at worst). */
 internal suspend fun FocusRequester.focusSoon() {
     repeat(4) {
@@ -120,9 +90,12 @@ internal suspend fun FocusRequester.focusSoon() {
 }
 
 /**
- * A transport control (the artboard's `.cbtn`): a 60 dp pill, an icon-only
- * circle, or with [primary] the 76 dp white play/pause. Focus adds the gold
- * ring and a 6 % scale.
+ * A player control, as the TV's other buttons: 72 high, a dark fill that
+ * lifts when focused, the gold ring, growth and a shadow. [icon] alone
+ * makes it square (Pause); with [text] it leads, or follows with
+ * [iconAfter] (Next episode, Skip intro). [detail] follows the words after a
+ * dot ("Quality · Automatic"). [fill] (0–1) runs a gold wash across it, for
+ * Skip's own countdown.
  */
 @Composable
 internal fun ControlButton(
@@ -132,80 +105,51 @@ internal fun ControlButton(
     text: String? = null,
     detail: String? = null,
     contentDescription: String? = null,
-    primary: Boolean = false,
+    iconAfter: Boolean = false,
+    fill: () -> Float = { 0f },
 ) {
-    var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.06f else 1f, label = "focus scale")
-    val height = if (primary) 76.dp else 60.dp
-    val bg = if (primary) WmmColors.Text else Color.White.copy(alpha = 0.12f)
-    val fg = if (primary) WmmColors.Ground else WmmColors.Text
-    val shape = RoundedCornerShape(height / 2)
-    Row(
-        modifier
-            .onFocusChanged { focused = it.isFocused }
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
+    val shape = RoundedCornerShape(16.dp)
+    FocusableBox(
+        onClick = onClick,
+        modifier = modifier.then(if (contentDescription != null) Modifier.semantics { this.contentDescription = contentDescription } else Modifier),
+        cornerRadius = 16.dp,
+        focusedScale = FocusGrowth.BUTTON,
+        role = Role.Button,
+    ) { focused ->
+        Row(
+            Modifier
+                .heightIn(min = ButtonHeight)
+                .clip(shape)
+                .background(if (focused) TvPalette.Lift else TvPalette.ButtonFill, shape)
+                .drawBehind {
+                    val f = fill()
+                    if (f > 0f) drawRect(WmmColors.Accent.copy(alpha = 0.35f), size = Size(size.width * f.coerceAtMost(1f), size.height))
+                }
+                .border(2.dp, if (focused) TvPalette.Lift else Color.White.copy(alpha = 0.2f), shape)
+                .then(if (text == null) Modifier.width(ButtonHeight) else Modifier.padding(horizontal = 32.dp, vertical = 6.dp)),
+            horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val glyph: @Composable () -> Unit = {
+                if (icon != null) Icon(icon, if (text == null) contentDescription else null, Modifier.size(if (text == null) 30.dp else 26.dp), tint = WmmColors.Text)
             }
-            .focusRing(focused, height / 2)
-            .clip(shape)
-            .background(bg, shape)
-            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onClick)
-            // At least the mockup's height; taller when the TV's text size is larger.
-            .heightIn(min = height)
-            .then(if (text == null) Modifier.width(height) else Modifier.padding(horizontal = 22.dp, vertical = 6.dp)),
-        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (icon != null) {
-            val iconSize = when {
-                primary -> 34.dp
-                text == null -> 28.dp
-                else -> 24.dp
+            if (!iconAfter) glyph()
+            if (text != null) {
+                Text(
+                    if (detail != null) "$text · $detail" else text,
+                    style = TvType.BodyStrong,
+                    color = WmmColors.Text,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-            Icon(icon, contentDescription, Modifier.size(iconSize), tint = fg)
-        }
-        if (text != null) Text(text, style = playerText(20, FontWeight.SemiBold, fg), maxLines = 1)
-        if (detail != null) {
-            Text(detail, style = playerText(17, FontWeight.Medium, WmmColors.TextMuted), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (iconAfter) glyph()
         }
     }
 }
 
-/**
- * A card button (PlayerNext's `.nbtn`): [filled] on a light wash, else an
- * outline. [progress] (0–1) runs a burgundy fill across it, for countdowns.
- */
-@Composable
-internal fun CardButton(
-    text: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    filled: Boolean = true,
-    icon: ImageVector? = null,
-    progress: Float = 0f,
-) {
-    var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(12.dp)
-    val fg = if (filled) WmmColors.Text else Color(0xFFE5E5E5)
-    var m = modifier
-        .onFocusChanged { focused = it.isFocused }
-        .focusRing(focused, 12.dp)
-        .clip(shape)
-    m = if (filled) m.background(Color.White.copy(alpha = 0.14f)) else m.border(1.dp, Color.White.copy(alpha = 0.28f), shape)
-    Box(
-        m
-            .drawBehind { if (progress > 0f) drawRect(WmmColors.Brand, size = Size(size.width * progress.coerceAtMost(1f), size.height)) }
-            .clickable(remember { MutableInteractionSource() }, indication = null, onClick = onClick)
-            .height(60.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Row(Modifier.padding(horizontal = 22.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (icon != null) Icon(icon, null, Modifier.size(22.dp), tint = fg)
-            Text(text, style = playerText(20, FontWeight.SemiBold, fg), maxLines = 1)
-        }
-    }
-}
+/** A button's height, as everywhere on the TV. */
+internal val ButtonHeight = 72.dp
 
 /**
  * Shows [content] with an entrance and drops it at once when the caller

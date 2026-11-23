@@ -33,13 +33,13 @@ class ControlsAccessibilityTest {
             TvTheme {
                 Column {
                     TvButton("Sign in", {})
-                    ControlButton({}, text = "Audio", detail = "English")
+                    ControlButton({}, text = "Quality", detail = "Automatic")
                     TvChip("Movies", selected = false, onClick = {})
                 }
             }
         }
         compose.onNode(hasText("Sign in") and hasClickAction()).assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
-        compose.onNode(hasText("Audio") and hasClickAction(), useUnmergedTree = false).assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+        compose.onNode(hasText("Quality · Automatic") and hasClickAction(), useUnmergedTree = false).assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
         compose.onNode(hasText("Movies") and hasClickAction()).assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Checkbox))
     }
 }

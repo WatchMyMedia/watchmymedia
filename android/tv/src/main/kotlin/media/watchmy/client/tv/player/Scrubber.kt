@@ -1,7 +1,6 @@
 package media.watchmy.client.tv.player
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -27,41 +26,47 @@ import media.watchmy.client.model.ScrubberBand
 import media.watchmy.client.ui.WmmColors
 
 /**
- * PlayerControls' scrubber track: buffered range, progress, segment bands and
- * the gold thumb. [focused] enlarges the thumb and its halo.
+ * The scrubber: a 10 dp track across the safe area, what has loaded a
+ * little lighter, what has played in gold, the intro and credits as white
+ * bands on it, and a gold thumb at [progress]. While a seek has a target
+ * ahead of or behind what has [played], the stretch between is a paler gold.
+ * Focused, the thumb grows and takes the gold ring and a shadow, as
+ * everything focused does.
  */
 @Composable
-internal fun ScrubberTrack(progress: Float, buffered: Float, bands: List<ScrubberBand>, focused: Boolean, modifier: Modifier = Modifier) {
-    Canvas(modifier.height(40.dp)) {
-        val trackH = 8.dp.toPx()
+internal fun ScrubberTrack(progress: Float, buffered: Float, bands: List<ScrubberBand>, focused: Boolean, modifier: Modifier = Modifier, played: Float = progress) {
+    Canvas(modifier.height(34.dp)) {
+        val trackH = 10.dp.toPx()
         val top = size.height / 2 - trackH / 2
         val pill = CornerRadius(trackH / 2)
-        drawRoundRect(Color.White.copy(alpha = 0.22f), Offset(0f, top), Size(size.width, trackH), pill)
-        if (buffered > 0f) drawRoundRect(Color.White.copy(alpha = 0.35f), Offset(0f, top), Size(size.width * buffered, trackH), pill)
-        if (progress > 0f) drawRoundRect(WmmColors.Accent, Offset(0f, top), Size(size.width * progress, trackH), pill)
-        for (band in bands) drawBand(band, top - 6.dp.toPx())
+        drawRoundRect(Color.White.copy(alpha = 0.26f), Offset(0f, top), Size(size.width, trackH), pill)
+        if (buffered > 0f) drawRoundRect(Color.White.copy(alpha = 0.16f), Offset(0f, top), Size(size.width * buffered, trackH), pill)
+        for (band in bands) drawBand(band, top, trackH)
+        val done = minOf(played, progress)
+        if (done > 0f) drawRoundRect(WmmColors.Accent, Offset(0f, top), Size(size.width * done, trackH), pill)
+        if (progress != played) {
+            val from = size.width * minOf(played, progress)
+            drawRect(WmmColors.Accent.copy(alpha = 0.45f), Offset(from, top), Size(size.width * kotlin.math.abs(progress - played), trackH))
+        }
         val x = size.width * progress
         val cy = size.height / 2
-        val thumb = (if (focused) 14.dp else 11.dp).toPx()
-        val halo = thumb + (if (focused) 6.dp else 4.dp).toPx()
-        drawCircle(WmmColors.Accent.copy(alpha = if (focused) 0.4f else 0.3f), halo, Offset(x, cy))
-        drawCircle(WmmColors.Accent, thumb, Offset(x, cy))
+        if (focused) {
+            val r = 16.dp.toPx()
+            drawCircle(Color.Black.copy(alpha = 0.35f), r + 10.dp.toPx(), Offset(x, cy + 6.dp.toPx()))
+            drawCircle(WmmColors.Accent, r, Offset(x, cy))
+            // The gold ring every focused thing has, 4 dp out.
+            drawCircle(WmmColors.Accent, r + 6.dp.toPx(), Offset(x, cy), style = Stroke(4.dp.toPx()))
+        } else {
+            drawCircle(WmmColors.Accent, 9.dp.toPx(), Offset(x, cy))
+        }
     }
 }
 
-private fun DrawScope.drawBand(band: ScrubberBand, top: Float) {
-    val h = 20.dp.toPx()
+/** An intro or credits band: white over the track, as long as the part is. */
+private fun DrawScope.drawBand(band: ScrubberBand, top: Float, height: Float) {
     val left = size.width * band.start
     val width = size.width * (band.end - band.start)
-    val corner = CornerRadius(3.dp.toPx())
-    val (fill, line) = if (band.opening) {
-        WmmColors.Accent.copy(alpha = 0.22f) to WmmColors.Accent.copy(alpha = 0.6f)
-    } else {
-        Color.White.copy(alpha = 0.10f) to Color.White.copy(alpha = 0.35f)
-    }
-    drawRoundRect(fill, Offset(left, top), Size(width, h), corner)
-    val stroke = 1.dp.toPx()
-    drawRoundRect(line, Offset(left + stroke / 2, top + stroke / 2), Size(width - stroke, h - stroke), corner, style = Stroke(stroke))
+    drawRect(Color.White.copy(alpha = 0.72f), Offset(left, top), Size(width, height))
 }
 
 /**
@@ -75,8 +80,7 @@ internal fun SeekStepChip(stepMs: () -> Long, modifier: Modifier = Modifier) {
     Row(
         modifier
             .height(40.dp)
-            .background(WmmColors.Accent.copy(alpha = 0.16f), shape)
-            .border(1.dp, WmmColors.Accent.copy(alpha = 0.6f), shape)
+            .border(2.dp, WmmColors.Accent, shape)
             .padding(horizontal = 14.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -87,6 +91,6 @@ internal fun SeekStepChip(stepMs: () -> Long, modifier: Modifier = Modifier) {
             tint = WmmColors.Accent,
             modifier = Modifier.size(22.dp).graphicsLayer { scaleX = if (step < 0) -1f else 1f },
         )
-        Text(seekStepLabel(step), style = playerText(20, FontWeight.Bold, color = WmmColors.Accent, tabular = true), maxLines = 1)
+        Text(seekStepLabel(step), style = playerText(22, FontWeight.Bold, color = WmmColors.Accent, tabular = true), maxLines = 1)
     }
 }

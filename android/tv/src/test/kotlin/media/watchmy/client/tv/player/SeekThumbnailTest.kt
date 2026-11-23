@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.StandardTestDispatcher
 import media.watchmy.client.fake.FakeAppServices
@@ -32,8 +33,10 @@ import org.robolectric.annotation.Config
 
 /**
  * The seek thumbnail on the TV player (PlayerScrub): left and right show the
- * target's tile above the scrubber with the step beside the time, Skip Intro
- * makes way for it, and it goes once the player gets there. Without
+ * target's tile above the scrubber with the step beside the time, Skip intro
+ * makes way for it, and it goes once the player gets there. Skip takes
+ * focus when it shows, and ◀ ▶ do nothing there: ▼ goes to the scrubber
+ * first. Without
  * thumbnails, the scrubber alone as before. On the fakes, at a 1080p TV's
  * size; the fake player only moves when told, so nothing ticks.
  */
@@ -65,16 +68,23 @@ class SeekThumbnailTest {
 
     private val thumbnail get() = compose.onNodeWithTag(SEEK_THUMBNAIL_TAG)
 
-    @Test fun `a press shows the target's tile with its step, and Skip Intro makes way until the player gets there`() {
+    /** From Skip, which has focus as it shows, down to the scrubber. */
+    private fun toScrubber() {
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.waitForIdle()
+    }
+
+    @Test fun `a press shows the target's tile with its step, and Skip intro makes way until the player gets there`() {
         val player = play(FakeData.trickplay)
-        compose.onNodeWithText("Skip Intro").assertIsDisplayed()
+        compose.onNodeWithText("Skip intro").assertIsDisplayed()
         thumbnail.assertDoesNotExist()
+        toScrubber()
 
         // Held down: the tile at the target above the scrubber, and no Skip.
         compose.onRoot().performKeyInput { keyDown(Key.DirectionRight) }
         compose.waitForIdle()
         thumbnail.assertIsDisplayed()
-        compose.onNodeWithText("Skip Intro").assertDoesNotExist()
+        compose.onNodeWithText("Skip intro").assertDoesNotExist()
         val tile = thumbnail.getBoundsInRoot()
         val track = compose.onNodeWithContentDescription("Position", substring = true).getBoundsInRoot()
         assertTrue("above the scrubber", tile.bottom < track.top)
@@ -86,16 +96,17 @@ class SeekThumbnailTest {
         compose.mainClock.advanceTimeBy(SeekState.SEND_AFTER_MS + 100)
         compose.waitForIdle()
         thumbnail.assertDoesNotExist()
-        compose.onNodeWithText("Skip Intro").assertIsDisplayed()
+        compose.onNodeWithText("Skip intro").assertIsDisplayed()
         assertEquals(80_000L, player.progress.value.positionMs)
     }
 
     @Test fun `without thumbnails the remote seeks as before`() {
         play(trickplay = null)
+        toScrubber()
         compose.onRoot().performKeyInput { keyDown(Key.DirectionRight) }
         compose.waitForIdle()
         thumbnail.assertDoesNotExist()
-        compose.onNodeWithText("Skip Intro").assertIsDisplayed()
+        compose.onNodeWithText("Skip intro").assertIsDisplayed()
         compose.onRoot().performKeyInput { keyUp(Key.DirectionRight) }
     }
 }

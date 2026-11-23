@@ -31,46 +31,36 @@ class PlayerLabelsTest {
     )
 
     @Test
-    fun theStreamPill() {
-        assertEquals("Direct stream · EAC3 5.1", streamSummary(state))
-        assertEquals("Transcode · 1080p · 8 Mbps", streamSummary(state.copy(mode = PlaybackMode.Transcode, quality = StreamQuality.FullHd)))
-        assertEquals("Direct play", streamSummary(state.copy(mode = PlaybackMode.Direct, audio = emptyList())))
-        assertNull(streamSummary(state.copy(mode = null)))
-        // The server's video, once it answers, in place of the cap.
-        val uhd = StreamVideo(3840, 2160, "HDR10")
-        assertEquals("Direct play · 4K HDR", streamSummary(state.copy(mode = PlaybackMode.Direct, audio = emptyList(), video = uhd)))
-        assertEquals("Direct stream · 4K Dolby Vision · EAC3 5.1", streamSummary(state.copy(video = uhd.copy(hdr = "Dolby Vision"))))
-        assertEquals("Transcode · 1080p", streamSummary(state.copy(mode = PlaybackMode.Transcode, quality = StreamQuality.FullHd, video = StreamVideo(1920, 1080, null))))
-    }
-
-    @Test
     fun theButtonsSmallText() {
         assertEquals("English", audioSummary(state))
         assertNull(audioSummary(state.copy(audio = emptyList())))
         assertEquals("Off", subtitleSummary(state))
-        assertEquals("Español · PGS", subtitleSummary(state.copy(selectedSubtitle = "s6")))
+        assertEquals("Español", subtitleSummary(state.copy(selectedSubtitle = "s6")))
         assertEquals("Original", qualitySummary(StreamQuality.Original))
         assertEquals("720p", qualitySummary(StreamQuality.Hd))
     }
 
     @Test
-    fun subtitlesStartWithOffAndSayWhichRestartPlayback() {
+    fun subtitlesStartWithOffAndSayInWordsWhichRestartPlayback() {
         val rows = subtitleRows(state)
-        // The labels and details are the phone's (subtitleOptionLabel), laid out as the TV's rows.
-        assertEquals(listOf("Off", "English", "Español · PGS", "English", "English · SRT"), rows.map { it.label })
+        // The language alone; the format is in Playback info.
+        assertEquals(listOf("Off", "English", "Español", "English", "English"), rows.map { it.label })
         assertEquals(listOf(true, false, false, false, false), rows.map { it.selected })
         assertEquals(PickerChoice.Subtitle(null), rows.first().choice)
-        assertEquals("burned in, restarts playback", rows[2].detail)
-        // The label already says it: not twice.
-        assertEquals("PGS, burned in, restarts playback", rows[3].detail)
-        assertEquals("Forced", rows[4].detail)
+        assertEquals(null, rows[0].detail)
+        assertEquals("In this file", rows[1].detail)
+        assertEquals("Drawn into the picture, so the video starts again", rows[2].detail)
+        assertEquals("Drawn into the picture, so the video starts again", rows[3].detail)
+        assertEquals("Only the parts in another language", rows[4].detail)
         assertEquals(listOf(false, false, true, false, false), subtitleRows(state.copy(selectedSubtitle = "s6")).map { it.selected })
     }
 
     @Test
     fun audioRowsMarkTheSelection() {
         val rows = audioRows(state.copy(selectedAudio = 2))
-        assertEquals(listOf("EAC3 5.1 (Default)", "AAC 2.0 · Commentary"), rows.map { it.detail })
+        // In words: how it sounds and what it is, not the format.
+        assertEquals(listOf("5.1 surround", "Commentary · stereo"), rows.map { it.detail })
+        assertEquals(listOf("English", "English"), rows.map { it.label })
         assertEquals(listOf(false, true), rows.map { it.selected })
         assertEquals(PickerChoice.Audio(2), rows[1].choice)
     }
@@ -79,11 +69,12 @@ class PlayerLabelsTest {
     fun qualityRowsAreOriginalAndTheSteps() {
         val rows = qualityRows(state)
         assertEquals(listOf("Original", "4K", "1080p", "720p", "480p", "360p"), rows.map { it.label })
-        assertEquals("Direct play when it can · now direct stream", rows[0].detail)
+        assertEquals("The file as it is", rows[0].detail)
         assertEquals("20 Mbps", rows[1].detail)
         assertEquals("1 Mbps", rows[5].detail)
         assertEquals(listOf(true, false, false, false, false, false), rows.map { it.selected })
-        assertEquals("Direct play when it can", qualityRows(state.copy(quality = StreamQuality.Hd))[0].detail)
+        assertEquals("The file as it is · 4K HDR", qualityRows(state.copy(video = StreamVideo(3840, 2160, "HDR10")))[0].detail)
+        assertEquals("The file as it is", qualityRows(state.copy(quality = StreamQuality.Hd, video = StreamVideo(3840, 2160, "HDR10")))[0].detail)
     }
 
     @Test
@@ -93,19 +84,16 @@ class PlayerLabelsTest {
         assertEquals(listOf("Automatic", "Original", "4K", "1080p", "720p", "480p", "360p"), rows.map { it.label })
         assertEquals("Now 720p · 4 Mbps", rows[0].detail)
         assertTrue(rows[0].selected)
-        assertEquals("Now Original · 48 Mbps", qualityRows(auto.copy(autoStep = StreamQuality.Original, bitrate = 48_200_000))[0].detail)
-        assertEquals("Now Original", qualityRows(auto.copy(autoStep = StreamQuality.Original, bitrate = 0))[0].detail)
-        assertEquals("Original first, lower when it can’t keep up", qualityRows(auto.copy(quality = StreamQuality.Hd, autoStep = null))[0].detail)
-
-        assertEquals("Auto · 720p", streamSummary(auto.copy(mode = PlaybackMode.Transcode)))
-        assertEquals("Auto · Direct stream · EAC3 5.1", streamSummary(auto.copy(autoStep = StreamQuality.Original)))
+        assertEquals("Now the original · 4K HDR", qualityRows(auto.copy(autoStep = StreamQuality.Original, video = StreamVideo(3840, 2160, "HDR10")))[0].detail)
+        assertEquals("Now the original", qualityRows(auto.copy(autoStep = StreamQuality.Original))[0].detail)
+        assertEquals("The original, stepping down only if it has to", qualityRows(auto.copy(quality = StreamQuality.Hd, autoStep = null))[0].detail)
         assertEquals("Auto · 720p", qualitySummary(auto))
         assertEquals("Automatic", qualitySummary(auto.copy(autoStep = StreamQuality.Original)))
     }
 
     @Test
     fun pickerSectionsLeaveOutEmptyOnes() {
-        assertEquals(PickerSection.entries.toList(), pickerSections(state).map { it.first })
+        assertEquals(listOf(PickerSection.Audio, PickerSection.Subtitles, PickerSection.Quality), pickerSections(state).map { it.first })
         assertEquals(listOf(PickerSection.Quality), pickerSections(PlayerTracks()).map { it.first })
     }
 
@@ -150,7 +138,9 @@ class PlayerLabelsTest {
         assertEquals(listOf(null, "In this file", "OpenSubtitles", null), rows.map { it.heading })
         assertEquals(listOf(null, null, null, "Subtitles provided by OpenSubtitles.com"), rows.map { it.footer })
         assertEquals("Downloading… · Matches this file · HI · Film.2020.1080p", rows[3].detail)
-        assertEquals("SRT · Film.2020.720p", rows[2].detail)
+        assertEquals("Downloaded · Film.2020.720p", rows[2].detail)
+        // Under group names, a track of the file's own says nothing more.
+        assertEquals(null, rows[1].detail)
         assertEquals(listOf(false, false, true, false), rows.map { it.selected })
 
         // Only admins may download here: the results show, faint, with the reason.

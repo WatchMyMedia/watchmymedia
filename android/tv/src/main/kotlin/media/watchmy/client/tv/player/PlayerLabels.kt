@@ -1,46 +1,28 @@
 package media.watchmy.client.tv.player
 
+import media.watchmy.client.model.AudioOption
 import media.watchmy.client.model.PlaybackMode
 import media.watchmy.client.model.PlayerTracks
 import media.watchmy.client.model.StreamQuality
 import media.watchmy.client.model.SubtitleEntry
-import media.watchmy.client.model.audioOptionLabel
+import media.watchmy.client.model.SubtitleOption
+import media.watchmy.client.model.SubtitleSource
 import media.watchmy.client.model.mbps
-import media.watchmy.client.model.modeLabel
 import media.watchmy.client.model.splitLabel
 import media.watchmy.client.model.subtitleEntries
-import media.watchmy.client.model.subtitleOptionLabel
 import media.watchmy.client.model.videoLabel
 
-/**
- * The pill at the top right: how the file is sent, the video (or, before
- * the server says, the quality cap) and, when the audio goes through
- * untouched, its format: "Direct play · 4K HDR · EAC3 5.1". Automatic leads
- * with "Auto": just "Auto · 720p" once it went down a step.
- */
-internal fun streamSummary(tracks: PlayerTracks): String? {
-    val mode = tracks.mode ?: return null
-    val step = autoStepDown(tracks)
-    if (step != null) return "Auto$SEP${qualitySummary(step)}"
-    val parts = mutableListOf(modeLabel(mode))
-    if (tracks.quality == StreamQuality.Auto) parts.add(0, "Auto")
-    val video = tracks.video
-    if (video != null) parts += videoLabel(video) else if (tracks.quality != StreamQuality.Original && tracks.quality != StreamQuality.Auto) parts += tracks.quality.label
-    if (mode == PlaybackMode.Direct || mode == PlaybackMode.Remux) {
-        tracks.audio.firstOrNull { it.index == tracks.selectedAudio }
-            ?.let { splitLabel(it.label).detail }
-            ?.substringBefore(" (")
-            ?.let { parts += it }
-    }
-    return parts.joinToString(SEP)
-}
+// The TV player's words. What a viewer picks is said in words ("5.1 surround",
+// "Drawn into the picture, so the video starts again"); formats, codecs and
+// how the server sends the file are in Playback info, one press away.
 
-/** The small text on the Audio button: the selected track's language. */
+/** The Audio & subtitles button's language: the selected track's, else the default's. */
 internal fun audioSummary(tracks: PlayerTracks): String? =
     (tracks.audio.firstOrNull { it.index == tracks.selectedAudio } ?: tracks.audio.firstOrNull { it.isDefault })?.let { splitLabel(it.label).label }
 
+/** The selected subtitles' name, or Off. */
 internal fun subtitleSummary(tracks: PlayerTracks): String =
-    tracks.subtitles.firstOrNull { it.id == tracks.selectedSubtitle }?.let { subtitleOptionLabel(it).label } ?: "Off"
+    tracks.subtitles.firstOrNull { it.id == tracks.selectedSubtitle }?.let { subtitleName(it) } ?: "Off"
 
 internal fun qualitySummary(quality: StreamQuality): String = when (quality) {
     StreamQuality.Auto -> "Automatic"
@@ -55,7 +37,7 @@ internal fun qualitySummary(tracks: PlayerTracks): String = autoStepDown(tracks)
 private fun autoStepDown(tracks: PlayerTracks): StreamQuality? =
     tracks.autoStep?.takeIf { tracks.quality == StreamQuality.Auto && it != StreamQuality.Original }
 
-/** What a picker row picks. */
+/** What a panel row picks. */
 internal sealed interface PickerChoice {
     data class Audio(val index: Int) : PickerChoice
 
@@ -74,7 +56,7 @@ internal sealed interface PickerChoice {
 /**
  * One row. [heading] goes above it (a group's name: "OpenSubtitles", "In
  * this file") and [footer] below it (the group's note and credit); a row
- * that is not [enabled] shows but can't be chosen.
+ * that is not [enabled] shows dimmed and can't be chosen.
  */
 internal data class PickerRow(
     val choice: PickerChoice,
@@ -86,19 +68,73 @@ internal data class PickerRow(
     val footer: String? = null,
 )
 
+/** The audio tracks: each one's language, and in words how it sounds ("5.1 surround", "Commentary · stereo"). */
 internal fun audioRows(tracks: PlayerTracks): List<PickerRow> = tracks.audio.map {
-    val (label, detail) = audioOptionLabel(it)
-    PickerRow(PickerChoice.Audio(it.index), label, detail, it.index == tracks.selectedAudio)
+    PickerRow(PickerChoice.Audio(it.index), splitLabel(it.label).label, audioWords(it), it.index == tracks.selectedAudio)
 }
 
 /**
- * [subtitleEntries] as the panel's rows: a group's name goes over its first
- * row and its note and credit under its last. A group
- * with nothing in it (no results) gets one row that can't be chosen, with
- * the note as its text. Image subtitles stay listed: picking one burns it in
- * and restarts the stream, and the row says so.
+ * How a track sounds, in words: its title (Commentary) and its channels
+ * ("stereo", "5.1 surround"), from the track's channel count or the
+ * server's label ("English · AAC 2.0 · Commentary"). The format stays in
+ * Playback info.
+ */
+internal fun audioWords(option: AudioOption): String? {
+    val parts = option.label.split(SEP).drop(1)
+    val layout = channelWords(option.channels) ?: parts.firstNotNullOfOrNull { LAYOUT.find(it)?.value }?.let(::layoutWords)
+    // A part that isn't the format ("AAC 2.0", "EAC3 5.1 (Default)") names the track: "Commentary".
+    val title = option.title?.takeIf { it.isNotBlank() } ?: parts.drop(1).firstOrNull { LAYOUT.find(it) == null && it.isNotBlank() }
+    return listOfNotNull(title, layout).joinToString(SEP).ifEmpty { null }
+}
+
+private val LAYOUT = Regex("""\b\d\.\d\b""")
+
+private fun channelWords(channels: Int): String? = when (channels) {
+    1 -> "mono"
+    2 -> "stereo"
+    6 -> "5.1 surround"
+    8 -> "7.1 surround"
+    0 -> null
+    else -> "$channels channels"
+}
+
+private fun layoutWords(layout: String): String = when (layout) {
+    "1.0" -> "mono"
+    "2.0" -> "stereo"
+    else -> "$layout surround"
+}
+
+/** A subtitle track's language or name, without the format or the server's note ("English (PGS, burned in…)" is English). */
+internal fun subtitleName(option: SubtitleOption): String = option.label.substringBefore(" (").substringBefore(SEP).trim().ifEmpty { option.label }
+
+/**
+ * What a subtitle track is, in words: drawn into the picture (and so the
+ * video starts again), for the deaf and hard of hearing, only the parts in
+ * another language, or downloaded. [grouped]: the list names its groups,
+ * so a track of the file's own says nothing more.
+ */
+internal fun subtitleWords(option: SubtitleOption, grouped: Boolean): String? = when {
+    option.burnInOnly -> BURNED_IN
+    option.hearingImpaired -> "For the deaf and hard of hearing"
+    option.forced -> "Only the parts in another language"
+    option.source == SubtitleSource.Online -> listOfNotNull("Downloaded", option.release).joinToString(SEP)
+    grouped -> null
+    else -> "In this file"
+}
+
+private const val BURNED_IN = "Drawn into the picture, so the video starts again"
+
+/**
+ * Off, the file's own subtitles and what OpenSubtitles found, as the
+ * panel's rows: a group's name goes over its first row and its note and
+ * credit under its last. A group with nothing in it (no results) gets one
+ * row that can't be chosen, with the note as its text. Subtitles drawn into
+ * the picture stay listed, and say so.
  */
 internal fun subtitleRows(tracks: PlayerTracks): List<PickerRow> {
+    val entries = subtitleEntries(tracks)
+    val grouped = entries.any { it is SubtitleEntry.Heading }
+    val options = tracks.subtitles.associateBy { it.id }
     val rows = mutableListOf<PickerRow>()
     var heading: String? = null
     var groupStart = 0
@@ -115,14 +151,19 @@ internal fun subtitleRows(tracks: PlayerTracks): List<PickerRow> {
         }
         notes.clear()
     }
-    for (e in subtitleEntries(tracks)) {
+    for (e in entries) {
         when (e) {
             is SubtitleEntry.Heading -> {
                 closeGroup()
                 heading = e.text
                 groupStart = rows.size
             }
-            is SubtitleEntry.Track -> rows += PickerRow(PickerChoice.Subtitle(e.id), e.label.label, e.label.detail, e.selected, heading = heading).also { heading = null }
+            is SubtitleEntry.Track -> {
+                val option = e.id?.let(options::get)
+                val label = option?.let(::subtitleName) ?: e.label.label
+                val detail = option?.let { subtitleWords(it, grouped) }
+                rows += PickerRow(PickerChoice.Subtitle(e.id), label, detail, e.selected, heading = heading).also { heading = null }
+            }
             is SubtitleEntry.Online -> rows += PickerRow(PickerChoice.Online(e.id), e.label.label, e.label.detail, selected = false, enabled = e.enabled, heading = heading).also { heading = null }
             is SubtitleEntry.Note -> notes += e.text
         }
@@ -132,9 +173,9 @@ internal fun subtitleRows(tracks: PlayerTracks): List<PickerRow> {
 }
 
 /**
- * Automatic (where the server can do it), Original and the fixed steps.
- * Automatic, picked, says what it sends now ("Now 720p · 4 Mbps"); Original
- * says what the server is doing now, from [PlayerTracks.mode].
+ * Automatic (where the server can do it), Original and the fixed steps, in
+ * words. Automatic, picked, says what it sends now ("Now 720p · 4 Mbps");
+ * Original is the file as it is.
  */
 internal fun qualityRows(tracks: PlayerTracks): List<PickerRow> = tracks.qualities.map { q ->
     val selected = q == tracks.quality
@@ -143,14 +184,14 @@ internal fun qualityRows(tracks: PlayerTracks): List<PickerRow> = tracks.qualiti
             val step = tracks.autoStep?.takeIf { selected }
             val now = when (step) {
                 null -> null
-                StreamQuality.Original -> listOfNotNull("Now Original", mbps(tracks.bitrate)).joinToString(SEP)
+                StreamQuality.Original -> listOfNotNull("Now the original", tracks.video?.let { videoLabel(it) }).joinToString(SEP)
                 else -> "Now ${step.label}"
             }
-            PickerRow(PickerChoice.Quality(q), "Automatic", now ?: "Original first, lower when it can’t keep up", selected)
+            PickerRow(PickerChoice.Quality(q), "Automatic", now ?: "The original, stepping down only if it has to", selected)
         }
         StreamQuality.Original -> {
-            val now = tracks.mode?.takeIf { selected }?.let { " · now ${modeLabel(it).lowercase()}" }.orEmpty()
-            PickerRow(PickerChoice.Quality(q), "Original", "Direct play when it can$now", selected)
+            val size = tracks.video?.takeIf { selected && tracks.mode != PlaybackMode.Transcode }?.let { videoLabel(it) }
+            PickerRow(PickerChoice.Quality(q), "Original", listOfNotNull("The file as it is", size).joinToString(SEP), selected)
         }
         else -> {
             val (label, detail) = splitLabel(q.label)
@@ -158,5 +199,69 @@ internal fun qualityRows(tracks: PlayerTracks): List<PickerRow> = tracks.qualiti
         }
     }
 }
+
+/** One line of Playback info: what ("Video") and how it is now ("4K HDR, as it is"). */
+internal data class InfoLine(val what: String, val value: String)
+
+/**
+ * What Playback info opens with: what is happening, in one sentence. A
+ * picture converted because the connection couldn't keep up, or because
+ * the quality chosen is lower, says so.
+ */
+internal fun playbackStory(tracks: PlayerTracks): String = when (tracks.mode) {
+    null -> "Starting. The server hasn’t said yet how it will send this."
+    PlaybackMode.Direct -> "Playing the file as it is. Nothing is being converted."
+    PlaybackMode.Remux -> "Playing the picture and sound as they are. The server only repackages them for this TV."
+    PlaybackMode.AudioTranscode -> "Playing the picture as it is. The server converts the sound for this TV."
+    PlaybackMode.Transcode -> when {
+        autoStepDown(tracks) != null -> "The server is converting the video, because the connection couldn’t keep up with the original."
+        tracks.quality != StreamQuality.Auto && tracks.quality != StreamQuality.Original -> "The server is converting the video to the ${qualitySummary(tracks.quality)} you chose."
+        else -> "The server is converting the video, because this TV can’t play it as it is."
+    }
+}
+
+/**
+ * Playback info's lines: the video, the sound, the subtitles, the quality,
+ * the stream's rate, why the server isn't sending the file as it is, and
+ * the server. The buffer is the screen's to add, as it moves.
+ */
+internal fun playbackInfo(tracks: PlayerTracks, serverName: String?): List<InfoLine> = buildList {
+    val copied = tracks.mode != null && tracks.mode != PlaybackMode.Transcode
+    val how = when {
+        tracks.mode == null -> null
+        copied -> "as it is"
+        else -> "converted for this TV"
+    }
+    tracks.video?.let { add(InfoLine("Video", listOfNotNull(videoLabel(it), how).joinToString(", "))) }
+    tracks.audio.firstOrNull { it.index == tracks.selectedAudio }?.let { a ->
+        val sound = when (tracks.mode) {
+            PlaybackMode.AudioTranscode -> "converted for this TV"
+            PlaybackMode.Direct, PlaybackMode.Remux -> "as it is"
+            else -> null
+        }
+        add(InfoLine("Sound", listOfNotNull(a.label.replace(" (Default)", ""), sound).joinToString(", ")))
+    }
+    val subtitle = tracks.subtitles.firstOrNull { it.id == tracks.selectedSubtitle }
+    add(InfoLine("Subtitles", subtitle?.let { s -> listOfNotNull(subtitleName(s), s.format, "drawn into the picture".takeIf { s.burnInOnly }).joinToString(", ") } ?: "Off"))
+    add(InfoLine("Quality", qualityLine(tracks)))
+    mbps(tracks.bitrate)?.let { add(InfoLine("Stream", "About $it")) }
+    if (!copied || tracks.mode == PlaybackMode.Remux || tracks.mode == PlaybackMode.AudioTranscode) {
+        tracks.reasons.takeIf { it.isNotEmpty() }?.let { add(InfoLine("Why", it.joinToString("; ").replaceFirstChar(Char::uppercase))) }
+    }
+    serverName?.let { add(InfoLine("Server", it)) }
+}
+
+private fun qualityLine(tracks: PlayerTracks): String = when (tracks.quality) {
+    StreamQuality.Auto -> when (val step = tracks.autoStep) {
+        null -> "Automatic"
+        StreamQuality.Original -> "Automatic, on the original"
+        else -> "Automatic, lowered to ${qualitySummary(step)}"
+    }
+    StreamQuality.Original -> "Original"
+    else -> tracks.quality.label.replace(SEP, ", ")
+}
+
+/** "Skip Intro" in the TV's sentence case: "Skip intro". */
+internal fun sentenceCase(label: String): String = label.lowercase().replaceFirstChar(Char::uppercase)
 
 private const val SEP = " · "

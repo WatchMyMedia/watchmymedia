@@ -18,9 +18,10 @@ internal fun overlayOf(state: PlayerUiState, picker: PickerSection?, episodes: B
 }
 
 /** Where focus is while no overlay is up. [Root] is the screen itself (controls hidden). */
-internal enum class FocusArea { Root, Back, Skip, Scrubber, Buttons }
+internal enum class FocusArea { Root, Skip, Scrubber, Buttons }
 
-internal enum class PickerSection { Audio, Subtitles, Quality }
+/** Where a panel opens: Audio & subtitles on its audio or its subtitles, Quality, or Playback info. */
+internal enum class PickerSection { Audio, Subtitles, Quality, Info }
 
 /** What a key press does. */
 internal sealed interface KeyAction {
@@ -31,6 +32,9 @@ internal sealed interface KeyAction {
     data object Swallow : KeyAction
 
     data object ShowControls : KeyAction
+
+    /** From Skip, down to the scrubber, showing the controls. */
+    data object ToScrubber : KeyAction
 
     data class Seek(val forward: Boolean) : KeyAction
 
@@ -49,11 +53,12 @@ internal sealed interface KeyAction {
 
 /**
  * The player's remote, for a key-down. Left and right seek unless focus is in
- * the button row (where they move along it); Centre plays or pauses unless a
- * control has focus; with the controls hidden, Up and Down only bring them
- * back. An overlay (the Next Episode card, the picker, a prompt) keeps the
- * D-pad for its own buttons; media keys still work under the card and the
- * picker. Back is not routed here: the screen takes it on key-up and asks
+ * the button row (where they move along it) or on Skip (where they do
+ * nothing); Centre plays or pauses unless a control has focus; with the
+ * controls hidden, Up and Down only bring them back. From Skip, Down goes to
+ * the scrubber and Up does nothing. An overlay (Up next, a panel, a
+ * problem) keeps the D-pad for its own buttons; media keys still work under
+ * Up next and the panels. Back is not routed here: the screen takes it on key-up and asks
  * [backAction].
  */
 internal fun routeKey(key: PlayerKey, overlay: Overlay, controlsVisible: Boolean, focus: FocusArea, hasNext: Boolean = false): KeyAction {
@@ -63,13 +68,19 @@ internal fun routeKey(key: PlayerKey, overlay: Overlay, controlsVisible: Boolean
     return when (key) {
         PlayerKey.Left, PlayerKey.Right -> when {
             overlay != Overlay.None -> KeyAction.PassThrough
-            controlsVisible && (focus == FocusArea.Buttons || focus == FocusArea.Back) -> KeyAction.PassThrough
+            focus == FocusArea.Skip -> KeyAction.Swallow
+            controlsVisible && focus == FocusArea.Buttons -> KeyAction.PassThrough
             else -> KeyAction.Seek(forward = key == PlayerKey.Right)
         }
-        PlayerKey.Up, PlayerKey.Down -> if (overlay == Overlay.None && !controlsVisible) KeyAction.ShowControls else KeyAction.PassThrough
+        PlayerKey.Up, PlayerKey.Down -> when {
+            overlay != Overlay.None -> KeyAction.PassThrough
+            focus == FocusArea.Skip -> if (key == PlayerKey.Down) KeyAction.ToScrubber else KeyAction.Swallow
+            !controlsVisible -> KeyAction.ShowControls
+            else -> KeyAction.PassThrough
+        }
         PlayerKey.Centre -> when {
             overlay != Overlay.None -> KeyAction.PassThrough
-            focus == FocusArea.Skip || focus == FocusArea.Buttons || focus == FocusArea.Back -> KeyAction.PassThrough
+            focus == FocusArea.Skip || focus == FocusArea.Buttons -> KeyAction.PassThrough
             else -> KeyAction.TogglePlayPause
         }
         PlayerKey.PlayPause -> if (prompt) KeyAction.Swallow else KeyAction.TogglePlayPause
@@ -90,14 +101,22 @@ internal fun routeKey(key: PlayerKey, overlay: Overlay, controlsVisible: Boolean
 
 private fun isDpad(key: PlayerKey) = key == PlayerKey.Left || key == PlayerKey.Right || key == PlayerKey.Up || key == PlayerKey.Down || key == PlayerKey.Centre
 
-/** What Back does: close what is open first, then hide the controls, then leave. */
-internal enum class BackAction { Leave, KeepWatching, ClosePicker, CloseEpisodes, WatchCredits, HideControls }
+/**
+ * What Back does: close what is open first, then hide the controls, then
+ * leave. From Skip it goes to the scrubber. On a problem screen it does
+ * what the last button does: Stop, or Back to the title.
+ */
+internal enum class BackAction { Leave, StopWatching, ClosePicker, CloseEpisodes, WatchCredits, HideControls, ToScrubber }
 
-internal fun backAction(overlay: Overlay, controlsVisible: Boolean): BackAction = when (overlay) {
+internal fun backAction(overlay: Overlay, controlsVisible: Boolean, focus: FocusArea = FocusArea.Root): BackAction = when (overlay) {
     Overlay.Message -> BackAction.Leave
-    Overlay.StillWatching -> BackAction.KeepWatching
+    Overlay.StillWatching -> BackAction.StopWatching
     Overlay.Picker -> BackAction.ClosePicker
     Overlay.Episodes -> BackAction.CloseEpisodes
     Overlay.UpNext -> BackAction.WatchCredits
-    Overlay.None -> if (controlsVisible) BackAction.HideControls else BackAction.Leave
+    Overlay.None -> when {
+        focus == FocusArea.Skip -> BackAction.ToScrubber
+        controlsVisible -> BackAction.HideControls
+        else -> BackAction.Leave
+    }
 }
