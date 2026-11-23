@@ -77,12 +77,17 @@ func offlineFetch(w http.ResponseWriter, r *http.Request, deps Deps) (offlineMed
 
 // transferInfo describes the fetch for Activity › Downloads.
 func transferInfo(r *http.Request, m offlineMedia, s *playback.Session) offline.Info {
-	network := netguard.NetRemote
-	if n, ok := netguard.From(r.Context()); ok && !n.Proxied {
-		network = netguard.Classify(n.IP)
+	network, ip := netguard.NetRemote, ""
+	if n, ok := netguard.From(r.Context()); ok {
+		if !n.Proxied {
+			network = netguard.Classify(n.IP)
+		}
+		if n.IP.IsValid() {
+			ip = n.IP.String()
+		}
 	}
 	info := offline.Info{Record: m.rec.PublicID, UserID: m.user.ID, UserName: m.user.Name, DeviceName: m.rec.DeviceName, FileID: m.file.ID,
-		Item: m.rec.Item, Quality: m.rec.Quality, Mode: m.rec.Mode, Network: network, SizeBytes: m.rec.SizeBytes,
+		Item: m.rec.Item, Quality: m.rec.Quality, Mode: m.rec.Mode, Network: network, IP: ip, SizeBytes: m.rec.SizeBytes,
 		Estimated: m.rec.Mode != string(playback.ModeDirect)}
 	if s != nil {
 		info.SessionID, info.Encoder = s.ID, s.Encoder
@@ -90,12 +95,16 @@ func transferInfo(r *http.Request, m offlineMedia, s *playback.Session) offline.
 	return info
 }
 
-func transferView(deps Deps, t offline.Transfer) OfflineTransfer {
+// transferView describes a transfer; its address only for an admin.
+func transferView(deps Deps, t offline.Transfer, admin bool) OfflineTransfer {
 	v := OfflineTransfer{DownloadID: t.Record, User: OfflineUser{ID: t.UserID, Name: t.UserName}, DeviceName: t.DeviceName, FileID: t.FileID,
 		Item: offlineItem(t.Item), Quality: t.Quality, Mode: t.Mode, Network: t.Network, SizeBytes: t.SizeBytes, SizeEstimated: t.Estimated,
 		BytesSent: t.BytesSent, Bandwidth: t.Bandwidth, Progress: t.Progress, StartedAt: t.StartedAt, LastSeenAt: t.LastSeenAt}
 	if t.Mode == string(playback.ModeTranscode) {
 		v.Encoder = t.Encoder
+	}
+	if admin {
+		v.IP = t.IP
 	}
 	if t.SessionID != "" && deps.Playback != nil {
 		if s, ok := deps.Playback.Get(t.SessionID); ok {

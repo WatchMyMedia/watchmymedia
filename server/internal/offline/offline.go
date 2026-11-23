@@ -87,6 +87,8 @@ type Info struct {
 	Mode    string
 	// Network is local, tailnet or remote, for the address fetching.
 	Network string
+	// IP is the address fetching, for admins' Activity.
+	IP string
 	// SessionID is the download session's, for a transcode's speed.
 	SessionID string
 	Encoder   string

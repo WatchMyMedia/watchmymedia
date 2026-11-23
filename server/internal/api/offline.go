@@ -136,6 +136,7 @@ type OfflineTransfer struct {
 	Encoder       string      `json:"encoder,omitempty" doc:"A transcode's encoder."`
 	Speed         float64     `json:"speed,omitempty" doc:"A transcode's ffmpeg speed, as a multiple of real time."`
 	Network       string      `json:"network" doc:"local, tailnet or remote."`
+	IP            string      `json:"ip,omitempty" required:"false" doc:"The address fetching it, for admins only (API level 34)."`
 	SizeBytes     int64       `json:"sizeBytes"`
 	SizeEstimated bool        `json:"sizeEstimated"`
 	BytesSent     int64       `json:"bytesSent" doc:"Sent since this transfer started."`
@@ -636,7 +637,7 @@ func registerOffline(h huma.API, r *chi.Mux, deps Deps) {
 			}
 		}
 		for _, t := range deps.Offline.List(scope) {
-			out.Transfers = append(out.Transfers, transferView(deps, t))
+			out.Transfers = append(out.Transfers, transferView(deps, t, u.IsAdmin))
 		}
 		return &OfflineDownloadListOutput{Body: out}, nil
 	})

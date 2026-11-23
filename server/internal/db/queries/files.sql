@@ -33,3 +33,18 @@ LEFT JOIN episodes e ON f.movie_id IS NULL AND e.id = (
 LEFT JOIN seasons se ON se.id = e.season_id
 LEFT JOIN shows s ON s.id = e.show_id
 WHERE f.id = ?;
+
+-- name: ListMovieTitlesByIDs :many
+-- The titles of a page of files' movies.
+SELECT id, title, year FROM movies WHERE id IN (sqlc.slice(ids));
+
+-- name: ListFilesEpisodes :many
+-- The episodes a page of files hold, each file's in order: the first is
+-- the one a row names.
+SELECT ef.media_file_id, s.title AS show_title, se.number AS season_number, e.number AS episode_number, e.title AS episode_title
+FROM episode_files ef
+CROSS JOIN episodes e ON e.id = ef.episode_id
+CROSS JOIN seasons se ON se.id = e.season_id
+CROSS JOIN shows s ON s.id = e.show_id
+WHERE ef.media_file_id IN (sqlc.slice(file_ids))
+ORDER BY ef.media_file_id, se.number, e.number;

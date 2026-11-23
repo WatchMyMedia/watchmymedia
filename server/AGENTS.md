@@ -120,6 +120,12 @@ SQLite plans joins without statistics, and a plan that looks fine after
   `sqlc.slice` for `?N` by byte offset, so a `§` or an em dash earlier in
   the file shifts every later swap, and sqlc reports parse errors in
   unrelated queries ("extraneous input 'SELECTid'").
+- sqlc parses the migrations too, with a grammar narrower than SQLite's.
+  `UPDATE ... FROM` fails there ("extraneous input '<EOF>'" at 1:1 of the
+  migration): use correlated subqueries, as `00051_recording_facts.sql`
+  does. In a query, `path LIKE sqlc.narg('x') ESCAPE '\'` fails ("no
+  viable alternative at input 'LIKE'"): write
+  `LIKE CAST(sqlc.narg(x) AS TEXT)`, without `ESCAPE`.
 - A query's parameters are all `?` or all `sqlc.arg(name)`. Mixed, sqlc
   generates without complaint and the query fails when it runs ("missing
   argument with index 19"); `?` with a numbered `?13` is refused at
