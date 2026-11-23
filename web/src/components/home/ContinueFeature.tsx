@@ -7,6 +7,7 @@ import { leftAndEnds, percentWatched } from '../../lib/endTime'
 import { img } from '../../lib/images'
 import { Poster } from '../Poster'
 import { PlayIcon } from '../icons'
+import { RemoveFromContinue } from '../RemoveFromContinue'
 import { useNow } from '../useNow'
 
 type ContinueItem = components['schemas']['ContinueItem']
@@ -16,6 +17,7 @@ const playSearch = (item: ContinueItem) => ({ title: item.subtitle ? `${item.tit
 /**
  * Home's lead: what this person is most likely to resume, large, with what is
  * left and when it would end, beside the rest of what they have in progress.
+ * Each can be removed from the row, keeping its place.
  */
 export function ContinueFeature({ items }: { items: readonly ContinueItem[] }) {
   const [first, ...rest] = items
@@ -65,6 +67,7 @@ function Feature({ item }: { item: ContinueItem }) {
   return (
     <article aria-label={words.label} className="relative isolate overflow-hidden rounded-[14px] bg-surface-2 ring-1 ring-inset ring-white/[.07]">
       {picture && <img src={picture} alt="" className="absolute inset-0 -z-10 size-full object-cover" />}
+      <RemoveFromContinue item={item} name={words.title} className="absolute right-3 top-3 border-white/15 bg-ground/70 md:right-4 md:top-4" />
       <span aria-hidden="true" className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(15,15,16,.9)_0%,rgba(15,15,16,.6)_46%,rgba(15,15,16,.05)_80%)] max-md:bg-[linear-gradient(0deg,rgba(15,15,16,.95)_0%,rgba(15,15,16,.6)_55%,rgba(15,15,16,.1)_100%)]" />
       <div className="flex min-h-[300px] max-w-[540px] flex-col justify-end gap-2.5 p-5 md:min-h-[356px] md:p-7">
         <p className="eyebrow">{words.eyebrow}</p>
@@ -104,25 +107,28 @@ function Listed({ item }: { item: ContinueItem }) {
   const words = continueWords(item)
   const pct = percentWatched(item.positionMs, item.durationMs)
   return (
-    <Link
-      to="/play/$fileId"
-      params={{ fileId: String(item.fileId) }}
-      search={playSearch(item)}
-      aria-label={`Resume ${words.label}${words.left ? `, ${words.left}` : ''}`}
-      className="group flex min-h-20 items-center gap-3.5 rounded-lg"
-    >
-      <span className="relative block w-[142px] shrink-0">
-        <Poster path={item.stillPath ?? item.backdropPath ?? item.posterPath} size="w300" alt="" ratio="aspect-video" className="rounded-lg ring-1 ring-inset ring-white/[.07] group-hover:ring-2 group-hover:ring-accent" />
-        <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1 overflow-hidden rounded-b-lg bg-black/60">
-          <span className="block h-full bg-accent" style={{ width: `${pct}%` }} />
+    <div className="flex items-center gap-1.5">
+      <Link
+        to="/play/$fileId"
+        params={{ fileId: String(item.fileId) }}
+        search={playSearch(item)}
+        aria-label={`Resume ${words.label}${words.left ? `, ${words.left}` : ''}`}
+        className="group flex min-h-20 min-w-0 flex-1 items-center gap-3.5 rounded-lg"
+      >
+        <span className="relative block w-[142px] shrink-0">
+          <Poster path={item.stillPath ?? item.backdropPath ?? item.posterPath} size="w300" alt="" ratio="aspect-video" className="rounded-lg ring-1 ring-inset ring-white/[.07] group-hover:ring-2 group-hover:ring-accent" />
+          <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1 overflow-hidden rounded-b-lg bg-black/60">
+            <span className="block h-full bg-accent" style={{ width: `${pct}%` }} />
+          </span>
         </span>
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[15px] font-medium group-hover:text-accent">{words.title}</span>
-        <span className="block truncate text-[12.5px] text-neutral-400">{words.line}</span>
-        {words.left && <span className="block truncate text-[12.5px] text-neutral-300">{words.left}</span>}
-      </span>
-    </Link>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-medium group-hover:text-accent">{words.title}</span>
+          <span className="block truncate text-[12.5px] text-neutral-400">{words.line}</span>
+          {words.left && <span className="block truncate text-[12.5px] text-neutral-300">{words.left}</span>}
+        </span>
+      </Link>
+      <RemoveFromContinue item={item} name={words.title} className="ib-ghost shrink-0" />
+    </div>
   )
 }
 

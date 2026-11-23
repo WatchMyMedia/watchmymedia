@@ -2,6 +2,7 @@ import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-q
 import { api, unwrap } from './client'
 import type { components } from './schema'
 import { queryEventInvalidator } from './queryEventInvalidator'
+import { withoutContinue, type ContinueTarget } from '../lib/continueWatching'
 
 export type Progress = components['schemas']['Progress']
 export type PlayState = 'playing' | 'paused' | 'buffering' | 'stopped' | 'closed'
@@ -112,4 +113,35 @@ export function useMarkShowWatched() {
         : unwrap(await api.DELETE('/api/shows/{id}/watched', { params: { path: { id: showId } } })),
     onSuccess: () => invalidateWatch(qc),
   })
+}
+
+const continueKeys = new Set(['home', 'rows'])
+const inContinue = ({ queryKey }: { queryKey: readonly unknown[] }) => continueKeys.has(String(queryKey[0]))
+
+/**
+ * Remove from Continue watching (API level 34): the title leaves the row at
+ * once, in every cached Home and library reply, and the server keeps its
+ * place. Refused, the row is put back and the error thrown.
+ */
+export async function hideFromContinueWatching(qc: QueryClient, target: ContinueTarget): Promise<void> {
+  await qc.cancelQueries({ predicate: inContinue })
+  const before = qc.getQueriesData({ predicate: inContinue })
+  qc.setQueriesData({ predicate: inContinue }, (d: unknown) => withoutContinue(d, target))
+  try {
+    unwrap(await api.PUT('/api/watch/{type}/{id}/hidden', { params: { path: target } }))
+  } catch (e) {
+    for (const [key, data] of before) qc.setQueryData(key, data)
+    throw e
+  } finally {
+    void qc.invalidateQueries({ predicate: inContinue })
+  }
+}
+
+/** Undo: back in Continue watching, where its place puts it. */
+export async function showInContinueWatching(qc: QueryClient, target: ContinueTarget): Promise<void> {
+  try {
+    unwrap(await api.DELETE('/api/watch/{type}/{id}/hidden', { params: { path: target } }))
+  } finally {
+    void qc.invalidateQueries({ predicate: inContinue })
+  }
 }
