@@ -168,6 +168,21 @@ alone. Sheets come through the image loader (`CoilSeekThumbnails`), which
 signs in only to the current server, and each tile is cut out of its sheet
 with `BitmapRegionDecoder`. On the fakes every play has them, drawn in code.
 
+On a TV, ◀ and ▶ (and Rewind and Fast-forward, and the ⟲ and ⟳ buttons)
+move the scrubber's target, and the seek goes once the key is up and the
+remote has been quiet for 400 ms (`SeekState`), so a run of quick presses
+is one seek to where they add up. Each seek
+flushes the player's buffers and audio output, a TV keeps nothing behind
+the picture, and on a server's stream a seek can restart the transcode.
+Two seeks a moment apart on a passthrough audio track (Dolby to a TV or
+receiver) left Media3 1.11 buffering for good, with its buffer full and no
+error, until the viewer left the player. Whatever the cause, a player that
+sits buffering for 10 s with 10 s or more in hand and doesn't move is
+stuck: the controller seeks where it is, then loads the stream again, then
+stops with "Playback stopped and didn’t start again.", which Play retries
+(`stuck` and `unstick` in `RealPlaybackController`, logged under
+`WmmPlayback`).
+
 Movie trailers need a server at
 API level 20, which lists them on the movie (`trailers`, best first); older
 servers list none, so there is no Trailer button. The button (after Play or

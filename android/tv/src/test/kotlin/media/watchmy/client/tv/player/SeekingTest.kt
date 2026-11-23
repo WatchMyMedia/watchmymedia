@@ -42,6 +42,12 @@ class SeekingTest {
         assertEquals(10_000, a.step(9_500, repeat = true))
     }
 
+    /** Releases the key and sends what it left, as the screen does once the remote is quiet. */
+    private fun SeekState.releaseAndSend(): Long? {
+        release()
+        return send()
+    }
+
     @Test
     fun pressesMoveTheTargetAndReleaseSendsIt() {
         val s = SeekState()
@@ -49,11 +55,13 @@ class SeekingTest {
         assertEquals(70_000L, s.targetMs)
         assertEquals(70_000L, s.displayed(60_100))
         assertTrue(s.holding)
-        assertEquals(70_000L, s.release())
+        assertNull("nothing goes while the key is down", s.send())
+        assertEquals(70_000L, s.releaseAndSend())
         assertFalse(s.holding)
+        assertNull("a release's seek goes once", s.send())
         // A second tap before the player lands builds on the target, not the stale position.
         s.press(forward = true, positionMs = 60_200, durationMs = 3_120_000, nowMs = 400, repeat = false)
-        assertEquals(80_000L, s.release())
+        assertEquals(80_000L, s.releaseAndSend())
         assertFalse(s.landed(60_300))
         assertTrue(s.landed(79_000))
         s.settle()
@@ -62,17 +70,51 @@ class SeekingTest {
     }
 
     @Test
+    fun aRunOfQuickPressesIsOneSeekToWhereTheyAddUp() {
+        val s = SeekState()
+        // Three taps of ◀, each up before the seek went: each release leaves the sum so far, and only the last is sent.
+        val releases = (0 until 3).map { i ->
+            s.press(forward = false, positionMs = 600_000, durationMs = 3_120_000, nowMs = 200L * i, repeat = false)
+            s.release()
+            s.releases
+        }
+        assertEquals(listOf(1, 2, 3), releases)
+        assertEquals(570_000L, s.send())
+        assertNull(s.send())
+    }
+
+    @Test
+    fun aPressBeforeTheSendTakesTheSeekBackUntilItsOwnRelease() {
+        val s = SeekState()
+        s.press(forward = false, positionMs = 600_000, durationMs = 3_120_000, nowMs = 0, repeat = false)
+        s.release()
+        s.press(forward = false, positionMs = 600_000, durationMs = 3_120_000, nowMs = 300, repeat = false)
+        // The quiet time after the first release ends with the key down again: nothing goes.
+        assertNull(s.send())
+        s.release()
+        assertEquals(580_000L, s.send())
+    }
+
+    @Test
+    fun aReleaseWithNothingPressedSendsNothing() {
+        val s = SeekState()
+        s.release()
+        assertEquals(0, s.releases)
+        assertNull(s.send())
+    }
+
+    @Test
     fun theTargetStaysInsideTheFile() {
         val s = SeekState()
         s.press(forward = false, positionMs = 4_000, durationMs = 3_120_000, nowMs = 0, repeat = false)
-        assertEquals(0L, s.release())
+        assertEquals(0L, s.releaseAndSend())
         s.settle()
         s.press(forward = true, positionMs = 3_115_000, durationMs = 3_120_000, nowMs = 1_000, repeat = false)
-        assertEquals(3_120_000L, s.release())
+        assertEquals(3_120_000L, s.releaseAndSend())
         s.settle()
         // Unknown duration: no upper bound.
         s.press(forward = true, positionMs = 5_000, durationMs = 0, nowMs = 2_000, repeat = false)
-        assertEquals(15_000L, s.release())
+        assertEquals(15_000L, s.releaseAndSend())
     }
 
     @Test
