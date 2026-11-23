@@ -79,8 +79,11 @@ class SeekThumbnailTest {
         val track = compose.onNodeWithContentDescription("Position", substring = true).getBoundsInRoot()
         assertTrue("above the scrubber", tile.bottom < track.top)
 
-        // Up: the seek goes, and once the player is there the scrubber is plain again.
+        // Up: once the remote is quiet the seek goes, and once the player is there the scrubber is plain again.
         compose.onRoot().performKeyInput { keyUp(Key.DirectionRight) }
+        compose.waitForIdle()
+        thumbnail.assertIsDisplayed()
+        compose.mainClock.advanceTimeBy(SeekState.SEND_AFTER_MS + 100)
         compose.waitForIdle()
         thumbnail.assertDoesNotExist()
         compose.onNodeWithText("Skip Intro").assertIsDisplayed()

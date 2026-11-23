@@ -324,6 +324,56 @@ class AutoQualityTest {
         assertTrue("old source was not stopped", "s720" !in h.gateway.stoppedSessions)
     }
 
+    /** Plays at 720p, then the server offers 1080p as generation 4 and refuses the decision for it once the hold ends. */
+    private fun refusedUpgradeOut(): CompletableDeferred<Unit> {
+        step = StreamQuality.Hd
+        h.start(PlayRequest(1, 0, "Harbor Lights")) { r ->
+            if (r.switchGeneration == 4L) throw ApiException(409, "quality switch generation is stale; keep the current stream")
+            answer(r)
+        }
+        h.advance(10_000)
+        val hold = CompletableDeferred<Unit>()
+        h.gateway.hold = hold
+        h.gateway.reply = { ProgressReply(false, null, null, QualityChange(StreamQuality.FullHd, "Raised to 1080p", 4)) }
+        h.advance(5_000)
+        assertEquals(4L, h.gateway.decisions.last().switchGeneration)
+        h.gateway.reply = { ProgressReply(false, null, null) }
+        return hold
+    }
+
+    @Test
+    fun aRefusedSwitchAfterTheOldStreamFailedLoadsItAgainWhereItWas() {
+        val hold = refusedUpgradeOut()
+        // The old stream fails while the switch is out: Media3 stops, and the error waits on the switch's load.
+        val at = h.progress.positionMs
+        h.player.stop()
+        h.player.fail(PlayerFailure(PlayerFailure.Kind.Network, "ERROR_CODE_IO_NETWORK_CONNECTION_FAILED"))
+        h.run()
+        hold.complete(Unit)
+        h.run()
+        // With nothing left playing, the same play loads again as before, where it was, rather than spin with nothing behind it.
+        assertNull(h.gateway.decisions.last().switchGeneration)
+        assertEquals(2, h.player.loads.size)
+        assertEquals(at, h.player.loads.last().startPositionMs)
+        assertEquals(PlayerStatus.Playing, h.state.status)
+        assertNull(h.state.error)
+    }
+
+    @Test
+    fun aSeekWhileARefusedSwitchWasOutGoesToTheStreamStillPlaying() {
+        val hold = refusedUpgradeOut()
+        h.controller.seekTo(30 * MIN)
+        h.run()
+        assertEquals(30 * MIN, h.progress.positionMs)
+        hold.complete(Unit)
+        h.run()
+        assertEquals(listOf(30 * MIN), h.player.seeks)
+        assertEquals(1, h.player.loads.size)
+        h.advance(2_000)
+        assertEquals("the scrubber follows the stream again", 30 * MIN + 2_000, h.progress.positionMs)
+        assertEquals(PlayerStatus.Playing, h.state.status)
+    }
+
     @Test
     fun failedLowerStepRestoresThePreviousSource() {
         step = StreamQuality.FullHd

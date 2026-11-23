@@ -44,9 +44,11 @@ class HeartbeatTest {
         h.advance(250)
         assertEquals(listOf(PlayState.Paused, PlayState.Paused), h.states.takeLast(2))
 
-        // Buffering: at once, then every 30 s.
+        // Buffering: at once, then every 30 s. Waiting on the network, with nothing in hand:
+        // 30 s still with a full buffer would be a stuck player (StuckPlayerTest).
         h.controller.play()
         h.run()
+        h.player.bufferAheadMs = 0
         h.player.buffer()
         h.run()
         assertEquals(listOf(PlayState.Playing, PlayState.Buffering), h.states.takeLast(2))

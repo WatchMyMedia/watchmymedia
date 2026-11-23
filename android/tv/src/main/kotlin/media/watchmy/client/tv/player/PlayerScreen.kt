@@ -46,6 +46,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.compose.ContentFrame
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import media.watchmy.client.model.ImageSize
@@ -320,7 +321,7 @@ private fun PlayerContent(
         val key = playerKey(native.keyCode)
         if (event.type == KeyEventType.KeyUp) {
             if (!consumedKeys.remove(native.keyCode)) return false
-            if (seek.holding) seek.release()?.let { controller.seekTo(it) }
+            if (seek.holding) seek.release()
             return true
         }
         if (event.type != KeyEventType.KeyDown) return false
@@ -367,6 +368,13 @@ private fun PlayerContent(
         if (skipSegment != null && overlayOf(controller.state.value, picker, episodesOpen) == Overlay.None) shell.wanted = focus.skip
     }
 
+    // A release's seek goes once the remote has been quiet a moment: a run of presses is one seek.
+    LaunchedEffect(seek.releases) {
+        if (seek.releases == 0) return@LaunchedEffect
+        delay(SeekState.SEND_AFTER_MS)
+        seek.send()?.let { controller.seekTo(it) }
+    }
+
     // After a seek is sent, keep showing its target until the player gets there.
     LaunchedEffect(seek.targetMs, seek.holding) {
         if (seek.targetMs != null && !seek.holding) {
@@ -385,7 +393,7 @@ private fun PlayerContent(
             onBack = { leave(true) },
             onSeekStep = { forward ->
                 seekStep(forward, System.nanoTime() / 1_000_000, repeat = false)
-                seek.release()?.let { controller.seekTo(it) }
+                seek.release()
             },
             onTogglePlay = { controller.togglePlayPause() },
             onOpenPicker = { openPicker(it) },

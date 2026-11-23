@@ -242,6 +242,17 @@ class RealPlaybackController(
         var recoveries = 0
         var recoveredAt = 0L
 
+        /** The load playing has been ready at least once: buffering from here on is a stall, not its start. */
+        var loadReady = false
+
+        /** How long the player has sat buffering with plenty in hand, at [stuckAtMs] (player time), and not moved. */
+        var stuckMs = 0L
+        var stuckAtMs = 0L
+
+        /** Steps taken to get a stuck player going ([unstick]) since it last played on for a while. */
+        var unsticks = 0
+        var unstuckAt = 0L
+
         /** When the decision playing (or being fetched) was asked for. */
         var askedAt = 0L
 
@@ -593,8 +604,17 @@ class RealPlaybackController(
                     v.loading = false
                     v.switch.failed(switchGeneration)
                     v.stepMessage = null
-                    showNote(v, stillPlayingNote(prior.autoStep ?: StreamQuality.Original))
-                    refresh(0)
+                    val seek = v.pendingPositionMs
+                    v.pendingPositionMs = null
+                    if (media?.phase == PlayerPhase.Idle) {
+                        // The stream it was to replace failed meanwhile, its error set aside for this load:
+                        // with nothing left playing, a load as before, where the viewer is.
+                        reload(v, seekMs = seek)
+                    } else {
+                        showNote(v, stillPlayingNote(prior.autoStep ?: StreamQuality.Original))
+                        // A seek made while the switch was out goes to the stream still playing.
+                        if (seek != null) seekWithin(v, seek) else refresh(0)
+                    }
                 } else fail(v, e)
             }
         }
@@ -710,6 +730,8 @@ class RealPlaybackController(
         v.error = null
         v.startupMs = null
         v.startupSent = false
+        v.loadReady = false
+        v.stuckMs = 0
         if (qualitySwitch?.generation == null) noteStepChange(v, previous, d)
         val token = tokens.token
         // The stream's further requests carry this token, and a renewed one after it.
@@ -990,6 +1012,52 @@ class RealPlaybackController(
         return true
     }
 
+    /**
+     * Whether the player has sat buffering for [STUCK_MS] with at least
+     * [STUCK_BUFFER_MS] in hand and its position not moving: waiting on
+     * nothing it is fetching, so it won't get going by itself. Media3 1.11
+     * did that after two quick seeks on a passthrough audio track (a Dolby
+     * bitstream to a TV or receiver), until the app left the player. A load
+     * that hasn't been ready yet is starting, and a slow decoder still moves.
+     */
+    private fun stuck(v: Viewing, p: MediaPlayer, status: PlayerStatus, dtMs: Long): Boolean {
+        val pos = p.positionMs
+        val waiting = status == PlayerStatus.Buffering && !v.loading && v.loadReady && p.playWhenReady &&
+            p.phase == PlayerPhase.Buffering && p.bufferedPositionMs - pos >= STUCK_BUFFER_MS
+        if (!waiting || pos != v.stuckAtMs) {
+            v.stuckMs = 0
+            v.stuckAtMs = pos
+            return false
+        }
+        v.stuckMs += dtMs
+        return v.stuckMs >= STUCK_MS
+    }
+
+    /** Gets a stuck player going: a seek where it is, then a new load there, then an error that Play retries. */
+    private fun unstick(v: Viewing, p: MediaPlayer) {
+        v.stuckMs = 0
+        v.unsticks++
+        v.unstuckAt = clock.elapsedMs()
+        when (v.unsticks) {
+            1 -> {
+                Log.w(TAG, "The player has buffered ${p.bufferedPositionMs - p.positionMs} ms ahead and not moved for $STUCK_MS ms; seeking where it is")
+                p.seekTo(p.positionMs)
+                refresh(0)
+            }
+            2 -> {
+                Log.w(TAG, "The player is stuck again; loading the stream again")
+                reload(v)
+            }
+            else -> {
+                Log.w(TAG, "The player is still stuck after a new load; giving up")
+                // Stopped, not paused: Play's new load keeps playing as the viewer had it.
+                p.stop()
+                v.error = STUCK_MESSAGE
+                refresh(0)
+            }
+        }
+    }
+
     // --- the tick ---
 
     /**
@@ -1016,6 +1084,7 @@ class RealPlaybackController(
         val buffered = if (replacing) 0 else (v.streamClock.filePosition(p.bufferedPositionMs) - pos).coerceAtLeast(0)
         if (!v.loading && phase == PlayerPhase.Ready) {
             v.everReady = true
+            v.loadReady = true
             if (v.startupMs == null) v.startupMs = now - v.askedAt
         }
         if (v.request.recordingId == null && v.everReady && !v.searchedOnline && !d.isOffline) searchOnline(v)
@@ -1031,6 +1100,8 @@ class RealPlaybackController(
         }
         val ended = status == PlayerStatus.Ended
         if (status == PlayerStatus.Playing && v.recoveries > 0 && now - v.recoveredAt >= RECOVERY_RESET_MS) v.recoveries = 0
+        if (status == PlayerStatus.Playing && v.unsticks > 0 && now - v.unstuckAt >= RECOVERY_RESET_MS) v.unsticks = 0
+        val stuck = stuck(v, p, status, dtMs)
 
         var forceBeat = false
         if (!v.watched && d.watchedAtMs > 0 && pos >= d.watchedAtMs) {
@@ -1110,6 +1181,7 @@ class RealPlaybackController(
 
         // Actions last: each may start a new load or a new viewing.
         when {
+            stuck -> unstick(v, p)
             ended && !nextOffered -> {
                 v.finished = true
                 markWatched(v)
