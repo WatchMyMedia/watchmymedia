@@ -153,3 +153,16 @@
 .dt-trailer__keys b { font-weight: 600; color: var(--text-3); }
 .dt-trailer__head { position: absolute; left: var(--safe-x); top: var(--safe-y); display: flex; align-items: baseline; gap: 1rem; font-size: var(--t-small); color: var(--muted); }
 .dt-trailer__head b { font-size: var(--t-head); font-weight: 700; color: var(--text); }
+
+/* A cast member's page: their round picture, name and how many of their titles are here, then a row of movies and one of shows. */
+.person .person-scroll { position: absolute; inset: 0; margin: 0; padding: 0; }
+.person-head { display: flex; align-items: center; gap: 2.25rem; padding: var(--safe-y) var(--safe-x) 0 var(--page-left); }
+.person-head__pic { position: relative; flex: none; width: 11rem; height: 11rem; border-radius: 50%; overflow: hidden; background: var(--surface-2); }
+.person-head__pic .tv-person__initials { font-size: 3.5rem; }
+.person-head__pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.person-head__text { display: flex; flex-direction: column; gap: .5rem; min-width: 0; }
+.person-head__name { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.person-head__line { margin: .25rem 0 0; font-size: var(--t-body); color: var(--text-2); }
+.person-row { margin-top: 3.5rem; padding-left: var(--page-left); }
+.person-row .tv-row { width: calc(120rem - var(--page-left)); }
+.person-rows { padding: 3.5rem 0 0 var(--page-left); }

@@ -5,6 +5,7 @@ import { ListScreen } from '../screens/browse/ListScreen'
 import { WatchlistsScreen } from '../screens/watchlists/WatchlistsScreen'
 import { MovieScreen } from '../screens/details/MovieScreen'
 import { ShowScreen } from '../screens/details/ShowScreen'
+import { PersonScreen } from '../screens/details/PersonScreen'
 import { PlayerScreen } from '../screens/player/PlayerScreen'
 import { LiveScreen } from '../screens/live/LiveScreen'
 import { SearchScreen } from '../screens/search/SearchScreen'
@@ -44,6 +45,8 @@ export type Route =
   /** The person's watchlists, from Servers. */
   | { name: 'watchlists' }
   | { name: 'movie'; id: number }
+  /** A cast member's movies and shows on this server (API level 34), from a cast card. */
+  | { name: 'person'; personId: number; who?: string }
   /** The show page: up next on top, or a season's start, or an episode. */
   | { name: 'show'; id: number; season?: number; episodeId?: number }
   | { name: 'requests'; inbox?: boolean }
@@ -78,6 +81,7 @@ export const ROUTES: { [N in Route['name']]: RouteDef<N> } = {
   watchlists: { screen: WatchlistsScreen },
   movie: { screen: MovieScreen, chrome: 'full' },
   show: { screen: ShowScreen, chrome: 'full' },
+  person: { screen: PersonScreen, chrome: 'full' },
   requests: { screen: RequestsScreen },
   liveGuide: { screen: LiveGuideScreen },
   recordings: { screen: RecordingsScreen },

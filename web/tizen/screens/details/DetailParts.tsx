@@ -1,7 +1,7 @@
 import { memo, useState, type CSSProperties, type FocusEvent, type ReactNode } from 'react'
 import type { components } from '../../../src/api/schema'
 import { rowWindow } from '../../app/focusRules'
-import { useGroupMemory, useMediaUrls, useNav } from '../../app/hooks'
+import { useGroupMemory, useLevel34, useMediaUrls, useNav } from '../../app/hooks'
 import { Card } from '../../ui/Card'
 import { Banner, SidePanel } from '../../ui/Overlays'
 import { placeholderTone } from '../../ui/tones'
@@ -11,6 +11,8 @@ import { castLabel } from './movieLabels'
 import type { WatchLine } from './titleWords'
 import { titleCard, type RelatedRow } from './relatedCards'
 import { initials, toneStyle, type Notice } from './detailWords'
+import { castPress, PERSON_UNKNOWN } from './personWords'
+import { showNote } from '../../ui/notes'
 
 // The parts the movie page and the show page share (the Android TV app's
 // DetailParts.kt and ShowPageMore.kt), drawn with the kit's tokens.
@@ -75,12 +77,15 @@ const PEOPLE_IN_VIEW = 8
 
 /**
  * The cast as a row of people cards: a round picture, the name and the part
- * played, a focus stop each, ◀ ▶ along it and stopping at its ends. Opening
- * a person's movies and shows needs the server to know who each credit is,
- * so OK does nothing yet.
+ * played, a focus stop each, ◀ ▶ along it and stopping at its ends. OK opens
+ * that person's movies and shows on this server (API level 34). A credit the
+ * server hasn't matched to a person yet is dimmed and says why; below level
+ * 34 OK does nothing, as before.
  */
 export const PeopleRow = memo(function PeopleRow({ cast, group, autoFocus }: { cast: Credit[]; group: string; autoFocus?: boolean }) {
   const media = useMediaUrls()
+  const nav = useNav()
+  const level34 = useLevel34()
   const remembered = useGroupMemory(group)
   const [focus, setFocus] = useState(() => Math.max(0, cast.findIndex((_, i) => `${group}/${i}` === remembered)))
   // The person before the focused one stays in view, and the row never moves past its last full screen.
@@ -93,7 +98,10 @@ export const PeopleRow = memo(function PeopleRow({ cast, group, autoFocus }: { c
     <div className="dt-people" data-row data-group={group} onFocus={onFocus} style={{ transform: `translateX(calc(${-start} * (var(--person-w) + 1.75rem)))` }}>
       {cast.map((c, i) => {
         const [a, b] = placeholderTone(c.name)
-        return <button key={`${i}${c.name}`} type="button" data-index={i} data-focus={`${group}/${i}`} data-autofocus={(autoFocus && i === 0) || undefined} className="tv-person" aria-label={castLabel(c)}>
+        const press = castPress(c, level34)
+        const onPress = press?.kind === 'open' ? () => nav.push(press.route) : press?.kind === 'unknown' ? () => showNote(PERSON_UNKNOWN, 'info') : undefined
+        return <button key={`${i}${c.name}`} type="button" data-index={i} data-focus={`${group}/${i}`} data-autofocus={(autoFocus && i === 0) || undefined} className="tv-person"
+          aria-label={castLabel(c)} aria-disabled={press?.kind === 'unknown' || undefined} onClick={onPress}>
           <span className="tv-person__pic" style={{ '--ph-a': a, '--ph-b': b } as CSSProperties}>
             <span className="tv-person__initials" aria-hidden="true">{initials(c.name)}</span>
             <Picture src={media.imageUrl(c.profilePath, 'w185')}/>

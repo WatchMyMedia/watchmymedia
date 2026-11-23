@@ -8,6 +8,7 @@ import type { PlayRequest, Route } from './routes'
 import type { ActiveSession } from '../session/active'
 import type { AppSession, StartState } from '../session/session'
 import type { Player } from '../player'
+import { from34 } from '../session/features'
 
 // The contexts the app provides and the hooks screens use. Screens never
 // reach for the DOM's keys or the stack themselves.
@@ -59,6 +60,9 @@ export function usePlayer(): Player | undefined { return useContext(PlayerContex
 
 /** The signed-in session: its server, account, query client and media addresses. */
 export function useSession(): ActiveSession { return need(useContext(SessionContext), 'useSession') }
+
+/** Whether the current server answers API level 34's features (`session/features.ts`); below it the screens ask it nothing new. */
+export function useLevel34(): boolean { return from34(useSession().server.apiLevel) }
 
 /** The screen's own entry in the stack: its key and the FocusMemory it keeps while under others. */
 export function useEntry(): Entry<Route> | null { return useContext(EntryContext) }
