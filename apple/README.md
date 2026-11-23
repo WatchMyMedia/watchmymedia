@@ -257,8 +257,16 @@ shows a group with focus on it at launch; `-renameDevice`, `-changePassword`,
 `-homeRowsSettings` open the rest, in debug builds.
 `TVUITests/SettingsTests.swift` drives them with the remote.
 
-Sorted by title, the Apple TV grid has a letter index down its right edge:
-right from the last column
+The Apple TV grid has four controls on one line with its heading: Sort,
+Unwatched, Genre and More filters, which holds the other filters and the
+decade (`TVLibraryControls.swift` in the Kit); only the focused poster
+carries words, under it (`GridPoster`). Search on Apple TV lists movies
+and shows in one row (`SearchListing.titles`), offers the recent searches
+before anything is typed, and watches a programme on now from On live TV
+on Select (`LiveSearchHit.searchSelect`).
+
+Sorted by title, the Apple TV grid has a letter index down its right edge,
+inside the safe area: right from the last column
 enters it at the poster's letter, the grid follows the letters up and down,
 Select or left lands on the letter's first title, and Menu goes back to the
 poster. It is built from the `letters` the server already sends with a
@@ -1201,7 +1209,8 @@ their own:
   ends its tab's pages there. A launch with `-open` or `-tab` goes where it
   says; on the fakes nothing is kept unless `-fakesRestorePlace` is given.
 - **Recent searches** are kept between launches per account and server
-  (`RecentSearches`); they show on iPad, as before.
+  (`RecentSearches`); they show on iPad, as before, and on Apple TV before
+  anything is typed.
 - **A Live TV reminder's notification** offers Watch and Remind again,
   which notifies once more five minutes later.
 - **Text size.** `PrimaryButtonStyle`, `GhostButtonStyle` and `Chip` scale
