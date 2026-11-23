@@ -1,5 +1,24 @@
 import Foundation
 
+/// The day a repeat airs again, in "on again Friday": "today", "tomorrow",
+/// the weekday within the week, else the date ("Nov 30").
+func liveAgainDay(_ date: Date, now: Date, clock: LiveClock) -> String {
+    let calendar = clock.calendar
+    let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)).day ?? 0
+    switch days {
+    case ...0: return "today"
+    case 1: return "tomorrow"
+    case 2...6:
+        var style = Date.FormatStyle.dateTime.weekday(.wide)
+        style.timeZone = calendar.timeZone
+        return date.formatted(style)
+    default:
+        var style = Date.FormatStyle.dateTime.month(.abbreviated).day()
+        style.timeZone = calendar.timeZone
+        return date.formatted(style)
+    }
+}
+
 /// Record's answer when the tuners are booked while the programme would run:
 /// what holds the tuners, and a choice of which one gives way. The
 /// web draws it as a dialog; the iPhone and iPad show
@@ -48,9 +67,29 @@ public struct LiveRecordingClash: Hashable, Sendable, Identifiable {
         return "To record \(recording.title) on \(recording.number), choose one that won’t record."
     }
 
-    /// A holder's channel and time: "4.1 · 9:00–10:30 PM".
-    public func line(_ holder: LiveRecordingHolder, clock: LiveClock = .device) -> String {
-        "\(holder.number) · \(clock.range(holder.start, holder.end))"
+    /// A holder's channel and time: "4.1 · 9:00–10:30 PM", then, where the
+    /// server says (API level 34), "new episode" or "a repeat, on again
+    /// Friday at 2:00 PM".
+    public func line(_ holder: LiveRecordingHolder, clock: LiveClock = .device, now: Date = .now) -> String {
+        ["\(holder.number) · \(clock.range(holder.start, holder.end))", airingNote(holder, clock: clock, now: now)].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// "new episode", "a repeat, on again Friday at 2:00 PM" (or "a repeat"
+    /// when the listings have it on no other time); nil when the server doesn't say.
+    public func airingNote(_ holder: LiveRecordingHolder, clock: LiveClock = .device, now: Date = .now) -> String? {
+        switch holder.isRepeat {
+        case true?:
+            guard let next = holder.nextAiring else { return "a repeat" }
+            return "a repeat, on again \(liveAgainDay(next.start, now: now, clock: clock)) at \(clock.time(next.start))"
+        case false?: return "new episode"
+        case nil: return nil
+        }
+    }
+
+    /// The holder to give way first: one that can, a repeat that airs again,
+    /// so nothing is lost. Apple TV puts focus on it; nil when none is.
+    public var suggested: LiveRecordingHolder? {
+        choices.first { $0.isRepeat == true && $0.nextAiring != nil }
     }
 
     /// "Recording now" for one that can't give way, else "Set by Sam".

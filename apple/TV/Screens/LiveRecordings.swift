@@ -77,6 +77,8 @@ struct TVLiveRecordingClashView: View {
     @Environment(LiveRecordingsStore.self) private var recordings
     @State private var failure: String?
     @FocusState private var keepFocused: Bool
+    /// The repeat that airs again, which the sheet suggests leaving out.
+    @FocusState private var suggestedFocused: String?
     init(clash: LiveRecordingClash, done: @escaping (_ kept: Bool) -> Void) { _clash = State(initialValue: clash); self.done = done }
     var body: some View {
         TVSheet {
@@ -92,6 +94,7 @@ struct TVLiveRecordingClashView: View {
                         if choosable { Task { await giveWay(holder) } }
                     }
                     .disabled(!choosable || recordings.changing.contains(clash.id))
+                    .focused($suggestedFocused, equals: holder.id)
                     .accessibilityLabel(choosable ? clash.recordInsteadLabel(holder) : holder.title)
                 }
                 TVSheetRow(title: clash.recording.title, value: clash.choices.isEmpty ? nil : "Left out",
@@ -105,7 +108,8 @@ struct TVLiveRecordingClashView: View {
             .focusSection()
             if let failure { Text(failure).font(.tv(.body)).foregroundStyle(Palette.warning) }
         }
-        .defaultFocus($keepFocused, true)
+        .defaultFocus($keepFocused, clash.suggested == nil)
+        .defaultFocus($suggestedFocused, clash.suggested?.id)
         .onExitCommand { done(!clash.choices.isEmpty) }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("live-recording-clash")
@@ -241,7 +245,9 @@ struct TVLiveRecordingsScreen: View {
     private func readyCard(_ item: ReadyItem) -> some View {
         Button { open(item) } label: {
             TVRecordingCard(title: item.title, line: liveReadyLine(item.recordings), picture: item.first.pictureURL,
-                            tag: item.first.state == .recording ? .recording : item.playable ? nil : .warning(item.first.statusTitle))
+                            tag: item.first.state == .recording ? .recording : !item.playable ? .warning(item.first.statusTitle)
+                                : item.newCount > 0 && item.recordings.count > 1 ? .new(item.newCount) : nil,
+                            watched: item.watched, progress: item.recordings.count == 1 ? item.first.watchProgress : nil)
         }
         .buttonStyle(TVLiveCardButtonStyle())
         .contextMenu {
@@ -293,6 +299,10 @@ struct ReadyItem: Identifiable {
     var first: LiveRecording { recordings[0] }
     var title: String { first.title }
     var playable: Bool { recordings.contains(where: \.playable) }
+    /// Recorded and not watched yet, where the server says (API level 34): "2 new" on a title recorded several times.
+    var newCount: Int { recordings.filter(\.unwatched).count }
+    /// Every recording of it watched, where the server says: the check on its card.
+    var watched: Bool { recordings.allSatisfy { $0.watched == true } }
 
     /// What is recording now first, then each title recorded, newest first,
     /// its recordings together.
@@ -311,13 +321,17 @@ struct ReadyItem: Identifiable {
 /// A recording's 16:9 card: its picture, a tag (Recording, its time, or
 /// Won't record in orange), then its title and a line.
 private struct TVRecordingCard: View {
-    enum Tag { case recording, when(String), warning(String) }
+    enum Tag { case recording, when(String), warning(String), new(Int) }
     let title: String
     let line: String
     let picture: URL?
     var tag: Tag?
     /// Not recorded yet: the picture a little dimmed.
     var dimmed = false
+    /// Watched by the signed-in person: the check, as on every card.
+    var watched = false
+    /// How far they got, while partway.
+    var progress: Double?
     @Environment(\.isFocused) private var focused
     @Environment(\.displayScale) private var scale
 
@@ -329,6 +343,13 @@ private struct TVRecordingCard: View {
                 .overlay { if picture == nil { PlaceholderTitle(title: title) } }
                 .opacity(dimmed ? 0.8 : 1)
                 .overlay(alignment: .topLeading) { tagView.padding(12) }
+                .overlay {
+                    if watched {
+                        WatchedCheck(size: 40).pinned(.topTrailing)
+                    } else if let progress, progress > 0 {
+                        TVProgressBar(progress: progress).pinned(.bottom, padding: 14)
+                    }
+                }
                 .overlay { FocusSheen(focused: focused) }
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 .focusLift(focused)
@@ -352,6 +373,8 @@ private struct TVRecordingCard: View {
             TVBadge(text)
         case .warning(let text)?:
             TVBadge(text, style: .warning)
+        case .new(let count)?:
+            TVBadge("\(formatCount(count)) new", style: .gold)
         case nil:
             EmptyView()
         }
