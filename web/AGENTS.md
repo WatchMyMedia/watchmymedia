@@ -17,6 +17,7 @@ From `web/`. Node 24 and pnpm 9, as CI uses.
 | As CI's `web` job does: the web app and the receiver, not the Samsung app | `pnpm lint:web && pnpm typecheck:web && pnpm test:web && pnpm build && pnpm build:receiver` |
 | As CI's `samsung` job does: the Samsung app alone, and the check that its build loads on the TV | `pnpm lint:tizen && pnpm test:tizen && pnpm build:tizen && pnpm check:tizen` ([tizen/AGENTS.md](tizen/AGENTS.md)) |
 | One test file | `pnpm vitest run src/lib/quality.test.ts` |
+| Two dev servers against two backends in one browser | Give the second its own host name (`vite --host 127.0.0.1 --port 5291`, opened as `http://live.localhost:5291`): cookies don't separate by port, so signing in on one `localhost` port signs the other out |
 | Regenerate the API types | `make gen-api` from the root (never `pnpm gen:api` alone: it reads a copy of the document the server writes) |
 | Embed in the server | `make web` from the root |
 
@@ -53,8 +54,14 @@ the user asks in this conversation; see Authority in the root file.
   `src/index.css`, no new hex values. Burgundy (`brand`) is only ever a fill,
   never text or a thin line (1.4:1 on the ground); gold (`accent`) marks
   progress, selection, focus and badges; orange (`warn`) is for warnings. The
-  apps and the site use the same colours. Check every page at phone width:
-  some header pieces hide below the `sm` breakpoint.
+  apps and the site use the same colours. Pages share the component classes
+  in `src/index.css` (`btn`, `ib`, `chip`, `tab`, `seg`, `menu`, `meta`,
+  `eyebrow`, `pill`, `tag`, `meter`, `panel`, the closed `tech` disclosure,
+  `dl`, `rowh`, `tbl`, `wrap`) and the line icons in
+  `src/components/icons.tsx`; a time that moves on ("ends 8:41 PM") reads
+  `useNow`. Inter is bundled (`@fontsource-variable/inter`): the server's
+  content policy allows its own fonts only. Below `md` the sections are a bar
+  at the foot of the window: check every page at phone width.
 - **Screens follow the maintainers' designs.** Don't restyle one in passing.
 - **`public/reminders-sw.js`** is the service worker that shows Live TV
   reminders and new episodes of followed shows (scope `/`). It handles no
