@@ -856,11 +856,13 @@ SELECT s.id, s.library_id, s.tmdb_id, s.title, s.year, s.overview, s.status, s.g
     MAX(f.added_at) AS added_at,
     MAX(f.height) AS max_height,
     MAX(CASE WHEN f.hdr != '' THEN 1 ELSE 0 END) AS has_hdr,
-    SUM(f.size) AS total_size
+    SUM(f.size) AS total_size,
+    COUNT(DISTINCT CASE WHEN se.number > 0 THEN se.id END) AS season_count
 FROM shows s
 CROSS JOIN episodes e ON e.show_id = s.id
 CROSS JOIN episode_files ef ON ef.episode_id = e.id
 CROSS JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
+CROSS JOIN seasons se ON se.id = e.season_id
 WHERE s.id IN (/*SLICE:ids*/?)
 GROUP BY s.id
 `
@@ -885,6 +887,7 @@ type ListShowCardsByIDsRow struct {
 	MaxHeight     interface{} `json:"max_height"`
 	HasHdr        interface{} `json:"has_hdr"`
 	TotalSize     *float64    `json:"total_size"`
+	SeasonCount   int64       `json:"season_count"`
 }
 
 // ListShowItems for some shows, in any library, for list rows.
@@ -927,6 +930,7 @@ func (q *Queries) ListShowCardsByIDs(ctx context.Context, ids []int64) ([]ListSh
 			&i.MaxHeight,
 			&i.HasHdr,
 			&i.TotalSize,
+			&i.SeasonCount,
 		); err != nil {
 			return nil, err
 		}
@@ -949,11 +953,13 @@ SELECT s.tmdb_id,
     MAX(f.added_at) AS added_at,
     MAX(f.height) AS max_height,
     MAX(CASE WHEN f.hdr != '' THEN 1 ELSE 0 END) AS has_hdr,
-    SUM(f.size) AS total_size
+    SUM(f.size) AS total_size,
+    COUNT(DISTINCT CASE WHEN se.number > 0 THEN se.id END) AS season_count
 FROM shows s
 CROSS JOIN episodes ep ON ep.show_id = s.id
 CROSS JOIN episode_files ef ON ef.episode_id = ep.id
 CROSS JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
+CROSS JOIN seasons se ON se.id = ep.season_id
 WHERE s.tmdb_id IN (/*SLICE:tmdb_ids*/?)
 GROUP BY s.id
 ORDER BY s.library_id, s.id
@@ -979,6 +985,7 @@ type ListShowItemsByTMDBRow struct {
 	MaxHeight     interface{} `json:"max_height"`
 	HasHdr        interface{} `json:"has_hdr"`
 	TotalSize     *float64    `json:"total_size"`
+	SeasonCount   int64       `json:"season_count"`
 }
 
 // ListShowItems for some TMDB IDs, in every library, for a list preview.
@@ -1021,6 +1028,7 @@ func (q *Queries) ListShowItemsByTMDB(ctx context.Context, tmdbIds []int64) ([]L
 			&i.MaxHeight,
 			&i.HasHdr,
 			&i.TotalSize,
+			&i.SeasonCount,
 		); err != nil {
 			return nil, err
 		}

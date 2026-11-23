@@ -202,7 +202,7 @@ func (q *Queries) ListMovieItems(ctx context.Context, libraryID int64) ([]ListMo
 }
 
 const listNewEpisodeFiles = `-- name: ListNewEpisodeFiles :many
-SELECT e.id AS episode_id, e.show_id, e.number AS episode_number, e.title, e.overview, e.air_date,
+SELECT e.id AS episode_id, e.show_id, e.number AS episode_number, e.title, e.overview, e.air_date, e.runtime_min,
     se.number AS season_number, s.title AS show_title, s.poster_path AS show_poster_path, s.backdrop_path AS show_backdrop_path,
     f.id AS file_id, f.added_at, f.height,
     EXISTS (SELECT 1 FROM watch_state w
@@ -237,6 +237,7 @@ type ListNewEpisodeFilesRow struct {
 	Title            string  `json:"title"`
 	Overview         string  `json:"overview"`
 	AirDate          *string `json:"air_date"`
+	RuntimeMin       *int64  `json:"runtime_min"`
 	SeasonNumber     int64   `json:"season_number"`
 	ShowTitle        string  `json:"show_title"`
 	ShowPosterPath   *string `json:"show_poster_path"`
@@ -277,6 +278,7 @@ func (q *Queries) ListNewEpisodeFiles(ctx context.Context, arg ListNewEpisodeFil
 			&i.Title,
 			&i.Overview,
 			&i.AirDate,
+			&i.RuntimeMin,
 			&i.SeasonNumber,
 			&i.ShowTitle,
 			&i.ShowPosterPath,
@@ -734,11 +736,13 @@ SELECT s.id, s.library_id, s.tmdb_id, s.title, s.year, s.overview, s.status, s.g
     MAX(f.added_at) AS added_at,
     MAX(f.height) AS max_height,
     MAX(CASE WHEN f.hdr != '' THEN 1 ELSE 0 END) AS has_hdr,
-    SUM(f.size) AS total_size
+    SUM(f.size) AS total_size,
+    COUNT(DISTINCT CASE WHEN se.number > 0 THEN se.id END) AS season_count
 FROM shows s
 JOIN episodes e ON e.show_id = s.id
 JOIN episode_files ef ON ef.episode_id = e.id
 JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
+JOIN seasons se ON se.id = e.season_id
 WHERE s.library_id = ?
 GROUP BY s.id
 `
@@ -763,6 +767,7 @@ type ListShowItemsRow struct {
 	MaxHeight     interface{} `json:"max_height"`
 	HasHdr        interface{} `json:"has_hdr"`
 	TotalSize     *float64    `json:"total_size"`
+	SeasonCount   int64       `json:"season_count"`
 }
 
 // A library's shows with present episode files, for its grid; as
@@ -796,6 +801,7 @@ func (q *Queries) ListShowItems(ctx context.Context, libraryID int64) ([]ListSho
 			&i.MaxHeight,
 			&i.HasHdr,
 			&i.TotalSize,
+			&i.SeasonCount,
 		); err != nil {
 			return nil, err
 		}
@@ -817,11 +823,13 @@ SELECT s.id, s.library_id, s.tmdb_id, s.title, s.year, s.overview, s.status, s.g
     MAX(f.added_at) AS added_at,
     MAX(f.height) AS max_height,
     MAX(CASE WHEN f.hdr != '' THEN 1 ELSE 0 END) AS has_hdr,
-    SUM(f.size) AS total_size
+    SUM(f.size) AS total_size,
+    COUNT(DISTINCT CASE WHEN se.number > 0 THEN se.id END) AS season_count
 FROM shows s
 JOIN episodes e ON e.show_id = s.id
 JOIN episode_files ef ON ef.episode_id = e.id
 JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
+JOIN seasons se ON se.id = e.season_id
 WHERE s.library_id = ?1 AND s.id IN (/*SLICE:ids*/?)
 GROUP BY s.id
 `
@@ -851,6 +859,7 @@ type ListShowItemsByIDsRow struct {
 	MaxHeight     interface{} `json:"max_height"`
 	HasHdr        interface{} `json:"has_hdr"`
 	TotalSize     *float64    `json:"total_size"`
+	SeasonCount   int64       `json:"season_count"`
 }
 
 // ListShowItems for a few shows, such as Recently added's.
@@ -894,6 +903,7 @@ func (q *Queries) ListShowItemsByIDs(ctx context.Context, arg ListShowItemsByIDs
 			&i.MaxHeight,
 			&i.HasHdr,
 			&i.TotalSize,
+			&i.SeasonCount,
 		); err != nil {
 			return nil, err
 		}

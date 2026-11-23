@@ -831,6 +831,15 @@ type ShowsSearch struct {
 	Words         string `json:"words"`
 }
 
+type TmdbCollection struct {
+	ID           int64   `json:"id"`
+	Name         string  `json:"name"`
+	PosterPath   *string `json:"poster_path"`
+	BackdropPath *string `json:"backdrop_path"`
+	Parts        string  `json:"parts"`
+	FetchedAt    string  `json:"fetched_at"`
+}
+
 type Trickplay struct {
 	MediaFileID int64  `json:"media_file_id"`
 	Version     string `json:"version"`

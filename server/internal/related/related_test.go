@@ -265,6 +265,8 @@ func TestRefresher(t *testing.T) {
 		"keywords": map[string]any{"keywords": []any{map[string]any{"id": 1}}}, "recommendations": map[string]any{"results": []any{map[string]any{"id": 14}}}})
 	fake.JSON("/tv/13", map[string]any{"id": 13, "keywords": map[string]any{"results": []any{map[string]any{"id": 2}}}})
 	fake.JSON("/movie/14", map[string]any{"id": 14, "keywords": map[string]any{"keywords": []any{map[string]any{"id": 1}}}})
+	fake.JSON("/collection/5", map[string]any{"id": 5, "name": "Five", "poster_path": "/five.jpg",
+		"parts": []any{map[string]any{"id": 11, "title": "Never fetched", "release_date": "2010-06-01"}, map[string]any{"id": 15, "title": "Five Again", "release_date": "2014-06-01"}}})
 
 	r := New(e.q, fake.Client(), slog.New(slog.NewTextHandler(io.Discard, nil)))
 	r.Now = func() time.Time { return now }
@@ -274,8 +276,16 @@ func TestRefresher(t *testing.T) {
 		t.Fatalf("first run: more %v, err %v", more, err)
 	}
 	more, err = r.RunOnce(ctx)
-	if err != nil || more {
+	if err != nil || !more {
 		t.Fatalf("second run: more %v, err %v", more, err)
+	}
+	// The second run's room went to the collection the first movie named.
+	more, err = r.RunOnce(ctx)
+	if err != nil || more {
+		t.Fatalf("third run: more %v, err %v", more, err)
+	}
+	if fake.Count("/collection/5") != 1 {
+		t.Errorf("collection fetched %d times", fake.Count("/collection/5"))
 	}
 	for _, id := range []int64{fresh, gone} {
 		info, err := e.q.GetMovieRelatedInfo(ctx, id)
@@ -286,6 +296,9 @@ func TestRefresher(t *testing.T) {
 	info, _ := e.q.GetMovieRelatedInfo(ctx, fresh)
 	if deref(info.CollectionName) != "Five" {
 		t.Errorf("collection = %v", info.CollectionName)
+	}
+	if c, err := e.q.GetTMDBCollection(ctx, 5); err != nil || deref(c.PosterPath) != "/five.jpg" || !strings.Contains(c.Parts, `"title":"Five Again"`) {
+		t.Errorf("kept collection = %+v, %v", c, err)
 	}
 	if s, _ := e.q.GetShowRelatedInfo(ctx, show); s.RelatedCheckedAt == nil {
 		t.Error("show not fetched")
@@ -414,7 +427,9 @@ func TestRefresherCastFailureLeavesTheRest(t *testing.T) {
 	fake := tmdbtest.New(t)
 	id := e.movie(1, 31, "Unlucky", 2001)
 	e.exec(`UPDATE movies SET related_checked_at = ?`, db.FormatTime(now))
-	fake.Handle("/movie/31", func(*http.Request) any { return tmdbtest.Reply{Status: http.StatusUnauthorized, Body: `{"status_code":7}`} })
+	fake.Handle("/movie/31", func(*http.Request) any {
+		return tmdbtest.Reply{Status: http.StatusUnauthorized, Body: `{"status_code":7}`}
+	})
 	r := New(e.q, fake.Client(), slog.New(slog.NewTextHandler(io.Discard, nil)))
 	r.Now = func() time.Time { return now }
 	if _, err := r.RunOnce(ctx); err == nil {

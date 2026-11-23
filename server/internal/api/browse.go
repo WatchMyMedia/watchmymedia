@@ -39,6 +39,9 @@ type Movie struct {
 	BackdropPath  string          `json:"backdropPath,omitempty"`
 	FileCount     int64           `json:"fileCount"`
 	Credits       []people.Credit `json:"credits" nullable:"false"`
+	// Watched and Progress are from API level 34, on search's results.
+	Watched  *bool   `json:"watched,omitempty" required:"false" doc:"Search results: the signed-in person finished it. Absent elsewhere; a movie's page has watch."`
+	Progress float64 `json:"progress,omitempty" required:"false" doc:"Search results: the fraction watched (0-1) when partway through."`
 }
 
 type MovieList struct {
@@ -68,6 +71,8 @@ type MovieDetail struct {
 	Watchlists []int64 `json:"watchlists" required:"false" nullable:"false" doc:"The signed-in person's watchlists that hold the movie (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33."`
 	// Crew is from API level 34.
 	Crew []people.CrewMember `json:"crew" required:"false" nullable:"false" doc:"Its directors, writers, composers and producers, in that order; empty until the server has fetched the movie's credits with person IDs. Absent on servers below API level 34."`
+	// Collection is from API level 34.
+	Collection *MovieCollection `json:"collection,omitempty" required:"false" doc:"Its TMDB collection, where it falls in it and how many of it this library has (\"Part 2 of 3 · you have all three\"). Absent when it belongs to none."`
 }
 
 // Show is a matched series with at least one present episode file.
@@ -91,6 +96,11 @@ type Show struct {
 	LastAirDate   string          `json:"lastAirDate,omitempty"`
 	NextAirDate   string          `json:"nextAirDate,omitempty"`
 	Credits       []people.Credit `json:"credits" nullable:"false"`
+	// Watched, UnwatchedCount and SeasonCount are from API level 34, on
+	// search's results.
+	Watched        *bool  `json:"watched,omitempty" required:"false" doc:"Search results: the signed-in person has watched every episode with a present file."`
+	UnwatchedCount *int64 `json:"unwatchedCount,omitempty" required:"false" doc:"Search results: episodes with a present file they haven't finished, as on cards."`
+	SeasonCount    int64  `json:"seasonCount,omitempty" required:"false" doc:"Search results: seasons with a present episode, specials left out, as on cards."`
 }
 
 type ShowList struct {
@@ -278,6 +288,9 @@ func registerBrowse(h huma.API, deps Deps) {
 			return nil, err
 		}
 		out.Body.Trailers = append(out.Body.Trailers, movieTrailers(deps, row.Trailers)...)
+		if out.Body.Collection, err = movieCollection(ctx, deps, row); err != nil {
+			return nil, err
+		}
 		if user, ok := auth.UserFrom(ctx); ok {
 			w, err := deps.Queries.GetWatchState(ctx, db.GetWatchStateParams{UserID: user.ID, ItemType: "movie", ItemID: row.ID})
 			switch {

@@ -224,9 +224,38 @@ func (q *Queries) ListFollowedArrivals(ctx context.Context, arg ListFollowedArri
 	return items, nil
 }
 
+const listFollowedTMDBIDs = `-- name: ListFollowedTMDBIDs :many
+SELECT tmdb_id FROM show_follows WHERE user_id = ?
+`
+
+// The TMDB IDs of the shows a person follows, for a library's Following
+// filter.
+func (q *Queries) ListFollowedTMDBIDs(ctx context.Context, userID int64) ([]int64, error) {
+	rows, err := q.db.QueryContext(ctx, listFollowedTMDBIDs, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []int64{}
+	for rows.Next() {
+		var tmdb_id int64
+		if err := rows.Scan(&tmdb_id); err != nil {
+			return nil, err
+		}
+		items = append(items, tmdb_id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listNewestFollowedArrivals = `-- name: ListNewestFollowedArrivals :many
 SELECT a.id, a.tmdb_id, a.arrived_at, a.season AS season_number, a.number AS episode_number,
-    e.id AS episode_id, e.show_id, e.title, e.overview, e.air_date, e.still_path,
+    e.id AS episode_id, e.show_id, e.title, e.overview, e.air_date, e.still_path, e.runtime_min,
     s.title AS show_title, s.poster_path AS show_poster_path, s.backdrop_path AS show_backdrop_path,
     CAST(COALESCE((SELECT mf.id FROM episode_files ef CROSS JOIN media_files mf ON mf.id = ef.media_file_id
         WHERE ef.episode_id = e.id AND mf.status = 'present' ORDER BY mf.height DESC LIMIT 1), 0) AS INTEGER) AS file_id
@@ -271,6 +300,7 @@ type ListNewestFollowedArrivalsRow struct {
 	Overview         string  `json:"overview"`
 	AirDate          *string `json:"air_date"`
 	StillPath        *string `json:"still_path"`
+	RuntimeMin       *int64  `json:"runtime_min"`
 	ShowTitle        string  `json:"show_title"`
 	ShowPosterPath   *string `json:"show_poster_path"`
 	ShowBackdropPath *string `json:"show_backdrop_path"`
@@ -301,6 +331,7 @@ func (q *Queries) ListNewestFollowedArrivals(ctx context.Context, arg ListNewest
 			&i.Overview,
 			&i.AirDate,
 			&i.StillPath,
+			&i.RuntimeMin,
 			&i.ShowTitle,
 			&i.ShowPosterPath,
 			&i.ShowBackdropPath,

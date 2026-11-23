@@ -105,6 +105,10 @@ func TestHomeHeroIsPerPerson(t *testing.T) {
 		if show := want[:strings.LastIndex(want, " ")]; h.Kicker != "New episode · "+show || h.FileID == nil || *h.FileID != files[want] {
 			t.Errorf("%s's hero = %+v", who, h)
 		}
+		// What the kicker and facts word, as fields too.
+		if show := want[:strings.LastIndex(want, " ")]; h.ShowTitle != show || h.EpisodeNumber == 0 || h.AirDate == "" {
+			t.Errorf("%s's hero fields = %q %d %q", who, h.ShowTitle, h.EpisodeNumber, h.AirDate)
+		}
 	}
 
 	// The admin has watched Lantern Bay, so its new episode comes before

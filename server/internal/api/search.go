@@ -8,6 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"watchmymedia/server/internal/auth"
 	"watchmymedia/server/internal/db"
 )
 
@@ -28,6 +29,9 @@ type SearchEpisode struct {
 	AirDate        string `json:"airDate,omitempty"`
 	FileID         int64  `json:"fileId"`
 	Watched        bool   `json:"watched" required:"false" doc:"The signed-in user has watched it."`
+	// RuntimeMin and Progress are from API level 34.
+	RuntimeMin int64   `json:"runtimeMin,omitempty" required:"false" doc:"Its length in minutes, as TMDB lists it."`
+	Progress   float64 `json:"progress,omitempty" required:"false" doc:"The fraction the signed-in person has watched (0-1) when partway through."`
 }
 
 type SearchResults struct {
@@ -110,10 +114,93 @@ func searchLibrary(ctx context.Context, deps Deps, typed string, limit int64) (*
 		out.Episodes = append(out.Episodes, SearchEpisode{
 			ID: e.ID, ShowID: e.ShowID, ShowTitle: e.ShowTitle, ShowPosterPath: deref(e.ShowPosterPath), SeasonNumber: e.SeasonNumber,
 			Number: e.Number, Title: e.Title, StillPath: deref(e.StillPath), AirDate: deref(e.AirDate), FileID: e.FileID,
-			Watched: watched[e.ID],
+			Watched: watched[e.ID], RuntimeMin: deref(e.RuntimeMin),
 		})
 	}
+	if err := markSearch(ctx, deps, out); err != nil {
+		return nil, err
+	}
 	return out, nil
+}
+
+// markSearch gives search's results the signed-in person's state, as cards
+// have it, read for the few titles shown, by id.
+func markSearch(ctx context.Context, deps Deps, out *SearchResults) error {
+	user, ok := auth.UserFrom(ctx)
+	if !ok {
+		return nil
+	}
+	q := deps.Queries
+	ids := make([]int64, 0, len(out.Movies))
+	for _, m := range out.Movies {
+		ids = append(ids, m.ID)
+	}
+	if len(ids) > 0 {
+		states, err := q.ListWatchStatesForItems(ctx, db.ListWatchStatesForItemsParams{UserID: user.ID, ItemType: "movie", Ids: ids})
+		if err != nil {
+			return err
+		}
+		byID := map[int64]db.ListWatchStatesForItemsRow{}
+		for _, s := range states {
+			byID[s.ItemID] = s
+		}
+		for i := range out.Movies {
+			s := byID[out.Movies[i].ID]
+			out.Movies[i].Watched = new(s.Completed == 1)
+			if s.Completed == 0 && s.DurationMs > 0 && s.PositionMs > 0 {
+				out.Movies[i].Progress = float64(s.PositionMs) / float64(s.DurationMs)
+			}
+		}
+	}
+	ids = ids[:0]
+	for _, s := range out.Shows {
+		ids = append(ids, s.ID)
+	}
+	if len(ids) > 0 {
+		cards, err := q.ListShowCardsByIDs(ctx, ids)
+		if err != nil {
+			return err
+		}
+		watched, err := q.ListShowWatchedCountsByIDs(ctx, db.ListShowWatchedCountsByIDsParams{UserID: user.ID, Ids: ids})
+		if err != nil {
+			return err
+		}
+		present, seasons, seen := map[int64]int64{}, map[int64]int64{}, map[int64]int64{}
+		for _, c := range cards {
+			present[c.ID], seasons[c.ID] = c.EpisodeCount, c.SeasonCount
+		}
+		for _, w := range watched {
+			seen[w.ShowID] = w.Watched
+		}
+		for i := range out.Shows {
+			id := out.Shows[i].ID
+			out.Shows[i].SeasonCount = seasons[id]
+			out.Shows[i].UnwatchedCount = new(max(0, present[id]-seen[id]))
+			out.Shows[i].Watched = new(present[id] > 0 && seen[id] >= present[id])
+		}
+	}
+	ids = ids[:0]
+	for _, e := range out.Episodes {
+		if !e.Watched {
+			ids = append(ids, e.ID)
+		}
+	}
+	if len(ids) > 0 {
+		states, err := q.ListWatchStatesForItems(ctx, db.ListWatchStatesForItemsParams{UserID: user.ID, ItemType: "episode", Ids: ids})
+		if err != nil {
+			return err
+		}
+		progress := map[int64]float64{}
+		for _, s := range states {
+			if s.Completed == 0 && s.DurationMs > 0 && s.PositionMs > 0 {
+				progress[s.ItemID] = float64(s.PositionMs) / float64(s.DurationMs)
+			}
+		}
+		for i := range out.Episodes {
+			out.Episodes[i].Progress = progress[out.Episodes[i].ID]
+		}
+	}
+	return nil
 }
 
 // searchHit is a title that matches a search, with what orders it among

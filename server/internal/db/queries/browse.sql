@@ -60,11 +60,13 @@ SELECT s.id, s.library_id, s.tmdb_id, s.title, s.year, s.overview, s.status, s.g
     MAX(f.added_at) AS added_at,
     MAX(f.height) AS max_height,
     MAX(CASE WHEN f.hdr != '' THEN 1 ELSE 0 END) AS has_hdr,
-    SUM(f.size) AS total_size
+    SUM(f.size) AS total_size,
+    COUNT(DISTINCT CASE WHEN se.number > 0 THEN se.id END) AS season_count
 FROM shows s
 JOIN episodes e ON e.show_id = s.id
 JOIN episode_files ef ON ef.episode_id = e.id
 JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
+JOIN seasons se ON se.id = e.season_id
 WHERE s.library_id = ?
 GROUP BY s.id;
 
@@ -76,11 +78,13 @@ SELECT s.id, s.library_id, s.tmdb_id, s.title, s.year, s.overview, s.status, s.g
     MAX(f.added_at) AS added_at,
     MAX(f.height) AS max_height,
     MAX(CASE WHEN f.hdr != '' THEN 1 ELSE 0 END) AS has_hdr,
-    SUM(f.size) AS total_size
+    SUM(f.size) AS total_size,
+    COUNT(DISTINCT CASE WHEN se.number > 0 THEN se.id END) AS season_count
 FROM shows s
 JOIN episodes e ON e.show_id = s.id
 JOIN episode_files ef ON ef.episode_id = e.id
 JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
+JOIN seasons se ON se.id = e.season_id
 WHERE s.library_id = sqlc.arg(library_id) AND s.id IN (sqlc.slice(ids))
 GROUP BY s.id;
 
@@ -181,7 +185,7 @@ ORDER BY top.air_date DESC, top.show_title, top.season_number, top.number;
 -- added_at index from the newest end, so only the last few weeks' files are
 -- read. follows walks the show's episodes and looks each up in watch_state,
 -- rather than every episode the person has watched.
-SELECT e.id AS episode_id, e.show_id, e.number AS episode_number, e.title, e.overview, e.air_date,
+SELECT e.id AS episode_id, e.show_id, e.number AS episode_number, e.title, e.overview, e.air_date, e.runtime_min,
     se.number AS season_number, s.title AS show_title, s.poster_path AS show_poster_path, s.backdrop_path AS show_backdrop_path,
     f.id AS file_id, f.added_at, f.height,
     EXISTS (SELECT 1 FROM watch_state w

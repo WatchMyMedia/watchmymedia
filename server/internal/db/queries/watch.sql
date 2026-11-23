@@ -184,9 +184,9 @@ LIMIT ?;
 -- Each library's added_at index is walked from
 -- the cutoff, so only the window's files are read, not every episode.
 -- Episode files are reached through episode_files, which leaves trailer
--- files out. Only the show id is needed, so the watch_state lookup is a
--- NOT EXISTS on its primary key.
-SELECT DISTINCT e.show_id
+-- files out. Only the show id and how many episodes are needed, so the
+-- watch_state lookup is a NOT EXISTS on its primary key.
+SELECT e.show_id, COUNT(DISTINCT e.id) AS episodes
 FROM libraries l
 CROSS JOIN media_files f INDEXED BY media_files_added_idx
     ON f.library_id = l.id AND f.status = 'present' AND f.added_at >= sqlc.arg(since)
@@ -194,7 +194,8 @@ CROSS JOIN episode_files ef ON ef.media_file_id = f.id
 CROSS JOIN episodes e ON e.id = ef.episode_id
 WHERE l.type = 'tv'
   AND NOT EXISTS (SELECT 1 FROM watch_state w
-      WHERE w.user_id = sqlc.arg(user_id) AND w.item_type = 'episode' AND w.item_id = e.id AND w.completed = 1);
+      WHERE w.user_id = sqlc.arg(user_id) AND w.item_type = 'episode' AND w.item_id = e.id AND w.completed = 1)
+GROUP BY e.show_id;
 
 -- name: ListWatchedEpisodeIDs :many
 -- Which of some episodes the user has finished.

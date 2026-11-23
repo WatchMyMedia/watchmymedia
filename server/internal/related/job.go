@@ -3,6 +3,7 @@ package related
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"sync"
@@ -205,6 +206,20 @@ func (r *Refresher) RunOnce(ctx context.Context) (more bool, err error) {
 		}
 		budget -= len(shows)
 	}
+	// TMDB's collections the library's movies name, so a collection's page
+	// can offer the films the library lacks.
+	if budget > 0 {
+		ids, err := r.q.ListCollectionsToFetch(ctx, db.ListCollectionsToFetchParams{Stale: db.FormatTime(r.Now().Add(-collectionsEvery)), MaxRows: int64(budget)})
+		if err != nil {
+			return false, err
+		}
+		for _, id := range ids {
+			if err := r.refreshCollection(ctx, id); err != nil {
+				return false, err
+			}
+		}
+		budget -= len(ids)
+	}
 	r.mu.Lock()
 	left := len(r.order)
 	r.mu.Unlock()
@@ -236,6 +251,45 @@ func (r *Refresher) refreshWanted(ctx context.Context, w want) error {
 		return r.refreshShow(ctx, info.ID, info.TmdbID)
 	}
 	return nil
+}
+
+// collectionsEvery is how often a collection is fetched again: TMDB adds a
+// film to one now and then.
+const collectionsEvery = 30 * 24 * time.Hour
+
+// refreshCollection stores what TMDB lists in a collection. One TMDB no
+// longer has is marked fetched as it was, so it isn't asked for again
+// until it is stale.
+func (r *Refresher) refreshCollection(ctx context.Context, id *int64) error {
+	if id == nil {
+		return nil
+	}
+	c, err := r.tmdb.GetCollection(ctx, int(*id))
+	now := db.FormatTime(r.Now())
+	if errors.Is(err, tmdb.ErrNotFound) {
+		name, err := r.q.GetCollectionName(ctx, id)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		return r.q.MarkTMDBCollectionFetched(ctx, db.MarkTMDBCollectionFetchedParams{ID: *id, Name: deref(name), FetchedAt: now})
+	}
+	if err != nil {
+		return err
+	}
+	parts := c.Parts
+	if parts == nil {
+		parts = []tmdb.CollectionPart{}
+	}
+	b, _ := json.Marshal(parts)
+	return r.q.UpsertTMDBCollection(ctx, db.UpsertTMDBCollectionParams{ID: *id, Name: c.Name, PosterPath: nilIfEmpty(c.PosterPath),
+		BackdropPath: nilIfEmpty(c.BackdropPath), Parts: string(b), FetchedAt: now})
+}
+
+func nilIfEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 func (r *Refresher) refreshMovie(ctx context.Context, id, tmdbID int64) error {

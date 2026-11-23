@@ -151,11 +151,13 @@ SELECT s.id, s.library_id, s.tmdb_id, s.title, s.year, s.overview, s.status, s.g
     MAX(f.added_at) AS added_at,
     MAX(f.height) AS max_height,
     MAX(CASE WHEN f.hdr != '' THEN 1 ELSE 0 END) AS has_hdr,
-    SUM(f.size) AS total_size
+    SUM(f.size) AS total_size,
+    COUNT(DISTINCT CASE WHEN se.number > 0 THEN se.id END) AS season_count
 FROM shows s
 CROSS JOIN episodes e ON e.show_id = s.id
 CROSS JOIN episode_files ef ON ef.episode_id = e.id
 CROSS JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
+CROSS JOIN seasons se ON se.id = e.season_id
 WHERE s.id IN (sqlc.slice(ids))
 GROUP BY s.id;
 
@@ -184,11 +186,13 @@ SELECT s.tmdb_id,
     MAX(f.added_at) AS added_at,
     MAX(f.height) AS max_height,
     MAX(CASE WHEN f.hdr != '' THEN 1 ELSE 0 END) AS has_hdr,
-    SUM(f.size) AS total_size
+    SUM(f.size) AS total_size,
+    COUNT(DISTINCT CASE WHEN se.number > 0 THEN se.id END) AS season_count
 FROM shows s
 CROSS JOIN episodes ep ON ep.show_id = s.id
 CROSS JOIN episode_files ef ON ef.episode_id = ep.id
 CROSS JOIN media_files f ON f.id = ef.media_file_id AND f.status = 'present'
+CROSS JOIN seasons se ON se.id = ep.season_id
 WHERE s.tmdb_id IN (sqlc.slice(tmdb_ids))
 GROUP BY s.id
 ORDER BY s.library_id, s.id;

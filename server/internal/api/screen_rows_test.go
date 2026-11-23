@@ -80,7 +80,9 @@ var unarrangedGolden embed.FS
 // apps that don't know rows see no change. The golden files were written
 // by the code before arranged rows existed (WMM_UPDATE_GOLDEN=1, which
 // writes them to testdata/ for the next build to embed), and written again
-// only for an optional field added to every card since (tmdbId).
+// only for optional fields added to cards since (tmdbId; and from API level
+// 34 a show card's unwatchedCount, seasonCount and, on recently added
+// shows, added).
 func TestUnarrangedRepliesUnchanged(t *testing.T) {
 	t.Parallel()
 	srv := newTestServer(t)

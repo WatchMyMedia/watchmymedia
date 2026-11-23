@@ -638,7 +638,7 @@ func (q *Queries) ListShowWatchedCounts(ctx context.Context, userID int64) ([]Li
 }
 
 const listShowsWithNewEpisodes = `-- name: ListShowsWithNewEpisodes :many
-SELECT DISTINCT e.show_id
+SELECT e.show_id, COUNT(DISTINCT e.id) AS episodes
 FROM libraries l
 CROSS JOIN media_files f INDEXED BY media_files_added_idx
     ON f.library_id = l.id AND f.status = 'present' AND f.added_at >= ?1
@@ -647,6 +647,7 @@ CROSS JOIN episodes e ON e.id = ef.episode_id
 WHERE l.type = 'tv'
   AND NOT EXISTS (SELECT 1 FROM watch_state w
       WHERE w.user_id = ?2 AND w.item_type = 'episode' AND w.item_id = e.id AND w.completed = 1)
+GROUP BY e.show_id
 `
 
 type ListShowsWithNewEpisodesParams struct {
@@ -654,26 +655,31 @@ type ListShowsWithNewEpisodesParams struct {
 	UserID int64  `json:"user_id"`
 }
 
+type ListShowsWithNewEpisodesRow struct {
+	ShowID   int64 `json:"show_id"`
+	Episodes int64 `json:"episodes"`
+}
+
 // Shows with an episode whose present file arrived since the cutoff and
 // which the user has not finished: what keeps a show card's New badge.
 // Each library's added_at index is walked from
 // the cutoff, so only the window's files are read, not every episode.
 // Episode files are reached through episode_files, which leaves trailer
-// files out. Only the show id is needed, so the watch_state lookup is a
-// NOT EXISTS on its primary key.
-func (q *Queries) ListShowsWithNewEpisodes(ctx context.Context, arg ListShowsWithNewEpisodesParams) ([]int64, error) {
+// files out. Only the show id and how many episodes are needed, so the
+// watch_state lookup is a NOT EXISTS on its primary key.
+func (q *Queries) ListShowsWithNewEpisodes(ctx context.Context, arg ListShowsWithNewEpisodesParams) ([]ListShowsWithNewEpisodesRow, error) {
 	rows, err := q.db.QueryContext(ctx, listShowsWithNewEpisodes, arg.Since, arg.UserID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []int64{}
+	items := []ListShowsWithNewEpisodesRow{}
 	for rows.Next() {
-		var show_id int64
-		if err := rows.Scan(&show_id); err != nil {
+		var i ListShowsWithNewEpisodesRow
+		if err := rows.Scan(&i.ShowID, &i.Episodes); err != nil {
 			return nil, err
 		}
-		items = append(items, show_id)
+		items = append(items, i)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
