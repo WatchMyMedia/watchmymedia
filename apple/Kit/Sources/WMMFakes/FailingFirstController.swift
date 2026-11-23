@@ -46,6 +46,7 @@ public final class FailingFirstController: PlaybackController {
     public func downloadSubtitle(_ resultID: String) { base.downloadSubtitle(resultID) }
     public func selectQuality(_ quality: StreamQuality) { base.selectQuality(quality) }
     public func noteUserInput() { base.noteUserInput() }
+    public func describeEnd(_ line: String?) { base.describeEnd(line) }
     public func stop() { base.stop() }
     public func close() { base.close() }
     public func release() { base.release() }

@@ -45,16 +45,23 @@ public struct TVPlayerAction: Hashable, Sendable, Identifiable {
 
 /// The Apple TV player screen's state around a ``PlaybackController``. The
 /// screen is the system's `AVPlayerViewController`: its
-/// transport bar seeks and scrubs, its info panel holds the Audio, Subtitles
+/// transport bar seeks and scrubs, its info panel holds the Audio & subtitles
 /// and Quality tabs, Skip is its contextual action and Next Episode a button
 /// of its transport bar, and the prompts are overlays. This decides which of
 /// those show, passes on what the viewer does, and gives Menu its order: the
-/// system closes its info panel first; then Menu answers Still watching, puts
-/// the Next Episode card away (Watch credits), and otherwise leaves, as
+/// system closes its info panel first; then Menu is Stop on Still watching,
+/// puts the Next Episode card away (Watch credits), and otherwise leaves, as
 /// android/tv/.../PlayerKeys.kt does. Android hides its controls before
 /// leaving; tvOS 27's AVKit passes Menu on while its transport bar is up and
 /// has no call to hide the bar, so here Menu leaves with the bar up, as AVKit
 /// itself does.
+///
+/// Still watching is answered only by its buttons: Menu there is Stop, and
+/// Play/Pause does nothing, so a stray press never decides it.
+///
+/// While the transport bar shows, the system's title view says when the
+/// play would end, after the episode ("S03 E07 · The Long Dark · Ends at
+/// 9:41 PM"): ``refreshEndsAt()`` keeps it to the minute, paused or not.
 ///
 /// The info panel leaves the video playing, as the system's own Info tab
 /// does: tvOS gives no dependable sign of the panel opening and closing
@@ -77,9 +84,14 @@ public final class TVPlayerModel {
     /// When the admin's stop message appeared, and where the video was then, for its small print.
     public private(set) var stoppedAt: Date?
     public private(set) var stoppedAtMs: Int?
+    @ObservationIgnored private let now: @MainActor () -> Date
+    @ObservationIgnored private let clock: LiveClock
 
-    public init(controller: any PlaybackController, request: PlayRequest, onExit: @escaping @MainActor () -> Void) {
+    public init(controller: any PlaybackController, request: PlayRequest, onExit: @escaping @MainActor () -> Void,
+                now: @escaping @MainActor () -> Date = { .now }, clock: LiveClock = .device) {
         session = PlayerSession(controller: controller, request: request, onExit: onExit)
+        self.now = now
+        self.clock = clock
     }
 
     public var state: PlayerState { controller.state }
@@ -105,6 +117,18 @@ public final class TVPlayerModel {
     /// Try again after the can't-play state: the same play, from the start of it.
     public func retry() {
         controller.noteUserInput()
+        session.restart()
+    }
+
+    /// The quality the can't-play state offers instead: the step below the one tried.
+    public var lowerQuality: StreamQuality? { tvLowerQuality(state) }
+
+    /// Play at 1080p (or lower) after the can't-play state: that quality,
+    /// kept for this device as any choice of quality is, and the same play again.
+    public func playAtLowerQuality() {
+        guard let quality = lowerQuality else { return }
+        controller.noteUserInput()
+        controller.selectQuality(quality)
         session.restart()
     }
 
@@ -167,8 +191,27 @@ public final class TVPlayerModel {
 
     /// The transport bar came up or went away. Coming up means a press on the remote.
     public func transportBarChanged(visible: Bool) {
-        if visible { controller.noteUserInput() }
+        if visible {
+            controller.noteUserInput()
+            refreshEndsAt()
+        }
         transportBarVisible = visible
+    }
+
+    /// When the play would end, from where it is now: "Ends at 9:41 PM". Nil
+    /// before the length is known, for a recording still being made, and
+    /// once the play has failed or been stopped.
+    public var endsAt: String? {
+        let s = state
+        guard s.durationMs > 0, s.growing == nil, showsVideo else { return nil }
+        return endsAtLine(remainingMs: max(s.durationMs - s.positionMs, 0), now: now(), clock: clock)
+    }
+
+    /// Tells the system's title view when the play would end. The screen
+    /// calls it every few seconds while the transport bar shows; the
+    /// controller passes a line on only when it changes.
+    public func refreshEndsAt() {
+        controller.describeEnd(endsAt)
     }
 
     /// The viewer scrubbed or skipped on the transport bar, which moves the player to `playerMs` itself.
@@ -211,22 +254,22 @@ public final class TVPlayerModel {
         controller.answerStillWatching(keepWatching: keepWatching)
     }
 
-    /// Play/Pause while a prompt has focus (the system's controls take it otherwise).
+    /// Play/Pause while a prompt has focus (the system's controls take it
+    /// otherwise). It never answers Still watching: only a button does.
     public func playPause() {
         switch overlay {
-        case .stillWatching?: answerStillWatching(keepWatching: true)
-        case .failed?, .stopped?: break
+        case .stillWatching?, .failed?, .stopped?: break
         default:
             controller.noteUserInput()
             controller.togglePlayPause()
         }
     }
 
-    /// Menu, once the system has closed its info panel: answers Still
-    /// watching (any press does), puts the Next Episode card away, or leaves.
+    /// Menu, once the system has closed its info panel: Stop on Still
+    /// watching, puts the Next Episode card away, or leaves.
     public func back() {
         switch overlay {
-        case .stillWatching?: answerStillWatching(keepWatching: true)
+        case .stillWatching?: answerStillWatching(keepWatching: false)
         case .upNext?: watchCredits()
         default: close()
         }

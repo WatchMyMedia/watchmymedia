@@ -7,10 +7,13 @@ import WMMUI
 /// The player:
 /// the system's `AVPlayerViewController` on the controller's player, with
 /// Skip as its contextual action, Next Episode among its transport bar's
-/// buttons, Audio, Subtitles and Quality as tabs of its info panel, and the
-/// app's subtitle cues over the video. The Next Episode card, Are you still watching and the stopped and
-/// can't-play states are the app's own, over it. The controller does the
-/// playing; ``TVPlayerModel`` decides what shows.
+/// buttons, the title view saying when the play would end, and Info,
+/// Episodes, Audio & subtitles and Quality as tabs of its info panel; the
+/// app's subtitle cues over the video. Nothing about the stream is on the
+/// picture: how it plays is in the Quality tab. The Up next card, Are you
+/// still watching, and the stopped and can't-play states are the app's
+/// own, over it; while it starts, black with a spinner. The controller does
+/// the playing; ``TVPlayerModel`` decides what shows.
 struct PlayerScreen: View {
     let request: PlayRequest
     @Environment(AppServices.self) private var services
@@ -60,12 +63,15 @@ private struct PlayerContent: View {
     @Environment(AppServices.self) private var services
     /// The fakes have no video: the system's player runs empty over the backdrop.
     @State private var standIn = AVPlayer()
-    /// The Episodes tab over the video, on the fakes, whose empty player has no info panel (`-playerPanel episodes`).
+    /// A tab of the info panel over the video, on the fakes, whose empty
+    /// player has no info panel (`-playerPanel episodes|tracks|quality`).
     #if DEBUG
-    @State private var episodesPreview = PlayerLaunchArguments.episodesPanel
+    @State private var panelPreview = PlayerLaunchArguments.panel
     #else
-    @State private var episodesPreview = false
+    @State private var panelPreview: PlayerPanelPreview? = nil
     #endif
+
+    private var serverName: String? { services.servers.current?.server.name }
 
     var body: some View {
         let state = model.state
@@ -76,7 +82,7 @@ private struct PlayerContent: View {
                     player: model.controller.player ?? standIn,
                     contextualActions: model.contextualActions,
                     transportBarActions: model.transportBarActions,
-                    behavior: .film(model, episodesTab: episodes.hasTab ? episodesTab : nil),
+                    behavior: .film(model, serverName: serverName, episodesTab: episodes.hasTab ? episodesTab : nil),
                     overlay: VideoOverlay(
                         model: model,
                         standIn: model.controller.player == nil,
@@ -85,57 +91,62 @@ private struct PlayerContent: View {
                     .environment(\.imageLoader, services.images)
                 )
                 // Still watching asks first; the remote is its.
-                .disabled(!model.videoTakesInput || episodesPreview)
+                .disabled(!model.videoTakesInput || panelPreview != nil)
                 .transition(.opacity)
             }
 
-            if episodesPreview, episodes.hasTab, model.overlay == nil {
-                EpisodesTab(model: model, episodes: episodes, imageURL: { services.library.imageURL($0, size: .w780) })
-                    .environment(\.imageLoader, services.images)
-                    .padding(.top, 40)
-                    .frame(maxHeight: .infinity, alignment: .top)
-            }
+            if model.overlay == nil, let panelPreview { preview(panelPreview) }
 
             switch model.overlay {
             case .upNext(let prompt):
-                NextEpisodeCard(
+                UpNextCard(
                     prompt: prompt,
-                    still: services.library.imageURL(prompt.next.stillPath, size: .w342),
+                    still: services.library.imageURL(prompt.next.stillPath, size: .w780),
                     onPlay: { model.playNext() },
                     onWatchCredits: { model.watchCredits() }
                 )
-                .padding(TVLayout.gutter)
+                .padding(.trailing, TVLayout.gutter)
+                .padding(.bottom, TVLayout.safeBottom)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                 .transition(.opacity.combined(with: .move(edge: .trailing)))
             case .stillWatching:
-                StillWatchingPrompt(state: state) { model.answerStillWatching(keepWatching: $0) }
+                StillWatchingPrompt(title: playerTitleLine(title: title, subtitle: state.subtitle)) { model.answerStillWatching(keepWatching: $0) }
                     .transition(.opacity)
             case .stopped(let message):
                 PlayerEndState(
-                    kind: .stopped(message: message, note: model.stoppedAt.map { stoppedNote(at: $0, watchedMs: model.stoppedAtMs) }),
-                    title: playerTitleLine(title: title, subtitle: state.subtitle),
-                    onBack: { model.close() },
-                    onRetry: { model.retry() }
+                    kind: .stopped(message: message, line: tvStoppedLine(serverName: serverName),
+                                   note: model.stoppedAt.map { tvStoppedNote(at: $0, watchedMs: model.stoppedAtMs) }),
+                    onBack: { model.close() }
                 )
                 .transition(.opacity)
             case .failed(let message):
-                let server = services.servers.current?.server
                 PlayerEndState(
-                    kind: .failed(message: message, note: failedNote(mode: state.mode, serverName: server?.name, serverVersion: server?.version)),
-                    title: playerTitleLine(title: title, subtitle: state.subtitle),
+                    kind: .failed(words: TVCantPlay(error: message, serverName: serverName),
+                                  lower: model.lowerQuality,
+                                  details: services.auth.user?.isAdmin == true ? message : nil),
                     onBack: { model.close() },
-                    onRetry: { model.retry() }
+                    onRetry: { model.retry() },
+                    onLower: { model.playAtLowerQuality() }
                 )
                 .transition(.opacity)
             case nil:
                 EmptyView()
             }
+
+            LoadingCover(loading: state.status == .loading && model.overlay == nil)
         }
         .animation(.easeOut(duration: 0.25), value: model.overlay)
         .task(id: model.request) { await episodes.follow(model.request) }
+        // While the transport bar shows, its title view says when the play would end, to the minute.
+        .task(id: model.transportBarVisible) {
+            while model.transportBarVisible, !Task.isCancelled {
+                model.refreshEndsAt()
+                try? await Task.sleep(for: .seconds(5))
+            }
+        }
         // What reaches the app once the system's controls have closed what is theirs.
         .onExitCommand {
-            if episodesPreview { episodesPreview = false } else { model.back() }
+            if panelPreview != nil { panelPreview = nil } else { model.back() }
         }
         .onPlayPauseCommand { model.playPause() }
     }
@@ -144,14 +155,42 @@ private struct PlayerContent: View {
     private func episodesTab() -> UIViewController {
         EpisodesTabController(model: model, episodes: episodes, imageURL: { [library = services.library] in library.imageURL($0, size: .w780) }, images: services.images)
     }
+
+    /// A tab over the video where the system's info panel would hold it (the fakes' previews).
+    @ViewBuilder
+    private func preview(_ panel: PlayerPanelPreview) -> some View {
+        Group {
+            switch panel {
+            case .episodes:
+                if episodes.hasTab {
+                    EpisodesTab(model: model, episodes: episodes, imageURL: { services.library.imageURL($0, size: .w780) })
+                        .environment(\.imageLoader, services.images)
+                }
+            case .tracks:
+                PlaybackOptions(model: model, tab: .tracks, serverName: serverName)
+            case .quality:
+                PlaybackOptions(model: model, tab: .quality, serverName: serverName)
+            }
+        }
+        .padding(.top, TVLayout.safeTop + 80)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background { Color.black.opacity(0.5).ignoresSafeArea() }
+    }
+}
+
+/// A tab of the info panel shown over the video on the fakes, whose empty
+/// player has no info panel: `-playerPanel episodes|tracks|quality`.
+enum PlayerPanelPreview: String {
+    case episodes, tracks, quality
 }
 
 /// Over the video and under the system's controls (`contentOverlayView`):
 /// the subtitle cues, lifted clear of the transport bar while it shows, and
-/// with it the swipe-down hint and how the server is sending the file, with
-/// Automatic's step. Automatic's note shows with
-/// or without the bar and never takes focus. On the fakes, the backdrop and
-/// what would play.
+/// Automatic's brief note when it changes the quality, with or without the
+/// bar, never taking focus. A recording still being made says so while the
+/// bar shows. On the fakes, which have no video and so no system title view,
+/// the backdrop and the title and episode with when it would end, where the
+/// system draws them.
 struct VideoOverlay: View {
     let model: TVPlayerModel
     let standIn: Bool
@@ -165,69 +204,42 @@ struct VideoOverlay: View {
                 Color.clear
                     .overlay {
                         Artwork(url: backdrop, seed: state.title.isEmpty ? model.request.title : state.title, maxPixel: 1920)
-                            .overlay(Color.black.opacity(0.45))
+                            .overlay(LinearGradient(stops: [.init(color: .black.opacity(0.62), location: 0), .init(color: .clear, location: 0.22), .init(color: .clear, location: 0.46), .init(color: .black.opacity(0.88), location: 1)], startPoint: .top, endPoint: .bottom))
                     }
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(state.title.isEmpty ? model.request.title : state.title).font(.system(size: 48, weight: .bold))
-                    if let subtitle = state.subtitle ?? model.request.subtitle { Text(subtitle).font(.system(size: 26)).foregroundStyle(Palette.textSecondary) }
-                    Text(state.status == .playing ? "Playing" : "Paused").font(.system(size: 20)).foregroundStyle(Palette.muted)
+                    Text(state.title.isEmpty ? model.request.title : state.title).font(.tv(.headline, .bold))
+                    if let line = tvPlayerSubtitle(state.subtitle ?? model.request.subtitle, endsAt: model.endsAt) {
+                        Text(line).font(.tv(.body)).foregroundStyle(Palette.textSecondary)
+                    }
+                    Text(state.status == .playing ? "Playing" : "Paused").font(.tv(.caption2)).foregroundStyle(Palette.muted)
                 }
                 .foregroundStyle(Palette.text)
-                .padding(TVLayout.gutter)
-                .padding(.bottom, bar ? 220 : 0)
+                .padding(.horizontal, TVLayout.gutter)
+                .padding(.bottom, bar ? 214 : 120)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
             }
 
-            if bar {
-                if state.growing != nil {
-                    Label("Recording", systemImage: "record.circle").font(.system(size: 24, weight: .bold)).foregroundStyle(Palette.liveText)
-                        .padding(.top, 50).padding(.leading, TVLayout.gutter).frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                }
-                LinearGradient(colors: [.black.opacity(0.6), .clear], startPoint: .top, endPoint: .bottom)
-                    .frame(height: 200)
-                    .frame(maxHeight: .infinity, alignment: .top)
+            if bar, state.growing != nil {
+                Text("\(Image(systemName: "record.circle")) Recording")
+                    .font(.tv(.caption1, .bold))
+                    .foregroundStyle(Palette.liveText)
+                    .padding(.top, TVLayout.safeTop)
+                    .padding(.leading, TVLayout.gutter)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     .transition(.opacity)
-                ZStack {
-                    Label(infoPanelHint, systemImage: "chevron.down")
-                        .font(.system(size: 19))
-                        .foregroundStyle(Palette.muted)
-                    if let line = streamLine(state) {
-                        HStack(spacing: 10) {
-                            if let chip = autoChip(state) {
-                                Text(chip)
-                                    .font(.system(size: 17, weight: .semibold))
-                                    .foregroundStyle(Palette.gold)
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 7)
-                                    .background(.black.opacity(0.45), in: Capsule())
-                                    .overlay(Capsule().strokeBorder(Palette.gold.opacity(0.75), lineWidth: 2))
-                            }
-                            Text(line)
-                                .font(.system(size: 17))
-                                .foregroundStyle(Palette.textSecondary)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(.black.opacity(0.45), in: Capsule())
-                        }
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                    }
-                }
-                .padding(.horizontal, TVLayout.gutter)
-                .padding(.top, 40)
-                .frame(maxHeight: .infinity, alignment: .top)
-                .transition(.opacity)
             }
 
             if let note = state.qualityNote {
                 Text(note)
-                    .font(.system(size: 22, weight: .medium))
+                    .font(.tv(.body, .semibold))
                     .foregroundStyle(Palette.text)
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 14)
-                    .background(Palette.ground.opacity(0.88), in: Capsule())
-                    .overlay(Capsule().strokeBorder(.white.opacity(0.2)))
-                    .shadow(color: .black.opacity(0.55), radius: 20, y: 16)
-                    .padding(.top, 110)
+                    .padding(.horizontal, 34)
+                    .padding(.vertical, 20)
+                    .background(Color(hex: 0x18181B).opacity(0.96), in: RoundedRectangle(cornerRadius: 24))
+                    .overlay(RoundedRectangle(cornerRadius: 24).strokeBorder(Color(hex: 0x34343A), lineWidth: 2))
+                    .shadow(color: .black.opacity(0.6), radius: 25, y: 20)
+                    .frame(maxWidth: 1500)
+                    .padding(.top, TVLayout.safeTop)
                     .frame(maxHeight: .infinity, alignment: .top)
                     .transition(.opacity)
             }
@@ -238,5 +250,32 @@ struct VideoOverlay: View {
         .animation(.easeInOut(duration: 0.25), value: state.qualityNote)
         .ignoresSafeArea()
         .allowsHitTesting(false)
+    }
+}
+
+/// While a play starts: black and a spinner, nothing else. It shows only
+/// once starting has taken two seconds, so a quick start never flashes it.
+private struct LoadingCover: View {
+    let loading: Bool
+    @State private var shown = false
+
+    var body: some View {
+        ZStack {
+            if shown {
+                Color.black
+                TVSpinner().scaleEffect(1.3)
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .accessibilityHidden(!shown)
+        .task(id: loading) {
+            guard loading else {
+                shown = false
+                return
+            }
+            guard (try? await Task.sleep(for: .seconds(2))) != nil else { return }
+            shown = true
+        }
     }
 }

@@ -206,10 +206,17 @@ Its player takes these too, on the fakes and in debug builds
 (`TV/Screens/Player/PlayerLaunchArguments.swift`): `-playerSeek 2970000`
 (the Next Episode card), `-playerSubtitle s4`, `-playerStillWatching`,
 `-playerStopped` and `-playerError`, after `-open watchmymedia://play/9101`.
-The fakes have no video, so the system player runs empty over the backdrop:
-Skip, the card and the prompts show, but not the transport bar or its
-Episodes, Audio, Subtitles and Quality tabs, which need a server;
-`-playerPanel episodes` shows the Episodes tab over the video instead.
+The fakes have no video, so the system player runs empty over the backdrop,
+with the title, the episode and when it would end where the system's title
+view draws them: Skip, Up next and the prompts show, but not the transport
+bar or its Episodes, Audio & subtitles and Quality tabs, which need a server;
+`-playerPanel episodes`, `tracks` or `quality` shows that tab over the video
+instead. Nothing about the stream is on the picture: the Quality tab says
+how the file plays, in a sentence and then the picture, sound, speed and
+server (`TVWhatIsPlaying`), and the tracks are named in words
+(`TVPlayerWords.swift` in the Kit). While the transport bar shows, the
+model tells the controller when the play would end (`describeEnd`), which
+the title view shows after the episode.
 
 The info panel's Episodes tab
 comes after Info for an episode, never a film or a recording: the
@@ -883,8 +890,8 @@ output, including Original, and acknowledges a prepared replacement after AVPlay
 decodes a frame. A failed replacement restores the previous live URL. Mobile-data
 or display-profile changes retune only after the old session releases its tuner.
 
-The existing iPhone, iPad and Apple TV Auto chip, quality picker and short note
-display these transitions. The Cast remote offers Live TV Automatic only when
+The iPhone and iPad Auto chip and quality picker, the Apple TV's Quality tab,
+and the short note on each display these transitions. The Cast remote offers Live TV Automatic only when
 the receiver advertises `live-auto` and its server is capable; a handoff to an
 older receiver uses fixed 1080p. On debug fakes,
 `-open watchmymedia://play/9101 -playerAutomatic slowed|recovered|failed`
