@@ -1165,7 +1165,11 @@ Admins set folders and recording access in the server’s web app.
 
 Recordings shows Recording now, Won’t record, Upcoming, Series and Recorded,
 hiding empty sections; on iPhone and iPad a swipe left skips, stops or doesn't
-record one. Each section loads 20 at a time with Load more; a
+record one. On Apple TV it is rows: Ready to watch (what is recording now
+first, a title recorded several times as one card that opens its episodes),
+Coming up (Won't record marked in orange, opening the clash), and the series
+recorded, with how many hours are recorded and, at the rate they took, room
+for how many more. Each section loads 20 at a time with Load more; a
 `live.recordings.changed` event refreshes the sections on screen (a screen
 says which with `LiveRecordingsStore.show(_:)`; one that has left is
 forgotten and loads again on return) and the guide's span while

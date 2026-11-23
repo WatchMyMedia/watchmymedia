@@ -43,4 +43,36 @@ import WMMModel
         #expect(liveWatchNowRow(lksd) == "Watch 7.1 LKSD now")
         #expect(liveIsOn(LiveProgramme(id: "p", start: at(20, 30), end: at(21), title: "Lake Report")) == "Lake Report is on")
     }
+
+    @Test func recordingsSayHoursRecordedAndRoomInHours() {
+        // Two hours that took 12 GB: 6 GB an hour, so 420 GB holds about 70 more.
+        let done = [
+            LiveRecording(id: "a", channelID: "c", number: "2.1", title: "Harbor Lights", start: at(19), end: at(20), state: .done, bytes: 6_000_000_000),
+            LiveRecording(id: "b", channelID: "c", number: "2.1", title: "Harbor Lights", start: at(20), end: at(21), state: .partial, bytes: 6_000_000_000),
+            LiveRecording(id: "c", channelID: "c", number: "2.1", title: "Later", start: at(22), end: at(23), state: .scheduled),
+        ]
+        #expect(liveRecordedHoursLine(done, freeBytes: 420_000_000_000) == "2 hours recorded · room for about 70 more")
+        #expect(liveRecordedHoursLine(done, freeBytes: nil) == "2 hours recorded")
+        #expect(liveRecordedHoursLine([done[0]], freeBytes: 1_000_000_000) == "1 hour recorded · room for less than an hour more")
+        #expect(liveRecordedHoursLine([done[2]], freeBytes: 1) == nil, "nothing recorded yet")
+    }
+
+    @Test func readyAndComingCardsSayWhatAndWhen() {
+        let recording = LiveRecording(id: "r", channelID: "c", number: "9.1", channelName: "PNVL", title: "Valley Bake-Off", start: at(19, 30), end: at(21, 30), state: .recording)
+        let one = LiveRecording(id: "d", channelID: "c", number: "4.1", title: "The Deep End", season: 1, episode: 3, start: at(19), end: at(20), state: .done)
+        #expect(plain(liveReadyLine([recording], clock: us)) == "Until 9:30 PM · watch from the start")
+        #expect(liveReadyLine([one], clock: us) == "S1 E3 · 1 h")
+        #expect(liveReadyLine([one, one], clock: us) == "2 episodes")
+
+        let series = LiveRecording(id: "s", ruleID: "rule", channelID: "c", number: "2.1", channelName: "HRBR", title: "Harbor Lights", start: at(21), end: at(22), state: .scheduled, series: true)
+        let once = LiveRecording(id: "o", channelID: "c", number: "7.1", channelName: "LKSD", title: "Lakeside Kitchen", start: at(20, day: 3), end: at(21, day: 3), state: .scheduled)
+        let clash = LiveRecording(id: "x", channelID: "c", number: "7.1", channelName: "LKSD", title: "The Quiet Meridian", start: at(21), end: at(22), state: .conflict)
+        #expect(plain(liveComingTag(series, now: now, clock: us)) == "Tonight 9:00 PM")
+        #expect(plain(liveComingTag(once, now: now, clock: us)) == "Tomorrow 8:00 PM")
+        #expect(liveComingTag(clash, now: now, clock: us) == "Won’t record")
+        #expect(liveComingLine(series, rule: nil, now: now, clock: us) == "2.1 HRBR · every new episode")
+        #expect(liveComingLine(series, rule: LiveRecordingRule(id: "rule", title: "Harbor Lights", newOnly: false), now: now, clock: us) == "2.1 HRBR · every episode")
+        #expect(liveComingLine(once, rule: nil, now: now, clock: us) == "7.1 LKSD · this episode")
+        #expect(plain(liveComingLine(clash, rule: nil, now: now, clock: us)) == "Tonight 9:00 PM · no tuner free")
+    }
 }
