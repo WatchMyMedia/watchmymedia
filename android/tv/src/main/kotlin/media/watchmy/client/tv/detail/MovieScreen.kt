@@ -1,5 +1,6 @@
 package media.watchmy.client.tv.detail
 
+import media.watchmy.client.model.watchedLine
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
@@ -115,8 +116,8 @@ fun MovieScreen(
     onOpenMovie: (Long) -> Unit = {},
     onOpenShow: (Long) -> Unit = {},
     onOpenTrailer: (TrailerPlay.YouTube) -> Unit = {},
-) {
     onOpenPerson: (media.watchmy.client.model.Person, from: String) -> Unit = { _, _ -> },
+) {
     val services = LocalAppServices.current
     val context = LocalContext.current
     // YouTube's player in a WebView here, else the YouTube app.
@@ -166,8 +167,8 @@ fun MovieScreen(
                     trailerInApp = inApp,
                     onTrailer = onTrailer,
                     hasFile = main != null,
-                ) {
                     onOpenPerson = { p -> onOpenPerson(p, movie.title) },
+                ) {
                     RelatedRows(state.related, services.library, memory, onOpenMovie, onOpenShow, Modifier.padding(bottom = 60.dp))
                 }
                 LaunchedEffect(Unit) {
@@ -291,8 +292,8 @@ private fun MovieContent(
     trailerInApp: Boolean,
     onTrailer: () -> Unit,
     hasFile: Boolean,
-    related: @Composable () -> Unit,
     onOpenPerson: (media.watchmy.client.model.Person) -> Unit,
+    related: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
     // The compact heading takes the top of the screen once the page has scrolled: rows stay under it.
@@ -356,7 +357,7 @@ private fun Header(
         when {
             !hasFile -> Text("No file for this movie is in the library.", style = TvType.Body, color = WmmColors.Warn, modifier = whenLine)
             partway != null -> WhenLine("${formatDuration(partway.positionMs)} in", " · ${endsAt(partway.durationMs - partway.positionMs, now, format)}", whenLine)
-            movie.watch?.completed == true -> WhenLine("Watched", runtime?.let { " · ${formatDuration(it)} · ${wouldEndAt(it, now, format)} if you started now" }, whenLine)
+            movie.watch?.completed == true -> WhenLine(movie.watch?.watchedLine() ?: "Watched", runtime?.let { " · ${formatDuration(it)} · ${wouldEndAt(it, now, format)} if you started now" }, whenLine)
             runtime != null -> WhenLine(formatDuration(runtime), " · ${wouldEndAt(runtime, now, format)} if you started now", whenLine)
         }
         Overview(movie.overview, lines = 3, Modifier.padding(top = 22.dp))

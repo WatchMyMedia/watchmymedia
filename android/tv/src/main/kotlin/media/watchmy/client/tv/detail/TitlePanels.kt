@@ -1,5 +1,6 @@
 package media.watchmy.client.tv.detail
 
+import media.watchmy.client.model.addedLine
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -226,7 +227,7 @@ private fun FileFact(label: String, value: String) {
     }
 }
 
-/** What File details says of a file, label by label: the picture, the sound, the subtitles, the file's name. */
+/** What File details says of a file, label by label: the picture, the sound, the subtitles, the file's name, and when it came into the library. */
 internal fun fileFacts(v: MediaVersion, recorded: String?): List<Pair<String, String>> = listOfNotNull(
     videoLine(v)?.let { "Video" to it },
     soundLine(v)?.let { "Sound" to it },
@@ -234,6 +235,7 @@ internal fun fileFacts(v: MediaVersion, recorded: String?): List<Pair<String, St
     "File" to v.label,
     formatBytes(v.sizeBytes).let { "Size" to it },
     recorded?.let { "Recorded" to it.removePrefix("Recorded from ") },
+    v.addedLine()?.let { "Added" to it },
 )
 
 /** "3840 × 1608, HEVC, Dolby Vision profile 8". */

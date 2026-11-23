@@ -1,5 +1,6 @@
 package media.watchmy.client.tv.detail
 
+import media.watchmy.client.model.watchedLine
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -120,7 +121,7 @@ internal fun Top(
                 !ep.aired -> WhenLine(airedLabel(ep.airDate) ?: "Not aired yet", null, line)
                 !ep.hasFile -> WhenLine("Not in library", null, line)
                 partway != null -> WhenLine(timeLeft(partway.durationMs - partway.positionMs), " · ${endsAt(partway.durationMs - partway.positionMs, now, format)}", line)
-                ep.watched -> WhenLine("Watched", runtime?.let { " · ${wouldEndAt(it, now, format)} if you watched it again" }, line)
+                ep.watched -> WhenLine(ep.watch?.watchedLine() ?: "Watched", runtime?.let { " · ${wouldEndAt(it, now, format)} if you watched it again" }, line)
                 else -> WhenLine("Not watched yet", runtime?.let { " · ${wouldEndAt(it, now, format)} if you started now" }, line)
             }
             Overview(ep.overview, lines = 2, Modifier.padding(top = 16.dp))
