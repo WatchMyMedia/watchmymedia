@@ -288,7 +288,9 @@ server, and on iPad in both a regular and a compact width.
   it (Back to the top, Menu), and each screen has such a state of its own
   (`ScreenFocus`). Apple TV's Home opens on its first card that way: when
   it first has rows at launch, `HomeView` asks the first screen for focus
-  (`openOnFirstCard`), and the row moves it to its first card; reached later
+  (`openOnFirstCard`): the large card for what was being watched
+  (`HomeLead`, that screen's one focusable thing), or with no card the
+  first row, which moves it to its first card; reached later
   (the tab bar, Menu from another tab) focus stays the system's. Menu from a
   later screen goes back to the first and from the first is the system's
   (the tab bar), judged by the screen focus is in (`HomePaging.focusedPage`),

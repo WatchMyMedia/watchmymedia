@@ -27,15 +27,15 @@ final class SeeAllTests: XCTestCase {
         app.press(.down, thenWaitForFocusToMove: 5)
         XCTAssertFalse(app.tabBars.buttons.matching(NSPredicate(format: "hasFocus == true")).firstMatch.exists, "focus is in TV Shows")
         remote.press(.menu)
-        let continuing = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "S02 E04 · 23 min left")).firstMatch
-        XCTAssertTrue(continuing.waitUntilExists(timeout: 15), "Home shows its first row")
+        let lead = app.homeFirstCard
+        XCTAssertTrue(lead.waitUntilExists(timeout: 15), "Home shows its large card")
         XCTAssertTrue(app.waitForFocusedButton(timeout: 15) { _ in true }, "the tab bar has focus")
         remote.press(.down)
-        XCTAssertTrue(continuing.waitForFocus(), "Down from the tab bar lands on the first Continue watching card")
+        XCTAssertTrue(lead.waitForFocus(), "Down from the tab bar lands on the large card")
 
-        // Recently aired is the fourth row: Recently added · TV Shows and a list come first.
+        // Recently aired is the fourth row, under the card: Continue watching, Recently added · TV Shows and a list come first.
         let panel = app.descendants(matching: .any)["homeFocusPanel-recentlyAired"]
-        for _ in 0..<3 { app.press(.down, thenWaitForFocusToMove: 5) }
+        for _ in 0..<4 { app.press(.down, thenWaitForFocusToMove: 5) }
         XCTAssertTrue(eventually(timeout: 10) { panel.exists && app.windows.firstMatch.frame.contains(panel.frame) }, "Down pages to Recently aired")
 
         // ▶ to the row's end: See all comes after the last episode, and the panel stays on that episode.
