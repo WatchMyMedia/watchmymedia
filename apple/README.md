@@ -125,6 +125,10 @@ can be judged on a simulator. `-fakesSignedOut` starts at sign-in, `-fakesNoServ
 server picker. The scheme's Run action lists `-fakes`, off by default.
 `-fakesLargeLibrary` gives the fakes' Movies library about 1,200 titles (the
 sample's, then made-up ones), for measuring the grid.
+Apple TV keeps each library's sort and filters on the device, for the server
+and person (`LibraryChoices`); on the fakes they last the launch, so one UI
+test's choice doesn't carry into the next, unless `-fakesKeepLibraryChoices`
+is given.
 `-search harbor` searches at launch. The fake player has seek thumbnails drawn in
 code, so `-open watchmymedia://play/9101 -playerKeepControls -playerScrub 0.44`
 holds the scrubber at 44 % with its tile up.
