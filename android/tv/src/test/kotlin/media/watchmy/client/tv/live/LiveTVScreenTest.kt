@@ -120,6 +120,20 @@ class LiveTVScreenTest {
         } finally { fakeLatencyMs = previous }
     }
 
+    /** With channels starred, the guide opens on Favourites, on what one of them has on; the Channels button says so. */
+    @Test fun `the guide opens on Favourites when there are some`() {
+        val previous = fakeLatencyMs
+        fakeLatencyMs = 0
+        try {
+            showGuide(personal = true, favourites = true)
+            compose.onNode(hasText("Favourites") and hasClickAction()).assertExists()
+            // 2.2, watched last, isn't a favourite: focus is on 2.1's programme, and ▼ goes down the favourites alone.
+            assertTrue("\"${focusedSpoken()}\" is a programme", focusedSpoken().isNotBlank())
+            repeat(2) { press(Key.DirectionDown) }
+            assertEquals("4.3 Coast Shop, No listings, Watch live", focusedSpoken())
+        } finally { fakeLatencyMs = previous }
+    }
+
     /** The guide's map: ▲ from the first channel reaches the tabs, ▼ from them goes back to the programme, OK on what is on watches. */
     @Test fun `the first channel goes up to the Guide tab, and down comes back to the programme`() {
         val previous = fakeLatencyMs
@@ -359,8 +373,10 @@ class LiveTVScreenTest {
         compose.waitForIdle()
     }
     /** The guide with listings, opened on 2.2; [personal] adds favourites and reminders, which make a channel's own cell a place focus goes. */
-    private fun showGuide(personal: Boolean = false, onWatch: (LiveChannel) -> Unit = {}, quiet: Boolean = false) {
+    /** The guide on the fakes; without [favourites] the person has starred none, so it opens on All channels. */
+    private fun showGuide(personal: Boolean = false, onWatch: (LiveChannel) -> Unit = {}, quiet: Boolean = false, favourites: Boolean = false) {
         val services = if (quiet) quietTvFakes() else FakeAppServices(tv = true)
+        if (!favourites) services.live.favourites = emptySet()
         val listed = runBlocking { services.live.channels() }
         compose.setContent {
             CompositionLocalProvider(LocalAppServices provides services, LocalLiveTVAvailable provides true) {

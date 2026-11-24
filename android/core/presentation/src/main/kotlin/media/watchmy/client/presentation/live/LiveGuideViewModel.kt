@@ -40,7 +40,11 @@ import java.time.temporal.ChronoUnit
  * the programme whose details show. It asks only while a screen [show]s it
  * with listings on, so servers without them never see a guide request.
  * From [LIVE_PERSONAL_API_LEVEL] it also keeps the person's favourites (the
- * Favourites filter) and their reminders.
+ * Favourites filter) and their reminders. With [opensOnFavourites] (the TV),
+ * the guide opens on Favourites when the person has starred channels, and
+ * on All channels otherwise, as every app's TV guide does; it decides once,
+ * when the first listings come, so a star added later doesn't narrow the
+ * grid under the person.
  */
 class LiveGuideViewModel(
     private val live: LiveRepository,
@@ -48,6 +52,7 @@ class LiveGuideViewModel(
     private val auth: AuthRepository,
     private val clock: () -> Long = System::currentTimeMillis,
     private val zone: () -> ZoneId = ZoneId::systemDefault,
+    private val opensOnFavourites: Boolean = false,
 ) : ViewModel() {
     data class Selection(val channel: LiveChannel, val programme: LiveProgramme)
 
@@ -145,6 +150,8 @@ class LiveGuideViewModel(
     private var preferredChannel: String? = null
     private var personalJob: Job? = null
     private var pending: Target? = null
+    /** Whether the filter it opens on is still to be chosen ([opensOnFavourites]): until the first listings, a pick or a target. */
+    private var opening = opensOnFavourites
 
     private fun personalLevel() = (servers.current.value?.server?.apiLevel ?: 0) >= LIVE_PERSONAL_API_LEVEL
 
@@ -163,6 +170,7 @@ class LiveGuideViewModel(
                     personalJob?.cancel()
                     val on = _state.value.enabled
                     _state.value = State(spanMinutes = _state.value.spanMinutes)
+                    opening = opensOnFavourites
                     if (on) show(true, preferredChannel)
                 }
         }
@@ -269,7 +277,10 @@ class LiveGuideViewModel(
         move(target.coerceAtLeast(day.startMs))
     }
 
-    fun filter(filter: LiveGuideFilter) = _state.update { it.copy(filter = filter) }
+    fun filter(filter: LiveGuideFilter) {
+        opening = false
+        _state.update { it.copy(filter = filter) }
+    }
 
     /**
      * Opens the guide at [target]: its day and half hour, with it selected
@@ -278,6 +289,7 @@ class LiveGuideViewModel(
     fun open(target: Target) {
         pending = target
         preferredChannel = target.channelId
+        opening = false
         _state.update { it.copy(filter = LiveGuideFilter.All) }
         if (!_state.value.enabled) return
         move(target.startMs.coerceAtLeast(clock()))
@@ -333,6 +345,10 @@ class LiveGuideViewModel(
                             days = days(now, listed),
                         )
                     }
+                    if (guide != null && opening) {
+                        opening = false
+                        if (_state.value.favourites.isNotEmpty()) _state.update { it.copy(filter = LiveGuideFilter.Favourites) }
+                    }
                     if (guide != null && _state.value.selection == null) select(guide, preferredChannel)
                     else if (guide != null) reselect(guide)
                     // A target beyond the first day waits for where listings end, then moves there.
@@ -359,10 +375,13 @@ class LiveGuideViewModel(
         if (programme != selection.programme || row.channel != selection.channel) _state.update { it.copy(selection = Selection(row.channel, programme)) }
     }
 
-    /** What is on now on [channelId], else on the first channel with listings. */
+    /** What is on now on [channelId], else on the first channel with listings; under Favourites, among the favourites. */
     private fun select(guide: LiveGuide, channelId: String?) {
         val now = clock()
-        val rows = guide.rows.filter { it.listings }
+        val s = _state.value
+        val rows = guide.rows.filter { it.listings }.let { all ->
+            if (s.shownFilter == LiveGuideFilter.Favourites) all.filter { it.channel.id in s.favourites }.ifEmpty { all } else all
+        }
         val row = rows.firstOrNull { it.channel.id == channelId && it.programmes.at(now) != null } ?: rows.firstOrNull { it.programmes.at(now) != null } ?: return
         _state.update { it.copy(selection = Selection(row.channel, row.programmes.at(now)!!)) }
     }

@@ -111,14 +111,23 @@ internal fun ScreenRow.homeFocusAt(index: Int, channels: List<LiveChannel>, now:
     }
 }
 
-private fun continueFocus(c: ContinueItem, now: Long, format: LiveClockFormat): HomeFocus {
+/**
+ * The episode's name from a Continue watching subtitle, without the code it
+ * may start with: "Open Late" from the server's "S02E01 Open Late", "Drift"
+ * from "S02 E04 · Drift"; null when nothing is left.
+ */
+internal fun episodeName(subtitle: String?): String? = subtitle?.replace(LEADING_CODE, "")?.trim()?.takeIf { it.isNotEmpty() }
+
+private val LEADING_CODE = Regex("""^\s*S\d+\s*E\d+\s*[·:–-]?\s*""", RegexOption.IGNORE_CASE)
+
+internal fun continueFocus(c: ContinueItem, now: Long, format: LiveClockFormat): HomeFocus {
     val code = if (c.season != null && c.episode != null) episodeCode(c.season!!, c.episode!!) else null
     val watchedMin = (c.positionMs / 60_000L).toInt()
     val totalMin = (c.durationMs / 60_000L).toInt()
     return HomeFocus(
         kicker = "Continue watching",
         title = c.title,
-        episode = if (code != null) listOfNotNull(code, c.subtitle?.takeIf { it.isNotBlank() && !it.startsWith(code) }).joinToString(" · ") else null,
+        episode = if (code != null) listOfNotNull(code, episodeName(c.subtitle)).joinToString(" · ") else null,
         facts = listOfNotNull(
             HomeFact(timeLeft(c.remainingMs), HomeFact.Kind.Strong),
             HomeFact(endsAt(c.remainingMs, now, format)),
@@ -252,7 +261,7 @@ internal fun HomeFocusPanel(focus: HomeFocus, modifier: Modifier = Modifier) {
     Column(modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (focus.live) {
-                Box(Modifier.padding(end = 12.dp).size(16.dp).background(WmmColors.BrandLine, CircleShape))
+                Box(Modifier.padding(end = 12.dp).size(16.dp).background(WmmColors.Record, CircleShape))
             }
             Kicker(focus.kicker)
         }
@@ -314,15 +323,15 @@ internal fun FactsLine(facts: List<HomeFact>, modifier: Modifier = Modifier) {
     }
 }
 
-/** A Recording tag: burgundy with its rim, white words. */
+/** A Recording tag: red, white words. */
 @Composable
 internal fun RecordingTag(text: String, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(8.dp)
     Text(
         text.uppercase(),
         modifier = modifier
-            .background(WmmColors.Brand, shape)
-            .border(2.dp, WmmColors.BrandLine, shape)
+            .background(WmmColors.RecordFill, shape)
+            .border(2.dp, WmmColors.Record, shape)
             .padding(horizontal = 10.dp, vertical = 3.dp),
         style = TvType.Caption.copy(fontWeight = FontWeight.Bold, letterSpacing = TvType.Caption.fontSize * 0.03f),
         color = WmmColors.Text,

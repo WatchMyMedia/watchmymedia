@@ -305,4 +305,5 @@ private class RealAppServices(
     override val follows: FollowsRepository get() = data.follows
     override val watchlists: WatchlistRepository get() = data.watchlists
     override val copyChoices: media.watchmy.client.model.CopyChoices get() = data.copyChoices
+    override val gridChoices: media.watchmy.client.model.GridChoices get() = data.gridChoices
 }

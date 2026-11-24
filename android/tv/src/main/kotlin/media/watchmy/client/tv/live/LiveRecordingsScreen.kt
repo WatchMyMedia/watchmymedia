@@ -388,14 +388,16 @@ fun LiveRecordingsScreenTv(onNavigate: (Any) -> Unit, onPlay: (PlayRequest) -> U
             note = if (rule.canCancel) null else "Someone else set this series, so only they or an admin can change it.",
         )
     }
-    // Deleting asks first, and opens on the choice that changes nothing.
+    // Deleting asks first, naming which recording goes, and opens on the choice that changes nothing.
+    // Only its own Delete is marked; Delete recording… in the recording's choices is plain, and last.
     deleting?.let { recording ->
+        val which = listOfNotNull(recording.episodeLine(), format.dayTime(recording.startMs)).joinToString(" · ")
         TvLiveMenu(
-            recording.title, "Delete the recorded file? This can’t be undone.", null,
+            recording.title, "$which. Delete the recorded file? This can’t be undone.", null,
             listOf(
                 TvMenuItem("Keep it", WmmIcons.Close) { deleting = null },
                 TvMenuItem(if (recordAgain) "Don’t record it again: on" else "Don’t record it again: off", WmmIcons.Record) { recordAgain = !recordAgain },
-                TvMenuItem("Delete recording", WmmIcons.Trash) { model.deleteFile(recording, recordAgain); deleting = null },
+                TvMenuItem("Delete recording", WmmIcons.Trash, warn = true) { model.deleteFile(recording, recordAgain); deleting = null },
             ),
             onDismiss = { deleting = null },
         )

@@ -27,6 +27,15 @@ object WmmColors {
     val OnAccent = Color(0xFF0F0F10)
     /** Orange, so warnings never read as the gold accent ("Not in library"). */
     val Warn = Color(0xFFFB923C)
+
+    /**
+     * Red, for Recording and Live marks and nothing else: the dot, a mark's
+     * rim. Burgundy is too dark to read as a small mark on the ground.
+     */
+    val Record = Color(0xFFF04438)
+
+    /** A Recording or Live mark's fill under white words (REC, LIVE), 6.6:1. */
+    val RecordFill = Color(0xFFB42318)
     val Text = Color(0xFFF5F5F5)
     val TextSoft = Color(0xFFD4D4D4)
     val TextMuted = Color(0xFFA3A3A3)

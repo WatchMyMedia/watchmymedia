@@ -146,7 +146,7 @@ internal fun guideOkHint(choices: List<ProgrammeChoice>, airing: Boolean, number
 }
 
 /**
- * The focused programme above the grid: when and where it is on (a burgundy
+ * The focused programme above the grid: when and where it is on (a red
  * dot while it is on now), its title, its facts and two lines about it, with
  * what OK and Hold OK do; its picture on the right. For a channel without
  * listings, the channel alone.
@@ -320,7 +320,7 @@ internal fun TvProgrammeChoices(
 
 /**
  * Home's On now card: the programme's picture, the channel in a dark flag,
- * REC in burgundy while it records, and how far it has got along the
+ * REC in red while it records, and how far it has got along the
  * bottom; then the title and "48 min left · then Night Ferry". Focus grows
  * the picture, as a card's does. The width is the caller's.
  */

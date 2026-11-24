@@ -24,7 +24,6 @@ import media.watchmy.client.model.ImageSize
 import media.watchmy.client.model.episodeCards
 import media.watchmy.client.model.LibraryRepository
 import media.watchmy.client.model.PlayRequest
-import media.watchmy.client.model.heroBadges
 import media.watchmy.client.model.playRequest
 import media.watchmy.client.tv.components.Backdrop
 import media.watchmy.client.tv.components.ContentStart
@@ -33,28 +32,23 @@ import media.watchmy.client.tv.components.Kicker
 import media.watchmy.client.tv.components.TextBright
 import media.watchmy.client.tv.components.TvButton
 import media.watchmy.client.tv.components.TvButtonStyle
-import media.watchmy.client.tv.components.TvTag
 import media.watchmy.client.tv.components.bringWholeIntoView
 import media.watchmy.client.tv.components.focusMemory
 import media.watchmy.client.tv.components.inter
 import media.watchmy.client.tv.components.overflowHeight
 import media.watchmy.client.ui.open
+import media.watchmy.client.ui.imageFor
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
 
-/** "S03 E07 · The Long Dark · 52 min · [4K] [HDR] · TV-14". */
+/** "S03 E07 · The Long Dark · 52 min · TV-14". The picture and sound are said on the title's page, never on Home. */
 @Composable
-private fun HeroFacts(hero: Hero, tags: List<String>) {
+private fun HeroFacts(hero: Hero) {
     val style = inter(24.sp)
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         var before = false
         if (hero.facts.isNotBlank()) {
             Text(hero.facts, style = style, color = TextBright, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-            before = true
-        }
-        if (tags.isNotEmpty()) {
-            if (before) Text("·", style = style, color = WmmColors.TextFaint)
-            tags.forEach { TvTag(it) }
             before = true
         }
         hero.contentRating?.let {
@@ -98,7 +92,7 @@ internal fun HeroSection(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            HeroFacts(hero, home.heroBadges)
+            HeroFacts(hero)
             Text(
                 hero.overview,
                 style = inter(22.sp, lineHeight = 33.sp),
@@ -139,5 +133,30 @@ internal fun HeroSection(
                 }
             }
         }
+    }
+}
+
+/**
+ * Home's lead on servers without rows, when something is in progress: the
+ * words and buttons arranged Home's lead has ([LeadPanel]), over the picture
+ * as the server's pick lays it out, above Continue watching's other titles.
+ */
+@Composable
+internal fun FixedResumeLead(lead: HomeLead.Resume, home: HomeData, library: LibraryRepository, memory: FocusMemory, actions: media.watchmy.client.tv.rows.TvRowActions) {
+    val item = lead.item
+    Box(Modifier.fillMaxWidth().height(600.dp).bringWholeIntoView()) {
+        Backdrop(
+            url = library.imageFor(item.where, item.stillPath ?: item.backdropPath, ImageSize.W1280),
+            seed = item.title,
+            modifier = Modifier
+                .offset(x = 560.dp)
+                .width(1360.dp)
+                .overflowHeight(720.dp, reported = 600.dp),
+            leftFade = listOf(0f to 1f, 0.22f to 0.85f, 0.6f to 0f),
+            bottomFadeFrom = 0.55f,
+            glowX = 0.7f,
+            glowY = 0.3f,
+        )
+        LeadPanel(lead, home, memory, actions, Modifier.padding(start = ContentStart, top = 112.dp).width(1100.dp))
     }
 }

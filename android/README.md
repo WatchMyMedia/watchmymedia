@@ -438,9 +438,12 @@ library's Movies or TV screen come in the person's order
 Rows are drawn by their style (`poster`, `wide`, `episode`, `continue`,
 `live`); a style the app doesn't know is skipped, and `live` is the app's
 own Live TV row in that place. The tablet keeps Continue beside the hero only
-while it is the first row drawn; the TV opens on the first row's first
-card, each row a screen of its own, and shows the hero only when there are
-no rows. Movies and TV get their rows above the grid.
+while it is the first row drawn. The TV leads Home with a screen of its own
+(`HomeLead`): a large card to resume Continue watching's first title, which
+then leaves that row, with Resume, Go to episode and Remove from Continue
+watching; the server's pick when nothing is in progress. Focus starts on
+Resume (or Play), and the rows follow a screen each; with neither, Home
+opens on its first row. Movies and TV get their rows above the grid.
 
 - **Edit Home** (end of Home, and Settings › Home rows) and a
   library's **Edit rows**: a page on the phone, a dialog on the tablet.
@@ -766,7 +769,10 @@ From API level 15 with listings,
 the guide has a star column left of the channels and a Favourites
 filter first among the chips once there is a favourite. Every client keeps
 one rule (`LiveGuideFilter.keeps`): a favourite shows with or without
-listings, in channel order. Live TV's top bar has Search listings and More
+listings, in channel order. The TV's guide opens on Favourites when there
+are some, else on All channels, deciding once as the listings arrive
+(`LiveGuideViewModel`'s `opensOnFavourites`); the phone and tablet open on
+All channels. Live TV's top bar has Search listings and More
 (Reminders, Reminder time); from 1000 dp they are header buttons that switch
 the panel beside the guide. A later programme that starts more than the lead
 time ahead offers Remind me, and its details then show the reminder, moved
@@ -1167,6 +1173,10 @@ minutes of playing a file, before and after a change.
   one UI does stays in that UI's module. What a page should keep across the
   process being killed (a filter, a query, the season) goes in a
   `SavedStateHandle`: `viewModel { SomeViewModel(createSavedStateHandle(), …) }`.
+  What must outlast the visit goes on the device: the TV keeps each
+  library's sort and filters in `GridChoices` (`LibraryViewModel`'s `kept`,
+  by "server id/type"), so Movies and TV Shows open as they were left; a
+  row's See all sorts that visit only.
   A ViewModel never takes a screen's lambda to call later; it says what
   happened through its state or an `events` flow the screen collects.
   Outside a nav host (the server picker and sign-in), `viewModel {}` lives
@@ -1197,7 +1207,10 @@ minutes of playing a file, before and after a change.
   1.02 panel rows) and a shadow; while OK is held the target sinks and its
   ring thickens. A card's picture grows rather than the card (`FocusedArt`),
   so its words stay sharp; the main button keeps its burgundy and other
-  controls lift to `TvPalette.Lift`. A choice that stays chosen is a gold
+  controls lift to `TvPalette.Lift`. Recording and Live marks (the dot,
+  REC, LIVE, Recording) are red (`WmmColors.Record`, fills
+  `WmmColors.RecordFill`), those marks only, as on every app; burgundy is a
+  button's fill. A choice that stays chosen is a gold
   tick (`OptionRow`, `PanelRow`, `TvChip`) or a gold underline (`TvTab`),
   never a gold fill or a ring, so it can't be taken for focus. Panels come
   from the right (`TvSidePanel`, 736 wide, 900 for detail); rows remember

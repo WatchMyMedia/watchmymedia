@@ -1,5 +1,6 @@
 package media.watchmy.client.tv.detail
 
+import media.watchmy.client.model.pictureAndSound
 import media.watchmy.client.presentation.servers.OtherServers
 import media.watchmy.client.model.at
 import media.watchmy.client.model.watchedLine
@@ -48,10 +49,8 @@ import media.watchmy.client.model.PlaybackPlan
 import media.watchmy.client.model.ProblemKind
 import media.watchmy.client.model.Trailer
 import media.watchmy.client.model.TrailerText
-import media.watchmy.client.model.channelsLabel
 import media.watchmy.client.model.formatDuration
 import media.watchmy.client.model.formatRating
-import media.watchmy.client.model.hdrLabel
 import media.watchmy.client.model.playRequest
 import media.watchmy.client.model.versionTitle
 import media.watchmy.client.model.watchToggleLabel
@@ -293,21 +292,17 @@ private fun movieMoreRows(
 private val MovieDetail.runtimeMs: Long?
     get() = runtimeMin?.takeIf { it > 0 }?.let { it * 60_000L } ?: versions.firstOrNull()?.durationMs?.takeIf { it > 0 }
 
-/** The facts a viewer asks first, in that order: year, rating, how long, genre, score, then up to three tags. */
+/**
+ * The facts a viewer asks first, in that order: year, rating, how long,
+ * genre, score. The picture and sound are a line of words under the
+ * buttons ([pictureAndSound]), never tags.
+ */
 private fun MovieDetail.viewerFacts(): List<Fact> = buildList {
     year?.let { add(Fact.Words("$it")) }
     contentRating?.takeIf { it.isNotBlank() }?.let { add(Fact.Tag(it)) }
     runtimeMs?.let { add(Fact.Words(formatDuration(it), bold = true)) }
     genres.firstOrNull()?.let { add(Fact.Words(it)) }
     formatRating(rating)?.let { add(Fact.Words(it)) }
-    viewerTags().forEach { add(Fact.Tag(it)) }
-}
-
-/** "4K", "HDR", "5.1": the picture and the sound at a glance, the rest in File details. */
-internal fun MovieDetail.viewerTags(): List<String> {
-    val v = versions.firstOrNull()
-    val isHdr = v?.let { hdrLabel(it.hdr) != null } ?: hdr
-    return listOfNotNull(quality, "HDR".takeIf { isHdr }, channelsLabel(v?.audioSummary)).take(3)
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -419,6 +414,12 @@ private fun Header(
             if (trailer != null) TrailerButton(handOff = trailer is Trailer.YouTube && !trailerInApp, onTrailer, Modifier.button("trailer"))
             WatchlistButtonTv(movie.watchlistTitle(), movie.watchlists, Modifier.button("watchlist"))
             TvButton("More", onMore, Modifier.button("more"))
+        }
+        // "In 4K with Dolby Vision and 7.1 sound": one quiet line under the buttons, below Trailer's
+        // "Opens the YouTube app" when that shows; the formats are in More › File details.
+        if (hasFile) movie.pictureAndSound()?.let { line ->
+            val handOff = trailer is Trailer.YouTube && !trailerInApp
+            Text(line, style = TvType.Second, color = TvPalette.Muted, maxLines = 1, modifier = Modifier.padding(top = if (handOff) 58.dp else 18.dp))
         }
     }
 }

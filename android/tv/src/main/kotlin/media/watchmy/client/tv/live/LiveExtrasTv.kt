@@ -110,7 +110,8 @@ import media.watchmy.client.ui.components.rememberLiveNow
 
 /** One row of a Hold OK menu. */
 @Immutable
-internal class TvMenuItem(val label: String, val icon: ImageVector, val enabled: Boolean = true, val onClick: () -> Unit)
+/** One of a thing's choices; [warn] marks a confirmation's own Delete, its icon in the warning orange (the only row marked). */
+internal class TvMenuItem(val label: String, val icon: ImageVector, val enabled: Boolean = true, val warn: Boolean = false, val onClick: () -> Unit)
 
 /**
  * A thing's choices (a recording's, a search card's): a panel from the
@@ -132,7 +133,10 @@ internal fun TvLiveMenu(title: String, subtitle: String, logo: LiveChannel?, ite
             }
             Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 items.forEachIndexed { index, item ->
-                    PanelRow(item.label, item.onClick, if (index == first.coerceIn(0, items.lastIndex)) Modifier.focusRequester(focus) else Modifier, icon = item.icon, enabled = item.enabled)
+                    PanelRow(
+                        item.label, item.onClick, if (index == first.coerceIn(0, items.lastIndex)) Modifier.focusRequester(focus) else Modifier,
+                        icon = item.icon, iconTint = if (item.warn) WmmColors.Warn else WmmColors.TextSoft, enabled = item.enabled,
+                    )
                 }
             }
             note?.let { Text(it, style = TvType.Second, color = TvPalette.Muted) }

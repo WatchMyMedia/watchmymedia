@@ -75,6 +75,7 @@ class FakeAppServices(
     /** Each fake's own, so one test's See all doesn't reach another's grid. */
     override val browseRequests = BrowseRequests()
     override val copyChoices = media.watchmy.client.model.CopyChoices.InMemory()
+    override val gridChoices = media.watchmy.client.model.GridChoices.InMemory()
     override val cast: CastService = if (cast && !tv) FakeCastService("Living Room TV", connected = true) else CastService.None
     override val client = ClientInfo(
         deviceId = "fake-device",

@@ -124,6 +124,17 @@ class StoredSettingsFormatTest {
         assertTrue("The other server's sign-in is untouched", saved.getValue("Golden Fixture").signedIn)
     }
 
+    @Test
+    fun `each library's sort and filters are kept across a restart`() = runBlocking {
+        val services = installed(release())
+        services.gridChoices.keep("a1/Tv", mapOf("sort" to "Title", "genre" to "Drama, Mystery"))
+        services.gridChoices.keep("a1/Movie", mapOf("filter" to "Unwatched"))
+        val again = h.reopen()
+        assertEquals(mapOf("sort" to "Title", "genre" to "Drama, Mystery"), again.gridChoices.recalled("a1/Tv"))
+        assertEquals(mapOf("filter" to "Unwatched"), again.gridChoices.recalled("a1/Movie"))
+        assertNull(again.gridChoices.recalled("cabin/Tv"))
+    }
+
     /** DataServices opened on a DataStore holding [values], as after an update. */
     private suspend fun installed(values: Map<String, String>): DataServices {
         h.editStorage { prefs -> values.forEach { (key, value) -> prefs[stringPreferencesKey(key)] = value } }

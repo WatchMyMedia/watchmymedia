@@ -224,7 +224,8 @@ private fun TvGuideContent(
     onTargetShown: () -> Unit = {},
 ) {
     val services = LocalAppServices.current
-    val model = viewModel { LiveGuideViewModel(services.live, services.servers, services.auth) }
+    // The TV's guide opens on Favourites when the person has some.
+    val model = viewModel { LiveGuideViewModel(services.live, services.servers, services.auth, opensOnFavourites = true) }
     val state by model.state.collectAsStateWithLifecycle()
     val recordingActions = rememberTvRecordingActions()
     val recordingState by recordingActions.state.collectAsStateWithLifecycle()

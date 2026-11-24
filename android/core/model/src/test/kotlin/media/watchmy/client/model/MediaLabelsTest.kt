@@ -37,6 +37,28 @@ class MediaLabelsTest {
         assertNull(resolutionLabel(0, 0))
     }
 
+    @Test fun `a title page says the picture and sound in words, as the Apple apps do`() {
+        assertEquals("In 4K with Dolby Vision and 5.1 sound", pictureAndSoundLine("4K", DOLBY_VISION, "TrueHD 5.1 · English"))
+        assertEquals("In HD with stereo sound", pictureAndSoundLine("1080p", null, "AAC 2.0 · English"))
+        assertEquals("In 4K with HDR", pictureAndSoundLine("4K", "hdr10", null))
+        assertEquals("With 5.1 sound", pictureAndSoundLine("SD", null, "AC3 5.1"))
+        assertEquals("With HDR and stereo sound", pictureAndSoundLine(null, "hlg", "AAC Stereo"))
+        assertNull(pictureAndSoundLine(null, null, null))
+        assertNull("Mono says nothing", pictureAndSoundLine(null, null, "AAC 1.0"))
+    }
+
+    @Test fun `a movie's line comes from the version Play plays`() {
+        val hd = uhd.copy(fileId = 2, width = 1920, height = 1080, hdr = null, audioSummary = "AC3 5.1 · English")
+        val movie = MovieDetail(
+            id = 1, libraryId = 1, title = "Film", year = 2026, tagline = null, overview = "", releaseDate = null, runtimeMin = 120,
+            genres = emptyList(), rating = null, posterPath = null, backdropPath = null, quality = "4K", hdr = true,
+            versions = listOf(uhd, hd), cast = emptyList(), watch = null,
+        )
+        assertEquals("In 4K with Dolby Vision and 7.1 sound", movie.pictureAndSound())
+        assertEquals("In HD with 5.1 sound", movie.pictureAndSound(hd))
+        assertEquals("Without a file, the movie's own", "In 4K with HDR", movie.copy(versions = emptyList()).pictureAndSound())
+    }
+
     @Test fun `hdr, codec and audio`() {
         assertEquals(DOLBY_VISION, hdrLabel("dolbyvision"))
         assertEquals(DOLBY_VISION, hdrLabel("Dolby Vision"))

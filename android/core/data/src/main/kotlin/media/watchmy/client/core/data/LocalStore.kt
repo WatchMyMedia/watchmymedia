@@ -100,6 +100,8 @@ internal data class Stored(
     val subtitleSize: String? = null,
     /** For each title on several servers, the copy Play uses: its card key, then "server id/file id"; the newest last. */
     val chosenCopies: Map<String, String> = emptyMap(),
+    /** Each library's sort and filters ([media.watchmy.client.model.GridChoices]), by "server id/library type"; the newest last. */
+    val gridChoices: Map<String, Map<String, String>> = emptyMap(),
 ) {
     val current: StoredServer? get() = servers.firstOrNull { it.id == currentId }
 
@@ -416,6 +418,8 @@ internal class LocalStore(
         private val SUBTITLE_SIZE = stringPreferencesKey("subtitle_size")
         private val CHOSEN_COPIES = stringPreferencesKey("chosen_copies")
         private val copiesSerializer = kotlinx.serialization.builtins.MapSerializer(String.serializer(), String.serializer())
+        private val GRID_CHOICES = stringPreferencesKey("grid_choices")
+        private val gridSerializer = kotlinx.serialization.builtins.MapSerializer(String.serializer(), copiesSerializer)
         private val json = Json { ignoreUnknownKeys = true }
         private val serversSerializer = ListSerializer(StoredServer.serializer())
 
@@ -430,6 +434,7 @@ internal class LocalStore(
             passthrough = prefs[PASSTHROUGH],
             subtitleSize = prefs[SUBTITLE_SIZE],
             chosenCopies = prefs[CHOSEN_COPIES]?.let { runCatching { json.decodeFromString(copiesSerializer, it) }.getOrNull() }.orEmpty(),
+            gridChoices = prefs[GRID_CHOICES]?.let { runCatching { json.decodeFromString(gridSerializer, it) }.getOrNull() }.orEmpty(),
         )
 
         fun encode(s: Stored, prefs: androidx.datastore.preferences.core.MutablePreferences) {
@@ -445,6 +450,7 @@ internal class LocalStore(
             put(PASSTHROUGH, s.passthrough)
             put(SUBTITLE_SIZE, s.subtitleSize)
             put(CHOSEN_COPIES, s.chosenCopies.takeIf { it.isNotEmpty() }?.let { json.encodeToString(copiesSerializer, it) })
+            put(GRID_CHOICES, s.gridChoices.takeIf { it.isNotEmpty() }?.let { json.encodeToString(gridSerializer, it) })
             // Left out while off, as the other settings are while at their defaults.
             if (s.matchFrameRate) prefs[MATCH_FRAME_RATE] = true else prefs.remove(MATCH_FRAME_RATE)
         }

@@ -56,7 +56,8 @@ class GuideRecompositionTest {
     }
 
     @Test fun `moving through the guide recomposes the hero, not the rows`() {
-        val services = FakeAppServices(tv = true)
+        // No favourites, so the guide opens on All channels and every channel is in it.
+        val services = FakeAppServices(tv = true).also { it.live.favourites = emptySet() }
         val listed = runBlocking { services.live.channels() }
         compose.setContent {
             CompositionLocalProvider(LocalAppServices provides services, LocalLiveTVAvailable provides true) {
