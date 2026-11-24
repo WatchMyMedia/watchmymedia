@@ -1,6 +1,7 @@
 import type { LiveChannel, LiveProgramme } from '../../../src/api/liveTV'
 import { timeOfDay } from '../../../src/lib/liveGuide'
 import type { OnNowCard } from './liveWords'
+import { platform } from '../../platform/current'
 
 // The Live TV player's words that decide something: what the banner says
 // next, what holds the tuners when they are all busy, when a recording
@@ -36,7 +37,9 @@ export function liveBadge(o: { tuning: boolean; paused: boolean; behind: boolean
 }
 
 /** The line under the controls: what the keys do with the controls hidden. */
-export const CONTROLS_NOTE = 'With these hidden, Up and Down or the channel keys change channel, and the number keys open Go to channel.'
+export const CONTROLS_NOTE = platform.numberKeys
+  ? 'With these hidden, Up and Down or the channel keys change channel, and the number keys open Go to channel.'
+  : `With these hidden, Up and Down change channel.${platform.pointer ? ' The arrows at the right are for the pointer.' : ''}`
 
 /** What a press on Go live says while the picture is already live. */
 export const AT_LIVE_NOTE = 'You’re watching live already.'

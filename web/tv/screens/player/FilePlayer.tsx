@@ -25,6 +25,7 @@ import { atRecordingEdge } from './scrubber'
 import { useSelect } from './select'
 import { Cues, SkipButton } from './Ticking'
 import './player.css'
+import { usePointerMove } from '../../app/pointer'
 
 type Episode = components['schemas']['Episode']
 
@@ -273,6 +274,12 @@ export function FilePlayer({ play, request, player, source }: { play: PlayReques
     }
   }
   useKeys(onKey, overlay !== 'panel')
+  // A remote that points: moving it is a press too, and brings up the controls.
+  usePointerMove(() => {
+    playback.noteInput()
+    setSerial((n) => n + 1)
+    if (!starting && overlayOf(playback.snapshot(), panelOpen) === 'none') showControls()
+  })
 
   const actions: ChromeActions = {
     back: leave,

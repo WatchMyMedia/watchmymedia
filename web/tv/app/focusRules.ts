@@ -46,8 +46,11 @@ export class LeftRun {
  * never moves past its last full screen, and only the cards near the view
  * are drawn (`margin` either side), so a long row costs no more than a short one.
  */
-export function rowWindow(focus: number, count: number, visible: number, margin = 3) {
-  const start = Math.max(0, Math.min(focus - 1, count - visible))
+export function rowWindow(focus: number, count: number, visible: number, margin = 3, keep?: number) {
+  const last = Math.max(0, count - visible)
+  // Under a pointer the row holds still while the focused card is in view (`keep`, where it is now).
+  const start = keep !== undefined && keep <= last && focus >= keep && focus < keep + visible ? keep
+    : Math.max(0, Math.min(focus - 1, last))
   return { start, from: Math.max(0, start - margin), to: Math.min(count, start + visible + margin) }
 }
 
@@ -56,10 +59,13 @@ export function rowWindow(focus: number, count: number, visible: number, margin 
  * either side of the ones in view, and whether to ask for more (the focus
  * is within `ahead` rows of the end of what has loaded).
  */
-export function gridWindow(focus: number, count: number, columns: number, visibleRows: number, margin = 2, ahead = 2) {
+export function gridWindow(focus: number, count: number, columns: number, visibleRows: number, margin = 2, ahead = 2, keep?: number) {
   const rows = Math.ceil(count / columns)
   const row = Math.floor(Math.max(0, focus) / columns)
-  const first = Math.max(0, Math.min(row - 1, rows - visibleRows))
+  const last = Math.max(0, rows - visibleRows)
+  // Under a pointer the grid holds still while the focused row is in view (`keep`, the first row now).
+  const first = keep !== undefined && keep <= last && row >= keep && row < keep + visibleRows ? keep
+    : Math.max(0, Math.min(row - 1, last))
   return {
     first,
     from: Math.max(0, first - margin) * columns,

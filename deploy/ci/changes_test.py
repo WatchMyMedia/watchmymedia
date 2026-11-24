@@ -17,7 +17,7 @@ spec.loader.exec_module(changes)
 # The areas each job waits for. scripts runs for every change, and
 # windows-signing only when asked by hand.
 GATES = {'server': ['server'], 'server-macos': ['server'], 'server-race': ['race'], 'contract': ['contract'],
-         'web': ['web'], 'samsung': ['samsung'], 'docker': ['docker'], 'android': ['android'],
+         'web': ['web'], 'samsung': ['samsung'], 'lg': ['lg'], 'docker': ['docker'], 'android': ['android'],
          'apple': ['apple', 'apple-api'], 'apple-tv': ['apple-tv'], 'windows-server': ['windows'],
          'windows-live-tv': ['windows'], 'windows-app': ['windows'], 'linux-packages': ['linux-packages'],
          'linux-packages-install': ['linux-packages']}
@@ -47,13 +47,16 @@ class RulesTest(unittest.TestCase):
                 (['web/receiver/main.ts', 'web/vite.receiver.config.ts'], {'web', 'docker'}),
                 # The TV app's own files are its jobs' alone, and
                 # what it shares with the web app runs both.
-                (['web/tv/app/App.tsx'], {'samsung'}),
-                (['web/vite.tv.config.ts', 'web/vite.tizen-core.config.ts', 'deploy/samsung/bundle.py'], {'samsung'}),
+                (['web/tv/app/App.tsx'], {'samsung', 'lg'}),
+                (['web/vite.tv.config.ts', 'web/vite.tizen-core.config.ts'], {'samsung', 'lg'}),
+                (['deploy/samsung/bundle.py'], {'samsung', 'lg'}),
+                (['deploy/samsung/package.py'], {'samsung'}),
                 (['brand/export/android/play-store-icon-512.png'], {'samsung'}),
-                (['web/src/lib/play/rules.ts'], {'web', 'docker', 'samsung'}),
-                (['web/src/api/schema.d.ts'], {'web', 'docker', 'contract', 'samsung'}),
-                (['web/pnpm-lock.yaml'], {'web', 'docker', 'contract', 'samsung'}),
-                (['web/tv/app/App.tsx', 'web/src/App.tsx'], {'web', 'docker', 'samsung'}),
+                (['deploy/lg/package.py', 'brand/export/webos/icon-80.png'], {'lg'}),
+                (['web/src/lib/play/rules.ts'], {'web', 'docker', 'samsung', 'lg'}),
+                (['web/src/api/schema.d.ts'], {'web', 'docker', 'contract', 'samsung', 'lg'}),
+                (['web/pnpm-lock.yaml'], {'web', 'docker', 'contract', 'samsung', 'lg'}),
+                (['web/tv/app/App.tsx', 'web/src/App.tsx'], {'web', 'docker', 'samsung', 'lg'}),
                 (['android/tv/src/main/kotlin/Home.kt'], {'android'}),
                 (['apple/App/Screens/Home.swift', 'apple/UITests/HomeTests.swift'], {'apple'}),
                 (['apple/TV/Screens/Home.swift', 'apple/TVUITests/HomeTests.swift'], {'apple-tv'}),

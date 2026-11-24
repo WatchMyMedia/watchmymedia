@@ -50,6 +50,7 @@ Type is Inter: Bold for "watchmy" / "WatchMy", SemiBold for "media", tracking
 | Cast receiver | `export/logo/logo-stacked-dark.svg` and `mark-dark.svg` (copied into `web/receiver/public` as `logo.svg` and `mark.svg`) |
 | Windows app | `export/windows/watchmymedia.ico` (16–256 px); `tray-light.ico` and `tray-dark.ico` (16–32 px, for the taskbar theme) |
 | Linux desktop | `export/linux/hicolor` (install under `/usr/share/icons/hicolor`) |
+| LG webOS TV app | `export/webos/icon-80.png` and `icon-130.png` (the package's `icon` and `largeIcon`, packed by `pnpm build:webos`), and `icon-400.png` for LG's store |
 | Logos for documents and sites | `export/logo/*.svg` (PNG @2x for the horizontal and app lockups) |
 
 Pick `-dark` files for dark backgrounds and `-light` files for light ones. Use

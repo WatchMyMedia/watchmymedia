@@ -1,0 +1,15 @@
+{
+  "id": "media.watchmy.client",
+  "version": "2.2.0",
+  "vendor": "Eldwick Software",
+  "type": "web",
+  "main": "index.html",
+  "title": "WatchMyMedia",
+  "appDescription": "Live TV, recordings and your own movies and shows",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "iconColor": "#0f0f10",
+  "resolution": "1920x1080",
+  "disableBackHistoryAPI": true,
+  "handlesRelaunch": true
+}

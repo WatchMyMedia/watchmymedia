@@ -40,6 +40,7 @@ jobs:
       contract: ${{ steps.areas.outputs.contract }}
       web: ${{ steps.areas.outputs.web }}
       samsung: ${{ steps.areas.outputs.samsung }}
+      lg: ${{ steps.areas.outputs.lg }}
       docker: ${{ steps.areas.outputs.docker }}
       linux-packages: ${{ steps.areas.outputs.linux-packages }}
       android: ${{ steps.areas.outputs.android }}
@@ -427,6 +428,45 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # The TV app (web/tv) built for LG TVs, a packaged webOS web app for the
+  # Chromium 108 of webOS 24: its build, the check that it loads there and
+  # that appinfo.json and the icons are what LG asks (deploy/lg/bundle.py),
+  # and the .ipk from LG's own ares-package, which checks the app first. The
+  # samsung job lints and tests the shared app. LG signs what its store
+  # accepts, so the .ipk is unsigned.
+  lg:
+    needs: changes
+    if: needs.changes.outputs.lg == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          version: 9
+          dest: ${{ runner.temp }}/setup-pnpm
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: ${{ runner.environment == 'github-hosted' && 'pnpm' || '' }}
+          cache-dependency-path: web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      # build:webos checks the types first.
+      - run: pnpm build:webos
+      - run: pnpm check:webos
+      # LG's CLI at a fixed version, in this job's own folder and without its
+      # install scripts, which only make its settings files writable.
+      - run: npm install --prefix "$RUNNER_TEMP/webos-cli" --no-save --ignore-scripts @webos-tools/cli@3.2.6
+      - run: python3 -I ../deploy/lg/package.py --app dist-webos --ares "$RUNNER_TEMP/webos-cli/node_modules/.bin/ares-package"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lg-tv-ipk
+          path: build/lg/*.ipk
+          if-no-files-found: error
+          retention-days: 7
+
   # The scripts under deploy/ (releases, the Unraid template, these
   # workflows' own checks) and the guidance's paths and make targets. For
   # every change, without waiting for the changes job: there is no build, so
@@ -438,7 +478,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Test the release, Unraid, Samsung, Apple and CI scripts
+      - name: Test the release, Unraid, Samsung, LG, Apple and CI scripts
         run: |
           python3 -I -m unittest discover -s deploy/release -p '*_test.py'
           python3 -I -m unittest discover -s deploy/ci -p '*_test.py'
@@ -446,6 +486,7 @@ jobs:
           python3 -I -m unittest discover -s deploy/fixture -p '*_test.py'
           python3 -I -m unittest discover -s deploy/linux -p '*_test.py'
           python3 -I -m unittest discover -s deploy/samsung -p '*_test.py'
+          python3 -I -m unittest discover -s deploy/lg -p '*_test.py'
           python3 -I -m unittest discover -s apple/scripts -p '*_test.py'
       - name: Check the guidance's paths and make targets
         run: python3 -I deploy/ci/check-agent-docs.py

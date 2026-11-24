@@ -62,6 +62,12 @@ AREAS = {
     'samsung': [*TV, 'web/src/lib/', 'web/src/api/', 'web/package.json', 'web/pnpm-lock.yaml',
                 'web/eslint.config.js', 'web/tsconfig.json', 'web/vite.config.ts', 'deploy/samsung/',
                 'brand/export/android/play-store-icon-512.png'],
+    # lg: the same app and what it reads, built for LG: its packaging and
+    # bundle check (deploy/lg, which reads deploy/samsung's), and the icons
+    # its build packs.
+    'lg': [*TV, 'web/src/lib/', 'web/src/api/', 'web/package.json', 'web/pnpm-lock.yaml',
+           'web/eslint.config.js', 'web/tsconfig.json', 'web/vite.config.ts', 'deploy/lg/', 'deploy/samsung/bundle.py',
+           'brand/export/webos/'],
     'docker': ['deploy/Dockerfile', 'deploy/entrypoint.sh', '.dockerignore', 'deploy/ci/docker-smoke.sh',
                'deploy/ci/prepare-docker.py', 'server/', 'web/'],
     # linux-packages and linux-packages-install, thirteen jobs, so this list

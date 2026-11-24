@@ -3,14 +3,24 @@ import react from '@vitejs/plugin-react'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-// The TV app, built once for each make of TV: `--mode samsung`. Each build
-// resolves tv/platform/current.ts to that make's folder, takes its package
-// files from that folder's public/, and writes its own dist folder.
-type Make = { outDir: string; icons: Record<string, string> }
+// The TV app, built once for each make of TV: `--mode samsung` or
+// `--mode lg`. Each build resolves tv/platform/current.ts to that make's
+// folder, takes its package files from that folder's public/, and writes its
+// own dist folder.
+type Make = { outDir: string; icons: Record<string, string>; html?: (html: string) => string; scriptKb: number }
 
 const MAKES: Record<string, Make> = {
   // Samsung's signing steps and CI's artifact read dist-tizen/.
-  samsung: { outDir: '../dist-tizen', icons: { 'icon.png': '../brand/export/android/play-store-icon-512.png' } },
+  samsung: { outDir: '../dist-tizen', icons: { 'icon.png': '../brand/export/android/play-store-icon-512.png' }, scriptKb: 900 },
+  // appinfo.json names an 80 px icon and a 130 px largeIcon. LG plays through
+  // the page's video element: AVPlay's <object> plane is Samsung's alone.
+  lg: {
+    outDir: '../dist-webos',
+    icons: { 'icon.png': '../brand/export/webos/icon-80.png', 'largeIcon.png': '../brand/export/webos/icon-130.png' },
+    html: (html) => html.replace(/\s*<object id="av-player"[^>]*><\/object>/, ''),
+    // hls.js, with alternate audio, adds about 570 kB.
+    scriptKb: 1600,
+  },
 }
 
 const here = (path: string) => fileURLToPath(new URL(path, import.meta.url))
@@ -43,6 +53,9 @@ export default defineConfig(({ mode }) => {
         for (const [fileName, source] of Object.entries(make.icons)) this.emitFile({ type: 'asset', fileName, source: readFileSync(source) })
       },
     }, {
+      name: 'tv-html',
+      transformIndexHtml: (html) => make.html?.(html) ?? html,
+    }, {
       // The packaged app loads from file://, where module scripts and crossorigin
       // requests can be refused. Ship one classic, deferred script instead.
       name: 'classic-script',
@@ -51,9 +64,9 @@ export default defineConfig(({ mode }) => {
     }],
     build: {
       outDir: make.outDir, emptyOutDir: true, target: 'chrome108', cssTarget: 'chrome108', sourcemap: false,
-      // One deliberate script (about 650 kB, 200 kB gzipped, read from the TV's own
-      // storage): warn only if it grows well past that. Launch time is measured on the TV.
-      chunkSizeWarningLimit: 900,
+      // One deliberate script (Samsung's about 900 kB, 280 kB gzipped, read from the
+      // TV's own storage): warn only if it grows well past that. Launch time is measured on the TV.
+      chunkSizeWarningLimit: make.scriptKb,
       modulePreload: false, cssCodeSplit: false, rolldownOptions: { output: { format: 'iife', codeSplitting: false } },
     },
     server: {

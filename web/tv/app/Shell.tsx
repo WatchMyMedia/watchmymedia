@@ -13,6 +13,7 @@ import { Rail } from '../ui/Rail'
 import { Dialog } from '../ui/Overlays'
 import { railBadge } from '../ui/railBadge'
 import { LeaveDialog } from './LeaveDialog'
+import { platform } from '../platform/current'
 import { ReminderBanner } from '../screens/live/ReminderBanner'
 import { keepSearch, searchScope } from '../screens/search/keptSearch'
 import { AddedDialog, NOTE_MS, SwitchNote } from '../screens/servers/Arrival'
@@ -73,7 +74,7 @@ function Frame({ nav, entries, arrival, exit }: { nav: NavStack<Route>; entries:
     push: (route) => nav.push(route),
     replace: (route) => nav.replace(route),
     openSection: (route) => { if (!nav.openSection(route)) input.focus.focusContent() },
-    back: () => { if (!nav.back()) setLeaving(true) },
+    back: () => { if (!nav.back() && !platform.backAtHome()) setLeaving(true) },
     play: (play) => nav.push({ name: 'player', play }),
     servers: () => setServers('screen'),
   }), [nav, input])
@@ -115,9 +116,9 @@ function Frame({ nav, entries, arrival, exit }: { nav: NavStack<Route>; entries:
     return true
   }, true, 'overlay')
 
-  // What no screen took: Return walks back the stack, and asks before leaving at Home; Guide opens Live TV.
+  // What no screen took: Back walks back the stack, and at Home the TV leaves its own way (LG) or the app asks first; Guide opens Live TV.
   const onApp = useEffectEvent((action: string) => {
-    if (action === 'back') { if (!nav.back()) setLeaving(true); return true }
+    if (action === 'back') { if (!nav.back() && !platform.backAtHome()) setLeaving(true); return true }
     if (action === 'guide' && liveTV) { nav.openSection(SECTION_ROUTES.live); return true }
     return false
   })

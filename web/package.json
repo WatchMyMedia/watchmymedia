@@ -10,6 +10,8 @@
     "build:tizen-core": "tsc --noEmit -p tv && vite build -c vite.tizen-core.config.ts",
     "build:tizen": "tsc --noEmit -p tv && vite build -c vite.tv.config.ts --mode samsung",
     "dev:tizen": "vite -c vite.tv.config.ts --mode samsung",
+    "build:webos": "tsc --noEmit -p tv && vite build -c vite.tv.config.ts --mode lg",
+    "dev:webos": "vite -c vite.tv.config.ts --mode lg",
     "dev:receiver": "vite -c vite.receiver.config.ts",
     "deploy:receiver": "pnpm build:receiver && wrangler deploy -c wrangler.receiver.jsonc",
     "typecheck": "pnpm typecheck:web && pnpm typecheck:tv",
@@ -22,6 +24,8 @@
     "test:web": "vitest run --exclude \"tv/**\"",
     "test:tv": "vitest run --dir tv",
     "check:tizen": "python3 -I ../deploy/samsung/bundle.py dist-tizen",
+    "check:webos": "python3 -I ../deploy/lg/bundle.py dist-webos",
+    "package:webos": "python3 -I ../deploy/lg/package.py --app dist-webos",
     "preview": "vite preview",
     "gen:api": "openapi-typescript src/api/openapi.json -o src/api/schema.d.ts"
   },

@@ -14,17 +14,18 @@ import { showNote } from '../../ui/notes'
 import { ProblemScreen } from '../../ui/States'
 import { placeholderTone } from '../../ui/tones'
 import { useNow } from './clock'
-import { GoToChannelPanel } from './GoToChannel'
+import { GoToChannelDialog, GoToChannelPanel } from './GoToChannel'
 import { useLiveTV, useRecordingAction } from './liveData'
 import { liveProblem, loggedKind, lowerQuality, type ProblemAction } from './liveProblems'
 import { registerTuner, rememberChannel, useLivePlayback } from './livePlayback'
 import { busyWords } from './livePlayerModel'
-import { BusyDialog, ChannelBanner, Controls, OnNowPanel, ProblemDialog, ProblemPage, QualityPanel, StillWatching, TakeoverBanner, TopClock, Tuning } from './LivePlayerParts'
+import { BusyDialog, ChannelArrows, ChannelBanner, Controls, OnNowPanel, ProblemDialog, ProblemPage, QualityPanel, StillWatching, TakeoverBanner, TopClock, Tuning } from './LivePlayerParts'
 import { BANNER_MS, CONTROLS_MS, liveBackAction, liveKeyAction, numberKey, type LivePanel } from './liveRemote'
 import { matchWords, qualityShort } from './liveWords'
 import { RecordPanel } from './RecordPanel'
 import './live.css'
 import './livePlayer.css'
+import { usePointerMove } from '../../app/pointer'
 
 /**
  * The Live TV player, which the player route
@@ -59,6 +60,8 @@ function LivePlayer({ channelId, live, preview }: { channelId: string; live: Liv
   const now = useNow()
   const [shownControls, setControls] = useState(false)
   const [panel, setPanel] = useState<LivePanel>()
+  // Go to channel's pad, for a remote without number keys.
+  const [goTo, setGoTo] = useState(false)
   const [recording, setRecording] = useState(false)
   // The channel whose banner has had its time.
   const [bannerDone, setBannerDone] = useState<string>()
@@ -114,10 +117,10 @@ function LivePlayer({ channelId, live, preview }: { channelId: string; live: Liv
     return () => clearTimeout(timer)
   }, [channel?.id, playing])
   useEffect(() => {
-    if (!controls || panel || !playing || state.paused || prompt) return
+    if (!controls || panel || goTo || !playing || state.paused || prompt) return
     const timer = setTimeout(() => { setControls(false); (document.activeElement as HTMLElement | null)?.blur() }, Math.max(0, lastKey + CONTROLS_MS - Date.now()))
     return () => clearTimeout(timer)
-  }, [controls, panel, playing, state.paused, prompt, lastKey])
+  }, [controls, panel, goTo, playing, state.paused, prompt, lastKey])
 
   useVideoSurface(!preview && playing)
   useEffect(() => (tuning || (playing && !state.paused) ? platform.holdScreenSaver() : undefined), [tuning, playing, state.paused])
@@ -136,7 +139,8 @@ function LivePlayer({ channelId, live, preview }: { channelId: string; live: Liv
     if (controls) show(was === 'onNow' ? 'live/onnow' : was === 'quality' ? 'live/quality' : 'live/play')
     else (document.activeElement as HTMLElement | null)?.blur()
   }
-  const watch = (c: LiveChannel) => { setPanel(undefined); setControls(false); void live.open(c.id) }
+  const watch = (c: LiveChannel) => { setPanel(undefined); setGoTo(false); setControls(false); void live.open(c.id) }
+  const closeGoTo = () => { setGoTo(false); show('live/goto') }
   const toGuide = () => nav.replace({ name: 'liveGuide', channelId: channel?.id })
   const leave = () => nav.back()
   const watchRecording = (id: string, title?: string) => nav.replace({ name: 'player', play: { kind: 'recording', id, startMs: 0, title } })
@@ -199,6 +203,13 @@ function LivePlayer({ channelId, live, preview }: { channelId: string; live: Liv
     }
   })
 
+  // A remote that points: moving it is a press too, and brings up the controls.
+  usePointerMove(() => {
+    setLastKey(Date.now())
+    live.noteInput()
+    if (playing && !controls && !panel && !goTo && !problem && !prompt && !recording) showControls()
+  })
+
   const act = (a: ProblemAction) => {
     switch (a) {
       case 'retry': case 'tuneAgain': return live.retry()
@@ -241,7 +252,10 @@ function LivePlayer({ channelId, live, preview }: { channelId: string; live: Liv
       takeoverCancel={takeoverCancel} quality={qualityShort(state.quality, state.autoStep)}
       onToggle={() => live.togglePause()} onLive={() => live.goLive()} onRecord={record}
       onCancelTakeover={() => { const id = state.takeover?.recordingId; live.dismissTakeover(); if (id) cancel.mutate(id) }}
-      onOnNow={() => openPanel('onNow')} onGuide={toGuide} onQuality={() => openPanel('quality')}/>}
+      onOnNow={() => openPanel('onNow')} onGuide={toGuide} onQuality={() => openPanel('quality')}
+      onGoTo={platform.numberKeys ? undefined : () => setGoTo(true)}/>}
+    {controlsShown && platform.pointer && <ChannelArrows onUp={() => { hideControls(); live.channelUp() }} onDown={() => { hideControls(); live.channelDown() }}/>}
+    {goTo && <GoToChannelDialog channels={state.channels} initial="" now={now} onWatch={watch} onClose={closeGoTo}/>}
     {panel === 'onNow' && !problem && <OnNowPanel channels={state.channels} current={channel?.id} listings={listings} now={now} onWatch={watch}/>}
     {panel === 'quality' && !problem && <QualityPanel state={state} onPick={(q) => { live.setQuality(q); closePanel() }}/>}
     {panel === 'number' && !problem && typed && number && <GoToChannelPanel digits={number.digits} text={typed.text} match={typed.match}

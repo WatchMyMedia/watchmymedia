@@ -1,12 +1,14 @@
 # TV app
 
 Read the root and `web/AGENTS.md` first. This is the TV client for makes of
-TV that run packaged web apps: one app, built once for each make. Today
-that is Samsung: a packaged Tizen web app for Chromium 108 that plays with
-Samsung's AVPlay, built to match the Android TV app's features, Live TV
-included. It is its own entry, not the browser app or the Cast receiver.
-[README.md](README.md) is for people: running it, building it, and the signing
-and QN90D steps still to do.
+TV that run packaged web apps: one app, built once for each make, to match
+the Android TV app's features, Live TV included. Samsung's is a packaged
+Tizen web app for Chromium 108 that plays with Samsung's AVPlay; LG's is a
+packaged webOS web app for the Chromium 108 of webOS 24 that plays through
+its video element, with hls.js for HLS, and answers the Magic Remote's
+pointer. It is its own entry, not the browser app or the Cast receiver.
+[README.md](README.md) is for people: running it, building it, packaging it,
+and the TV steps still to do.
 
 ## Makes of TV
 
@@ -29,6 +31,19 @@ checks and tests see Samsung's.
   sign-ins (`platform/samsung/samsung.test.ts` pins them).
 - The player engine (`player/`) takes the make's player and profiles from
   the shell, through its context; it imports no platform.
+- **LG's store identity** is `platform/lg/public/appinfo.json`'s `id`,
+  `media.watchmy.client`, which never changes after the first upload. Raise
+  its `version` with `TV_APP_VERSION` and Samsung's `config.xml`
+  (`platform/lg/lg.test.ts` holds them together). Its `requiredACG` is not
+  declared yet: which access groups its Luna calls need is to be seen on an
+  LG TV before it goes to LG's store.
+- What differs on LG, all from the platform: no number keys (`numberKeys`:
+  Go to channel is a button in the live player, and its pad takes focus);
+  the pointer (`pointer`, below); held keys acted on at most every 100 ms
+  (`repeatMs`; webOS repeats 40 times a second); and Back with nothing left
+  to go back to handed to webOS (`backAtHome()`, `webOS`'s `platformBack`),
+  which asks and leaves, as LG's checklist asks, where Samsung's app asks
+  "Leave WatchMyMedia?" itself.
 
 ## Rules
 
@@ -147,6 +162,20 @@ Focus is the remote's, kept by `app/focus.ts` from markup:
 
 Each stack entry keeps a `FocusMemory` (the last item, and each group's
 child); the shell restores it when the screen is drawn again.
+
+A remote that points (`platform.pointer`, LG's Magic Remote) is
+`app/pointer.ts`'s `PointerInput`. Focus stays the remote's: moving the
+pointer over a `data-focus` element focuses it (`FocusEngine.pointAt`, only
+in the newest modal while there is one), a click presses it as a browser's
+click does, a click on nothing leaves focus where it was, and the wheel
+steps as the arrows would (a card along a row, a row elsewhere). Only a
+pointer that moved counts, so a row sliding under a still pointer focuses
+nothing. While it shows, `<html>` has `tv-pointer`: rows and grids hold
+still while the focused card is in view (`rowWindow`'s and `gridWindow`'s
+`keep`), and what only a pointer needs draws (`.tv-pointer-only`): a row's
+arrows, a card's More (its Hold OK), the player's Back and the live
+player's CH ▲▼. None of them takes focus, and nothing needs the pointer.
+`usePointerMove` lets a player bring up its controls when it moves.
 
 Keys are named actions from one table (`app/keys.ts`): `up`, `down`,
 `left`, `right`, `ok`, `hold`, `back`, `playPause`, `play`, `pause`,
@@ -372,7 +401,7 @@ them is made up, and there are no pictures.
 
 ## Commands
 
-From `web/`: `pnpm dev:tizen` previews the Samsung app on port 5186, proxying only API
+From `web/`: `pnpm dev:tizen` and `pnpm dev:webos` preview the Samsung and LG apps on port 5186, proxying only API
 requests to the isolated fixture on port 27686 (open `/?fakes` instead for the
 fictional server). `pnpm build:tizen` builds unsigned app contents for Chromium
 108, as one classic deferred script without `crossorigin`: the package loads
@@ -388,7 +417,7 @@ TV does. `pnpm build:tizen-core` bundles the core separately. `pnpm typecheck`,
 `pnpm lint` and `pnpm test` include this entry. Run both existing web and
 receiver builds when shared code changes.
 
-CI checks this entry in its own `samsung` job, and the `web` job leaves it out
+CI checks this entry in its own `samsung` and `lg` jobs, and the `web` job leaves it out
 (`pnpm lint:web`, `typecheck:web`, `test:web`). The job runs `pnpm lint:tv`,
 `pnpm test:tv`, `pnpm build:tizen` (types first) and `pnpm check:tizen`, and
 keeps the unsigned build as the `samsung-tv-unsigned` artifact for a week. It
@@ -397,6 +426,19 @@ runs for this folder, `../vite.tv.config.ts`, `../vite.tizen-core.config.ts`,
 import, the web's dependencies and configs, and the packed icon (`samsung` in
 `deploy/ci/changes.py`). A new file outside this folder that only this entry
 reads goes in `TV` there, or the web job starts for it and this one doesn't.
+
+The `lg` job runs `pnpm build:webos` (types first), `pnpm check:webos` and
+`pnpm package:webos` with LG's CLI (`@webos-tools/cli`, a fixed version
+installed in the job), and keeps the `.ipk` as the `lg-tv-ipk` artifact for
+a week. It runs for the same paths with `deploy/lg/` and the webOS icons
+(`lg` in `deploy/ci/changes.py`).
+
+`pnpm check:webos` (`deploy/lg/bundle.py`) runs Samsung's checks on
+`../dist-webos/`, then LG's: `appinfo.json` with its id, a three-number
+version, `disableBackHistoryAPI` and `handlesRelaunch`, and an 80 px
+`icon.png` and 130 px `largeIcon.png`. `pnpm package:webos`
+(`deploy/lg/package.py`) has `ares-package` check the app, package it into
+`../../build/lg/<id>_<version>_all.ipk` and read it back.
 
 `pnpm check:tizen` (`deploy/samsung/bundle.py`) reads `../dist-tizen/`: one
 classic script and one stylesheet, `config.xml` and `icon.png`, no module script
@@ -407,5 +449,6 @@ as written (`toSorted` and the other copying array methods, `Object.groupBy`,
 syntax, never the browser's methods, so a library update can break this too.
 Add an API to its lists when one newer than Chrome 108 turns up.
 
-Signing and real TV testing are separate steps the user takes (README); don't
-attempt either as part of browser checks.
+Signing, installing on a TV (Samsung's Developer Mode or LG's), and anything
+in either store are separate steps the user takes or approves (README);
+don't attempt them as part of browser checks.

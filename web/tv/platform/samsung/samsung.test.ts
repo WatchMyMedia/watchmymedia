@@ -32,4 +32,9 @@ describe('the Samsung TV', () => {
     expect(platform.id).toBe('tizen')
     expect(platform.words).toMatchObject({ tv: 'Samsung TV', product: 'WatchMyMedia for Samsung TV', back: 'Return' })
   })
+
+  it('keeps its remote as it was: number keys, no pointer, every repeat, and its own Leave question at Home', () => {
+    expect(platform).toMatchObject({ numberKeys: true, pointer: false, repeatMs: 0 })
+    expect(platform.backAtHome()).toBe(false)
+  })
 })

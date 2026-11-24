@@ -122,6 +122,18 @@ export class FocusEngine {
     return el && usable(el) ? el : undefined
   }
 
+  /**
+   * The pointer is over an element: focus it, when the arrows could reach
+   * it (inside the newest modal while there is one, and in view).
+   */
+  pointAt(el: HTMLElement): boolean {
+    if (!el.matches(FOCUSABLE) || !usable(el) || !inView(el)) return false
+    const modal = this.scope('modal')
+    if (modal && !modal.contains(el)) return false
+    this.focus(el)
+    return true
+  }
+
   focusId(id: string, scope?: ParentNode | null) {
     const el = this.find(id, scope)
     if (el) this.focus(el)

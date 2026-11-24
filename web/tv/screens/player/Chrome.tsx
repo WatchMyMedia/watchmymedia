@@ -6,6 +6,8 @@ import { recordingLabel, type PlayerKind } from './labels'
 import { PlayerIcon, type PlayerIconName } from './PlayerIcons'
 import { ScrubberRow, SeekHints, WallClock } from './Ticking'
 import type { Heading } from './playerSession'
+import { platform } from '../../platform/current'
+import { Icon } from '../../ui/Icon'
 
 // The controls over the video, for files, recordings and trailer files:
 // the title and its line at the top left, the clock at the top right; at
@@ -84,6 +86,7 @@ export function PlayerChrome({ playback, model, actions }: { playback: FilePlayb
   return <>
     <div className="pl-shade pl-shade--top"/>
     <div className="pl-shade pl-shade--bottom"/>
+    {platform.pointer && <button type="button" className="pl-back tv-pointer-only" aria-label="Back" tabIndex={-1} onClick={actions.back}><Icon name="left"/></button>}
     <TitleBlock heading={model.heading} recordingMs={model.recordingMs}/>
     <WallClock className="pl-clock"/>
     <section className="pl-foot" aria-label="Playback">

@@ -28,12 +28,17 @@ export const platform: TvPlatform = {
   },
   keyCodes: SAMSUNG_KEY_CODES,
   typing: { done: [IME_DONE], cancel: [IME_CANCEL, RETURN] },
+  repeatMs: 0,
+  numberKeys: true,
+  pointer: false,
   async start() {
     // Samsung's webapis.js (AVPlay, the screensaver, the model) comes with the packaged app only.
     if (!import.meta.env.DEV || onTV()) await loadWebApis().catch(() => undefined)
     registerKeys(REGISTERED_KEYS)
   },
   exit: exitApp,
+  // Samsung's certification asks for the app's own Leave question.
+  backAtHome: () => false,
   holdScreenSaver,
   refreshScreenSaver,
   model: tvModel,
