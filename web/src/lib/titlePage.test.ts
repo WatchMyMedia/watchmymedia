@@ -4,6 +4,7 @@ import {
   codecName,
   episodeRowFacts,
   spoilerHidden,
+  hasTrackChoice,
   episodeRowState,
   filesSummary,
   historyWords,
@@ -178,5 +179,15 @@ describe('spoilerHidden', () => {
     expect(spoilerHidden(watched as never, true)).toBe(false)
     expect(spoilerHidden(started as never, true)).toBe(false)
     expect(spoilerHidden(fresh as never, false)).toBe(false)
+  })
+})
+
+describe('hasTrackChoice', () => {
+  it('is true for two sound tracks or any subtitle, false for one track alone', () => {
+    const a = (index: number) => ({ index, codec: 'aac', channels: 2 })
+    expect(hasTrackChoice({ audio: [a(1), a(2)], subtitles: [] } as never)).toBe(true)
+    expect(hasTrackChoice({ audio: [a(1)], subtitles: [{ index: 3, codec: 'subrip' }] } as never)).toBe(true)
+    expect(hasTrackChoice({ audio: [a(1)], subtitles: [] } as never)).toBe(false)
+    expect(hasTrackChoice(undefined)).toBe(false)
   })
 })

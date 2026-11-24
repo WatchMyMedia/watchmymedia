@@ -50,7 +50,7 @@ import {
   type OnTopReason,
 } from '../lib/showPage'
 import { useShowMissing } from '../lib/showMissing'
-import { HIDDEN_SYNOPSIS, episodeRowFacts, episodeRowState, playChoices, seasonLine, seasonTabWords, showState, spoilerHidden } from '../lib/titlePage'
+import { HIDDEN_SYNOPSIS, episodeRowFacts, hasTrackChoice, episodeRowState, playChoices, seasonLine, seasonTabWords, showState, spoilerHidden } from '../lib/titlePage'
 import { useHideSpoilers } from '../components/useHideSpoilers'
 import { watchlistTitle } from '../lib/watchlists'
 import { hasShowTracks, pickBody, rememberedChoice } from '../lib/showTracks'
@@ -336,7 +336,7 @@ function EpisodeTop({ show: s, se, e, why, listed }: { show: ShowDetail; se: Sea
         {best && (
           <div className="flex flex-wrap items-center gap-2">
             <TrackChoices probe={file.data?.probe} choice={choice} onChange={choose} />
-            {hasShowTracks(s.tracks) && !keepError && <span className="text-[13px] text-neutral-400 max-md:hidden">Remembered for this show.</span>}
+            {hasShowTracks(s.tracks) && !keepError && hasTrackChoice(file.data?.probe) && <span className="text-[13px] text-neutral-400 max-md:hidden">Remembered for this show.</span>}
             {keepError && <span className="text-[13px] text-warn">Not kept for the show: {keepError}</span>}
           </div>
         )}

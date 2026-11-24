@@ -169,6 +169,11 @@ export function subtitleOptions(probe?: Pick<MediaInfo, 'subtitles'>): SubtitleO
   }))
 }
 
+/** Whether a file has a sound or subtitle choice for Sound and Subtitles to show. */
+export function hasTrackChoice(probe?: Pick<MediaInfo, 'audio' | 'subtitles'>): boolean {
+  return soundOptions(probe).length > 1 || subtitleOptions(probe).length > 0
+}
+
 /** "2 versions · 27.6 GB · sound in 2 languages · 2 subtitle tracks": File details' line while it is closed. */
 export function filesSummary(files: readonly Pick<FileFacts, 'size' | 'probe'>[]): string {
   const size = files.reduce((n, f) => n + (f.size || 0), 0)
