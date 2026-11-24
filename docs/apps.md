@@ -65,7 +65,7 @@ The native apps all use the same server:
   sign-in of a server that isn't the one in use, it asks the address which server it is
   (`GET /api/server`) and sends nothing unless the id is the one it remembers. Each app's
   README has the details: [Android](../android/README.md#several-servers),
-  [Apple](../apple/README.md#several-servers), [Samsung TV](../web/tizen/README.md).
+  [Apple](../apple/README.md#several-servers), [Samsung TV](../web/tv/README.md).
 - **One title across servers (Samsung TV).** With servers newer than 2.1.0 (API level 34), the
   Samsung TV app shows a title that several servers have once, matched by its TMDB id: in
   search, on Home (Continue watching, and the recently added, aired and released rows), and in

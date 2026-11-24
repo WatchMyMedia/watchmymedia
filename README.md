@@ -97,7 +97,7 @@ accounts and what you watch stay on your own computer.
 | Fire TV | | The APK on each [release](https://github.com/WatchMyMedia/watchmymedia/releases) ([how](docs/apps.md#installing-the-apk-on-a-tv)) |
 | Chromecast and AirPlay devices | | Cast from a browser or the apps |
 
-A Samsung TV app is on its way; its code is in [web/tizen](web/tizen/README.md).
+A Samsung TV app is on its way; its code is in [web/tv](web/tv/README.md).
 
 ## Install
 

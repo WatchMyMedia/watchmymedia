@@ -45,15 +45,15 @@ class RulesTest(unittest.TestCase):
                 (['server/cmd/server/main.go'], server | {'linux-packages'}),
                 (['web/src/App.tsx'], {'web', 'docker'}),
                 (['web/receiver/main.ts', 'web/vite.receiver.config.ts'], {'web', 'docker'}),
-                # The Samsung TV app's own files are its job's alone, and
+                # The TV app's own files are its jobs' alone, and
                 # what it shares with the web app runs both.
-                (['web/tizen/App.tsx'], {'samsung'}),
-                (['web/vite.tizen.config.ts', 'web/vite.tizen-core.config.ts', 'deploy/samsung/bundle.py'], {'samsung'}),
+                (['web/tv/app/App.tsx'], {'samsung'}),
+                (['web/vite.tv.config.ts', 'web/vite.tizen-core.config.ts', 'deploy/samsung/bundle.py'], {'samsung'}),
                 (['brand/export/android/play-store-icon-512.png'], {'samsung'}),
                 (['web/src/lib/play/rules.ts'], {'web', 'docker', 'samsung'}),
                 (['web/src/api/schema.d.ts'], {'web', 'docker', 'contract', 'samsung'}),
                 (['web/pnpm-lock.yaml'], {'web', 'docker', 'contract', 'samsung'}),
-                (['web/tizen/App.tsx', 'web/src/App.tsx'], {'web', 'docker', 'samsung'}),
+                (['web/tv/app/App.tsx', 'web/src/App.tsx'], {'web', 'docker', 'samsung'}),
                 (['android/tv/src/main/kotlin/Home.kt'], {'android'}),
                 (['apple/App/Screens/Home.swift', 'apple/UITests/HomeTests.swift'], {'apple'}),
                 (['apple/TV/Screens/Home.swift', 'apple/TVUITests/HomeTests.swift'], {'apple-tv'}),
@@ -84,7 +84,7 @@ class RulesTest(unittest.TestCase):
                 self.assertEqual(expected, running(changes.plan(files, None, '')))
 
     def test_guidance_starts_no_build_wherever_it_is(self):
-        for path in ('AGENTS.md', 'README.md', 'CHANGELOG.md', 'server/AGENTS.md', 'server/CLAUDE.md', 'web/tizen/README.md',
+        for path in ('AGENTS.md', 'README.md', 'CHANGELOG.md', 'server/AGENTS.md', 'server/CLAUDE.md', 'web/tv/README.md',
                      'android/README.md', 'android/core/playback/README.md', 'windows/README.md', 'deploy/linux/README.md',
                      'apple/Kit/README.md'):
             with self.subTest(path=path):
@@ -147,8 +147,8 @@ class RulesTest(unittest.TestCase):
                     self.assertTrue(found.is_dir() if name.endswith('/') else found.is_file(), 'is not there')
 
     def test_what_an_area_leaves_to_another_job_starts_that_job(self):
-        # The Samsung app's files are in web/, and only the samsung job
-        # builds them: none falls between the two.
+        # The TV app's files are in web/, and only the TV jobs build them:
+        # none falls between the two.
         for area, names in changes.ELSEWHERE.items():
             for name in names:
                 path = name + 'App.tsx' if name.endswith('/') else name

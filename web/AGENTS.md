@@ -15,7 +15,7 @@ From `web/`. Node 24 and pnpm 9, as CI uses.
 | Receiver dev server on :5174 | `pnpm dev:receiver` (launch config `receiver`) |
 | Lint, types, tests and builds of everything here | `pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm build:receiver && pnpm build:tizen` |
 | As CI's `web` job does: the web app and the receiver, not the Samsung app | `pnpm lint:web && pnpm typecheck:web && pnpm test:web && pnpm build && pnpm build:receiver` |
-| As CI's `samsung` job does: the Samsung app alone, and the check that its build loads on the TV | `pnpm lint:tizen && pnpm test:tizen && pnpm build:tizen && pnpm check:tizen` ([tizen/AGENTS.md](tizen/AGENTS.md)) |
+| As CI's `samsung` job does: the TV app alone, and the check that its Samsung build loads on the TV | `pnpm lint:tv && pnpm test:tv && pnpm build:tizen && pnpm check:tizen` ([tv/AGENTS.md](tv/AGENTS.md)) |
 | One test file | `pnpm vitest run src/lib/quality.test.ts` |
 | Two dev servers against two backends in one browser | Give the second its own host name (`vite --host 127.0.0.1 --port 5291`, opened as `http://live.localhost:5291`): cookies don't separate by port, so signing in on one `localhost` port signs the other out |
 | Regenerate the API types | `make gen-api` from the root (never `pnpm gen:api` alone: it reads a copy of the document the server writes) |
@@ -35,7 +35,7 @@ the user asks in this conversation; see Authority in the root file.
 | `src/lib/` | Logic without React, each file with a `*.test.ts` beside it where it has rules: formats, quality, pairing, episode routes, the play rules in `play/` |
 | `src/cast/` | The Cast sender and `protocol.ts`, the messages both sides speak |
 | `receiver/` | The receiver: CAF and Shaka, its own `tsconfig.json`, `vite.receiver.config.ts`, `wrangler.receiver.jsonc`, CSP in `receiver/public/_headers` |
-| `tizen/` | The Samsung TV app (Tizen, Chromium 108, AVPlay); its own [guidance](tizen/AGENTS.md), with its architecture, and [README](tizen/README.md), with `pnpm dev:tizen` (`/?fakes` for its fictional server) and `pnpm build:tizen`; it reuses `src/api/` and `src/lib/`, so a change there runs its checks too; CI's `samsung` job, not `web`, lints, tests and builds it; signing and TV tests are still to do |
+| `tv/` | The TV app, built for each make of TV from one source: Samsung's (Tizen, Chromium 108, AVPlay) today, its parts in `tv/platform/samsung/`; its own [guidance](tv/AGENTS.md), with its architecture, and [README](tv/README.md), with `pnpm dev:tizen` (`/?fakes` for its fictional server) and `pnpm build:tizen`; it reuses `src/api/` and `src/lib/`, so a change there runs its checks too; CI's `samsung` job, not `web`, lints, tests and builds it; signing and TV tests are still to do |
 
 ## Rules
 

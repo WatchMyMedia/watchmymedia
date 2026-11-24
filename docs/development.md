@@ -13,7 +13,7 @@ version is in [releasing.md](releasing.md).
 ## Layout
 
 - `server/` — Go server (chi + huma API, SQLite via sqlc/goose, ffmpeg orchestration, embedded web UI)
-- `web/` — React + Vite web client, API types generated from the server's OpenAPI; the Cast receiver in `web/receiver`, and the Samsung TV app in `web/tizen` ([web/tizen/README.md](../web/tizen/README.md))
+- `web/` — React + Vite web client, API types generated from the server's OpenAPI; the Cast receiver in `web/receiver`, and the TV app (Samsung's today) in `web/tv` ([web/tv/README.md](../web/tv/README.md))
 - `android/` — Android app for phones, tablets, Google TV and Android TV ([android/README.md](../android/README.md))
 - `apple/` — iPhone, iPad and Apple TV apps ([apple/README.md](../apple/README.md))
 - `macos/` — the Mac menu bar app that runs the server

@@ -29,7 +29,7 @@ export function invalidateLibrary(qc: QueryClient, libraryId: number) {
 /**
  * Every server event (GET /api/events) that changes what the query cache
  * holds, and the queries each refetches. The web app's EventSource
- * (`events.ts`) and the Samsung TV app's fetch reader (`tizen/session/events.ts`)
+ * (`events.ts`) and the TV app's fetch reader (`tv/session/events.ts`)
  * both dispatch through this one table, so the two can't drift apart. Events
  * that only move a status line (scan and match progress) are not here.
  */
