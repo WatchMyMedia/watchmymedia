@@ -273,7 +273,7 @@ private struct LibraryView: View {
                 empty
             } else {
                 LazyVGrid(columns: columns, alignment: .leading, spacing: Self.rowSpacing) {
-                    ForEach(model.gridItems, id: \.cardID) { item in
+                    ForEach(model.gridItems, id: \.gridID) { item in
                         Button { model.open(item) } label: {
                             // A poster from another server says so in its line ("On Cabin · 2024 · 1 h 46 min").
                             GridPoster(item: item, imageURL: services.library.imageURL(item.posterPath, size: .w500, on: item.server),
@@ -296,10 +296,11 @@ private struct LibraryView: View {
                             }
                         }
                         .onAppear {
-                            drawn.ids.insert(item.id)
+                            // The posters focus is asked for are the server in use's, by id.
+                            if item.server == nil { drawn.ids.insert(item.id) }
                             Task { await model.itemAppeared(item) }
                         }
-                        .onDisappear { drawn.ids.remove(item.id) }
+                        .onDisappear { if item.server == nil { drawn.ids.remove(item.id) } }
                     }
                 }
                 .padding(.leading, TVLayout.gutter)

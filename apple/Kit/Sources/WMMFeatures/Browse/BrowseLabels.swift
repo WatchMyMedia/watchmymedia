@@ -202,6 +202,12 @@ extension BrowseItem {
     /// Another server's card carries its server: two servers' ids can be equal.
     public var cardID: String { "\(kind.rawValue)-\(id)" + (server.map { "@\($0)" } ?? "") }
 
+    /// A library grid's identity for the card: the server in use's by its
+    /// id, which a letter jump and Page Down scroll to
+    /// (``LibraryModel/scrollTargetID``), and another server's by its
+    /// ``cardID``, so two servers' ids never stand for each other.
+    public var gridID: AnyHashable { server == nil ? AnyHashable(id) : AnyHashable(cardID) }
+
     /// A show's card on Apple TV: "2 episodes left · next on Thursday",
     /// "All watched · next tomorrow"; nil for a movie, and from servers that
     /// don't count what is left (below API level 34).

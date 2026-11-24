@@ -44,4 +44,16 @@ import WMMModel
         #expect(MergedGrid.before(newer, older, sort: .added), "newest first")
     }
 
+    @Test func aGridCardIsKnownByWhatTheGridScrollsTo() {
+        // A letter jump and Page Down scroll to the server in use's id
+        // (scrollTargetID); keyed by cardID alone, they found nothing to scroll to.
+        let own = BrowseItem(kind: .movie, id: 7, libraryID: 1, title: "Cold Harbour Road")
+        #expect(own.gridID == AnyHashable(7))
+        #expect(own.gridID == AnyHashable(AnyHashable(7)), "as a scroll view compares it")
+        var theirs = own
+        theirs.server = cabin
+        #expect(theirs.gridID != own.gridID, "another server's card with the same id is another card")
+        #expect(theirs.gridID == AnyHashable(theirs.cardID))
+    }
+
 }

@@ -341,7 +341,7 @@ private struct LibraryView: View {
                 empty
             } else {
                 LazyVGrid(columns: columns, spacing: wide ? 18 : 14) {
-                    ForEach(model.gridItems, id: \.cardID) { item in
+                    ForEach(model.gridItems, id: \.gridID) { item in
                         Button { model.open(item) } label: {
                             // Every signed-in server's titles, one card each; one only another server has says so.
                             PosterCard(item: item, imageURL: services.library.imageURL(item.posterPath, size: .w342, on: item.server), compact: true,
