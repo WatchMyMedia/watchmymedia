@@ -59,7 +59,10 @@ public final class LiveGuideModel {
     public var query = ""
     /// A category chip; choosing one leaves Favourites.
     public var filter: LiveGuideFilter? {
-        didSet { if filter != nil { favouritesOnly = false } }
+        didSet {
+            if filter != nil { favouritesOnly = false }
+            openingChipChosen = true
+        }
     }
     /// The Favourites chip (API level 15): only the person's favourite channels.
     public private(set) var favouritesOnly = false
@@ -71,6 +74,12 @@ public final class LiveGuideModel {
     public let extras: LiveExtrasStore?
     @ObservationIgnored private let repository: any LiveTVRepository
     @ObservationIgnored private let now: @MainActor () -> Date
+    /// The guide opens on Favourites when the person has some (Apple TV, as
+    /// every app's guide does once they agree); otherwise on All channels.
+    @ObservationIgnored private let opensOnFavourites: Bool
+    /// The chip the guide opens on is settled: the channels were in, or the
+    /// person (or a programme the guide was opened on) chose one first.
+    @ObservationIgnored private var openingChipChosen = false
 
     // What reading the grid would otherwise recompute on every read:
     // kept until something they read changes,
@@ -95,9 +104,12 @@ public final class LiveGuideModel {
         var until: Date
     }
 
+    /// `opensOnFavourites`: the guide opens on Favourites when the person
+    /// has starred a channel, once the channels are in.
     public init(repository: any LiveTVRepository, extras: LiveExtrasStore? = nil, spanMinutes: Int = 60, clock: LiveClock = .device,
-                now: @escaping @MainActor () -> Date = { Date() }) {
+                opensOnFavourites: Bool = false, now: @escaping @MainActor () -> Date = { Date() }) {
         self.repository = repository
+        self.opensOnFavourites = opensOnFavourites
         self.extras = extras
         self.span = Double(spanMinutes) * 60
         self.clock = clock
@@ -120,6 +132,7 @@ public final class LiveGuideModel {
 
     public func load() async {
         await store.load(from: start, to: end)
+        settleOpeningChip()
         if let extras, extras.available {
             if let through = store.state?.listedThrough { extras.listedThrough = through }
             extras.noteProgrammes(store.channels.flatMap(\.programmes))
@@ -220,6 +233,15 @@ public final class LiveGuideModel {
 
     public func showFavourites() { filter = nil; favouritesOnly = true }
     public func showAll() { filter = nil; favouritesOnly = false }
+
+    /// Once, when the channels first come in: Favourites when the person has
+    /// a favourite among them and nothing was chosen meanwhile, else All
+    /// channels. A star added later doesn't move the guide.
+    private func settleOpeningChip() {
+        guard opensOnFavourites, !openingChipChosen, !store.channels.isEmpty else { return }
+        openingChipChosen = true
+        if hasFavourites { favouritesOnly = true }
+    }
 
     /// The Favourites rule, the same on every client: with the chip on, a
     /// channel shows when it is a favourite, with or without listings, in the

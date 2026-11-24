@@ -12,7 +12,9 @@ import WMMUI
 /// Watch now, which the long press offers too. Play/Pause on any cell
 /// watches that channel now. Moving up or down keeps the time: focus goes
 /// to what airs on the next channel at the time it came from. The channel
-/// watched last is marked, and the guide opens on what is on it now.
+/// watched last is marked, and the guide opens on what is on it now. It
+/// opens on Favourites when the person has starred a channel, otherwise on
+/// All channels.
 struct TVLiveGuideScreen: View {
     /// A later programme's sheet.
     private struct SheetTarget: Identifiable {
@@ -42,7 +44,7 @@ struct TVLiveGuideScreen: View {
     private let watching = TVLiveWatching.shared
 
     init(repository: any LiveTVRepository, extras: LiveExtrasStore) {
-        _model = State(initialValue: LiveGuideModel(repository: repository, extras: extras, spanMinutes: 90))
+        _model = State(initialValue: LiveGuideModel(repository: repository, extras: extras, spanMinutes: 90, opensOnFavourites: true))
         _live = State(initialValue: LiveTVModel(repository: repository))
     }
 
@@ -127,9 +129,11 @@ struct TVLiveGuideScreen: View {
                     Text("\(Image(systemName: "star.fill")) \(liveFavouritesTitle)")
                 }
                 .buttonStyle(TVChipStyle(selected: model.showingFavourites)).fixedSize()
+                .accessibilityAddTraits(model.showingFavourites ? .isSelected : [])
                 .accessibilityIdentifier("live-filter-favourites")
             }
             Button(liveAllChannels) { model.showAll() }.buttonStyle(TVChipStyle(selected: model.showingAll)).fixedSize()
+                .accessibilityAddTraits(model.showingAll ? .isSelected : [])
                 .accessibilityIdentifier("live-filter-all")
             ForEach(model.filters.prefix(max(8 - fixed, 0)), id: \.self) { filter in
                 Button(filter.title) { model.filter = model.filter == filter ? nil : filter }

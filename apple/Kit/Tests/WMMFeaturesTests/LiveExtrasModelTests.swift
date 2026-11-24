@@ -64,6 +64,52 @@ struct LiveExtrasModelTests {
         #expect(LiveGuideModel.showsUnderFavourites(favourite: false, favouritesOnly: false))
     }
 
+    // MARK: Where the guide opens (Apple TV)
+
+    private func opening(_ repository: FakeLiveTVRepository, _ store: LiveExtrasStore) -> LiveGuideModel {
+        let now = now
+        return LiveGuideModel(repository: repository, extras: store, spanMinutes: 90, clock: clock, opensOnFavourites: true, now: { now })
+    }
+
+    @Test func theGuideOpensOnFavouritesWhenThePersonHasSome() async throws {
+        let (repository, store) = try await make()
+        let model = opening(repository, store)
+        await model.load()
+        #expect(model.showingFavourites && !model.showingAll)
+        #expect(model.rows.map(\.channel.number) == ["2.1", "4.1", "4.3", "7.1", "20.1"])
+        // All channels, once chosen, stays when the guide loads again (another day, a later span).
+        model.showAll()
+        await model.load()
+        #expect(model.showingAll)
+    }
+
+    @Test func theGuideOpensOnAllChannelsWithoutFavouritesAndAStarLaterDoesNotMoveIt() async throws {
+        let (repository, store) = try await make(guide(favourites: false))
+        let model = opening(repository, store)
+        await model.load()
+        #expect(model.showingAll && !model.hasFavourites)
+        let channel = try #require(model.rows.first { $0.channel.number == "9.1" }?.channel)
+        await store.toggleFavourite(channel)
+        await model.load()
+        #expect(model.hasFavourites)
+        #expect(model.showingAll, "a star added while the guide is open leaves it on All channels")
+    }
+
+    @Test func aChipChosenBeforeTheChannelsComeInStands() async throws {
+        let (repository, store) = try await make()
+        let model = opening(repository, store)
+        // A programme the guide was opened on (Search, a reminder) shows All channels first.
+        model.showAll()
+        await model.load()
+        #expect(model.showingAll)
+    }
+
+    @Test func otherScreensStillOpenOnAllChannels() async throws {
+        let (repository, store) = try await make()
+        let model = await model(repository, store)
+        #expect(model.hasFavourites && model.showingAll)
+    }
+
     @Test func starringShowsAtOnceAndTheChipGoesWithTheLastStar() async throws {
         let (repository, store) = try await make(guide(favourites: false))
         let model = await model(repository, store)
