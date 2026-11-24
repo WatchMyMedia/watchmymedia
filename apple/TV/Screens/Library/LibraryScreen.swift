@@ -24,7 +24,8 @@ struct LibraryScreen: View {
     @Environment(Navigator.self) private var navigator
 
     var body: some View {
-        LibraryView(model: LibraryModel(library: services.library, navigator: navigator, type: type, rows: services.rows, letterJump: .extend))
+        LibraryView(model: LibraryModel(library: services.library, navigator: navigator, type: type, rows: services.rows, letterJump: .extend,
+                                        oneCard: OneCardContext(services: services, choices: CopyChoices())))
     }
 }
 
@@ -165,6 +166,27 @@ private struct LibraryView: View {
         .padding(.horizontal, TVLayout.gutter)
         .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
         .focusSection()
+        .overlay(alignment: .bottomLeading) { otherServersLine.offset(y: 52) }
+        // The grid sits lower by the line's height in every state, so it doesn't jump when the line comes and goes.
+        .padding(.bottom, model.merged == nil ? 0 : 52)
+    }
+
+    /// Other servers, under the count: still asking, one that didn't answer
+    /// with Try again beside it, or one that can't apply a filter.
+    @ViewBuilder private var otherServersLine: some View {
+        if let line = model.otherServersLine {
+            HStack(spacing: 24) {
+                Text(line).font(.tv(.caption1)).foregroundStyle(Palette.muted).lineLimit(1)
+                    .accessibilityIdentifier("library-other-servers")
+                if model.merged?.retryable != nil {
+                    Button("Try again") { Task { await model.retryOtherServer() } }
+                        .buttonStyle(TVChipStyle(selected: false))
+                        .accessibilityIdentifier("library-other-servers-retry")
+                }
+            }
+            .padding(.horizontal, TVLayout.gutter)
+            .focusSection()
+        }
     }
 
     private var sort: some View {
@@ -251,9 +273,11 @@ private struct LibraryView: View {
                 empty
             } else {
                 LazyVGrid(columns: columns, alignment: .leading, spacing: Self.rowSpacing) {
-                    ForEach(grid.items) { item in
+                    ForEach(model.gridItems, id: \.cardID) { item in
                         Button { model.open(item) } label: {
-                            GridPoster(item: item, imageURL: services.library.imageURL(item.posterPath, size: .w500), line: item.tvGridLine())
+                            // A poster from another server says so in its line ("On Cabin · 2024 · 1 h 46 min").
+                            GridPoster(item: item, imageURL: services.library.imageURL(item.posterPath, size: .w500, on: item.server),
+                                       line: [item.server.flatMap { model.serverName($0) }.map(OneCardWords.on), item.tvGridLine()].compactMap { $0 }.joined(separator: " · "))
                                 .overlay(alignment: .top) {
                                     // Where Select on the focused letter lands.
                                     if item.id == landingID {
@@ -263,7 +287,7 @@ private struct LibraryView: View {
                                 }
                         }
                         .buttonStyle(.borderless)
-                        .focused($focus, equals: .item(item.id))
+                        .focused($focus, equals: item.server == nil ? .item(item.id) : .other(item.cardID))
                         .playPauseCard(.card(item)) { model.open(item) }
                         .contextMenu {
                             TVWatchlistMenuButton(item)

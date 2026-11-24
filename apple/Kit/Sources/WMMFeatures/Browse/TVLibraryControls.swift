@@ -40,8 +40,9 @@ extension LibraryModel {
     /// The Unwatched chip: "Unwatched · 38" where the server counts what the
     /// person hasn't finished (API level 34), else "Unwatched".
     public var unwatchedChipLabel: String {
-        guard let count = state.value?.summary?.unwatched else { return TVLibraryWords.unwatched }
-        return "\(TVLibraryWords.unwatched) · \(formatCount(count))"
+        guard var count = state.value?.summary?.unwatched else { return TVLibraryWords.unwatched }
+        if let merged, merged.applies { count = merged.unwatched(own: count) ?? count }
+        return "\(TVLibraryWords.unwatched) · \(merged?.counting == true ? "about " : "")\(formatCount(count))"
     }
 
     /// A rating's choice in More filters: "PG-13", with how many titles it

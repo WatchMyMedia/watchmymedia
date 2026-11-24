@@ -8,6 +8,8 @@ import WMMUI
 enum GridFocus: Hashable {
     case item(Int)
     case letter(String)
+    /// A poster from another server (one card), by ``BrowseItem/cardID``: its id is that server's.
+    case other(String)
 }
 
 /// The letter index at the grid's right edge, inside the safe area: # and A

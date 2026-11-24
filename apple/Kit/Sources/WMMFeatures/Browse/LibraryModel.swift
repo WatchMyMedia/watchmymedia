@@ -113,12 +113,16 @@ public final class LibraryModel {
     @ObservationIgnored private let loads = LoadController<Grid>()
     @ObservationIgnored private let reloadPageSize: Int
     @ObservationIgnored private let letterJump: LetterJump
+    /// Every other signed-in server's titles, merged into the grid (one card); nil with one server.
+    public let merged: MergedGrid?
 
     /// `libraryID` skips looking the library up (the Apple TV app knows it from Home).
     /// `rows` gives the screen the library's arranged rows above the grid.
     /// `letterJump` says how a jump past the titles held loads.
+    /// With `oneCard`, the grid has every other signed-in server's titles too (``MergedGrid``).
     public init(library: any LibraryRepository, navigator: Navigator, type: LibraryType, libraryID: Int? = nil, rows: (any RowsRepository)? = nil, pageSize: Int = LibraryModel.pageSize, debounce: Duration = .milliseconds(300),
-                reloadPageSize: Int = LibraryModel.reloadPageSize, letterJump: LetterJump = .page, now: @escaping @MainActor () -> Date = { Date() }) {
+                reloadPageSize: Int = LibraryModel.reloadPageSize, letterJump: LetterJump = .page, oneCard: OneCardContext? = nil, now: @escaping @MainActor () -> Date = { Date() }) {
+        merged = oneCard.flatMap { $0.applies ? MergedGrid(services: $0.services, type: type, pageSize: pageSize) : nil }
         changes = ScreenChanges(now: now)
         self.letterJump = letterJump
         self.reloadPageSize = reloadPageSize
@@ -151,7 +155,29 @@ public final class LibraryModel {
     /// Exact totals supplied by the server; older servers leave unknown counts blank.
     public var genreCounts: [String: Int] { changingQuery ? [:] : state.value?.genreCounts ?? [:] }
     public var activeFilterCount: Int { (filter == .all ? 0 : 1) + (genre == nil ? 0 : 1) + (decade == nil ? 0 : 1) + (contentRatings.isEmpty ? 0 : 1) }
-    public var letters: [LetterOffset] { sort == .title && !changingQuery ? state.value?.letters ?? [] : [] }
+    /// The server's index of the title-sorted list; none while other
+    /// servers' titles are in the grid, since its offsets are the server in use's alone.
+    public var letters: [LetterOffset] { sort == .title && !changingQuery && !othersShown ? state.value?.letters ?? [] : [] }
+
+    /// The grid's cards: the server in use's, with every other server's
+    /// merged in where one card applies.
+    public var gridItems: [BrowseItem] {
+        guard let grid = state.value else { return [] }
+        return merged?.items(own: grid.items, ownHasMore: grid.hasMore) ?? grid.items
+    }
+
+    /// Other servers' titles are in the grid.
+    public var othersShown: Bool { merged?.feeds.values.contains { !$0.items.isEmpty } == true }
+
+    /// Under the header's count, from other servers: still asking, one that
+    /// didn't answer (with Try again), one that can't apply a filter.
+    public var otherServersLine: String? { merged?.line }
+
+    /// Try again on the server that didn't answer.
+    public func retryOtherServer() async {
+        guard let server = merged?.retryable else { return }
+        await merged?.retry(server)
+    }
     public var sortLabel: String { "Sort: \(sort.label)" }
 
     /// The Decade chip: "Decade", or the decade chosen ("1990s").
@@ -164,6 +190,10 @@ public final class LibraryModel {
     /// matched yet" while files wait for a match.
     public var headerCount: String? {
         guard let grid = state.value, !noLibrary else { return nil }
+        if let merged, merged.applies, !merged.feeds.isEmpty || merged.counting {
+            let total = merged.total(own: grid.summary?.items ?? grid.total, ownItems: grid.items)
+            return merged.counting ? "About \(plural(total, noun))" : plural(total, noun)
+        }
         guard let summary = grid.summary else { return plural(grid.total, noun) }
         return [plural(summary.items, noun), unmatchedCount(summary.unmatched)].compactMap { $0 }.joined(separator: " · ")
     }
@@ -176,7 +206,9 @@ public final class LibraryModel {
             return [plural(summary.items, noun), summary.episodes > 0 ? plural(summary.episodes, "episode") : nil, unmatchedCount(summary.unmatched)]
                 .compactMap { $0 }.joined(separator: " · ")
         }
-        var parts = [plural(grid.total, noun)]
+        var total = grid.total
+        if let merged, merged.applies { total = merged.total(own: grid.total, ownItems: grid.items) }
+        var parts = [(merged?.counting == true ? "About " : "") + plural(total, noun)]
         if let genre { parts.append("in \(genre)") }
         if let decade { parts.append("from the \(decadeLabel(decade))") }
         if !contentRatings.isEmpty { parts.append("rated \(contentRatings.map(contentRatingName).joined(separator: " or "))") }
@@ -451,7 +483,15 @@ public final class LibraryModel {
 
     /// A poster came on screen: near the end, the next page loads.
     public func itemAppeared(_ item: BrowseItem) async {
-        guard let grid = state.value, grid.items.suffix(12).contains(where: { $0.id == item.id }) else { return }
+        guard let grid = state.value else { return }
+        if let merged, othersShown || !merged.feeds.isEmpty {
+            // Near the end of what shows: a page more from whichever server holds the grid back.
+            guard gridItems.suffix(12).contains(where: { $0.cardID == item.cardID }) else { return }
+            await loadMore()
+            await merged.loadMore(own: state.value?.items ?? grid.items, ownHasMore: state.value?.hasMore ?? false)
+            return
+        }
+        guard grid.items.suffix(12).contains(where: { $0.id == item.id }) else { return }
         await loadMore()
     }
 
@@ -631,6 +671,11 @@ public final class LibraryModel {
             noLibrary = false
             state = .loaded(grid)
             if let fetchedRows { rows = fetchedRows }
+            // The other servers' first pages, with the same sort and filters.
+            if let merged, merged.applies, let id = libraryID {
+                let asked = query(id, offset: 0, limit: pageSize)
+                Task { await merged.start(asked) }
+            }
         case .loaded(nil):
             noLibrary = true
             rows = []
