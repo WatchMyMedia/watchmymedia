@@ -1,6 +1,6 @@
 import { type CSSProperties } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import type { PersonTitle } from '../../../src/api/people'
+import type { components } from '../../../src/api/schema'
 import { routeOn, SourceContext, useMediaUrls, useNav, usePageSource, useSource } from '../../app/hooks'
 import { personOn } from '../../session/sourceQueries'
 import type { Source } from '../../session/peerRegistry'
@@ -17,6 +17,8 @@ import { Picture } from './DetailParts'
 import { initials } from './detailWords'
 import { personLine, personTitleLine, personTitleRoute } from './personWords'
 import './details.css'
+
+type PersonTitle = components['schemas']['PersonTitle']
 
 /**
  * A cast member's movies and shows on this server (route `person`, from a

@@ -1,7 +1,6 @@
 import type { components } from '../../../src/api/schema'
 import { homeRows, type ScreenRow } from '../../../src/lib/screenRows'
-import type { HiddenTarget } from '../../../src/api/continueHidden'
-import { hiddenTarget } from '../../../src/api/continueHidden'
+import { continueTarget, type ContinueTarget } from '../../../src/lib/continueWatching'
 import type { ChosenCopy } from '../../session/chosenCopies'
 
 // Home across servers (one card across servers, API level 34): Continue
@@ -25,7 +24,7 @@ type EpisodeCard = components['schemas']['EpisodeCard']
 export type OneCardTag = { server: { id: string; name: string }; where: 'only' | 'from'; here?: { movieId?: number; showId?: number } }
 
 /** A Continue watching card's copy on a server, so Remove takes it off every server that has it. */
-export type ContinueCopy = { server: string; target: HiddenTarget }
+export type ContinueCopy = { server: string; target: ContinueTarget }
 
 export type TaggedContinue = ContinueItem & { oneCard?: OneCardTag; copies?: ContinueCopy[] }
 export type TaggedItem = BrowseItem & { oneCard?: OneCardTag }
@@ -72,7 +71,7 @@ export function mergeContinue(current: readonly ContinueItem[], currentId: strin
     const pick = chosen?.(latest.item)
     const preferred = pick && entries.find((e) => (e.server?.id ?? currentId) === pick.server)
     const plays = preferred ?? latest
-    const copies = entries.flatMap((e) => { const t = hiddenTarget(e.item); return t ? [{ server: e.server?.id ?? currentId, target: t }] : [] })
+    const copies = entries.flatMap((e) => { const t = continueTarget(e.item); return t ? [{ server: e.server?.id ?? currentId, target: t }] : [] })
     const base: TaggedContinue = plays === latest ? { ...latest.item } : { ...plays.item, positionMs: latest.item.positionMs, durationMs: latest.item.durationMs, updatedAt: latest.item.updatedAt }
     const tag: OneCardTag | undefined = plays.server ? { server: plays.server, where: here ? 'from' : 'only' } : undefined
     out.push({ ...base, ...(tag ? { oneCard: tag } : {}), ...(entries.length > 1 ? { copies } : {}) })

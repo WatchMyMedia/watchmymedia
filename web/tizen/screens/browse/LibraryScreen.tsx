@@ -2,8 +2,7 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState, type FocusEven
 import { flushSync } from 'react-dom'
 import { useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query'
 import type { components } from '../../../src/api/schema'
-import { librariesQuery, rowsQuery, useLibraryByType } from '../../../src/api/queries'
-import { libraryItemsQuery } from '../../../src/api/libraryItems'
+import { itemsQuery, librariesQuery, rowsQuery, useLibraryByType } from '../../../src/api/queries'
 import { sortOptions, type LibraryType } from '../../../src/lib/browseOptions'
 import { drawable, isListRow, libraryRows, type ScreenRow } from '../../../src/lib/screenRows'
 import { useBack, useFocus, useKeys, useLevel34, useMediaFor, useMediaUrls, useNav, useSession } from '../../app/hooks'
@@ -47,7 +46,7 @@ const COLUMNS = 6
  * with one filter.
  */
 const gridItems = (libraryId: number, c: GridChoices, level34: boolean, offset: number) =>
-  libraryItemsQuery(libraryId, { ...gridQuery(c, level34), limit: PAGE_SIZE, offset })
+  itemsQuery(libraryId, { ...gridQuery(c, level34), limit: PAGE_SIZE, offset })
 const pageData = (results: UseQueryResult<ItemList>[]) => results.map((r) => r.data)
 
 /** One of the library's rows, its See all sorting the grid below (or opening a list's page). */

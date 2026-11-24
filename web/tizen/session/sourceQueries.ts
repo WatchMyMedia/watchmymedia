@@ -1,7 +1,6 @@
 import type { UseQueryOptions } from '@tanstack/react-query'
 import { unwrap, type ApiClient } from '../../src/api/client'
-import { fileQuery, movieQuery, movieRelatedQuery, playbackPlansQuery, seasonQuery, showQuery, showRelatedQuery } from '../../src/api/queries'
-import { personTitlesQuery } from '../../src/api/people'
+import { fileQuery, movieQuery, movieRelatedQuery, personQuery, playbackPlansQuery, seasonQuery, showQuery, showRelatedQuery } from '../../src/api/queries'
 import type { components } from '../../src/api/schema'
 import type { Source } from './peerRegistry'
 
@@ -43,4 +42,4 @@ export const plansOn = (source: Source, fileIds: number[], profile: Schemas['Pro
     async (api, signal) => unwrap(await api.POST('/api/playback/plans', { body: { profile, fileIds }, signal })), { enabled: fileIds.length > 0, staleTime: 5 * 60_000 })
 
 export const personOn = (source: Source, personId: number): Options<Schemas['PersonDetail']> =>
-  on(source, () => personTitlesQuery(personId), ['person', personId], async (api, signal) => unwrap(await api.GET('/api/people/{personId}', { params: { path: { personId } }, signal })))
+  on(source, () => personQuery(personId), ['person', personId], async (api, signal) => unwrap(await api.GET('/api/people/{personId}', { params: { path: { personId } }, signal })))

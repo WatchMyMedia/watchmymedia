@@ -33,9 +33,10 @@ describe('the library’s Filter and Sort', () => {
   it('keeps one filter at a time below API level 34, as before', () => {
     const one = chooseFilter(DEFAULT_CHOICES, 'watched', 'unwatched', false)
     expect(chooseFilter(one, 'picture', '4k', false).filters).toEqual(['4k'])
-    expect(gridQuery(c({ filters: ['unwatched', '4k'], rating: 'PG-13' }), false)).toEqual({ sort: 'added', filters: ['unwatched'], genre: undefined, decade: undefined })
-    expect(gridQuery(c({ filters: ['inProgress'] }), false).filters).toEqual([])
-    expect(gridQuery(c({ filters: ['unwatched', '4k'], rating: 'PG-13', genre: 'Drama' }), true)).toEqual({ sort: 'added', filters: ['unwatched', '4k'], genre: 'Drama', decade: undefined, contentRating: ['PG-13'] })
+    expect(gridQuery(c({ filters: ['unwatched', '4k'], rating: 'PG-13' }), false)).toEqual({ sort: 'added', filter: 'unwatched', genre: undefined, decade: undefined })
+    expect(gridQuery(c({ filters: ['inProgress', 'hdr'] }), false)).toEqual({ sort: 'added', filter: 'hdr', genre: undefined, decade: undefined })
+    expect(gridQuery(c({ filters: ['inProgress'] }), false)).toEqual({ sort: 'added', filter: '', genre: undefined, decade: undefined })
+    expect(gridQuery(c({ filters: ['unwatched', '4k'], rating: 'PG-13', genre: 'Drama' }), true)).toEqual({ sort: 'added', filter: '', filters: ['unwatched', '4k'], genre: 'Drama', decade: undefined, contentRating: 'PG-13' })
   })
 
   it('words what narrows the grid', () => {
