@@ -920,20 +920,10 @@ private struct ShowPanels: View {
             Button {
                 go(nil)
                 Task { await model.askDelete() }
-            } label: { DangerRowLabel(title: "Delete episode…") }
+            } label: { TVRowLabel(title: "Delete episode…") }
             .buttonStyle(TVListRowStyle())
             .accessibilityIdentifier("episode-delete")
         }
-    }
-}
-
-/// A row that removes something: its words in red.
-private struct DangerRowLabel: View {
-    let title: String
-    @Environment(\.tvRowFocused) private var focused
-
-    var body: some View {
-        Text(title).foregroundStyle(focused ? Color.tvDanger : Color.tvRedText)
     }
 }
 
