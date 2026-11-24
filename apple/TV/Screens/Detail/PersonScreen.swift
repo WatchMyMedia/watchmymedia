@@ -111,15 +111,10 @@ struct PersonFace: View {
             .frame(width: size, height: size)
             .overlay {
                 if url == nil {
-                    Text(initials).font(.system(size: size * 0.32, weight: .semibold)).foregroundStyle(.white.opacity(0.9))
+                    Text(personInitials(name)).font(.system(size: size * 0.32, weight: .semibold)).foregroundStyle(.white.opacity(0.9))
                 }
             }
             .clipShape(Circle())
             .accessibilityHidden(true)
-    }
-
-    /// "ML" for Mara Lindqvist.
-    private var initials: String {
-        name.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined().uppercased()
     }
 }

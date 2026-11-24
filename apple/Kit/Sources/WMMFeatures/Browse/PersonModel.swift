@@ -120,6 +120,12 @@ public func personTitleLine(_ title: PersonTitle) -> String {
     return [lead, part].compactMap { $0 }.joined(separator: " · ")
 }
 
+/// "IV" for Ines Varga, the letters a face without a picture shows: the
+/// first letters of the first two words of the name.
+public func personInitials(_ name: String) -> String {
+    name.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined().uppercased()
+}
+
 extension Person {
     /// A person whose page can open: the server knows who they are.
     public var opensPage: Bool { personID != nil }

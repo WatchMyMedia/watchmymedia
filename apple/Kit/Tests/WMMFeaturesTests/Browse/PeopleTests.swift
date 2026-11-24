@@ -4,7 +4,7 @@ import Testing
 import WMMFakes
 import WMMModel
 
-/// The cast as people who each open their titles in the library (Apple TV, API level 34).
+/// The cast as people who each open their titles in the library (API level 34).
 @MainActor
 @Suite struct PeopleTests {
     init() { FakeLatency.duration = .zero }
@@ -63,6 +63,12 @@ import WMMModel
         #expect(navigator.path(for: .home) == [.onServer(cabin, .movie(id: first.item.id))])
         navigator.open(CastPerson(personID: FakeCabin.corinVale, name: "Corin Vale").route, on: cabin)
         #expect(navigator.path(for: .home).last == .onServer(cabin, .person(id: FakeCabin.corinVale, name: "Corin Vale")))
+    }
+
+    @Test func aFaceWithoutAPictureShowsTheirInitials() {
+        #expect(personInitials("Ines Varga") == "IV")
+        #expect(personInitials("Adaeze") == "A")
+        #expect(personInitials("Mara de la Cruz") == "MD", "the first two words")
     }
 
     @Test func nobodyTheLibraryHasSaysSo() async {

@@ -226,42 +226,70 @@ struct DetailHeading: View {
 }
 
 /// Cast as a sideways row of faces, names and roles, inset by `margin`.
-/// `large` is the iPad's: bigger faces and type.
+/// `large` is the iPad's: bigger faces and type. From API level 34 the
+/// server says who each person is, so the row is the cast, then the crew
+/// not already in it (`crew`, a movie's), each a button that opens their
+/// movies and shows in the library (``PersonScreen``), on the page's own
+/// server. Without that, the cast is names and faces that take no taps.
 struct CastRow: View {
     let cast: [Person]
+    var crew: [Person] = []
     var margin: CGFloat = 16
     var large = false
     @Environment(AppServices.self) private var services
+    @Environment(Navigator.self) private var navigator
 
     var body: some View {
-        if !cast.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                DetailHeading(title: "Cast").padding(.horizontal, margin)
-                ScrollView(.horizontal) {
-                    HStack(alignment: .top, spacing: large ? 14 : 10) {
-                        ForEach(cast, id: \.self) { person in
-                            VStack(spacing: large ? 6 : 5) {
-                                Artwork(url: services.library.imageURL(person.profilePath, size: .w185), seed: person.name, maxPixel: 200)
-                                    .frame(width: large ? 64 : 52, height: large ? 64 : 52)
-                                    .clipShape(Circle())
-                                Text(person.name)
-                                    .scaledFont(large ? 13 : 11, weight: .semibold)
-                                    .foregroundStyle(Palette.text)
-                                if let role = person.role {
-                                    Text(role).scaledFont(large ? 12 : 10).foregroundStyle(Palette.muted)
-                                }
-                            }
-                            .multilineTextAlignment(.center)
-                            .frame(width: large ? 96 : 82)
-                            .accessibilityElement(children: .combine)
-                        }
+        let people = CastPerson.row(cast: cast, crew: crew)
+        if !people.isEmpty {
+            row(title: people.contains(where: \.isCrew) ? "Cast and crew" : "Cast") {
+                ForEach(people) { person in
+                    Button { navigator.open(person.route, on: services.library.serverScope) } label: {
+                        face(name: person.name, role: person.role, path: person.profilePath)
+                            .contentShape(Rectangle())
                     }
+                    .buttonStyle(CardButtonStyle())
+                    .accessibilityLabel(person.accessibilityLabel)
+                    .accessibilityHint("Opens their movies and shows")
+                    .accessibilityIdentifier("cast-person-\(person.personID)")
                 }
-                .contentMargins(.horizontal, margin, for: .scrollContent)
-                .stopsAtVerticalBar()
-                .scrollIndicators(.hidden)
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("title-people")
+        } else if !cast.isEmpty {
+            row(title: "Cast") {
+                ForEach(cast, id: \.self) { person in
+                    face(name: person.name, role: person.role, path: person.profilePath)
+                        .accessibilityElement(children: .combine)
+                }
             }
         }
+    }
+
+    private func row<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            DetailHeading(title: title).padding(.horizontal, margin)
+            ScrollView(.horizontal) {
+                HStack(alignment: .top, spacing: large ? 14 : 10) { content() }
+            }
+            .contentMargins(.horizontal, margin, for: .scrollContent)
+            .stopsAtVerticalBar()
+            .scrollIndicators(.hidden)
+        }
+    }
+
+    private func face(name: String, role: String?, path: String?) -> some View {
+        VStack(spacing: large ? 6 : 5) {
+            PersonFace(name: name, url: services.library.imageURL(path, size: .w185), size: large ? 64 : 52)
+            Text(name)
+                .scaledFont(large ? 13 : 11, weight: .semibold)
+                .foregroundStyle(Palette.text)
+            if let role {
+                Text(role).scaledFont(large ? 12 : 10).foregroundStyle(Palette.muted)
+            }
+        }
+        .multilineTextAlignment(.center)
+        .frame(width: large ? 96 : 82)
     }
 }
 

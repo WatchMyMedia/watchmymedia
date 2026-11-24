@@ -118,7 +118,7 @@ private struct MovieView: View {
                             }
                             if !movie.versions.isEmpty { versions(movie, tiled: true) }
                             tracks
-                            CastRow(cast: movie.cast, margin: 0, large: true)
+                            CastRow(cast: movie.cast, crew: movie.crew, margin: 0, large: true)
                         }
                         .padding(PadLayout.margin)
                         // The rows run to the column's edge, so they sit outside its padding.
@@ -170,7 +170,7 @@ private struct MovieView: View {
             }
             .padding(.horizontal, 16)
             .padding(.top, 16)
-            CastRow(cast: movie.cast).padding(.top, 24)
+            CastRow(cast: movie.cast, crew: movie.crew).padding(.top, 24)
             details(movie)
                 .padding(.horizontal, 16)
                 .padding(.top, 24)
@@ -196,7 +196,7 @@ private struct MovieView: View {
                 playButtons(movie)
                 if !movie.versions.isEmpty { versions(movie, tiled: true) }
                 tracks
-                CastRow(cast: movie.cast, margin: 0, large: true)
+                CastRow(cast: movie.cast, crew: movie.crew, margin: 0, large: true)
                 details(movie)
             }
             .padding(.horizontal, PadLayout.margin)

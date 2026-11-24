@@ -579,10 +579,10 @@ chooses a server in it, and `-serverNoteSeconds <n>` keeps the banner up.
 
 On the fakes, `-fakesServers` signs Sam in to three servers: Living room
 server (in use, the sample library), Cabin server, with a small library of
-its own (`FakeCabin`: its ids are its own, and Harbor Lights is on both, so
-Harbor Lights and Ninety Fathoms are on both, so each is one card, and The
-Harbor Choir is Cabin's alone), and Den server, which doesn't answer and
-holds three downloads. Add a server finds the Office Mac mini.
+its own (`FakeCabin`: its ids are its own; Harbor Lights and Ninety Fathoms
+are on both, so each is one card, and The Harbor Choir is Cabin's alone; its
+two players, Odile Marsh and Corin Vale, open their pages there), and Den
+server, which doesn't answer and holds three downloads. Add a server finds the Office Mac mini.
 `-fakesServers` puts the three at API level 34, as `-fakesRedesign` puts the
 one server in use (the cast as people, card counts, the rating filter,
 Remove from Continue watching, recording marks).
@@ -798,6 +798,30 @@ the Carrow Coast Collection, every other movie and show has More like this,
 and Tin Sky (`movies/507`) and Glass Country (`shows/108`) have nothing.
 `UITests/RelatedTitlesTests.swift` and `TVUITests/RelatedTitlesTests.swift`
 drive them.
+
+## People
+
+From API level 34 a credit says who the person is (TMDB's person ID), so a
+title's cast is a row of people, a movie's crew after its cast (`CastPerson`
+in WMMFeatures, each person once: "Petra Lind, Director, Writer"). Choosing
+one opens their page (`PersonModel`, `GET /api/people/{personId}`): their
+face, or their initials without one, their name, how many of their titles
+the library has ("18 titles in your library: 2 movies and 16 shows"), then
+those movies and shows newest first, each saying the year, or that it is a
+show, and who they play ("2026 · as Io Vance"). From a page opened in place
+from another server, the person opens there too, with that server's titles.
+An older server's cast is faces and names that open nothing.
+
+- **iPhone and iPad** (`CastRow`, `PersonScreen`): the cast row's faces are
+  buttons. The page has the library's grid, three across on iPhone and as
+  many as fit on iPad, and the name moves up into the bar once the header
+  has scrolled away. A poster's long press marks it watched or saves it to a
+  watchlist. `UITests/PersonTests.swift` drives it.
+- **Apple TV** (`PeopleRow`, `PersonScreen`): the faces take focus in a
+  shelf of their own; the page's grid is seven across, and only the focused
+  poster has words.
+
+`-fakesRedesign` (or `-fakesServers`) puts the fakes' people on (`FakePeople`).
 
 ## Watchlists
 
