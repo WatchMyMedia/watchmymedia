@@ -1,5 +1,6 @@
 package media.watchmy.client.mobile.detail
 
+import media.watchmy.client.model.at
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.ScrollState
@@ -95,9 +96,49 @@ fun ShowPageScreen(
     onOpenDownloads: () -> Unit = {},
     onOpenShow: (Long) -> Unit = {},
     onOpenMovie: (Long) -> Unit = {},
+    /** The registered server the show is on, opened in place; null is the one in use. */
+    serverId: String? = null,
+) {
+    val root = LocalAppServices.current
+    // Another server's page: its calls and pictures go there, as the person signed in there, and nothing of it downloads.
+    val there = remember(serverId) { root.library.at(serverId) }
+    if (there == null) {
+        Box(modifier.fillMaxSize().background(WmmColors.Ground)) { ErrorState(SIGNED_OUT_THERE, onBack) }
+        return
+    }
+    val scoped = remember(root, there) {
+        if (serverId == null) root else object : media.watchmy.client.model.AppServices by root {
+            override val library: media.watchmy.client.model.LibraryRepository = there
+            override val downloads: media.watchmy.client.model.DownloadRepository = media.watchmy.client.model.DownloadRepository.Unavailable
+        }
+    }
+    val others = remember(root) { media.watchmy.client.presentation.servers.OtherServers(root.servers, root.library) }
+    androidx.compose.runtime.CompositionLocalProvider(LocalAppServices provides scoped) {
+        ShowPageBody(showId, arrival, onPlay, onBack, onOpenSettings, onOpenDownloads, onOpenShow, onOpenMovie, serverId, others, modifier)
+    }
+}
+
+@Composable
+private fun ShowPageBody(
+    showId: Long,
+    arrival: ShowArrival,
+    onPlay: (PlayRequest) -> Unit,
+    onBack: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onOpenDownloads: () -> Unit,
+    onOpenShow: (Long) -> Unit,
+    onOpenMovie: (Long) -> Unit,
+    serverId: String?,
+    others: media.watchmy.client.presentation.servers.OtherServers,
+    modifier: Modifier = Modifier,
 ) {
     val services = LocalAppServices.current
-    val vm = viewModel { ShowPageViewModel(services.library, showId, arrival, services.requests, services.downloads, services.follows, createSavedStateHandle(), services.watchlists) }
+    val vm = viewModel(key = "show-$serverId-$showId") {
+        ShowPageViewModel(
+            services.library, showId, arrival, services.requests, services.downloads, services.follows, createSavedStateHandle(), services.watchlists,
+            here = serverId, others = others, choices = services.copyChoices, plansOn = services.playback::plansOn,
+        )
+    }
     ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val downloadsVm = viewModel { DownloadsViewModel(services.downloads) }

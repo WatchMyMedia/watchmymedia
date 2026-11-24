@@ -218,7 +218,8 @@ fun SearchScreen(
                         onSetWatched = if (server == null) ({ watched: Boolean -> vm.setWatched(item, watched) }) else null,
                         titleSize = 13.sp, subtitleSize = 11.sp,
                     )
-                    hit.serverName?.let { ServerLabel(it, Modifier.padding(top = 6.dp)) }
+                    // "On Home and Cabin" for a title on several servers, its server's name for one only another has.
+                    hit.serversLine(state.inUseName)?.let { ServerLabel(it, Modifier.padding(top = 6.dp)) }
                 }
             }
             val episode: @Composable (SearchViewModel.Hit<EpisodeCard>, Boolean) -> Unit = { hit, withPlay ->
@@ -233,7 +234,7 @@ fun SearchScreen(
                         watchToggle(ep.watched) { vm.setEpisodeWatched(ep.episodeId, it) },
                         CardAction("Go to show") { onOpenSeason(ep.showId, ep.season) },
                     ),
-                    from = hit.serverName,
+                    from = hit.serversLine(state.inUseName),
                 )
             }
             when {

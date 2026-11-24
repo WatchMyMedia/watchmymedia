@@ -1,5 +1,7 @@
 package media.watchmy.client.mobile.home
 
+import media.watchmy.client.model.mergedAcrossServers
+import media.watchmy.client.ui.imageFor
 import androidx.compose.foundation.background
 import androidx.activity.compose.ReportDrawnWhen
 import androidx.compose.foundation.clickable
@@ -95,6 +97,7 @@ import media.watchmy.client.model.LibraryRepository
 import media.watchmy.client.model.PlayRequest
 import media.watchmy.client.model.WatchTarget
 import media.watchmy.client.model.airedLine
+import media.watchmy.client.model.cardLine
 import media.watchmy.client.model.codeBadge
 import media.watchmy.client.model.formatDate
 import media.watchmy.client.model.HomeEmptyState
@@ -147,7 +150,7 @@ fun HomeScreen(
 ) {
     val layout = rememberTabletLayout()
     val services = LocalAppServices.current
-    val vm = viewModel { HomeViewModel(services.library, services.auth, services.rows) }
+    val vm = viewModel { HomeViewModel(services.library, services.auth, services.rows, others = media.watchmy.client.presentation.servers.OtherServers(services.servers, services.library)) }
     ReportShown(vm::setShown)
     val notMatched = rememberNotMatchedNotice()
     val state by vm.state.collectAsStateWithLifecycle()
@@ -231,7 +234,10 @@ fun HomeScreen(
                             if (liveFirst || (arranged && state.isEmpty)) liveRow()
                             if (arranged) {
                                 val actions = RowActions(onPlay, onOpenShow, onOpenMovie, onOpenEpisode, notMatched, vm::setWatched)
-                                arrangedRows(home, services.library, services.browseRequests, actions, layout.isTablet, layout.twoPane, onNavigate, live = liveRow.takeIf { liveChannels.isNotEmpty() && !state.isEmpty })
+                                arrangedRows(
+                                    home, services.library, services.browseRequests, actions, layout.isTablet, layout.twoPane, onNavigate, live = liveRow.takeIf { liveChannels.isNotEmpty() && !state.isEmpty },
+                                    elsewhere = ElsewhereLine(state.stillAsking, state.notAnswered, vm::retryElsewhere).takeIf { state.stillAsking.isNotEmpty() || state.notAnswered.isNotEmpty() },
+                                )
                             } else {
                                 homeRows(home, services.library, vm, onPlay, onOpenShow, onOpenMovie, onOpenEpisode, notMatched, layout.isTablet, layout.twoPane, onNavigate, onNow = liveRow.takeIf { !liveFirst })
                             }
@@ -299,11 +305,11 @@ private fun LazyListScope.homeRows(
     }
     if (home.continueWatching.isNotEmpty() && !sideContinue) {
         section("continue", "Continue watching", null, tablet = tablet) {
-            items(home.continueWatching, key = { "c${it.fileId}" }) { item ->
+            items(home.continueWatching, key = { "c${it.where.serverId}:${it.fileId}" }) { item ->
                 WideCard(
                     title = item.title,
-                    subtitle = item.remainingLine,
-                    imageUrl = library.imageUrl(item.stillPath ?: item.backdropPath, ImageSize.W780),
+                    subtitle = listOfNotNull(item.remainingLine, item.where.cardLine(resumes = true)).joinToString(" · "),
+                    imageUrl = library.imageFor(item.where, item.stillPath ?: item.backdropPath, ImageSize.W780),
                     seed = item.title,
                     width = 232.dp,
                     onClick = { onPlay(item.playRequest()) },
@@ -328,7 +334,7 @@ private fun LazyListScope.homeRows(
     if (home.recentlyAddedShows.isNotEmpty()) {
         section("shows", "Recently added", "TV Shows", spacing = 8, tablet = tablet, onSeeAll = { onNavigate(MobileRoutes.TvShows) }) {
             items(home.recentlyAddedShows, key = { "s${it.id}" }) { item ->
-                PosterCard(item, library.imageUrl(item.posterPath, ImageSize.W342), item.subtitle, { item.open(onOpenShow, onOpenMovie, onPlay, onNotMatched, onOpenEpisode) }, { w: Boolean -> vm.setWatched(item, w) }.takeIf { item.watchTarget() != null }, width = if (tablet) 150.dp else 116.dp)
+                PosterCard(item, library.imageFor(item.where, item.posterPath, ImageSize.W342), item.subtitle, { item.open(onOpenShow, onOpenMovie, onPlay, onNotMatched, onOpenEpisode) }, { w: Boolean -> vm.setWatched(item, w) }.takeIf { item.watchTarget() != null }, width = if (tablet) 150.dp else 116.dp)
             }
         }
     }
@@ -340,7 +346,7 @@ private fun LazyListScope.homeRows(
     if (home.recentlyAddedMovies.isNotEmpty()) {
         section("movies", "Recently added", "Movies", spacing = 8, tablet = tablet, onSeeAll = { onNavigate(MobileRoutes.Movies) }) {
             items(home.recentlyAddedMovies, key = { "m${it.id}" }) { item ->
-                PosterCard(item, library.imageUrl(item.posterPath, ImageSize.W342), item.subtitle, { item.open(onOpenShow, onOpenMovie, onPlay, onNotMatched) }, { w: Boolean -> vm.setWatched(item, w) }.takeIf { item.watchTarget() != null }, width = if (tablet) 150.dp else 116.dp)
+                PosterCard(item, library.imageFor(item.where, item.posterPath, ImageSize.W342), item.subtitle, { item.open(onOpenShow, onOpenMovie, onPlay, onNotMatched) }, { w: Boolean -> vm.setWatched(item, w) }.takeIf { item.watchTarget() != null }, width = if (tablet) 150.dp else 116.dp)
             }
         }
     }
@@ -350,7 +356,7 @@ private fun LazyListScope.homeRows(
                 WideCard(
                     title = item.title,
                     subtitle = null,
-                    imageUrl = library.imageUrl(item.backdropPath, ImageSize.W780),
+                    imageUrl = library.imageFor(item.where, item.backdropPath, ImageSize.W780),
                     seed = item.title,
                     width = if (tablet) 240.dp else 160.dp,
                     onClick = { onOpenMovie(item.id) },
@@ -389,8 +395,11 @@ private fun LazyListScope.arrangedRows(
     twoPane: Boolean,
     onNavigate: (Any) -> Unit,
     live: (LazyListScope.() -> Unit)?,
+    elsewhere: ElsewhereLine? = null,
 ) {
     val rows = home.rows.orEmpty().drawn(live = live != null)
+    // The first row filled from every server ends with what a slow or silent server means for Home.
+    val endsWith = rows.firstOrNull { it.mergedAcrossServers }?.id
     val sideContinue = twoPane && home.hero != null && rows.firstOrNull()?.style == RowStyle.Continue
     home.hero?.let { hero ->
         item(key = "hero", contentType = "hero") {
@@ -407,6 +416,7 @@ private fun LazyListScope.arrangedRows(
             item(key = "row-${row.id}", contentType = "row-${row.style}") {
                 ArrangedRow(row, library, tablet, actions, seeAll = homeSeeAll(row, home, requests, onNavigate))
             }
+            if (elsewhere != null && row.id == endsWith) item(key = "elsewhere", contentType = "elsewhere") { ElsewhereNote(elsewhere, tablet) }
         }
     }
     item(key = "edit", contentType = "edit") {
@@ -484,7 +494,7 @@ internal fun ContinuePanel(
                         TextButton(onClick = { all = false }) { Text("Close", color = WmmColors.Accent) }
                     }
                 }
-                items(items, key = { it.fileId }) { ContinueRow(it, library, onSetWatched, onPlay, onOpenShow, onOpenMovie) }
+                items(items, key = { "${it.where.serverId}:${it.fileId}" }) { ContinueRow(it, library, onSetWatched, onPlay, onOpenShow, onOpenMovie) }
             }
         }
     }
@@ -498,12 +508,12 @@ private fun ContinueRow(item: ContinueItem, library: LibraryRepository, onSetWat
         item.showId?.let { id -> CardAction("Go to show") { onOpenShow(id) } },
     )) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Artwork(library.imageUrl(item.stillPath ?: item.backdropPath, ImageSize.W300), seed = item.title, contentDescription = null, modifier = Modifier.size(112.dp, 63.dp), shape = RoundedCornerShape(8.dp)) {
+            Artwork(library.imageFor(item.where, item.stillPath ?: item.backdropPath, ImageSize.W300), seed = item.title, contentDescription = null, modifier = Modifier.size(112.dp, 63.dp), shape = RoundedCornerShape(8.dp)) {
                 Box(Modifier.fillMaxSize()) { PlayGlyph(); ProgressStrip(item.progress, Modifier.align(Alignment.BottomStart)) }
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(item.title, color = WmmColors.Text, fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(item.remainingLine, color = WmmColors.TextMuted, fontFamily = Inter, fontSize = 12.sp, maxLines = 2)
+                Text(listOfNotNull(item.remainingLine, item.where.cardLine(resumes = true)).joinToString(" · "), color = WmmColors.TextMuted, fontFamily = Inter, fontSize = 12.sp, maxLines = 2)
             }
         }
     }
@@ -617,7 +627,7 @@ private fun AiredCard(ep: EpisodeCard, library: LibraryRepository, vm: HomeViewM
     WideCard(
         title = ep.showTitle,
         subtitle = ep.airedLine(),
-        imageUrl = library.imageUrl(ep.stillPath ?: ep.showBackdropPath, ImageSize.W780),
+        imageUrl = library.imageFor(ep.where, ep.stillPath ?: ep.showBackdropPath, ImageSize.W780),
         seed = ep.showTitle,
         width = 232.dp,
         onClick = { onOpenEpisode(ep.showId, ep.season, ep.episodeId) },
@@ -633,5 +643,24 @@ private fun AiredCard(ep: EpisodeCard, library: LibraryRepository, vm: HomeViewM
             Badge("Watched", Modifier.align(Alignment.TopEnd).padding(8.dp), style = BadgeStyle.Gold)
         }
         Badge(ep.codeBadge, Modifier.align(Alignment.BottomStart).padding(8.dp))
+    }
+}
+
+
+/** What a slow or silent server means for Home, under the first row filled from every server; Try again for one that didn't answer. */
+@androidx.compose.runtime.Immutable
+internal class ElsewhereLine(val stillAsking: List<String>, val notAnswered: List<String>, val onRetry: () -> Unit)
+
+@Composable
+private fun ElsewhereNote(line: ElsewhereLine, tablet: Boolean) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = if (tablet) 24.dp else 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        val text = line.notAnswered.firstOrNull()?.let { media.watchmy.client.model.notOnHome(it) }
+            ?: media.watchmy.client.model.stillAsking(line.stillAsking.map { media.watchmy.client.model.serverHeading(it) })
+        Text(text, color = WmmColors.TextMuted, fontFamily = media.watchmy.client.ui.Inter, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        if (line.notAnswered.isNotEmpty()) media.watchmy.client.mobile.components.GoldTextButton("Try again", line.onRetry)
     }
 }

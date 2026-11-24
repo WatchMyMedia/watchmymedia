@@ -1,5 +1,6 @@
 package media.watchmy.client.mobile.library
 
+import media.watchmy.client.ui.imageFor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -156,8 +157,11 @@ internal fun TabletLibraryScreen(
                                     }
                                 }
                             }
-                            items(state.items, key = { it.id }) { item ->
-                                PosterCard(item, library.imageUrl(item.posterPath, ImageSize.W342), item.gridSubtitle(), { item.open(onOpenShow, onOpenMovie, onPlay, onNotMatched) }, { vm.setWatched(item, it) })
+                            if (state.merged && state.notes.isNotEmpty()) item(key = "servers", span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                                ServersNote(state.notes, if (state.retryServers) vm::retryServers else null)
+                            }
+                            items(state.items, key = { "${it.where.serverId}:${it.kind}:${it.id}" }) { item ->
+                                PosterCard(item, library.imageFor(item.where, item.posterPath, ImageSize.W342), item.gridSubtitle(), { item.open(onOpenShow, onOpenMovie, onPlay, onNotMatched) }, { vm.setWatched(item, it) })
                             }
                             if (state.loadingMore || state.moreError != null) item(span = { GridItemSpan(maxLineSpan) }) {
                                 if (state.moreError != null) InlineError(state.moreError!!, vm::retryMore)
