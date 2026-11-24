@@ -119,6 +119,9 @@ fun LibraryScreen(
         LibraryViewModel(
             services.library, type, createSavedStateHandle(), pageSize = PAGE_SIZE, columns = COLUMNS, countsLine = true, requests = services.browseRequests,
             others = media.watchmy.client.presentation.servers.OtherServers(services.servers, services.library),
+            // The TV keeps each library's sort and filters, so it opens as it was left.
+            kept = services.gridChoices,
+            keptAs = services.servers.current.value?.server?.id?.let { "$it/$type" },
         )
     }
     ReportShown(vm::setShown)

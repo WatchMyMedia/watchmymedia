@@ -25,6 +25,7 @@ import media.watchmy.client.model.BrowseRequests
 import media.watchmy.client.model.ItemFilter
 import media.watchmy.client.model.ItemKind
 import media.watchmy.client.model.ItemPage
+import media.watchmy.client.model.GridChoices
 import media.watchmy.client.model.ItemQuery
 import media.watchmy.client.model.ItemSort
 import media.watchmy.client.model.LetterOffset
@@ -49,7 +50,9 @@ import media.watchmy.client.presentation.Freshness
  * jump when sorted by title. The grid holds a window of the whole result
  * (`offset` to `end`): a jump starts a new window at its letter, and pages
  * load after it ([loadMore]) and before it ([loadEarlier]). The choices
- * outlive the process ([saved]).
+ * outlive the process ([saved]). With [keptAs] (the TV), the person's own
+ * sort and filters are kept on the device ([kept]) and a new visit opens
+ * with them; a row's See all applies its sort for that visit only.
  *
  * [columns] is the TV grid's: a jump's window starts at a multiple of it,
  * so the letter's first title sits in its own column and earlier pages line
@@ -74,6 +77,9 @@ class LibraryViewModel(
      * ([MergedPages]); null is the server in use's alone.
      */
     private val others: OtherServers? = null,
+    /** Where this device keeps libraries' sort and filters, and this library's key there ([keptAs]: "server id/type"); none on the phone. */
+    private val kept: GridChoices = GridChoices.None,
+    private val keptAs: String? = null,
 ) : ViewModel() {
     data class Choices(
         val sort: ItemSort = ItemSort.Added,
@@ -155,14 +161,19 @@ class LibraryViewModel(
 
     private val _state = MutableStateFlow(
         State(
-            choices = Choices(
-                sort = saved.get<String>(SORT)?.let { n -> ItemSort.entries.firstOrNull { it.name == n } } ?: ItemSort.Added,
-                filter = saved.get<String>(FILTER)?.let { n -> ItemFilter.entries.firstOrNull { it.name == n } } ?: ItemFilter.All,
-                genre = saved[GENRE],
-                decade = saved[DECADE],
-                text = saved[TEXT] ?: "",
-                rating = saved[RATING],
-            ),
+            // This visit's, after the process comes back; else what the device kept for the library; else the defaults.
+            choices = if (saved.contains(SORT) || keptAs == null) {
+                Choices(
+                    sort = saved.get<String>(SORT)?.let { n -> ItemSort.entries.firstOrNull { it.name == n } } ?: ItemSort.Added,
+                    filter = saved.get<String>(FILTER)?.let { n -> ItemFilter.entries.firstOrNull { it.name == n } } ?: ItemFilter.All,
+                    genre = saved[GENRE],
+                    decade = saved[DECADE],
+                    text = saved[TEXT] ?: "",
+                    rating = saved[RATING],
+                )
+            } else {
+                keptChoices()
+            },
         ),
     )
     val state: StateFlow<State> = _state.asStateFlow()
@@ -499,7 +510,35 @@ class LibraryViewModel(
         beforeJump = null
         _state.update { it.copy(choices = after, letters = null, anchorLetter = null) }
         save(after)
+        keep(after)
         reload(debounce = debounce)
+    }
+
+    /** The person's own sort and filters, kept on the device for the next visit (not the title filter, which is for now). */
+    private fun keep(choices: Choices) {
+        val key = keptAs ?: return
+        kept.keep(
+            key,
+            buildMap {
+                put(SORT, choices.sort.name)
+                put(FILTER, choices.filter.name)
+                choices.genre?.let { put(GENRE, it) }
+                choices.decade?.let { put(DECADE, it.toString()) }
+                choices.rating?.let { put(RATING, it) }
+            },
+        )
+    }
+
+    /** What the device kept for this library; a sort or filter it doesn't offer reads as the default. */
+    private fun keptChoices(): Choices {
+        val m = keptAs?.let(kept::recalled) ?: return Choices()
+        return Choices(
+            sort = m[SORT]?.let { n -> ItemSort.entries.firstOrNull { it.name == n } }?.takeIf { it in sortOptions(type) } ?: ItemSort.Added,
+            filter = m[FILTER]?.let { n -> ItemFilter.entries.firstOrNull { it.name == n } }?.takeIf { it in filterOptions(type) } ?: ItemFilter.All,
+            genre = m[GENRE],
+            decade = m[DECADE]?.toIntOrNull(),
+            rating = m[RATING],
+        )
     }
 
     private fun save(choices: Choices) {

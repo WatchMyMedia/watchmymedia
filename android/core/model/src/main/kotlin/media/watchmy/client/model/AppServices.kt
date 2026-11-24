@@ -52,6 +52,9 @@ interface AppServices {
 
     /** Which server's copy Play uses for each title on several servers, kept on this device. */
     val copyChoices: CopyChoices get() = CopyChoices.None
+
+    /** Each library's sort and filters, kept on this device (the TV's Movies and TV Shows). */
+    val gridChoices: GridChoices get() = GridChoices.None
 }
 
 private val AppBrowseRequests = BrowseRequests()

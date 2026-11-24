@@ -1173,6 +1173,10 @@ minutes of playing a file, before and after a change.
   one UI does stays in that UI's module. What a page should keep across the
   process being killed (a filter, a query, the season) goes in a
   `SavedStateHandle`: `viewModel { SomeViewModel(createSavedStateHandle(), …) }`.
+  What must outlast the visit goes on the device: the TV keeps each
+  library's sort and filters in `GridChoices` (`LibraryViewModel`'s `kept`,
+  by "server id/type"), so Movies and TV Shows open as they were left; a
+  row's See all sorts that visit only.
   A ViewModel never takes a screen's lambda to call later; it says what
   happened through its state or an `events` flow the screen collects.
   Outside a nav host (the server picker and sign-in), `viewModel {}` lives

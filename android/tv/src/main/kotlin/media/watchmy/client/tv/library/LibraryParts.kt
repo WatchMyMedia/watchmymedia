@@ -217,6 +217,7 @@ internal fun SortFilterPanel(
                             )
                         }
                     }
+                    Text(gridKeptLine(type), style = TvType.Second, color = TvPalette.Muted, modifier = Modifier.padding(start = 10.dp))
                 }
                 LaunchedEffect(Unit) {
                     val back = cameFrom?.let(rowFocus::get)
@@ -304,3 +305,6 @@ private fun ChoiceList(
     }
     InitialFocus(focus)
 }
+
+/** Under Sort and filter: what the TV does with them. */
+internal fun gridKeptLine(type: LibraryType): String = "This TV remembers these for ${if (type == LibraryType.Tv) "TV Shows" else "Movies"}."

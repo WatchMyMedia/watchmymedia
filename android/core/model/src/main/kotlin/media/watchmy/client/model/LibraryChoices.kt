@@ -37,3 +37,30 @@ fun filterOptions(type: LibraryType): List<ItemFilter> = when (type) {
     LibraryType.Tv -> listOf(ItemFilter.All, ItemFilter.Continuing, ItemFilter.Ended, ItemFilter.Unwatched, ItemFilter.FourK, ItemFilter.Hdr)
     LibraryType.Movie -> listOf(ItemFilter.All, ItemFilter.Unwatched, ItemFilter.FourK, ItemFilter.Hdr)
 }
+
+/**
+ * A library grid's sort and filters, kept on this device for each server's
+ * library, so the library opens as it was left: every app's TV does this.
+ * The choices are names under the grid's own keys ("sort" to "Title").
+ */
+interface GridChoices {
+    /** What was kept for [key]; null when nothing was. */
+    fun recalled(key: String): Map<String, String>?
+
+    fun keep(key: String, choices: Map<String, String>)
+
+    /** Nowhere to keep them: the phone and tablet, and tests that don't ask. */
+    object None : GridChoices {
+        override fun recalled(key: String): Map<String, String>? = null
+        override fun keep(key: String, choices: Map<String, String>) = Unit
+    }
+
+    /** Kept in memory: the fakes'. */
+    class InMemory : GridChoices {
+        private val kept = java.util.concurrent.ConcurrentHashMap<String, Map<String, String>>()
+        override fun recalled(key: String): Map<String, String>? = kept[key]
+        override fun keep(key: String, choices: Map<String, String>) {
+            kept[key] = choices
+        }
+    }
+}

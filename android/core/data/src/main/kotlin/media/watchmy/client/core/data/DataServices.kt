@@ -168,6 +168,7 @@ class DataServices internal constructor(
 
     /** Which server's copy Play uses for each title on several servers. */
     val copyChoices: media.watchmy.client.model.CopyChoices = StoredCopyChoices(store)
+    val gridChoices: media.watchmy.client.model.GridChoices = StoredGridChoices(store)
 
     /** A sender's calls for casting to a TV. */
     val castGateway: CastGateway = RealCastGateway(store, http, liveRepository::capabilities)
