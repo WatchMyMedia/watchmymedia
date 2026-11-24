@@ -47,6 +47,7 @@
 .search-best__pic { position: relative; display: block; width: 18.75rem; height: 10.5rem; border-radius: var(--radius); overflow: hidden; flex: none; background: var(--surface-2); }
 .search-best__text { display: flex; flex-direction: column; gap: .375rem; min-width: 0; }
 .search-best__line { font-size: var(--t-label); color: var(--muted); }
+.search-best__servers { font-size: var(--t-label); font-weight: 600; color: var(--text-2); }
 .search-best__place { font-size: var(--t-label); color: var(--text-2); }
 .search-best__actions { margin-top: .5rem; gap: 1.125rem; flex-wrap: nowrap; }
 .search-best .tv-btn, .search-ask .tv-btn { height: 4.25rem; }

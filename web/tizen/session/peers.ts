@@ -2,7 +2,9 @@ import { ApiError, unwrap, type ApiClient } from '../../src/api/client'
 import type { components } from '../../src/api/schema'
 import type { ServerInfo } from './active'
 import { bearerClient } from './client'
-import { MediaTokens, MediaUrls } from './media'
+import { MediaTokens, MediaUrls, tokenedUrl } from './media'
+import { isPrivateNetworkHost } from './address'
+import { PlayerError } from '../player'
 import type { Account, RememberedServer } from './servers'
 import { serverProblem, tooOldForApp, type AppSession, type StartProblem } from './session'
 
@@ -23,31 +25,52 @@ export type PeerHooks = {
   onInfo?(info: ServerInfo): void
 }
 
+/** Rejects when `signal` aborts, as a fetch would. */
+function aborted(signal: AbortSignal): Promise<never> {
+  return new Promise((_, reject) => {
+    const fail = () => reject(signal.reason instanceof Error ? signal.reason : new DOMException('Aborted', 'AbortError'))
+    if (signal.aborted) fail()
+    else signal.addEventListener('abort', fail, { once: true })
+  })
+}
+
 /**
  * A remembered server other than the one the app is on, asked directly: a
  * bearer client of its own, built for its own address with its own
  * sign-in, and its own media token for its pictures. Nothing of the active
  * session goes to it, and its sign-in goes nowhere else. Before the sign-in
- * is sent the server is asked which one it is, once: another server
- * answering at a remembered address gets no token.
+ * goes out on any request the server is asked which one it is, once: every
+ * call through `api` waits for that answer, so another server answering at
+ * a remembered address gets no token, whichever screen asked.
  */
 export class PeerServer {
   readonly id: string
   readonly name: string
   readonly baseUrl: string
+  /** Reached beyond this network: its copies are offered last, with a note that they may be converted to keep up. */
+  readonly away: boolean
   readonly tokens: MediaTokens
   readonly media: MediaUrls
-  private api: ApiClient
+  /** Its own client: each call asks which server it is first (once), then sends its sign-in. */
+  readonly api: ApiClient
   private open: ApiClient
   private answered?: ServerInfo
+  private checking?: Promise<void>
+  private remembered?: number
   private wantsToken = true
 
   constructor(server: RememberedServer & { account: Account }, private hooks: PeerHooks = {}) {
     this.id = server.id
     this.name = server.name
     this.baseUrl = server.baseUrl
+    this.remembered = server.apiLevel
+    this.away = awayFromHome(server.baseUrl)
     this.open = bearerClient(server.baseUrl)
-    this.api = bearerClient(server.baseUrl, { token: server.account.token, onUnauthorized: () => this.hooks.onSignedOut?.() })
+    this.api = bearerClient(server.baseUrl, {
+      token: server.account.token,
+      onUnauthorized: () => this.hooks.onSignedOut?.(),
+      beforeSignIn: (signal) => this.verify(signal),
+    })
     this.tokens = new MediaTokens(async () => unwrap(await this.api.POST('/api/auth/media-token')))
     this.media = new MediaUrls(server.baseUrl, this.tokens)
   }
@@ -55,25 +78,49 @@ export class PeerServer {
   /** Its own answer to which server it is, once it has given one here: a switch to it needn't ask again. */
   get info(): ServerInfo | undefined { return this.answered }
 
-  private async verify(signal: AbortSignal) {
-    if (this.answered) return
-    const info = unwrap(await this.open.GET('/api/server', { signal }))
-    if (info.id !== this.id) throw new PeerError('moved')
-    this.hooks.onInfo?.(info)
-    const problem = serverProblem(info)
-    if (problem) throw new PeerError(problem)
-    this.answered = info
+  /** The API level it said it has, else the one remembered. */
+  get apiLevel(): number | undefined { return this.answered?.apiLevel ?? this.remembered }
+
+  /** Asks which server it is, once; calls made meanwhile wait for the one answer. */
+  verify(signal: AbortSignal): Promise<void> {
+    if (this.answered) return Promise.resolve()
+    this.checking ??= (async () => {
+      try {
+        const info = unwrap(await this.open.GET('/api/server'))
+        if (info.id !== this.id) throw new PeerError('moved')
+        this.hooks.onInfo?.(info)
+        const problem = serverProblem(info)
+        if (problem) throw new PeerError(problem)
+        this.answered = info
+      } finally {
+        this.checking = undefined
+      }
+    })()
+    return Promise.race([this.checking, aborted(signal)])
+  }
+
+  /** Forgets its answer, so the next call asks again: Try again, after it didn't answer. */
+  forget() { this.answered = undefined }
+
+  /** Its pictures need its own media token: fetched once something of it is drawn. */
+  showMedia() {
+    if (!this.wantsToken) return
+    this.wantsToken = false
+    void this.tokens.start()
+  }
+
+  /** The player engine's `mediaUrl` for a play from this server: its own media paths, with the play's own token. */
+  readonly playerMediaUrl = (path: string, token: string): string => {
+    const url = tokenedUrl(this.baseUrl, path, token)
+    if (!url) throw new PlayerError('The server sent an address this TV won’t open.')
+    return url
   }
 
   /** GET /api/search on this server, with its own sign-in. */
   async search(q: string, signal: AbortSignal): Promise<SearchResults> {
     await this.verify(signal)
     const results = unwrap(await this.api.GET('/api/search', { params: { query: { q } }, signal }))
-    // Its pictures need its own media token: fetched once it has something to show.
-    if (this.wantsToken) {
-      this.wantsToken = false
-      void this.tokens.start()
-    }
+    this.showMedia()
     return results
   }
 
@@ -81,6 +128,11 @@ export class PeerServer {
     this.wantsToken = false
     this.tokens.stop()
   }
+}
+
+/** Whether an address is beyond this network: a public name or address, not the house's own. */
+export function awayFromHome(baseUrl: string): boolean {
+  try { return !isPrivateNetworkHost(new URL(baseUrl).hostname) } catch { return false }
 }
 
 /**

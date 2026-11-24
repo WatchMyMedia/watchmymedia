@@ -1,7 +1,10 @@
 import { type CSSProperties } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { personQuery, type PersonTitle } from '../../../src/api/people'
-import { useMediaUrls, useNav, useSession } from '../../app/hooks'
+import type { PersonTitle } from '../../../src/api/people'
+import { routeOn, SourceContext, useMediaUrls, useNav, usePageSource, useSource } from '../../app/hooks'
+import { personOn } from '../../session/sourceQueries'
+import type { Source } from '../../session/peerRegistry'
+import { SourceGone } from './MovieScreen'
 import type { ScreenProps } from '../../app/routes'
 import { Card } from '../../ui/Card'
 import { Clock } from '../../ui/Clock'
@@ -23,7 +26,14 @@ import './details.css'
  * goes back to the title with focus on that person.
  */
 export function PersonScreen({ route }: ScreenProps<'person'>) {
-  const person = useQuery(personQuery(route.personId))
+  const source = useSource(route.server)
+  if (source === 'gone') return <SourceGone/>
+  return <SourceContext.Provider value={source}><PersonFrom route={route} source={source}/></SourceContext.Provider>
+}
+
+/** A person's titles on `source`: the current server, or the one the title they were in came from. */
+function PersonFrom({ route, source }: ScreenProps<'person'> & { source: Source }) {
+  const person = useQuery(personOn(source, route.personId))
   const nav = useNav()
   if (person.isPending) return <PersonLoading name={route.who}/>
   if (person.isError) {
@@ -49,14 +59,15 @@ function PersonLoading({ name }: { name?: string }) {
 }
 
 function PersonPage({ name, profilePath, movies, shows }: { name: string; profilePath?: string; movies: PersonTitle[]; shows: PersonTitle[] }) {
-  const session = useSession()
+  const source = usePageSource()
   const media = useMediaUrls()
   const nav = useNav()
   const [a, b] = placeholderTone(name)
   const row = (id: string, title: string, items: PersonTitle[], first: boolean) => items.length > 0 && <div className="person-row" data-vitem data-autofocus={first || undefined}>
     <Row id={id} title={title} variant="poster" items={items} itemKey={(t) => `${t.kind}${t.id}`}
       renderItem={(t, focusId) => {
-        const to = personTitleRoute(t)
+        const at = personTitleRoute(t)
+        const to = at && routeOn(at, source)
         const line = personTitleLine(t)
         return <Card id={focusId} variant="poster" title={t.title} subtitle={line} image={media.imageUrl(t.posterPath, 'w342')}
           progress={t.progress} done={!!t.watched && !t.progress} label={[t.title, line, t.watched && 'watched'].filter(Boolean).join(', ')}
@@ -74,7 +85,7 @@ function PersonPage({ name, profilePath, movies, shows }: { name: string; profil
         <div className="person-head__text">
           <p className="tv-kicker">Cast</p>
           <h1 className="tv-display person-head__name">{name}</h1>
-          <p className="person-head__line">{personLine(movies.length, shows.length, session.server.name)}</p>
+          <p className="person-head__line">{personLine(movies.length, shows.length, source?.name ?? '')}</p>
         </div>
       </header>
       {row('person/movies', 'Movies', movies, true)}

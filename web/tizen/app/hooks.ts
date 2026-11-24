@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useEffectEvent, useSyncExternalStore, type RefObject } from 'react'
+import { createContext, useContext, useEffect, useEffectEvent, useMemo, useSyncExternalStore, type RefObject } from 'react'
 import type { Input } from './input'
 import { HOLD_EVENT } from './input'
 import type { Layer } from './router'
@@ -9,6 +9,8 @@ import type { ActiveSession } from '../session/active'
 import type { AppSession, StartState } from '../session/session'
 import type { Player } from '../player'
 import { from34 } from '../session/features'
+import { currentSource, peerSource, peersOf, type Source } from '../session/peerRegistry'
+import type { PeerServer } from '../session/peers'
 
 // The contexts the app provides and the hooks screens use. Screens never
 // reach for the DOM's keys or the stack themselves.
@@ -22,6 +24,12 @@ export const NavContext = createContext<Nav | null>(null)
 export const EntryContext = createContext<Entry<Route> | null>(null)
 /** Which layer a component's keys belong to: Dialog and SidePanel set 'modal' for what they hold. */
 export const LayerContext = createContext<Layer>('screen')
+/**
+ * The server a page's title comes from (a title opened in place from
+ * another server): its pictures, cast, related titles and plays are that
+ * server's. None on the rest of the app, which is the current server's.
+ */
+export const SourceContext = createContext<Source | null>(null)
 
 /** Moving between screens. */
 export type Nav = {
@@ -64,6 +72,36 @@ export function useSession(): ActiveSession { return need(useContext(SessionCont
 /** Whether the current server answers API level 34's features (`session/features.ts`); below it the screens ask it nothing new. */
 export function useLevel34(): boolean { return from34(useSession().server.apiLevel) }
 
+/**
+ * The other servers this TV is signed in to and can use, in Servers' order,
+ * kept for the session (`session/peerRegistry.ts`): each asked through its
+ * own client, which checks which server it is before its sign-in goes out.
+ * Redrawn as Servers' list changes.
+ */
+export function usePeers(): PeerServer[] {
+  const app = useApp()
+  const session = useSession()
+  const state = useAppState()
+  const store = app.store.list()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => peersOf(app, session).list(), [app, session, state, store])
+}
+
+/**
+ * Where a page's title comes from: the current server, or another one by
+ * its id (a title opened in place). 'gone' when that server is no longer
+ * on this TV or signed in here.
+ */
+export function useSource(serverId: string | undefined): Source | 'gone' {
+  const session = useSession()
+  const peers = usePeers()
+  return useMemo(() => {
+    if (!serverId || serverId === session.server.id) return currentSource(session)
+    const peer = peers.find((p) => p.id === serverId)
+    return peer ? peerSource(peer) : 'gone'
+  }, [serverId, session, peers])
+}
+
 /** The screen's own entry in the stack: its key and the FocusMemory it keeps while under others. */
 export function useEntry(): Entry<Route> | null { return useContext(EntryContext) }
 
@@ -75,11 +113,34 @@ export function useGroupMemory(group: string): string | undefined {
 /**
  * Image and media addresses for the signed-in server, redrawn when a media
  * token arrives: `imageUrl('/abc.jpg', 'w342')`, `mediaUrl('/api/live-tv/art/7')`.
+ * Inside a page from another server (SourceContext), that server's, with
+ * its own media token.
  */
 export function useMediaUrls() {
   const session = useSession()
-  useSyncExternalStore(session.tokens.subscribe, session.tokens.snapshot)
-  return session.media
+  const peer = useContext(SourceContext)?.peer
+  const tokens = peer?.tokens ?? session.tokens
+  useSyncExternalStore(tokens.subscribe, tokens.snapshot)
+  useEffect(() => { peer?.showMedia() }, [peer])
+  return peer ? peer.media : session.media
+}
+
+/** The page's source, when the page set one: the server its title is on. */
+export function usePageSource(): Source | null { return useContext(SourceContext) }
+
+/**
+ * A route opened from a page whose title is on another server: a movie,
+ * show or person there opens in place from the same server. Anything else,
+ * and everything from the current server, is unchanged.
+ */
+export function routeOn(route: Route, source: Source | null | undefined): Route {
+  if (!source?.peer) return route
+  return route.name === 'movie' || route.name === 'show' || route.name === 'person' ? { ...route, server: source.id } : route
+}
+
+/** A play from a page whose title is on another server: from that server, without switching the app. */
+export function playOn(request: PlayRequest, source: Source | null | undefined): PlayRequest {
+  return source?.peer && request.kind === 'file' ? { ...request, server: source.id } : request
 }
 
 /**

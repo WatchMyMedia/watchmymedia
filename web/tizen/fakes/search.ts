@@ -16,13 +16,14 @@ type Reminder = components['schemas']['LiveTVReminder']
 const has = (title: string, q: string) => title.toLowerCase().includes(q)
 
 const MOVIES: Movie[] = [...MOVIE_ITEMS, { ...MOVIE_ITEMS[0], id: 151, title: 'Harbor at Dusk', year: 2011, runtimeMin: 98 }].map((m) => ({
-  id: m.id, libraryId: m.libraryId, tmdbId: 9000 + m.id, title: m.title, overview: m.overview, genres: m.genres, fileCount: 1, credits: [], year: m.year, runtimeMin: m.runtimeMin,
+  // The library's own TMDB ids, so a title another server has too is one result (API level 34).
+  id: m.id, libraryId: m.libraryId, tmdbId: m.id === 151 ? 9151 : m.tmdbId ?? 50_000 + m.id, title: m.title, overview: m.overview, genres: m.genres, fileCount: 1, credits: [], year: m.year, runtimeMin: m.runtimeMin,
 }))
 const SHOWS: Show[] = SHOW_ITEMS.map((s) => ({
-  id: s.id, libraryId: s.libraryId, tmdbId: 9000 + s.id, title: s.title, overview: s.overview, genres: s.genres, episodeCount: s.episodeCount ?? 10, credits: [], year: s.year, status: s.status,
+  id: s.id, libraryId: s.libraryId, tmdbId: s.tmdbId ?? 60_000 + s.id, title: s.title, overview: s.overview, genres: s.genres, episodeCount: s.episodeCount ?? 10, credits: [], year: s.year, status: s.status,
 }))
 const EPISODES: SearchEpisode[] = AIRED.map((e) => ({
-  id: e.episodeId, showId: e.showId, showTitle: e.showTitle, seasonNumber: e.seasonNumber, number: e.episodeNumber, title: e.title, fileId: e.fileId ?? 0,
+  id: e.episodeId, showId: e.showId, showTitle: e.showTitle, showTmdbId: 60_000 + e.showId, seasonNumber: e.seasonNumber, number: e.episodeNumber, title: e.title, fileId: e.fileId ?? 0,
 }))
 
 const channel = (id: string, number: string, name: string): LiveChannel => ({ id, sourceId: 'fake-tuner', number, name, enabled: true, available: true })

@@ -1,7 +1,7 @@
 import { memo, useState, type CSSProperties, type FocusEvent, type ReactNode } from 'react'
 import type { components } from '../../../src/api/schema'
 import { rowWindow } from '../../app/focusRules'
-import { useGroupMemory, useLevel34, useMediaUrls, useNav } from '../../app/hooks'
+import { routeOn, useGroupMemory, useLevel34, useMediaUrls, useNav, usePageSource } from '../../app/hooks'
 import { Card } from '../../ui/Card'
 import { Banner, SidePanel } from '../../ui/Overlays'
 import { placeholderTone } from '../../ui/tones'
@@ -85,7 +85,9 @@ const PEOPLE_IN_VIEW = 8
 export const PeopleRow = memo(function PeopleRow({ cast, group, autoFocus }: { cast: Credit[]; group: string; autoFocus?: boolean }) {
   const media = useMediaUrls()
   const nav = useNav()
-  const level34 = useLevel34()
+  const source = usePageSource()
+  // A person's titles on the server the page is from: its own level decides.
+  const level34 = useLevel34() && (!source?.peer || (source.apiLevel ?? 0) >= 34)
   const remembered = useGroupMemory(group)
   const [focus, setFocus] = useState(() => Math.max(0, cast.findIndex((_, i) => `${group}/${i}` === remembered)))
   // The person before the focused one stays in view, and the row never moves past its last full screen.
@@ -99,7 +101,7 @@ export const PeopleRow = memo(function PeopleRow({ cast, group, autoFocus }: { c
       {cast.map((c, i) => {
         const [a, b] = placeholderTone(c.name)
         const press = castPress(c, level34)
-        const onPress = press?.kind === 'open' ? () => nav.push(press.route) : press?.kind === 'unknown' ? () => showNote(PERSON_UNKNOWN, 'info') : undefined
+        const onPress = press?.kind === 'open' ? () => nav.push(routeOn(press.route, source)) : press?.kind === 'unknown' ? () => showNote(PERSON_UNKNOWN, 'info') : undefined
         return <button key={`${i}${c.name}`} type="button" data-index={i} data-focus={`${group}/${i}`} data-autofocus={(autoFocus && i === 0) || undefined} className="tv-person"
           aria-label={castLabel(c)} aria-disabled={press?.kind === 'unknown' || undefined} onClick={onPress}>
           <span className="tv-person__pic" style={{ '--ph-a': a, '--ph-b': b } as CSSProperties}>
@@ -127,11 +129,12 @@ export function WatchBar({ line }: { line: WatchLine }) {
 export const RelatedSection = memo(function RelatedSection({ row, hint }: { row: RelatedRow; hint?: ReactNode }) {
   const media = useMediaUrls()
   const nav = useNav()
+  const source = usePageSource()
   const cards = row.items.map(titleCard)
   return <div className="dt-related" data-vitem data-zone={`related/${row.id}`}>
     <Row id={`related/${row.id}`} title={row.title} subtitle={row.subtitle} variant="poster" items={cards} itemKey={(c) => c.key}
       renderItem={(c, id) => <Card id={id} variant="poster" title={c.title} subtitle={c.subtitle} image={media.imageUrl(c.posterPath, 'w342')} badges={c.badges} done={c.done}
-        progress={c.progress} label={c.label} onPress={() => nav.push(c.route)}/>}/>
+        progress={c.progress} label={c.label} onPress={() => nav.push(routeOn(c.route, source))}/>}/>
     {hint}
   </div>
 })

@@ -4,6 +4,7 @@ import { localSettings } from '../../app/localSettings'
 import { tvTakesHdr10 } from '../../app/platform'
 import { FilePlayback, playbackSettings, StillWatchingSession, type FilePlaybackState, type FileRequest, type PlaybackSettings, type Player, type Preferences, type UpNext } from '../../player'
 import type { ActiveSession } from '../../session/active'
+import type { Source } from '../../session/peerRegistry'
 import type { PlaybackMedia } from '../../app/playbackErrors'
 import { episodeLine, type PlayerKind } from './labels'
 
@@ -76,13 +77,19 @@ export class PlayerSession {
   private headings = new Map<string, Heading>()
   private unsubscribe: () => void
 
-  constructor(session: ActiveSession, player: Player) {
-    const level = session.server.apiLevel
+  /**
+   * `source` is where the file is: the current server, or another this TV is
+   * signed in to, whose own client and media addresses play it (and get its
+   * progress) without switching the app.
+   */
+  constructor(session: ActiveSession, player: Player, source?: Source) {
+    const peer = source?.peer
+    const level = peer ? peer.apiLevel ?? session.server.apiLevel : session.server.apiLevel
     this.quality = savedQuality(level).id
     this.controller = new FilePlayback({
-      api: session.api,
+      api: peer ? peer.api : session.api,
       player,
-      mediaUrl: session.playerMediaUrl,
+      mediaUrl: peer ? peer.playerMediaUrl : session.playerMediaUrl,
       client: session.client,
       settings: () => this.settings(),
       stillWatching: stillWatchingFor(session),
