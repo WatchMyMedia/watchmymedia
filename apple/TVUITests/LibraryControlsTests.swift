@@ -43,6 +43,26 @@ final class LibraryControlsTests: XCTestCase {
         XCTAssertTrue(app.waitForFocusedButton(timeout: 5) { $0 == third }, "Down lands on the poster focused last, \(third), not \(app.focusedButton.label)")
     }
 
+    /// Sorted by Title or by Year, the Sort chip was cut to "Sort: Title…" and
+    /// lost its chevron (tvOS 27.2): the menu made room for the whole label
+    /// (218 pt) and then laid the label out 20 pt narrower. The label fills
+    /// the room the menu made for it.
+    @MainActor
+    func testTheSortChipShowsItsWholeLabel() {
+        for (sort, label) in [("title", "Title"), ("year", "Year")] {
+            let app = XCUIApplication()
+            app.launchArguments = ["-fakes", "-tab", "movies", "-librarySort", sort]
+            app.launch()
+            let chip = app.buttons["Sort by"]
+            XCTAssertTrue(chip.waitUntilExists(timeout: 20))
+            XCTAssertTrue(chip.wait(until: NSPredicate(format: "value == %@", label), timeout: 10), "sorted by \(label): \(chip.value ?? "")")
+            let words = chip.staticTexts.firstMatch
+            XCTAssertTrue(eventually(timeout: 5) { words.exists && words.frame.width >= chip.frame.width - 1 },
+                          "Sort: \(label) is laid out whole: \(words.frame.width) pt of the menu's \(chip.frame.width)")
+            app.terminate()
+        }
+    }
+
     @MainActor
     func testUnwatchedNarrowsTheGrid() {
         let app = XCUIApplication()

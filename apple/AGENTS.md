@@ -239,7 +239,10 @@ server, and on iPad in both a regular and a compact width.
   (`Text("\(Image(systemName: …)) …")`). A `Menu`'s label does the same
   with an `Image` beside its words: drawn larger than the label was
   measured, it cut the words short ("Sort: Date add…", tvOS 27.2), so the
-  menu chips put the chevron in the text (`ChipMenuLabel`). The
+  menu chips put the chevron in the text (`ChipMenuLabel`). A `Menu` also
+  made room for its whole label and then laid the label out 20 pt narrower,
+  so a short one lost its chevron to an ellipsis ("Sort: Title…"): the
+  label's text keeps its own size (`.fixedSize()`). The
   library grid's focus section is the grid's own width: stretched under the
   letter index, Left from a letter level with the 100 pt gap between two
   rows found nothing. On iPad a `.presentationSizing(.fitted)`

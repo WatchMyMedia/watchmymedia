@@ -235,13 +235,18 @@ struct TVChipStyle: ButtonStyle {
 /// A chip's words with the chevron that says a menu opens from it ("Sort:
 /// Title ⌄", "Today ⌄"). The chevron is part of the text: as an `Image` of
 /// its own in a `Menu`'s label, tvOS drew it larger than the label was
-/// measured, and the words were cut short ("Sort: Date add…", "Gen…").
+/// measured, and the words were cut short ("Sort: Date add…", "Gen…"). The
+/// text keeps its own size too: a `Menu` made room for the whole label and
+/// then laid it out 20 pt narrower, so a short one lost its chevron to an
+/// ellipsis ("Sort: Title…", "Sort: Year…"; tvOS 27.2,
+/// `TVUITests/LibraryControlsTests.swift`).
 struct ChipMenuLabel: View {
     let title: String
 
     var body: some View {
         Text("\(title)  \(Text(Image(systemName: "chevron.down")).font(.tv(.caption2, .bold)))")
             .font(.tv(.body, .semibold))
+            .fixedSize()
     }
 }
 
