@@ -22,7 +22,7 @@ pageClient.use({
 /**
  * The client every query and mutation here calls. The web app and the Cast
  * receiver never change it. An app outside the browser app (the Samsung TV
- * app, `tizen/`) reuses these queries with its own client, for another
+ * app, `tv/`) reuses these queries with its own client, for another
  * server and a bearer token, through setApiClient; ES modules see the new
  * value wherever `api` was imported.
  */

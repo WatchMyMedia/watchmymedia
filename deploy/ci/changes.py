@@ -37,9 +37,9 @@ import sys
 
 WORKFLOW = '.github/workflows/ci.yml'
 
-# The Samsung TV app's own files. They are in web/, but only the samsung job
-# builds or tests them: the web job and the image's web build read none.
-SAMSUNG = ['web/tizen/', 'web/vite.tizen.config.ts', 'web/vite.tizen-core.config.ts']
+# The TV app's own files. They are in web/, but only the TV jobs build or
+# test them: the web job and the image's web build read none.
+TV = ['web/tv/', 'web/vite.tv.config.ts', 'web/vite.tizen-core.config.ts']
 
 # What each area is built or tested from: a name ending in / is a folder and
 # everything under it, any other a file. deploy/ci/changes_test.py holds
@@ -53,13 +53,13 @@ AREAS = {
     # contract: api/ and the web's copy and types against the server's code.
     'contract': ['server/', 'api/', 'web/src/api/', 'web/package.json', 'web/pnpm-lock.yaml', 'Makefile'],
     # web: the web app and the Cast receiver keep their own copies of the
-    # icons, so brand/export is not theirs. Not the Samsung app (ELSEWHERE).
+    # icons, so brand/export is not theirs. Not the TV app (ELSEWHERE).
     'web': ['web/'],
-    # samsung: the Samsung TV app's own files, what it imports from the web
+    # samsung: the TV app's own files, what it imports from the web
     # app (the API types and src/lib), the web's dependencies, the configs
     # its lint, types and tests read, its packaging helpers and bundle check
     # (deploy/samsung), and the icon its build packs.
-    'samsung': [*SAMSUNG, 'web/src/lib/', 'web/src/api/', 'web/package.json', 'web/pnpm-lock.yaml',
+    'samsung': [*TV, 'web/src/lib/', 'web/src/api/', 'web/package.json', 'web/pnpm-lock.yaml',
                 'web/eslint.config.js', 'web/tsconfig.json', 'web/vite.config.ts', 'deploy/samsung/',
                 'brand/export/android/play-store-icon-512.png'],
     'docker': ['deploy/Dockerfile', 'deploy/entrypoint.sh', '.dockerignore', 'deploy/ci/docker-smoke.sh',
@@ -97,7 +97,7 @@ AREAS = {
 }
 
 # What an area's folders hold that its job neither builds nor tests.
-ELSEWHERE = {'web': SAMSUNG, 'docker': SAMSUNG}
+ELSEWHERE = {'web': TV, 'docker': TV}
 
 # Guidance for people and agents: no build reads it, wherever it is. The
 # scripts job checks the paths and make targets it names.

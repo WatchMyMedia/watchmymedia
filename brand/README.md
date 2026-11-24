@@ -13,7 +13,7 @@ files, not by editing one by hand. The apps also draw the mark in code:
 `BrandMark` in the web app (`web/src/components/BrandMark.tsx`), the Apple apps
 (`apple/Kit/Sources/WMMUI/Marks.swift`), the Android app
 (`android/core/ui/…/components/Brand.kt`) and the Samsung app
-(`web/tizen/App.tsx`).
+(`web/tv/ui/Icon.tsx`).
 
 ## Colors
 

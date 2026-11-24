@@ -390,7 +390,7 @@ jobs:
       # The Cast receiver, deployed separately to cast.watchmy.media.
       - run: pnpm build:receiver
 
-  # The Samsung TV app (web/tizen), a packaged Tizen web app for the TV's
+  # The TV app (web/tv) built for Samsung TVs, a packaged Tizen web app for the TV's
   # Chromium 108: its lint, types and tests, which the web job leaves to it,
   # its unsigned build, and a check that the build loads there
   # (deploy/samsung/bundle.py). Signing needs a Samsung certificate, which
@@ -415,8 +415,8 @@ jobs:
           cache: ${{ runner.environment == 'github-hosted' && 'pnpm' || '' }}
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint:tizen
-      - run: pnpm test:tizen
+      - run: pnpm lint:tv
+      - run: pnpm test:tv
       # build:tizen checks the types first.
       - run: pnpm build:tizen
       - run: pnpm check:tizen
