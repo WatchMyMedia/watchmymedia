@@ -2,7 +2,8 @@ import XCTest
 
 /// Trailer on the Apple TV movie page,
 /// on the fakes: Dead Reckoning Bay has a YouTube trailer, The Paper
-/// Kite a trailer file. A simulator has no YouTube app, so a YouTube trailer
+/// Kite a trailer file and a YouTube one, so its button reads Trailers and
+/// lists both. A simulator has no YouTube app, so a YouTube trailer
 /// shows the code to scan. Runs in `make apple-tv-test-sim`.
 final class TrailerTests: XCTestCase {
     @MainActor private var remote: XCUIRemote { XCUIRemote.shared }
@@ -41,7 +42,18 @@ final class TrailerTests: XCTestCase {
         XCTAssertTrue(app.buttons["From the start"].exists, "a movie partway through")
         XCTAssertTrue(focus(trailer), "Right from Resume and From the start reaches Trailer")
         XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "YouTube")).firstMatch.exists, "a file says nothing about YouTube")
-        shot("Trailer focused, a trailer file")
+        shot("Trailers focused, a trailer file and a YouTube one")
+        remote.press(.select)
+        let file = app.buttons["movie-trailer-0"]
+        XCTAssertTrue(file.waitUntilExists(timeout: 10), "two trailers: the list of them")
+        XCTAssertTrue(app.buttons["movie-trailer-1"].exists)
+        XCTAssertTrue(file.waitForFocus(timeout: 5), "the list opens on the first")
+        shot("Trailers listed")
+        remote.press(.menu)
+        XCTAssertTrue(file.waitUntilGone(timeout: 5), "Menu closes the list")
+        XCTAssertTrue(focused(trailer), "back on Trailers")
+        remote.press(.select)
+        XCTAssertTrue(file.waitForFocus(timeout: 10))
         remote.press(.select)
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", "Trailer")).firstMatch.waitUntilExists(timeout: 20), "the player names it")
         XCTAssertFalse(app.buttons["trailer-code-done"].exists)
