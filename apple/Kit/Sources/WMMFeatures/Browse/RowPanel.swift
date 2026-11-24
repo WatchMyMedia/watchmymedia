@@ -50,6 +50,8 @@ public struct RowPanel: Hashable, Sendable {
     public var picturePath: String?
     /// A picture by absolute URL instead: a Live TV programme's.
     public var pictureURL: URL?
+    /// The server the card is on when it isn't the one in use: its picture comes from there.
+    public var server: String?
     /// The placeholder gradient's seed while the picture loads.
     public var seed: String
     /// What Select does, for the TV hint: "opens the episode", "resumes", "watches 7.1".
@@ -144,6 +146,7 @@ extension RowPanel {
             rating: formatRating(item.rating), overview: item.overview,
             picturePath: item.backdropPath, seed: item.title, opens: opens, buttons: buttons
         )
+        server = item.server
     }
 
     /// An episode card in an `episode` row (Recently aired).
@@ -160,6 +163,7 @@ extension RowPanel {
             picturePath: episode.stillPath ?? episode.showBackdropPath, seed: episode.showTitle,
             opens: "opens the episode", buttons: buttons
         )
+        server = episode.server
     }
 
     /// A Continue watching item, when its row is not the first.
@@ -173,6 +177,7 @@ extension RowPanel {
             picturePath: item.stillPath ?? item.backdropPath, seed: item.title,
             opens: "resumes", buttons: buttons
         )
+        server = item.server
     }
 
     /// A channel in the Live TV row: what is on now, or the channel alone without listings.

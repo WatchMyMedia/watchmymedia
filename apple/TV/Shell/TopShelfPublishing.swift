@@ -54,7 +54,8 @@ private struct KeepsTopShelfForTheAccount: ViewModifier {
             guard changed, let owner, let home = try? await services.library.home(), !Task.isCancelled,
                   TopShelf.owner(services) == owner else { return }
             let library = services.library
-            await TopShelf.publisher.publish(TopShelfPlan(home, serverID: owner.serverID), owner: owner, images: services.images) { library.imageURL($0, size: $1) }
+            await TopShelf.publisher.publish(TopShelfPlan(home, serverID: owner.serverID), owner: owner, images: services.images,
+                                             imageURL: { library.imageURL($0, size: $1) }, imageOn: { library.imageURL($0, size: $1, serverID: $2) })
         }
     }
 }
@@ -79,7 +80,8 @@ private struct PublishesTopShelf: ViewModifier {
             let key = key
             guard let plan = key.plan, let owner = key.owner else { return }
             let library = services.library
-            await TopShelf.publisher.publish(plan, owner: owner, images: services.images) { library.imageURL($0, size: $1) }
+            await TopShelf.publisher.publish(plan, owner: owner, images: services.images,
+                                             imageURL: { library.imageURL($0, size: $1) }, imageOn: { library.imageURL($0, size: $1, serverID: $2) })
         }
     }
 }

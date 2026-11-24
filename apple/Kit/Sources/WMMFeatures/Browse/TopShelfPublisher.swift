@@ -16,6 +16,8 @@ public struct TopShelfPlan: Hashable, Sendable {
         /// The server's image path and size the picture is made from.
         public var picturePath: String?
         public var pictureSize: ImageSize
+        /// The server the card is on when it isn't the one in use: its picture comes from there.
+        public var server: String? = nil
     }
 
     public struct Section: Hashable, Sendable {
@@ -43,6 +45,9 @@ public struct TopShelfPlan: Hashable, Sendable {
             shows = home.recentlyAddedShows
         }
 
+        // Continue watching as Home has it: one card, every server's, each
+        // card's links published for the server it is on, which the app
+        // opens in place from there.
         let continueCards = continuing.prefix(TopShelfRules.limit(.continueWatching)).map { item in
             let open: DeepLink = if let movieID = item.movieID {
                 .movie(id: movieID)
@@ -51,10 +56,12 @@ public struct TopShelfPlan: Hashable, Sendable {
             } else {
                 .play(fileID: item.fileID)
             }
+            let server = item.server ?? serverID
+            func on(_ link: DeepLink) -> URL { link.url(publishedFor: server, source: TopShelfRules.linkSource) }
             return Card(
-                item: TopShelfItem(id: "continue-\(item.fileID)", title: item.topShelfTitle, shape: .wide, progress: item.progress,
-                                   open: published(open), play: published(.play(fileID: item.fileID))),
-                picturePath: item.backdropPath ?? item.stillPath, pictureSize: .w780
+                item: TopShelfItem(id: "continue-\(item.id)", title: item.topShelfTitle, shape: .wide, progress: item.progress,
+                                   open: on(open), play: on(.play(fileID: item.fileID))),
+                picturePath: item.backdropPath ?? item.stillPath, pictureSize: .w780, server: item.server
             )
         }
 
@@ -70,7 +77,7 @@ public struct TopShelfPlan: Hashable, Sendable {
             if i < addedShows.count { added.append(addedShows[i]) }
         }
         var seen = Set<String>()
-        let addedCards: [Card] = added.compactMap { item in
+        let addedCards: [Card] = added.filter { $0.server == nil }.compactMap { item in
             let open: DeepLink, play: DeepLink
             switch item.kind {
             case .movie:
@@ -146,12 +153,14 @@ public final class TopShelfPublisher {
         if store.clear() { notify() }
     }
 
-    /// Publishes `plan` for `owner`: fetches the pictures it hasn't saved yet,
+    /// Publishes `plan` for `owner`: fetches the pictures it hasn't saved yet
+    /// (another server's card's from that server, through `imageOn`),
     /// then writes the snapshot and tells the system. Nothing is written if
     /// the person changed meanwhile or the task was cancelled (Home changed
     /// again). A plan with nothing in it clears the shelf.
     public func publish(_ plan: TopShelfPlan, owner: TopShelfOwner, images: any ImageLoader,
-                        imageURL: @MainActor (String?, ImageSize) -> URL?) async {
+                        imageURL: @MainActor (String?, ImageSize) -> URL?,
+                        imageOn: @MainActor (String?, ImageSize, String) -> URL? = { _, _, _ in nil }) async {
         signedIn(owner)
         guard let store else { return }
         if let published, published.plan == plan, now().timeIntervalSince(published.at) < Self.rewriteAfter { return }
@@ -166,7 +175,11 @@ public final class TopShelfPublisher {
             for card in section.cards {
                 var item = card.item
                 if let path = card.picturePath {
-                    item.picture = await picture(path: path, size: card.pictureSize, store: store, images: images, imageURL: imageURL)
+                    if let server = card.server {
+                        item.picture = await picture(path: path, size: card.pictureSize, store: store, images: images, imageURL: { imageOn($0, $1, server) })
+                    } else {
+                        item.picture = await picture(path: path, size: card.pictureSize, store: store, images: images, imageURL: imageURL)
+                    }
                 }
                 items.append(item)
             }

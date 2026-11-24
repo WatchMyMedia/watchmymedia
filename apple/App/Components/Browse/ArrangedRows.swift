@@ -13,6 +13,17 @@ struct RowActions {
     var setWatched: (WatchTarget, Bool) async -> Void
     /// A row's See all, or nil when it has none here.
     var seeAll: (ScreenRow) -> RowSeeAll?
+    /// A card from another server in a line ("On Cabin", "from Cabin"), by its server's id and the card.
+    var serverLine: (ContinueItem?, String?) -> String? = { _, _ in nil }
+    /// What ends a row filled from every server: still asking, and Try again for one that didn't answer.
+    var otherServers: (ScreenRow) -> RowServers = { _ in RowServers() }
+}
+
+/// The end of a row filled from every server (one card).
+struct RowServers {
+    var asking: String?
+    var failed: [(line: String, retry: () -> Void)] = []
+    var isEmpty: Bool { asking == nil && failed.isEmpty }
 }
 
 /// A row's See all: what its card and heading link say, and what they open.
@@ -78,6 +89,7 @@ struct ArrangedRow: View {
                 ForEach(row.continueItems, id: \.cardKey) { item in
                     ContinueCard(item: item, actions: actions, width: wideCardWidth, leading: isLeading(item.cardKey, first: row.continueItems.first?.cardKey))
                 }
+                ServerEndCards(servers: actions.otherServers(row), size: wideSize)
             }
             .accessibilityIdentifier("row-\(row.id)")
         case .episode:
@@ -85,6 +97,7 @@ struct ArrangedRow: View {
                 ForEach(row.episodes, id: \.cardKey) { episode in
                     EpisodeRowCard(episode: episode, actions: actions, width: wideCardWidth, leading: isLeading(episode.cardKey, first: row.episodes.first?.cardKey))
                 }
+                ServerEndCards(servers: actions.otherServers(row), size: wideSize)
                 seeAllCard(seeAll, size: wideSize)
             }
             .accessibilityIdentifier("row-\(row.id)")
@@ -93,6 +106,7 @@ struct ArrangedRow: View {
                 ForEach(row.items, id: \.cardID) { item in
                     WideItemCard(item: item, actions: actions, width: wideCardWidth, leading: isLeading(item.cardID, first: row.items.first?.cardID))
                 }
+                ServerEndCards(servers: actions.otherServers(row), size: wideSize)
                 seeAllCard(seeAll, size: wideSize)
             }
             .accessibilityIdentifier("row-\(row.id)")
@@ -101,6 +115,7 @@ struct ArrangedRow: View {
                 ForEach(row.items, id: \.cardID) { item in
                     PosterItemCard(item: item, actions: actions, width: posterSize.width, leading: isLeading(item.cardID, first: row.items.first?.cardID))
                 }
+                ServerEndCards(servers: actions.otherServers(row), size: posterSize)
                 seeAllCard(seeAll, size: posterSize)
             }
             .accessibilityIdentifier("row-\(row.id)")
@@ -179,7 +194,8 @@ struct ContinueCard: View {
 
     var body: some View {
         Button { actions.resume(item) } label: {
-            WideCard(title: item.title, subtitle: item.remainingLine, imageURL: services.library.imageURL(item.stillPath ?? item.backdropPath, size: .w780), seed: item.title, width: width, leading: leading) {
+            WideCard(title: item.title, subtitle: [item.remainingLine, actions.serverLine(item, item.server)].compactMap { $0 }.joined(separator: " · "),
+                     imageURL: services.library.imageURL(item.stillPath ?? item.backdropPath, size: .w780, on: item.server), seed: item.title, width: width, leading: leading) {
                 ProgressStrip(progress: item.progress).pinned(.bottom, padding: 0)
             }
         }
@@ -215,7 +231,7 @@ struct WideItemCard: View {
 
     var body: some View {
         Button { actions.open(item) } label: {
-            WideCard(title: item.title, imageURL: services.library.imageURL(item.backdropPath, size: .w780), seed: item.title, width: width, leading: leading) {
+            WideCard(title: item.title, subtitle: actions.serverLine(nil, item.server), imageURL: services.library.imageURL(item.backdropPath, size: .w780, on: item.server), seed: item.title, width: width, leading: leading) {
                 if let date = formatDate(item.releaseDate) { Badge(date).pinned(.bottomLeading) }
                 if item.watched { WatchedCheck().pinned(.bottomTrailing) }
             }
@@ -235,7 +251,8 @@ struct PosterItemCard: View {
 
     var body: some View {
         Button { actions.open(item) } label: {
-            PosterCard(item: item, imageURL: services.library.imageURL(item.posterPath, size: .w342), width: width, leading: leading)
+            PosterCard(item: item, imageURL: services.library.imageURL(item.posterPath, size: .w342, on: item.server), width: width, leading: leading,
+                       server: actions.serverLine(nil, item.server))
         }
         .buttonStyle(CardButtonStyle())
         .contextMenu { WatchMenu(item: item, actions: actions) }
@@ -252,7 +269,8 @@ struct EpisodeRowCard: View {
 
     var body: some View {
         Button { actions.openEpisode(episode) } label: {
-            WideCard(title: episode.showTitle, subtitle: episode.airedLine(), imageURL: services.library.imageURL(episode.stillPath ?? episode.showBackdropPath, size: .w780), seed: episode.showTitle, width: width, leading: leading) {
+            WideCard(title: episode.showTitle, subtitle: [episode.airedLine(), actions.serverLine(nil, episode.server)].compactMap { $0 }.joined(separator: " · "),
+                     imageURL: services.library.imageURL(episode.stillPath ?? episode.showBackdropPath, size: .w780, on: episode.server), seed: episode.showTitle, width: width, leading: leading) {
                 if episode.isNew { Badge("New", style: .gold).pinned(.topLeading) }
                 if !episode.hasFile {
                     Badge(notInLibraryBadge, style: .warning).pinned(.topTrailing)
@@ -299,5 +317,40 @@ struct EditRowsButton: View {
         }
         .buttonStyle(GhostButtonStyle(height: 44, fullWidth: false))
         .accessibilityIdentifier("editRows")
+    }
+}
+
+/// At the end of a row filled from every server: "Still asking Den
+/// server…" while one is out, and a card for one that didn't answer, with
+/// Try again.
+struct ServerEndCards: View {
+    let servers: RowServers
+    let size: CGSize
+
+    var body: some View {
+        if let asking = servers.asking {
+            VStack(alignment: .leading, spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text(asking).scaledFont(12).foregroundStyle(Palette.muted)
+            }
+            .padding(12)
+            .frame(width: size.width, height: size.height, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 10).strokeBorder(Palette.separator, style: StrokeStyle(lineWidth: 1, dash: [6, 4])))
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("row-server-asking")
+        }
+        ForEach(Array(servers.failed.enumerated()), id: \.offset) { _, failed in
+            Button(action: failed.retry) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(failed.line).scaledFont(12).foregroundStyle(Palette.textSecondary).fixedSize(horizontal: false, vertical: true)
+                    Text("Try again").scaledFont(13, weight: .semibold).foregroundStyle(Palette.gold)
+                }
+                .padding(12)
+                .frame(width: size.width, height: size.height, alignment: .leading)
+                .background(Palette.surface, in: RoundedRectangle(cornerRadius: 10))
+            }
+            .buttonStyle(CardButtonStyle())
+            .accessibilityIdentifier("row-server-retry")
+        }
     }
 }
