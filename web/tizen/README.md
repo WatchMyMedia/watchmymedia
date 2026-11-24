@@ -7,9 +7,11 @@ Tizen 9.0 with Chrome 120. It matches the Android TV app's features, Live TV
 included.
 It needs a server at API level 32 or newer (WatchMyMedia 1.8.0). It has
 been signed with a Samsung certificate and run on that TV (below). Its first
-version, 1.0.0, went to Samsung's review on 2026-11-20. This code is 2.1.0
-(`public/config.xml`): 2.0.0 added several servers, and 2.1.0 adds
-watchlists, which need a server at API level 33 (WatchMyMedia 2.1.0). It goes
+version, 1.0.0, went to Samsung's review on 2026-11-20. This code is 2.2.0
+(`public/config.xml`): 2.0.0 added several servers, 2.1.0 added watchlists,
+which need a server at API level 33 (WatchMyMedia 2.1.0), and 2.2.0 redraws
+the app for the couch, with people, Remove from Continue watching and one card
+a title across servers, which need API level 34 (WatchMyMedia 2.2.0). It goes
 to Samsung once 1.0.0 is approved.
 
 ## Where it stands
