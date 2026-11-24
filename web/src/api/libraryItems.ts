@@ -1,5 +1,5 @@
 import { queryOptions } from '@tanstack/react-query'
-import { api, unwrap } from './client'
+import { api, unwrap, type ApiClient } from './client'
 import type { ItemFilter, ItemSort } from '../lib/browseOptions'
 
 // A library's grid with API level 34's choices: several filters at once
@@ -25,29 +25,34 @@ export type LibraryItemsParams = {
   offset: number
 }
 
+/** A page of a library's grid from `client` (the page's own server by default). */
+export async function fetchLibraryItems(id: number, p: LibraryItemsParams, signal?: AbortSignal, client: ApiClient = api) {
+  return unwrap(
+    await client.GET('/api/libraries/{id}/items', {
+      params: {
+        path: { id },
+        query: {
+          sort: p.sort,
+          filter: p.filters[0],
+          filters: p.filters.length > 1 ? [...p.filters.slice(1)] : undefined,
+          contentRating: p.contentRating?.length ? [...p.contentRating] : undefined,
+          order: p.order,
+          genre: p.genre || undefined,
+          decade: p.decade || undefined,
+          q: p.q || undefined,
+          limit: p.limit,
+          offset: p.offset,
+        },
+      },
+      querySerializer: { array: { style: 'form', explode: false } },
+      signal,
+    }),
+  )
+}
+
 export const libraryItemsQuery = (id: number, p: LibraryItemsParams) =>
   queryOptions({
     queryKey: ['items', id, p],
-    queryFn: async () =>
-      unwrap(
-        await api.GET('/api/libraries/{id}/items', {
-          params: {
-            path: { id },
-            query: {
-              sort: p.sort,
-              filter: p.filters[0],
-              filters: p.filters.length > 1 ? [...p.filters.slice(1)] : undefined,
-              contentRating: p.contentRating?.length ? [...p.contentRating] : undefined,
-              order: p.order,
-              genre: p.genre || undefined,
-              decade: p.decade || undefined,
-              q: p.q || undefined,
-              limit: p.limit,
-              offset: p.offset,
-            },
-          },
-          querySerializer: { array: { style: 'form', explode: false } },
-        }),
-      ),
+    queryFn: ({ signal }) => fetchLibraryItems(id, p, signal),
     placeholderData: (prev) => prev,
   })

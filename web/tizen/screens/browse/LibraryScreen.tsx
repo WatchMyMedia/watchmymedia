@@ -6,7 +6,10 @@ import { librariesQuery, rowsQuery, useLibraryByType } from '../../../src/api/qu
 import { libraryItemsQuery } from '../../../src/api/libraryItems'
 import { sortOptions, type LibraryType } from '../../../src/lib/browseOptions'
 import { drawable, isListRow, libraryRows, type ScreenRow } from '../../../src/lib/screenRows'
-import { useBack, useFocus, useKeys, useLevel34, useMediaUrls, useNav, useSession } from '../../app/hooks'
+import { useBack, useFocus, useKeys, useLevel34, useMediaFor, useMediaUrls, useNav, useSession } from '../../app/hooks'
+import { bareName } from '../search/crossSearch'
+import { useMergedGrid, type MergedGrid } from './useMergedGrid'
+import type { TaggedItem } from './oneCardHome'
 import type { ScreenProps } from '../../app/routes'
 import { Button } from '../../ui/Button'
 import { Card } from '../../ui/Card'
@@ -59,8 +62,11 @@ type Picker = 'filter' | 'sort'
 /** Filter and Sort, each a button that opens its panel, with what each is set to; Clear filters while the grid is narrowed. */
 function GridButtons({ type, choices, onPick, onClear }: { type: LibraryType; choices: GridChoices; onPick(p: Picker): void; onClear(): void }) {
   // ▶ from the last button stops there, rather than dropping into the grid below.
+  // ▲ goes to Try again beside the count when a server didn't answer, before the rows above.
+  const focus = useFocus()
   useKeys((input) => {
     const active = document.activeElement as HTMLElement | null
+    if (input.action === 'up' && active?.closest('.library-buttons')) return focus.focusId('library/retry-servers')
     return input.action === 'right' && !!active?.closest('.library-buttons') && !active.nextElementSibling
   })
   return <div className="library-buttons">
@@ -259,6 +265,58 @@ function GridBody({ library, type, choices, first, focusFirst, onFocused, autoFo
 }
 
 /**
+ * The grid from every server (one card across servers): the titles merged
+ * a page at a time, each card's picture and page from its own server, a
+ * title only another server has saying "On Cabin" and opening in place.
+ * There is no A–Z strip: the servers' letters can't be told apart in one
+ * order without every page; the position bar stays.
+ */
+function MergedGridBody({ library, choices, grid, focusFirst, onFocused, autoFocus }: {
+  library: Library; choices: GridChoices; grid: MergedGrid; focusFirst: boolean; onFocused(): void; autoFocus: boolean
+}) {
+  const mediaFor = useMediaFor()
+  const focus = useFocus()
+  const { run } = useCardActions()
+  const menu = useWatchlistsOn()
+  const group = `${gridGroup(library.id, choices)}/all-servers`
+  const [view, setView] = useState(0)
+  useLayoutEffect(() => {
+    if (!focusFirst) return
+    focus.focusId(`${group}/${grid.items[0] ? cellKey(grid.items[0]) : ''}`)
+    onFocused()
+  }, [focusFirst, focus, group, grid.items, onFocused])
+  const onFocus = (e: FocusEvent) => {
+    const i = Number((e.target as HTMLElement).closest?.('[data-index]')?.getAttribute('data-index') ?? -1)
+    if (i >= 0 && i !== view) setView(i)
+  }
+  const rowCount = Math.max(1, Math.ceil(grid.items.length / COLUMNS))
+  const atRow = Math.floor(Math.max(0, view) / COLUMNS)
+  return <div className="library-grid__body" onFocus={onFocus} data-autofocus={autoFocus || undefined}>
+    <Grid id={group} items={grid.items} itemKey={cellKey} variant="poster" hasMore={grid.hasMore} onLoadMore={grid.loadMore}
+      renderItem={(item, id) => {
+        const tag = item.oneCard
+        const own = itemActions(item, !tag && menu)
+        const press = own.press
+        const open = press?.kind === 'open' && tag ? { kind: 'open' as const, route: { ...press.route, server: tag.server.id } as typeof press.route } : undefined
+        const actions = tag ? { press: open ?? own.press, hold: open ?? own.press } : own
+        const line = tag ? [`On ${bareName(tag.server.name)}`, item.year ? String(item.year) : ''].filter(Boolean).join(' · ') : gridLine(item)
+        return <div className="browse-cell">
+          <Card id={id} variant="poster" title={item.title} subtitle={line} image={mediaFor(tag?.server.id).imageUrl(item.posterPath, 'w342')}
+            progress={item.progress} badges={item.isNew ? [{ label: 'New', tone: 'gold' }] : undefined} done={!!item.watched && !item.progress}
+            label={[item.title, line, item.watched && 'watched'].filter(Boolean).join(', ')}
+            onPress={actions.press && (() => run(actions.press))} onHold={actions.hold && (() => run(actions.hold))}/>
+        </div>
+      }}/>
+    {rowCount > 2 && <div className="library-pos" role="img" aria-label={`Row ${atRow + 1} of ${rowCount}${grid.hasMore ? ' so far' : ''}`}>
+      <i style={{ height: `${Math.max(6, 200 / rowCount)}%`, top: `${(Math.min(atRow, rowCount - 2) / rowCount) * 100}%` }}/>
+    </div>}
+  </div>
+}
+
+/** A merged card's key: its server's id with its own, as ids are each server's own. */
+const cellKey = (item: TaggedItem) => (item.oneCard ? `${item.oneCard.server.id}:${item.kind}${item.id}` : `${item.kind}${item.id}`)
+
+/**
  * All movies or All shows: the count, Filter and Sort, and the grid.
  * Changing a choice leaves focus on its button, and the grid starts again
  * at its first title. Alone (no rows above), the library's name heads it.
@@ -272,18 +330,24 @@ function GridSection({ library, type, choices, onChange, alone, lists, autoFocus
   const title = type === 'tv' ? 'TV Shows' : 'Movies'
   const noun = type === 'tv' ? 'shows' : 'movies'
   const data = page.data
+  // With other servers at API level 34, the grid is every server's: merged a page at a time, the counts "about" until known.
+  const merged = useMergedGrid(library, type, choices, data && !page.isPlaceholderData ? data : undefined)
   const all = data?.totals?.items ?? data?.total
-  const line = data && narrowed(choices) && all !== undefined ? narrowedLine(type, data.total, all) : countsLine(type, { totals: data?.totals, total: data?.total, lists })
+  const line = merged ? merged.counts.line : data && narrowed(choices) && all !== undefined ? narrowedLine(type, data.total, all) : countsLine(type, { totals: data?.totals, total: data?.total, lists })
+  // Try again goes while the server is asked again, so focus moves to Filter rather than nowhere.
+  const focus = useFocus()
+  const retry = merged && merged.failed.length > 0 && <Button id="library/retry-servers" onPress={() => { merged.retry(); focus.focusId('library/filter') }}>Try again</Button>
   const clear = () => onChange({ ...DEFAULT_CHOICES, sort: choices.sort })
   return <section className={`library-grid${alone ? ' library-grid--alone' : ''}${choices.sort === 'title' && data?.letters?.length ? ' library-grid--az' : ''}`}
     data-vitem aria-label={`All ${noun}`}>
     {alone
-      ? <header className="library-head"><h1 className="library-title">{title}</h1><p className="library-counts">{line || ' '}</p></header>
-      : <div className="library-grid__head"><h2 className="library-grid__title">All {noun}{data && !page.isPlaceholderData && <small>{line}</small>}</h2></div>}
+      ? <header className="library-head"><h1 className="library-title">{title}</h1><div className="library-counts-row">{merged?.counts.about && <span className="tv-spinner" aria-hidden="true"/>}<p className="library-counts" role={merged ? 'status' : undefined}>{line || ' '}</p>{retry}</div></header>
+      : <div className="library-grid__head"><h2 className="library-grid__title">All {noun}{data && !page.isPlaceholderData && <small>{line}</small>}</h2>{retry}</div>}
     <GridButtons type={type} choices={choices} onPick={setPicker} onClear={clear}/>
     {page.isPending || page.isPlaceholderData ? <div className="library-grid__body"><SkeletonRow variant="poster" title={false}/></div>
       : page.isError ? <GridProblem error={page.error} onRetry={() => void page.refetch()}/>
-        : data && data.total === 0 ? <div className="library-empty">
+        : merged && merged.items.length > 0 ? <MergedGridBody key={`${gridGroup(library.id, choices)}/all`} library={library} choices={choices} grid={merged} focusFirst={focusFirst} onFocused={onFocused} autoFocus={autoFocus}/>
+        : data && data.total === 0 && !merged?.hasMore ? <div className="library-empty">
           <h2 className="library-empty__title">{narrowed(choices) ? 'Nothing matches' : `No ${noun} yet`}</h2>
           <p className="library-empty__body">{narrowed(choices) ? nothingMatches(type, choices) : 'Add them to the library on the server’s web page and scan it; they appear here.'}</p>
           {narrowed(choices) && <div className="tv-actions">

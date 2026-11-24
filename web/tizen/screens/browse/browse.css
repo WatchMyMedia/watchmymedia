@@ -84,7 +84,8 @@
    Edit rows leaves that margin empty above it. Alone (no rows) it is the whole screen. */
 .library-grid { position: relative; height: 64.5rem; display: flex; flex-direction: column; }
 .library-grid--alone { height: 67.5rem; }
-.library-grid__head { padding: 3rem var(--safe-x) 0 0; }
+.library-grid__head { padding: 3rem var(--safe-x) 0 0; display: flex; align-items: center; gap: 1.5rem; }
+.library-grid__head > .tv-btn { height: 3.75rem; }
 .library-grid__title { font-size: var(--t-head); font-weight: 600; display: flex; align-items: baseline; gap: 1.125rem; }
 .library-grid__title small { font-size: var(--t-label); font-weight: 500; color: var(--muted); }
 /* Filter and Sort: buttons that say what they are set to. */
@@ -159,3 +160,5 @@
 .browse-tile__text { font-size: var(--t-small); color: var(--muted); line-height: 1.35; }
 .browse-tile--retry .browse-tile__text { color: var(--text-2); }
 .browse-tile__btn { height: 4rem; padding: 0 1.75rem; pointer-events: none; }
+.library-counts-row { display: flex; align-items: center; gap: 1.125rem; min-height: 3.75rem; }
+.library-counts-row .tv-btn { height: 3.75rem; }
