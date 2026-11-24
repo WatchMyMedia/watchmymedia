@@ -23,7 +23,7 @@ import { ReportProblemDialog } from '../components/ReportProblemDialog'
 import { downloadLabel, toneText } from '../lib/requests'
 import { firstTrailer } from '../lib/trailers'
 import { watchlistTitle } from '../lib/watchlists'
-import { planWords, playChoices, sizeAndRate, versionName, yourPlace } from '../lib/titlePage'
+import { planWords, playChoices, qualityLine, sizeAndRate, versionName, yourPlace } from '../lib/titlePage'
 import { scoreWords } from '../lib/cardFacts'
 import { crewLine } from '../lib/personPage'
 import { collectionPartWords } from '../lib/collections'
@@ -72,6 +72,8 @@ function MovieView({ m }: { m: MovieDetail }) {
   const left = partway && watch ? leftAndEnds(watch.positionMs, durationMs, now) : undefined
   const pct = partway && watch ? percentWatched(watch.positionMs, durationMs) : 0
   const plan = selected ? planWords(plans.get(selected.id), selected) : undefined
+  // The chosen version's picture and sound in words; tags and codecs stay in File details.
+  const quality = selected ? qualityLine(selected) : ''
   const crew = crewLine(m.crew)
   const runtime = formatRuntime(m.runtimeMin ?? 0) || (selected?.durationMs ? formatRuntime(Math.round(selected.durationMs / 60_000)) : '')
 
@@ -169,6 +171,7 @@ function MovieView({ m }: { m: MovieDetail }) {
               durationMs > 0 && selected && <p className="text-[13.5px] text-neutral-300">Start now and it ends at {endsAt(durationMs, now)}.</p>
             )}
 
+            {quality && <p className="mt-1 text-sm text-neutral-200">{quality}</p>}
             {selected && (
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 {versions.length > 1 && (
