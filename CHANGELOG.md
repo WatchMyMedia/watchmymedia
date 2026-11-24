@@ -5,6 +5,125 @@ What each release changes, newest first, written for the people who run WatchMyM
 workflow puts the section on the GitHub release. A pre-release such as
 `v0.4.0-rc.1` uses the section of the release it leads to.
 
+## 2.2.0
+
+The web app and the Android TV, Apple TV and Samsung TV apps are redrawn to lead with what a
+viewer wants to know: what a title is, how long it runs, where they were and when it would end.
+File and stream detail is one step away. The cast on a title's page opens each person's movies
+and shows. An app signed in to several servers shows a title they share as one card, and plays
+whichever copy is furthest along. The TV players also get going again when they stick.
+
+- This release changes the server's database. Back up before updating: Settings › Backups ›
+  Back up now, or `watchmymedia backup`. Going back to 2.1.0 afterwards needs that backup.
+- After the update, the server fetches each title's cast and crew from TMDB again in the
+  background, about 40 minutes for 4,000 titles, and only with a TMDB key. Until a title's turn
+  comes, its cast shows as before and doesn't open anyone.
+
+**People**
+
+- On the web, on Apple TV, iPhone and iPad, on Android TV and in the Samsung TV app, a cast
+  member on a movie's or show's page opens their page: their picture, how many of their titles
+  the library has, then those movies and shows, newest first, with the part they play.
+- The web app's movie pages add the crew: "Directed by … · Written by …". iPhone and iPad list
+  the crew with the cast under Cast and crew.
+
+**Several servers**
+
+- The iPhone, iPad, Apple TV, Android and Samsung TV apps match titles across the servers
+  they're signed in to. Search, Continue watching, Recently added, Recently aired, Recently
+  released, Movies and TV Shows show a title once, saying "On Living room and Cabin" or the one
+  server that has it.
+- A title's page says "Also on Cabin", Resume starts from the latest place on any server, and
+  Play can use another server's copy. That copy plays from its own server without switching, and
+  its progress is kept there.
+- Finding a title's copies needs the other servers on 2.2.0. A server that doesn't answer within
+  four seconds is left out.
+
+**The web app and the TV apps**
+
+- Continue watching leads Home: the title you're likeliest to resume is drawn large, with time
+  left and when it would end ("29 min left · ends 8:41 PM").
+- Remove from Continue watching, on the web, Android TV, Apple TV and the Samsung TV app, takes a
+  title off the row and keeps the place. Playing it again brings it back.
+- 4K, HDR and surround are said once, in words, on a movie's page ("In 4K with Dolby Vision and
+  7.1 sound"), and no longer on cards. The tags and codecs are under File details.
+- Movies and TV Shows say what's left ("214 movies · 37 you haven't watched"), and show cards say
+  where you are: "2 new episodes", "6 left to watch", "3 left · next Thursday". Filters combine,
+  with In progress, Following and the content rating, and each library remembers its sort and
+  filters on each browser or TV.
+- Recordings lead with what's ready to watch, then what's coming up, with a clash and its fix
+  first, then series. Recorded episodes say New, watched or the time left, a repeat that won't
+  record says when it airs again, and storage is said in hours of room left.
+- The Live TV guide opens on Favourites when there are some. Recording and Live marks are red,
+  and only they are. Delete is last in More, in plain words, and asks first.
+- Home's Recently added, Recently released and Recently aired rows put the newest first across
+  all the libraries of a kind, not one library after another.
+
+**The web app**
+
+- The bar has Home, Movies, TV Shows, Live TV and, for admins, Activity. Settings, Library status
+  and Sign out are in the account menu, and at phone width the sections move to the foot of the
+  window. `/` goes to search from anywhere.
+- Home adds a strip of what's happening on the server (a recording under way, a clash in the
+  next day, a request that arrived), and On now where the person put that row. A mouse resting
+  on a poster shows its facts, Play, Watchlist and Mark watched.
+- Movies and TV Shows have Overview, All, Genres and, for films that have them, Collections. A
+  collection shows the films the library has, then the ones it lacks, with Request. Views are a
+  grid or a list, with an A–Z strip and a poster size.
+- A movie's page picks the version, sound and subtitles before playing. A show's page leads with
+  the episode to watch next and its season tabs say how much is watched.
+- A show remembers the sound and subtitles picked while watching it, and its next episode starts
+  with the same choices. Forget sound and subtitles is in the show's More. Hide spoilers, beside
+  Show missing, hides the synopses of episodes not yet watched, and follows the person to every
+  browser.
+- Search puts a best match first, with Resume or Play, then movies, shows, episodes and what's
+  on live TV, and sets apart what the library lacks.
+- The player shows the title, 10-second skips, the time left and the end time, marks the intro
+  and credits, and puts audio and subtitles in one panel. Playback info says in a sentence how
+  the stream plays here. Space or K, the arrows, M and F work from the keyboard.
+- Activity says what's playing in words, groups History by day and adds "Why it was converted"
+  to Stats. Library files can be searched and lists the files that can't be read.
+
+**The TV apps**
+
+- Android TV, Apple TV and the Samsung TV app are redrawn to read from three metres: larger
+  text, one focus look, and nothing outside the TV's safe area. Apple TV uses tvOS's own sizes
+  and focus.
+- A movie's page has Resume or Play, Trailer, Watchlist and More, with the version, audio and
+  subtitles, Mark watched and File details under More. The cast is a row of people below.
+- The player shows the title, the time left and the end time, with audio and subtitles in one
+  panel and Quality in another, kept as this TV's choice.
+- In the guide, OK on a later programme offers Record, Record every new episode and Remind me.
+- In the Samsung TV app, Return at Home asks Leave WatchMyMedia? with Stay chosen, and sign-in
+  opens on Use a password instead, so a habitual OK can't throw away a code someone is typing.
+
+**Fixes**
+
+- On Android TV, a few quick rewinds could leave the player spinning until the viewer left the
+  title, with E-AC-3 or AC-3 passed through to the TV. The Android app moves to Media3
+  1.12.0-beta01, which has the fix.
+- On Android TV and in the Samsung TV app, quick presses of the seek keys now add up to one
+  seek, sent once the remote is quiet. Three quick presses back no longer restart the server's
+  conversion three times.
+- A player that stands still with nothing loading and no error is got going: a seek where it is,
+  then the stream loaded again, then "Playback stopped and didn't start again." with Play to try
+  once more. This is in the Android, iPhone, iPad, Apple TV and Samsung TV apps.
+- On Apple TV, skipping or scrubbing as a play started partway in could leave it buffering for
+  good. It now plays from where the viewer went.
+
+**Versions**
+
+- The server, the Docker image, the Debian, Ubuntu and Fedora packages, the Mac app, the Windows
+  app and the Android app are 2.2.0. The Mac and Windows apps of 2.1.0 offer the update under
+  Check for updates. The iPhone, iPad and Apple TV apps are 2.2.0 once the App Store approves
+  them, and the Samsung TV app's 2.2.0 follows its earlier versions through Samsung's review.
+- Apps released before 2.2.0 work with a 2.2.0 server. The 2.2.0 apps work with older servers,
+  without people, Remove from Continue watching, the new counts and filters, or one card across
+  servers.
+- The redesigns have been tried in browsers, in Android and Apple emulators and simulators and
+  in the Samsung TV app's preview, against test servers. They have not yet been tried on a real
+  TV with its remote, on a phone, or with a screen reader.
+
 ## 2.1.0
 
 Everyone can keep the movies and shows they mean to watch on watchlists of their own, in the web
