@@ -1,11 +1,10 @@
-import type { components } from '../../../src/api/schema'
 import { continueTarget, type ContinueTarget } from '../../../src/api/continueWatching'
+import type { TaggedContinue } from './oneCardHome'
 import { useNav } from '../../app/hooks'
 import { MorePanel, type MenuItem } from '../details/DetailParts'
 import { continueMenuWords } from './continueWords'
 import { resumeLine } from './homePages'
 
-type ContinueItem = components['schemas']['ContinueItem']
 
 /**
  * A Continue watching card's actions, from Hold OK on it or on the resume
@@ -15,12 +14,15 @@ type ContinueItem = components['schemas']['ContinueItem']
  * `onRemove` (whoever opened it, which stays) sends the removal and says how
  * it went.
  */
-export function ContinueMenu({ item, onRemove, onClose }: { item: ContinueItem; onRemove(target: ContinueTarget): void; onClose(): void }) {
+export function ContinueMenu({ item, onRemove, onClose }: { item: TaggedContinue; onRemove(target: ContinueTarget): void; onClose(): void }) {
   const nav = useNav()
   const words = continueMenuWords(item)
   const target = continueTarget(item)
-  const request = { kind: 'file' as const, fileId: item.fileId, title: item.title, subtitle: resumeLine(item) || undefined, backdropPath: item.backdropPath ?? item.stillPath }
-  const page = item.showId ? { name: 'show' as const, id: item.showId, episodeId: item.episodeId } : item.movieId ? { name: 'movie' as const, id: item.movieId } : undefined
+  // A card from another server plays from there, and its page opens in place when only that server has it.
+  const from = item.oneCard ? { server: item.oneCard.server.id } : {}
+  const only = item.oneCard?.where === 'only' ? from : {}
+  const request = { kind: 'file' as const, fileId: item.fileId, title: item.title, subtitle: resumeLine(item) || undefined, backdropPath: item.backdropPath ?? item.stillPath, ...from }
+  const page = item.showId ? { name: 'show' as const, id: item.showId, episodeId: item.episodeId, ...only } : item.movieId ? { name: 'movie' as const, id: item.movieId, ...only } : undefined
   const items: MenuItem[] = [
     ...(page ? [{ id: 'cw/open', label: words.open, icon: 'open' as const, onPress: () => { onClose(); nav.push(page) } }] : []),
     { id: 'cw/restart', label: 'Start over', icon: 'replace', onPress: () => { onClose(); nav.play({ ...request, startMs: 0 }) } },

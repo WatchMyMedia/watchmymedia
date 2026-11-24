@@ -153,3 +153,9 @@
 .list-notfound__raw { font-size: var(--t-small); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .list-notfound .tv-card__title { color: var(--muted); }
 .browse-card { display: contents; }
+
+/* The end of a row filled from every server: a server still being asked (no focus), or Try again. */
+.browse-tile__art { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; padding: 1.25rem; text-align: center; background: var(--surface); border: 2px dashed var(--line-3); }
+.browse-tile__text { font-size: var(--t-small); color: var(--muted); line-height: 1.35; }
+.browse-tile--retry .browse-tile__text { color: var(--text-2); }
+.browse-tile__btn { height: 4rem; padding: 0 1.75rem; pointer-events: none; }

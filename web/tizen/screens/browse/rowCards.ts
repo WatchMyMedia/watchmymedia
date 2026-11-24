@@ -8,6 +8,8 @@ import { nowAndNext, progress, timeRange } from '../../../src/lib/liveGuide'
 import { resumeLine } from './homePages'
 import { attribution, isListRow, posterSubtitle, seeAllTarget, seeAllWords, titleParts, type ScreenRow, type SeeAllTarget } from '../../../src/lib/screenRows'
 import { watchlistTitle } from '../../../src/lib/watchlists'
+import { bareName } from '../search/crossSearch'
+import { oneCardWords, type OneCardTag, type TaggedContinue, type TaggedEpisode, type TaggedItem } from './oneCardHome'
 import type { PlayRequest, Route } from '../../app/routes'
 import type { CardBadge, CardVariant } from '../../ui/Card'
 
@@ -16,8 +18,6 @@ import type { CardBadge, CardVariant } from '../../ui/Card'
 // row screens, a library's rows and their tests share one set of rules.
 
 type BrowseItem = components['schemas']['BrowseItem']
-type ContinueItem = components['schemas']['ContinueItem']
-type EpisodeCard = components['schemas']['EpisodeCard']
 
 /** What OK or Hold OK on a card does; the screen carries it out. */
 export type CardAction =
@@ -31,7 +31,9 @@ export type CardAction =
   /** The card's actions (open it, Mark watched, its watchlist item), where the server keeps watchlists. */
   | { kind: 'menu'; item: BrowseItem }
   /** A Continue watching card's actions: its page, Start over, and Remove from Continue watching (API level 34). */
-  | { kind: 'continueMenu'; item: ContinueItem }
+  | { kind: 'continueMenu'; item: TaggedContinue }
+  /** Try again, at the end of a row a server didn't answer for. */
+  | { kind: 'retryServer'; id: string }
 
 export type RowCard = {
   /** Unique in the row: the card's focus id is `<row group>/<key>`. */
@@ -50,6 +52,10 @@ export type RowCard = {
   label?: string
   /** A row's last card, drawn as words (See all, Full guide). */
   more?: { title: string; detail?: string; glyph: 'grid' | 'list' | 'guide' }
+  /** The server the card's title and picture come from, when that isn't the current one. */
+  server?: string
+  /** The end of a row filled from every server: a server still being asked (takes no focus), or one that didn't answer, with Try again. */
+  tile?: { kind: 'wait' | 'retry'; text: string }
   press?: CardAction
   hold?: CardAction
 }
@@ -71,6 +77,8 @@ export type RowContext = {
   continueMenu?: boolean
   /** A Movies or TV screen's type: a list's See all opens its page on it. */
   screenType?: 'movie' | 'tv'
+  /** The tiles that end a row filled from every server: a server still being asked, or Try again. */
+  tail?: (row: ScreenRow) => RowCard[]
 }
 
 /** One of the person's watchlists, as a row: a list row with no source, since nothing fetches it. */
@@ -149,12 +157,21 @@ export function itemActions(item: BrowseItem, menu = false): Pick<RowCard, 'pres
   return menu && watchlistTitle(item.kind, item.tmdbId) ? { ...actions, hold: { kind: 'menu', item } } : actions
 }
 
-export function itemCard(row: Pick<ScreenRow, 'id' | 'style'>, item: BrowseItem, menu = false): RowCard {
+/** A route to a title only another server has: opened in place, from there. */
+function onServer(route: Route, tag: OneCardTag | undefined): Route {
+  return tag?.where === 'only' && (route.name === 'movie' || route.name === 'show') ? { ...route, server: tag.server.id } : route
+}
+
+export function itemCard(row: Pick<ScreenRow, 'id' | 'style'>, item: TaggedItem, menu = false): RowCard {
   const wide = row.style === 'wide'
   const subtitle = posterLine(row, item)
   const path = wide ? item.backdropPath : item.posterPath
+  const tag = item.oneCard
+  // A title only another server has opens in place from it; its actions panel (watchlists, marks) is the current server's, so Hold OK opens it too.
+  const actions = tag ? (() => { const a = itemActions(item, false); const open = a.press?.kind === 'open' ? { kind: 'open' as const, route: onServer(a.press.route, tag) } : a.press; return { press: open, hold: open } })() : itemActions(item, menu)
   return {
-    key: `${item.kind}${item.id}`,
+    key: tag ? `${tag.server.id}:${item.kind}${item.id}` : `${item.kind}${item.id}`,
+    ...(tag ? { server: tag.server.id } : {}),
     variant: wide ? 'wide' : 'poster',
     title: item.title,
     subtitle,
@@ -162,37 +179,46 @@ export function itemCard(row: Pick<ScreenRow, 'id' | 'style'>, item: BrowseItem,
     progress: item.progress,
     badges: badges(item.isNew),
     done: !!item.watched && !item.progress,
-    label: spoken(item.title, subtitle, item.watched && 'watched'),
-    ...itemActions(item, menu),
+    label: spoken(item.title, subtitle, item.watched && 'watched', oneCardWords(tag, bareName)),
+    ...actions,
   }
 }
 
-export function continueCard(c: ContinueItem, menu = false): RowCard {
-  // "S02 E04 · 23 min left", "1 h 12 min left": where you are and what is left, whatever the server's own line says.
+export function continueCard(c: TaggedContinue, menu = false): RowCard {
+  // "S02 E04 · 23 min left", "1 h 12 min left": where you are and what is left, whatever the server's own line says;
+  // "· On Cabin" for a title only another server has, "· from Cabin" when Resume plays another server's copy.
+  const tag = c.oneCard
   const code = c.kind === 'episode' && c.seasonNumber && c.episodeNumber ? episodeCode(c.seasonNumber, c.episodeNumber) : ''
-  const subtitle = c.durationMs ? [code, timeLeft(c.durationMs - c.positionMs)].filter(Boolean).join(' · ') : c.subtitle || code
+  const left = c.durationMs ? [code, timeLeft(c.durationMs - c.positionMs)].filter(Boolean).join(' · ') : c.subtitle || code
+  const subtitle = [left, oneCardWords(tag, bareName)].filter(Boolean).join(' · ')
   const path = c.stillPath ?? c.backdropPath
-  const page: Route | undefined = c.showId ? { name: 'show', id: c.showId } : c.movieId ? { name: 'movie', id: c.movieId } : undefined
+  const own: Route | undefined = c.showId ? { name: 'show', id: c.showId } : c.movieId ? { name: 'movie', id: c.movieId } : undefined
+  const page = own && onServer(own, tag)
+  const from = tag ? { server: tag.server.id } : {}
   return {
-    key: `cw${c.fileId}`,
+    key: tag ? `cw${tag.server.id}:${c.fileId}` : `cw${c.fileId}`,
+    ...(tag ? { server: tag.server.id } : {}),
     variant: 'continue',
     title: c.title,
     subtitle,
     image: path ? { path, size: 'w780' } : undefined,
     progress: c.durationMs ? c.positionMs / c.durationMs : 0,
     label: spoken(c.title, subtitle),
-    press: { kind: 'play', request: { kind: 'file', fileId: c.fileId, startMs: c.positionMs, title: c.title, subtitle: resumeLine(c) || undefined, backdropPath: c.backdropPath ?? c.stillPath } },
+    press: { kind: 'play', request: { kind: 'file', fileId: c.fileId, startMs: c.positionMs, title: c.title, subtitle: resumeLine(c) || undefined, backdropPath: c.backdropPath ?? c.stillPath, ...from } },
     hold: menu ? { kind: 'continueMenu', item: c } : page ? { kind: 'open', route: page } : undefined,
   }
 }
 
-export function episodeCard(e: EpisodeCard): RowCard {
+export function episodeCard(e: TaggedEpisode): RowCard {
+  const tag = e.oneCard
   const code = episodeCode(e.seasonNumber, e.episodeNumber)
   const subtitle = [code, e.title].filter(Boolean).join(' · ')
   const path = e.stillPath ?? e.showBackdropPath
-  const open: CardAction = { kind: 'open', route: { name: 'show', id: e.showId, episodeId: e.episodeId } }
+  const open: CardAction = { kind: 'open', route: onServer({ name: 'show', id: e.showId, episodeId: e.episodeId }, tag) }
+  const from = tag ? { server: tag.server.id } : {}
   return {
-    key: `e${e.episodeId}`,
+    key: tag ? `e${tag.server.id}:${e.episodeId}` : `e${e.episodeId}`,
+    ...(tag ? { server: tag.server.id } : {}),
     variant: 'episode',
     title: e.showTitle,
     subtitle,
@@ -202,7 +228,7 @@ export function episodeCard(e: EpisodeCard): RowCard {
     label: spoken(e.showTitle, `season ${e.seasonNumber} episode ${e.episodeNumber}`, e.title, e.watched && 'watched'),
     // OK opens the episode on its show, focused on Play; holding OK plays it at once.
     press: open,
-    hold: e.fileId ? { kind: 'play', request: { kind: 'file', fileId: e.fileId, title: e.showTitle, subtitle, backdropPath: e.showBackdropPath ?? e.stillPath } } : open,
+    hold: e.fileId ? { kind: 'play', request: { kind: 'file', fileId: e.fileId, title: e.showTitle, subtitle, backdropPath: e.showBackdropPath ?? e.stillPath, ...from } } : open,
   }
 }
 
@@ -255,7 +281,8 @@ export function rowCards(row: ScreenRow, ctx: RowContext): RowCard[] {
     default: cards = (row.items ?? []).map((i) => itemCard(row, i, ctx.menu))
   }
   const all = seeAllCard(row, ctx)
-  return all ? [...cards, all] : cards
+  const tail = ctx.tail?.(row) ?? []
+  return [...cards, ...tail, ...(all ? [all] : [])]
 }
 
 /** A row's heading and the muted words beside it: a list's "18 of 50 · From TMDB", Live TV's "Watch a channel". */

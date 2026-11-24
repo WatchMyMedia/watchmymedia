@@ -6,6 +6,7 @@ import type { KeyInput } from './keys'
 import type { Entry } from './nav'
 import type { PlayRequest, Route } from './routes'
 import type { ActiveSession } from '../session/active'
+import type { MediaUrls } from '../session/media'
 import type { AppSession, StartState } from '../session/session'
 import type { Player } from '../player'
 import { from34 } from '../session/features'
@@ -123,6 +124,30 @@ export function useMediaUrls() {
   useSyncExternalStore(tokens.subscribe, tokens.snapshot)
   useEffect(() => { peer?.showMedia() }, [peer])
   return peer ? peer.media : session.media
+}
+
+/**
+ * Image addresses for a card from any server this TV is signed in to: the
+ * current server's, or another's (`serverId`) with its own media token,
+ * redrawn as tokens arrive. For Home and the libraries, whose cards come
+ * from every server.
+ */
+export function useMediaFor(): (serverId?: string) => MediaUrls {
+  const session = useSession()
+  const peers = usePeers()
+  const subscribe = useMemo(() => (listener: () => void) => {
+    const offs = [session.tokens.subscribe(listener), ...peers.map((p) => p.tokens.subscribe(listener))]
+    return () => offs.forEach((off) => off())
+  }, [session, peers])
+  const version = useMemo(() => () => peers.reduce((n, p) => n + p.tokens.snapshot(), session.tokens.snapshot()), [session, peers])
+  // A new token redraws the caller; the addresses are read from each server's tokens as they are drawn.
+  useSyncExternalStore(subscribe, version)
+  return useMemo(() => (serverId?: string) => {
+    const peer = serverId && serverId !== session.server.id ? peers.find((p) => p.id === serverId) : undefined
+    if (!peer) return session.media
+    peer.showMedia()
+    return peer.media
+  }, [session, peers])
 }
 
 /** The page's source, when the page set one: the server its title is on. */
