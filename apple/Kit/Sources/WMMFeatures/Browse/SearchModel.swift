@@ -22,10 +22,14 @@ public struct FoundTitle: Hashable, Sendable, Identifiable {
     public var item: BrowseItem
     /// Nil for the server in use; a row from another names it.
     public var server: SearchSource?
+    /// The other servers that have the same title (by TMDB id): one row
+    /// for all of them, drawn from `server`'s copy, which opens.
+    public var alsoOn: [SearchSource]
 
-    public init(_ item: BrowseItem, server: SearchSource? = nil) {
+    public init(_ item: BrowseItem, server: SearchSource? = nil, alsoOn: [SearchSource] = []) {
         self.item = item
         self.server = server
+        self.alsoOn = alsoOn
     }
 
     public var id: String { "\(server?.id ?? "")/\(item.kind)/\(item.id)" }
@@ -38,10 +42,13 @@ public struct FoundTitle: Hashable, Sendable, Identifiable {
 public struct FoundEpisode: Hashable, Sendable, Identifiable {
     public var episode: EpisodeCard
     public var server: SearchSource?
+    /// The other servers that have the same episode (its show's TMDB id, season and number).
+    public var alsoOn: [SearchSource]
 
-    public init(_ episode: EpisodeCard, server: SearchSource? = nil) {
+    public init(_ episode: EpisodeCard, server: SearchSource? = nil, alsoOn: [SearchSource] = []) {
         self.episode = episode
         self.server = server
+        self.alsoOn = alsoOn
     }
 
     public var id: String { "\(server?.id ?? "")/\(episode.episodeID)" }
@@ -94,10 +101,10 @@ public struct UnlistedServer: Hashable, Sendable, Identifiable {
 /// the end of the list (``stillAsking``), and one that doesn't answer gets a
 /// line with Try again (``unlisted``) and isn't asked again for
 /// ``retryAfter`` on this visit, so typing doesn't queue timeouts. A new
-/// keystroke cancels every call still out. Opening a result on another
-/// server switches the app to it (``ServersModel``) and shows Home, Search
-/// with the same words and the title, there. Not in your library, Live TV
-/// and marking watched stay the server in use's.
+/// keystroke cancels every call still out. A title on several servers is
+/// one row (``listing``). Opening a result on another server opens it in
+/// place, from there, and the app doesn't switch. Not in your library,
+/// Live TV and marking watched stay the server in use's.
 @MainActor
 @Observable
 public final class SearchModel {
@@ -260,7 +267,11 @@ public final class SearchModel {
     /// Search looks in two or more servers.
     public var acrossServers: Bool { serverCount > 1 }
 
-    /// The three groups as listed: the server in use's results, then each other server's.
+    /// The three groups as listed: the server in use's results, then each
+    /// other server's. A title more than one server has (the same TMDB id;
+    /// an episode, its show's, season and number) is one row, placed where
+    /// its first copy came in and drawn from that copy; the others name
+    /// their servers on it, and it never moves.
     public var listing: SearchListing {
         var listing = SearchListing()
         if let results {
@@ -269,12 +280,41 @@ public final class SearchModel {
             listing.episodes = results.episodes.map { FoundEpisode($0) }
         }
         for (server, found) in added {
-            listing.shows += found.shows.map { FoundTitle($0, server: server) }
-            listing.movies += found.movies.map { FoundTitle($0, server: server) }
-            listing.episodes += found.episodes.map { FoundEpisode($0, server: server) }
+            Self.merge(found.shows.map { FoundTitle($0, server: server) }, into: &listing.shows)
+            Self.merge(found.movies.map { FoundTitle($0, server: server) }, into: &listing.movies)
+            for episode in found.episodes.map({ FoundEpisode($0, server: server) }) {
+                if let key = TitleKey(episode.episode), let index = listing.episodes.firstIndex(where: { TitleKey($0.episode) == key }) {
+                    listing.episodes[index].alsoOn.append(server)
+                } else {
+                    listing.episodes.append(episode)
+                }
+            }
         }
         return listing
     }
+
+    private static func merge(_ rows: [FoundTitle], into list: inout [FoundTitle]) {
+        for row in rows {
+            if let key = TitleKey(row.item), let index = list.firstIndex(where: { TitleKey($0.item) == key }), let server = row.server {
+                list[index].alsoOn.append(server)
+            } else {
+                list.append(row)
+            }
+        }
+    }
+
+    /// Where a row's title is, under it: "On Home and Cabin" for one on
+    /// several servers; the server's name for one only another server has
+    /// ("Cabin server"); nil for one only the server in use has.
+    public func whereLine(_ server: SearchSource?, alsoOn: [SearchSource]) -> String? {
+        guard !alsoOn.isEmpty else { return server?.name }
+        let first = server?.name ?? servers?.current?.server.name ?? ""
+        return OneCardWords.onServers(([first] + alsoOn.map(\.name)).map(cardServerShortName))
+    }
+
+    public func whereLine(_ found: FoundTitle) -> String? { whereLine(found.server, alsoOn: found.alsoOn) }
+
+    public func whereLine(_ found: FoundEpisode) -> String? { whereLine(found.server, alsoOn: found.alsoOn) }
 
     /// "Still asking Cabin server…", at the end of the list while a server
     /// asked more than ``stillAskingAfter`` ago hasn't answered; nil otherwise.
@@ -389,27 +429,18 @@ public final class SearchModel {
 
     // MARK: Taps
 
-    /// A result on the server in use opens its page; one on another server
-    /// switches the app to that server first.
+    /// A result opens its page in place, from the server whose copy the row
+    /// draws (the server in use's when it has one): the app doesn't switch,
+    /// and Back comes back to Search as it was.
     public func open(_ found: FoundTitle) {
-        guard let server = found.server else {
-            notice = navigator.open(found.item)
-            return
-        }
-        // An unmatched file has no page: the search is asked again there, and it is found again.
-        let route: Route? = if case .page(let route) = found.item.opening { route } else { nil }
-        leave(for: server, route: route)
+        notice = navigator.open(found.item, on: found.server?.id)
     }
 
     public func open(_ item: BrowseItem) { open(FoundTitle(item)) }
 
-    /// An episode opens its page.
+    /// An episode opens its page, in place from its server.
     public func open(_ found: FoundEpisode) {
-        guard let server = found.server else {
-            navigator.open(found.episode)
-            return
-        }
-        leave(for: server, route: found.episode.route)
+        navigator.open(found.episode, on: found.server?.id)
     }
 
     public func open(_ episode: EpisodeCard) { open(FoundEpisode(episode)) }
@@ -417,20 +448,6 @@ public final class SearchModel {
     public func play(_ episode: EpisodeCard) {
         guard let request = episode.playRequest else { return }
         navigator.play(request)
-    }
-
-    /// Switches to `server`: Home there, Search with the same words, and
-    /// the title over it. A server that answered as itself on this visit
-    /// isn't asked which server it is again; one whose answer no longer
-    /// stands (the network changed since) is, as a switch from Servers is.
-    private func leave(for server: SearchSource, route: Route?) {
-        guard let switcher else { return }
-        let words = resultsFor.isEmpty ? trimmedQuery : resultsFor
-        let justAnswered = library.answerStands(serverID: server.id)
-        cancelCalls()
-        Task {
-            await switcher.switchTo(server.id, arriving: ServerArrival(serverID: server.id, tab: .search, search: words, route: route), asking: !justAnswered)
-        }
     }
 
     public func setWatched(_ item: BrowseItem, _ watched: Bool) async {

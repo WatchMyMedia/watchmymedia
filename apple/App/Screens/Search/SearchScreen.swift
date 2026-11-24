@@ -313,11 +313,12 @@ private struct SearchView: View {
                                     .scaledFont(11, weight: .semibold)
                                     .foregroundStyle(Palette.muted)
                                 // The server it is on, when that isn't the one in use.
-                                if let server = found.server { ServerLabel(name: server.name) }
+                                // Where it is: "On Home and Cabin" for one on several servers, a server's name for one only it has.
+                                if let line = model.whereLine(found) { ServerLabel(name: line) }
                             }
                         }
                         .buttonStyle(CardButtonStyle())
-                        .accessibilityValue(found.server.map { "On \($0.name)" } ?? "")
+                        .accessibilityValue(model.whereLine(found).map { found.alsoOn.isEmpty ? "On \($0)" : $0 } ?? "")
                         .accessibilityIdentifier("search-result-\(found.id)")
                         .contextMenu {
                             // Marking watched stays the server in use's.
@@ -359,7 +360,7 @@ private struct SearchView: View {
 
     private func itemRow(_ found: FoundTitle, first: Bool) -> some View {
         Button { model.open(found) } label: {
-            ResultRow(title: found.title, line: found.item.searchLine, server: found.server?.name) {
+            ResultRow(title: found.title, line: found.item.searchLine, server: model.whereLine(found)) {
                 Artwork(url: services.library.imageURL(found.posterPath, size: .w185, on: found.server), seed: found.title, maxPixel: 200)
                     .frame(width: wide ? 48 : 44, height: wide ? 72 : 66)
                     .overlay { if found.watched { WatchedCheck(size: 16).pinned(.bottomTrailing, padding: 4) } }
@@ -381,7 +382,7 @@ private struct SearchView: View {
     private func episodeRow(_ found: FoundEpisode, first: Bool) -> some View {
         let episode = found.episode
         return Button { model.open(found) } label: {
-            ResultRow(title: episode.title, line: episode.searchLine(), server: found.server?.name) {
+            ResultRow(title: episode.title, line: episode.searchLine(), server: model.whereLine(found)) {
                 Group {
                     if episode.hasFile {
                         Artwork(url: services.library.imageURL(episode.stillPath ?? episode.showBackdropPath, size: .w300, on: found.server), seed: episode.showTitle, maxPixel: 300)
