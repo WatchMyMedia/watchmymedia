@@ -351,11 +351,32 @@ nothing ties two servers together, and the server has no part in this.
   Servers' order has answered or failed, so nothing on screen moves. One
   still out after a second is named at the end; one that fails gets a line
   with Try again and isn't asked again for 30 seconds on that visit. A
-  result on another server opens there: the app switches (without asking
-  the server again), then shows Search with the same words under the
-  title's page. What can be requested, and marking watched, stay the
+  title on several servers is one result, where its first copy is, saying
+  "On Living room and Cabin" (the TV draws it as a flag on the picture).
+  A result on another server opens there, in place, without switching.
+  What can be requested, and marking watched, stay the
   server in use's. A picture from another server is asked for with that
   server's sign-in, which goes to no other address.
+- **One card a title.** A movie or show on several signed-in servers is one
+  card (the same kind and TMDB id; an episode, its show's TMDB id, season
+  and number; `cardKey` in core:model), and a card says where its title
+  is only when it matters (`Where`: "On Cabin", "from Cabin"). Home's
+  Continue watching and its recent rows (`MERGED_HOME_ROWS`), Movies and
+  TV Shows (`MergedPages`, a page at a time, the counts "about" until
+  every server answers) and search are filled from every server through
+  `OtherServers` (presentation), which asks each through
+  `LibraryRepository.on(serverId)` with four seconds; a slow one joins at
+  the end of what is drawn, one that fails is named with Try again. A title
+  page asks the other servers for their copies by TMDB id (level 34,
+  `copies`) and offers each server's versions, grouped by server (the TV's
+  button after Play, the phones' Versions); Play uses the copy chosen for
+  the title on this device (`CopyChoices`), else the one with the latest
+  place, and Resume starts from the latest place on any copy. Another
+  server's title opens in place (`TvRoutes.Movie(id, serverId)`, the
+  phone's the same) and plays from there without switching
+  (`PlaybackControllerFactory.createOn`), so its progress stays on that
+  server. Downloads stay the server in use's. Below level 34 a server has
+  no copies to offer and its episode cards don't merge.
 - **Asked first.** A kept address is only an address: at home it is the
   Cabin server, and on another network it is someone else's machine. So
   before the sign-in of a server that isn't in use goes anywhere, the app
@@ -404,8 +425,9 @@ nothing ties two servers together, and the server has no part in this.
   server still in use would otherwise open the page and use the landing up.
 - **Links and notifications.** A launcher's or notification's link names
   its account (`account=`). One for another account signed in on the
-  device switches to its server before it opens (`DeepLink.serverFor`); one
-  for an account that isn't here still opens nothing.
+  device opens its title in place, from that server, without switching
+  (`DeepLink.elsewhere`); its Live TV says which server it is for and opens
+  nothing. One for an account that isn't here still opens nothing.
 
 ### Rows people arrange, and rows made from lists
 

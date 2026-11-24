@@ -82,6 +82,16 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   `LocalStore` sets the server in use before the saved list: a collector of
   `current` on the main thread can run between the two, so count or look up
   the server in use from `current`, and only the others from `saved`.
+  From a screen, another server is `LibraryRepository.on(serverId)` (its
+  library, asked first through `bindTo`) and `PlaybackControllerFactory
+  .createOn` (its player); `at(serverId)` is `on` with null meaning the
+  repository itself, so a wrapper (Watch Next's, a test's) stays in the way
+  for the server in use. A repository already bound to another server
+  answers only for itself: reach the others through `OtherServers`, which
+  keeps the in-use library, never through a bound one's `at(null)`. Two
+  servers' ids can be the same number, so a list that mixes servers keys
+  its items by server too (`Where.serverId`): a lazy list with duplicate
+  keys crashes.
 - **Server changes.** A page's ViewModel reloads for `libraryChanges`
   (core:model's `LibraryChange`, with the items and libraries an event
   names) through `Freshness` in core:presentation, which ignores changes
