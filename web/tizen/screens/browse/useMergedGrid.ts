@@ -103,7 +103,7 @@ export function useMergedGrid(library: Library, type: LibraryType, choices: Grid
   }
   const asking = useSlow(pending)
   const merged = mergeStreams(streams, q.sort)
-  const counts = mergedCounts(type, streams, merged.shared, { asking: pending.length ? (asking.length ? asking : pending) : [], failed: failed.map((f) => f.name), narrowed: narrowed(choices) })
+  const counts = mergedCounts(type, streams, merged.shared, { asking: pending.length ? (asking.length ? asking : pending) : [], failed: failed.map((f) => f.name), narrowed: narrowed(choices), items: merged.items })
   // Only a server whose pages asked for are all in is asked for another, so a slow page isn't asked for twice.
   const pagesIn = (id: string) => (id === session.server.id ? (first ? 1 + loaded(current).length : 0) : loaded(pages.filter((_, i) => pageQueries[i].peer.id === id)).length)
   const needsKey = merged.needs.filter((id) => pagesIn(id) >= pagesOf(id)).join(',')

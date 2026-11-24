@@ -17,8 +17,12 @@ type ContinueItem = components['schemas']['ContinueItem']
 type BrowseItem = components['schemas']['BrowseItem']
 type EpisodeCard = components['schemas']['EpisodeCard']
 
-/** Where a card's title is, when it matters: only on another server ('only', "On Cabin"), or playing from another server ('from', "from Cabin"). */
-export type OneCardTag = { server: { id: string; name: string }; where: 'only' | 'from' }
+/**
+ * Where a card's title is, when it matters: only on another server ('only',
+ * "On Cabin"), or playing from another server ('from', "from Cabin"). `here`
+ * is the current server's own copy of a 'from' title, whose page it opens.
+ */
+export type OneCardTag = { server: { id: string; name: string }; where: 'only' | 'from'; here?: { movieId?: number; showId?: number } }
 
 /** A Continue watching card's copy on a server, so Remove takes it off every server that has it. */
 export type ContinueCopy = { server: string; target: ContinueTarget }
@@ -148,6 +152,19 @@ export function rowOrder(row: ScreenRow, currentId: string): string[] | undefine
   if (!MERGED_ROWS.has(row.id)) return undefined
   const list = row.style === 'continue' ? row.continue : row.style === 'episode' ? row.episodes : row.items
   return (list as (TaggedContinue | TaggedItem | TaggedEpisode)[] | undefined)?.map((c) => oneCardKey(row, c, currentId))
+}
+
+/**
+ * A Continue watching card the current server's row hasn't, but whose title
+ * the current server has (`here`, from its copies by TMDB id): it plays from
+ * the other server, and its page is the current server's own.
+ */
+export function withHere(items: readonly TaggedContinue[], here: (c: TaggedContinue) => { movieId?: number; showId?: number } | undefined): TaggedContinue[] {
+  return items.map((c) => {
+    if (c.oneCard?.where !== 'only') return c
+    const own = here(c)
+    return own ? { ...c, oneCard: { ...c.oneCard, where: 'from' as const, here: own } } : c
+  })
 }
 
 /** "On Cabin", "from Cabin": a card's words about its server. */

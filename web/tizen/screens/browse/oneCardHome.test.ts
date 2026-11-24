@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { components } from '../../../src/api/schema'
 import type { ScreenRow } from '../../../src/lib/screenRows'
-import { keepOrder, mergeContinue, mergeEpisodes, mergeHomeRows, mergeItems, oneCardWords, rowOrder, type PeerHome } from './oneCardHome'
+import { keepOrder, mergeContinue, mergeEpisodes, mergeHomeRows, mergeItems, oneCardWords, rowOrder, withHere, type PeerHome } from './oneCardHome'
 
 type ContinueItem = components['schemas']['ContinueItem']
 type BrowseItem = components['schemas']['BrowseItem']
@@ -79,5 +79,13 @@ describe('rows built the same way on each server', () => {
     expect(oneCardWords({ server: cabin, where: 'only' }, bare)).toBe('On Cabin')
     expect(oneCardWords({ server: den, where: 'from' }, bare)).toBe('from Den')
     expect(oneCardWords(undefined, bare)).toBeUndefined()
+  })
+})
+
+describe('a Continue watching title only another server’s row has', () => {
+  it('plays from there, and says "from" with this server’s own page when this server has the title too', () => {
+    const merged = mergeContinue([], 'home', [{ server: cabin, items: [movie(51, 510, 500, 5), movie(52, 520, 700, 4)] }])
+    const tagged = withHere(merged, (c) => (c.tmdbId === 500 ? { movieId: 10 } : undefined))
+    expect(tagged.map((c) => [c.fileId, c.oneCard?.where, c.oneCard?.here])).toEqual([[51, 'from', { movieId: 10 }], [52, 'only', undefined]])
   })
 })

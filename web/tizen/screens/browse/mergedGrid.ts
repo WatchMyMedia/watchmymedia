@@ -70,8 +70,9 @@ export function mergeStreams(streams: readonly Stream[], sort: ItemSort): { item
     const there = key !== undefined ? seen.get(key) : undefined
     if (there !== undefined) {
       shared++
-      // The card stays where it is; the current server's copy is the one it opens.
-      if (st.server.current) items[there] = tagged
+      // The card stays where it is; the current server's copy is the one it opens. Watched on any server is watched.
+      const watched = !!items[there].watched || !!item.watched
+      items[there] = { ...(st.server.current ? tagged : items[there]), watched }
       continue
     }
     if (key !== undefined) seen.set(key, items.length)
@@ -88,10 +89,11 @@ export type GridCounts = { line: string; about: boolean }
  * one; "about" until every server has answered and every page is in, since
  * only then are the shared ones all known.
  */
-export function mergedCounts(type: LibraryType, streams: readonly Stream[], shared: number, o: { asking: readonly string[]; failed: readonly string[]; narrowed?: boolean }): GridCounts {
+export function mergedCounts(type: LibraryType, streams: readonly Stream[], shared: number, o: { asking: readonly string[]; failed: readonly string[]; narrowed?: boolean; items?: readonly BrowseItem[] }): GridCounts {
   const total = streams.reduce((n, s) => n + (s.totals?.items ?? s.total), 0) - shared
-  const left = streams.every((s) => s.totals?.unwatched !== undefined) ? streams.reduce((n, s) => n + (s.totals?.unwatched ?? 0), 0) : undefined
   const about = o.asking.length > 0 || streams.some((s) => !s.done)
+  // What's left is only known once every card is in, a title watched on any server counting as watched: the servers' own counts would count a shared title twice.
+  const left = !about && o.items && streams.every((s) => s.totals?.unwatched !== undefined) ? o.items.filter((i) => !i.watched).length : undefined
   const noun = libraryNoun(type)
   // Narrowed: "86 of 1,236 movies", what the filters leave of every server's library.
   const shown = streams.reduce((n, s) => n + s.total, 0) - shared
@@ -100,6 +102,6 @@ export function mergedCounts(type: LibraryType, streams: readonly Stream[], shar
     : `${about ? 'About ' : ''}${total.toLocaleString()} ${total === 1 ? noun : `${noun}s`}`
   const tail = o.asking.length ? `still asking ${o.asking.join(' and ')}…`
     : o.failed.length ? `${o.failed.join(' and ')} didn’t answer`
-      : left !== undefined && !about && !o.narrowed ? unwatchedWords(type, left) : ''
+      : left !== undefined && !o.narrowed ? unwatchedWords(type, left) : ''
   return { line: [count, tail].filter(Boolean).join(' · '), about }
 }

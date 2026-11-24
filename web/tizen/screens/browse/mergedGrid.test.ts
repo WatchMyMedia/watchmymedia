@@ -28,6 +28,14 @@ describe('a library from every server', () => {
     expect(m.shared).toBe(1)
   })
 
+  it('counts a title watched on any server as watched', () => {
+    const m = mergeStreams([
+      { server: home, items: [item(1, 500, 10)], total: 1, done: true },
+      { server: cabin, items: [{ ...item(51, 500, 20), watched: true }], total: 1, done: true },
+    ], 'added')
+    expect(m.items.map((i) => [i.id, i.watched])).toEqual([[1, true]])
+  })
+
   it('keeps a shared card where it fell and opens the current server’s copy', () => {
     const streams: Stream[] = [
       { server: home, items: [item(1, 500, 10)], total: 1, done: true },
@@ -35,12 +43,15 @@ describe('a library from every server', () => {
     ]
     const m = mergeStreams(streams, 'added')
     expect(m.items.map((i) => [i.id, i.oneCard])).toEqual([[1, undefined]])
+    expect(m.items[0].watched).toBe(false)
     expect(m.needs).toEqual([])
   })
 
   it('counts each server’s titles less those they share, "about" until it knows', () => {
     const done: Stream[] = [{ server: home, items: [], total: 0, totals: totals(1000, 300), done: true }, { server: cabin, items: [], total: 0, totals: totals(240, 112), done: true }]
-    expect(mergedCounts('movie', done, 4, { asking: [], failed: [] })).toEqual({ line: '1,236 movies · 412 you haven’t watched', about: false })
+    const cards = [item(1, 1, 1), { ...item(2, 2, 1), watched: true }, item(3, 3, 1)]
+    expect(mergedCounts('movie', done, 4, { asking: [], failed: [], items: cards })).toEqual({ line: '1,236 movies · 2 you haven’t watched', about: false })
+    expect(mergedCounts('movie', done, 4, { asking: [], failed: [] }).line).toBe('1,236 movies')
     expect(mergedCounts('movie', done, 4, { asking: ['Den server'], failed: [] }).line).toBe('About 1,236 movies · still asking Den server…')
     expect(mergedCounts('movie', done, 4, { asking: [], failed: ['Den server'] }).line).toBe('1,236 movies · Den server didn’t answer')
     expect(mergedCounts('tv', [{ ...done[0], done: false }, done[1]], 0, { asking: [], failed: [] }).line).toBe('About 1,240 shows')

@@ -192,7 +192,8 @@ export function continueCard(c: TaggedContinue, menu = false): RowCard {
   const left = c.durationMs ? [code, timeLeft(c.durationMs - c.positionMs)].filter(Boolean).join(' · ') : c.subtitle || code
   const subtitle = [left, oneCardWords(tag, bareName)].filter(Boolean).join(' · ')
   const path = c.stillPath ?? c.backdropPath
-  const own: Route | undefined = c.showId ? { name: 'show', id: c.showId } : c.movieId ? { name: 'movie', id: c.movieId } : undefined
+  const own: Route | undefined = tag?.here?.showId ? { name: 'show', id: tag.here.showId } : tag?.here?.movieId ? { name: 'movie', id: tag.here.movieId }
+    : c.showId ? { name: 'show', id: c.showId } : c.movieId ? { name: 'movie', id: c.movieId } : undefined
   const page = own && onServer(own, tag)
   const from = tag ? { server: tag.server.id } : {}
   return {

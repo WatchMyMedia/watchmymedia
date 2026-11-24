@@ -22,7 +22,9 @@ export function ContinueMenu({ item, onRemove, onClose }: { item: TaggedContinue
   const from = item.oneCard ? { server: item.oneCard.server.id } : {}
   const only = item.oneCard?.where === 'only' ? from : {}
   const request = { kind: 'file' as const, fileId: item.fileId, title: item.title, subtitle: resumeLine(item) || undefined, backdropPath: item.backdropPath ?? item.stillPath, ...from }
-  const page = item.showId ? { name: 'show' as const, id: item.showId, episodeId: item.episodeId, ...only } : item.movieId ? { name: 'movie' as const, id: item.movieId, ...only } : undefined
+  const here = item.oneCard?.here
+  const page = here?.showId ? { name: 'show' as const, id: here.showId } : here?.movieId ? { name: 'movie' as const, id: here.movieId }
+    : item.showId ? { name: 'show' as const, id: item.showId, episodeId: item.episodeId, ...only } : item.movieId ? { name: 'movie' as const, id: item.movieId, ...only } : undefined
   const items: MenuItem[] = [
     ...(page ? [{ id: 'cw/open', label: words.open, icon: 'open' as const, onPress: () => { onClose(); nav.push(page) } }] : []),
     { id: 'cw/restart', label: 'Start over', icon: 'replace', onPress: () => { onClose(); nav.play({ ...request, startMs: 0 }) } },
