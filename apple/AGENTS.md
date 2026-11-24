@@ -149,6 +149,10 @@ server, and on iPad in both a regular and a compact width.
     One card's cards do the same (`BrowseItem.server`, `ContinueItem.server`,
     `EpisodeCard.server`, `WatchTarget.onServer`): key a row's cards by
     `cardID` or `cardKey`, never the bare id, since two servers' ids collide.
+    A library grid keys its posters by `gridID` instead, which keeps the
+    server in use's bare id: a letter jump and Page Down scroll to that id
+    (`LibraryModel.scrollTargetID`), and keyed by `cardID` they found nothing
+    (`TVUITests/LetterIndexTests.swift`).
   - A page or play on another server goes through the services made for it
     (`AppServices.on(_:)`, `Route.onServer`, `PlayRequest.serverID`), never
     by handing its ids to the server in use's. Its library asks the server
