@@ -4,33 +4,36 @@ import { Poster } from './Poster'
 import { CardFlag, CardProgress, PosterCard, WatchedTick, type BrowseItem } from './PosterCard'
 import { posterLinks } from '../lib/cardLinks'
 import { movieLine, qualityWords, scoreWords, showStatusWords } from '../lib/cardFacts'
-import { addedWords, episodesWords, youWords } from '../lib/browsePrefs'
+import { addedWords, leftToWatch, newFlag, showCardLine, youWords } from '../lib/browsePrefs'
 import { formatDate, formatRuntime, formatBytes } from '../lib/format'
 import { useNow } from './useNow'
 
 /**
- * A title in a library's grid: the poster with New, watched and progress
- * marks, the title, and for a movie its year and length; for a show how many
- * episodes the library has and where the show stands ("Next episode Dec 1",
- * "Ended"). Files not matched yet keep their own card.
+ * A title in a library's grid: the poster with New ("2 new" for a show's new
+ * episodes), watched and progress marks, the title, and for a movie its year
+ * and length; for a show its seasons and what is left ("3 seasons · 2 left")
+ * and where it stands ("Next episode Dec 1", "Ended"). Files not matched yet keep their own card. role is a person's
+ * part in it, on their page.
  */
-export function LibraryCard({ item }: { item: BrowseItem }) {
+export function LibraryCard({ item, role }: { item: BrowseItem; role?: string }) {
   if (item.kind === 'unmatched') return <PosterCard item={item} />
   const show = item.kind === 'show'
-  const first = show ? episodesWords(item.episodeCount) || (item.year ? String(item.year) : '') : movieLine(item)
+  const first = show ? showCardLine(item) : movieLine(item)
+  const flag = newFlag(item)
   const second = show ? showStatusWords(item) : ''
   const links = posterLinks(item, first)
   return (
     <div>
       <CardPicture {...links.picture}>
         <Poster path={item.posterPath} alt={item.title} />
-        {item.isNew && <CardFlag>New</CardFlag>}
+        {flag && <CardFlag>{flag}</CardFlag>}
         {item.watched && <WatchedTick />}
         {!item.watched && item.progress ? <CardProgress pct={Math.round(item.progress * 100)} /> : null}
       </CardPicture>
       <CardTitle {...links.title} />
       <CardLine segments={links.line} className={show ? 'text-neutral-300' : 'text-neutral-400'} />
       {second && <CardLine segments={[{ text: second }]} />}
+      {role && <CardLine segments={[{ text: role }]} />}
     </div>
   )
 }
@@ -60,20 +63,21 @@ export function BrowseList({ items, type, columns = {} }: { items: BrowseItem[];
           </>
         ) : (
           <>
-            <span className={`${head} w-24 max-md:hidden`}>Episodes</span>
-            <span className={`${head} w-[170px]`}>Next episode</span>
+            <span className={`${head} w-24 max-md:hidden`}>Seasons</span>
+            <span className={`${head} w-[130px] max-sm:w-[96px]`}>Left to watch</span>
+            <span className={`${head} w-[170px] max-sm:hidden`}>Next episode</span>
             <span className={`${head} w-[120px] max-md:hidden`}>Last aired</span>
             <span className={`${head} w-14 max-md:hidden`}>Rating</span>
           </>
         )}
         {columns.quality && <span className={`${head} w-24 max-md:hidden`}>Quality</span>}
         {columns.size && <span className={`${head} w-20 text-right max-md:hidden`}>Size</span>}
-        <span className={`${head} w-[110px] max-sm:w-[84px]`}>You</span>
+        {type === 'movie' && <span className={`${head} w-[110px] max-sm:w-[84px]`}>You</span>}
       </div>
       <ul>
         {items.map((it, i) => (
           <li key={`${it.kind}-${it.id}`} data-row={i} className="scroll-mt-24 border-t border-surface-2 first:border-t-0">
-            <ListRow item={it} columns={columns} />
+            <ListRow item={it} columns={columns} type={type} />
           </li>
         ))}
       </ul>
@@ -81,8 +85,9 @@ export function BrowseList({ items, type, columns = {} }: { items: BrowseItem[];
   )
 }
 
-function ListRow({ item, columns }: { item: BrowseItem; columns: { quality?: boolean; size?: boolean } }) {
+function ListRow({ item, columns, type }: { item: BrowseItem; columns: { quality?: boolean; size?: boolean }; type: 'movie' | 'tv' }) {
   const you = youWords(item)
+  const left = item.kind === 'show' ? leftToWatch(item) : undefined
   const now = useNow(60 * 60_000)
   const body = (
     <>
@@ -106,8 +111,9 @@ function ListRow({ item, columns }: { item: BrowseItem; columns: { quality?: boo
       )}
       {item.kind === 'show' && (
         <>
-          <span className={`${cell} w-24 max-md:hidden`}>{item.episodeCount ?? '—'}</span>
-          <span className={`${cell} w-[170px]`}>{showStatusWords(item) || '—'}</span>
+          <span className={`${cell} w-24 max-md:hidden`}>{item.seasonCount ? `${item.seasonCount} ${item.seasonCount === 1 ? 'season' : 'seasons'}` : '—'}</span>
+          <span className={`${cellBase} w-[130px] max-sm:w-[96px] ${left?.left ? 'text-neutral-100' : 'text-neutral-400'}`}>{left?.text ?? '—'}</span>
+          <span className={`${cell} w-[170px] max-sm:hidden`}>{showStatusWords(item) || '—'}</span>
           <span className={`${cell} w-[120px] max-md:hidden`}>{item.lastAirDate ? formatDate(item.lastAirDate) : '—'}</span>
           <span className={`${cell} w-14 max-md:hidden`}>{scoreWords(item.rating) || '—'}</span>
         </>
@@ -115,7 +121,7 @@ function ListRow({ item, columns }: { item: BrowseItem; columns: { quality?: boo
       {item.kind === 'unmatched' && <span className={`${cell} w-[170px] text-warn`}>{item.subtitle}</span>}
       {columns.quality && <span className={`${cell} w-24 max-md:hidden`}>{qualityWords(item.quality, item.hdr) || '—'}</span>}
       {columns.size && <span className={`${cell} w-20 text-right tabular-nums max-md:hidden`}>{item.totalSize ? formatBytes(item.totalSize) : '—'}</span>}
-      <span className={`${cellBase} w-[110px] max-sm:w-[84px] ${you?.gold ? 'text-accent' : 'text-neutral-400'}`}>{you?.text ?? ''}</span>
+      {type === 'movie' && <span className={`${cellBase} w-[110px] max-sm:w-[84px] ${you?.gold ? 'text-accent' : 'text-neutral-400'}`}>{you?.text ?? ''}</span>}
     </>
   )
   const row = 'group flex items-center gap-3 rounded-[10px] px-2.5 py-2 hover:bg-surface md:gap-4'

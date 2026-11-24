@@ -10,11 +10,12 @@ export type EpisodeCardData = components['schemas']['EpisodeCard']
 /**
  * 16:9 still, 304px wide, for Recently aired rows. The show's title opens
  * the show, "S03" the season, "E07" and the still the season at this
- * episode (lib/cardLinks.ts); the third line says when it aired.
+ * episode (lib/cardLinks.ts); the third line says when it aired and how long it is.
  */
 export function EpisodeCard({ ep }: { ep: EpisodeCardData }) {
   const code = seCode(ep.seasonNumber, ep.episodeNumber)
   const links = episodeLinks(ep)
+  const third = [links.third, ep.runtimeMin ? `${ep.runtimeMin} min` : ''].filter(Boolean).join(' · ')
   return (
     <div className="w-[304px] shrink-0 snap-start">
       <CardPicture {...links.picture}>
@@ -25,7 +26,7 @@ export function EpisodeCard({ ep }: { ep: EpisodeCardData }) {
       </CardPicture>
       <CardTitle {...links.title} />
       <CardLine segments={links.line} className="text-neutral-300" />
-      {links.third && <CardLine segments={[{ text: links.third }]} />}
+      {third && <CardLine segments={[{ text: third }]} />}
     </div>
   )
 }

@@ -86,6 +86,11 @@ describe('validateBrowseSearch', () => {
   it('keeps a search and the Unmatched view as before', () => {
     expect(validateBrowseSearch({ q: 'alien', view: 'unmatched' })).toMatchObject({ q: 'alien', view: 'unmatched' })
   })
+
+  it('keeps the Collections tab and the collection open in it', () => {
+    expect(validateBrowseSearch({ view: 'collections', collection: '9910001' })).toMatchObject({ view: 'collections', collection: 9910001 })
+    expect(validateBrowseSearch({ view: 'collections', collection: 'x' })).toMatchObject({ view: 'collections', collection: undefined })
+  })
 })
 
 describe('validateEditSearch and validateNewListSearch', () => {

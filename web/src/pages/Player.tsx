@@ -33,6 +33,8 @@ import { clock as clockText } from '../lib/clock'
 import { DEFAULT_VOLUME, chosenSubtitle, episodeName, lastWithFile, parseVolume, playerTitle, previousInSeason, previousSeason, segmentMarks, stepVolume, timeLeftLine, volumeLabel, type VolumeSetting } from '../lib/play/words'
 import { CastButton } from '../components/Cast'
 import { InfoPanel, PlayerMoreMenu, PlayerSheet, TracksPanel } from '../components/PlayerPanels'
+import { setShowTracks } from '../api/showTracks'
+import { playerPickBody } from '../lib/showTracks'
 import { playerButton } from '../components/playerStyles'
 import { ReportProblemDialog } from '../components/ReportProblemDialog'
 import { useNow } from '../components/useNow'
@@ -726,6 +728,13 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, audio, 
     }
   }, [decision, subtitleId, ass, nativeVod, textTracks])
 
+  // A pick during an episode is kept for its show, so the next episodes start the same way.
+  const keepForShow = (pick: Parameters<typeof playerPickBody>[0]) => {
+    const showId = neighbours.file?.showId
+    const body = neighbours.isEpisode && showId != null ? playerPickBody(pick) : undefined
+    if (body && showId != null) void setShowTracks(qc, showId, body).catch(() => undefined)
+  }
+
   // A subtitle picked from the list: a track, or an online result to download first.
   const chooseSubtitle = async (value: string) => {
     if (!decision) return
@@ -738,6 +747,7 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, audio, 
       subtitleWork.choose(id)
       rememberSubtitle(subtitleWork.intent.request())
       setSubtitleId(id)
+      keepForShow(id ? { kind: 'subtitle', language: decision.subtitles.find((s) => s.id === id)?.language } : { kind: 'off' })
       const t = decision.subtitles.find((s) => s.id === id)
       // Image subtitles need a burn-in session; text ones switch instantly.
       if (t?.burnInOnly || decision.burnIn || loading.current) void load(time, { subtitleId: id })
@@ -753,6 +763,7 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, audio, 
       if (!active.current || !subtitleWork.intent.accepts(revision) || scope !== authScope()) return
       subtitleWork.choose(t.id)
       rememberSubtitle(subtitleWork.intent.request())
+      keepForShow({ kind: 'subtitle', language: t.language ?? r.language })
       void qc.invalidateQueries({ queryKey: ['subtitleSearch', fileId] })
       setSubNote(null)
       // Use the latest position/quality and let the server shift event cues and
@@ -1172,8 +1183,10 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, audio, 
             audioIndex={audioNow}
             onAudio={(idx) => {
               setAudioIndex(idx)
+              keepForShow({ kind: 'audio', language: decision.audioTracks.find((a) => a.index === idx)?.language })
               void load(time, { audioIndex: idx })
             }}
+            remembered={neighbours.isEpisode ? neighbours.showTitle : undefined}
             subtitleId={subtitleId}
             automatic={subtitleWork.intent.automatic}
             onSubtitle={(value) => void chooseSubtitle(value)}

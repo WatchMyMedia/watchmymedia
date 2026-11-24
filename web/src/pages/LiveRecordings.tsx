@@ -5,7 +5,28 @@ import { Link } from '@tanstack/react-router'
 import { liveTVChannelsQuery, liveTVRecordingsQuery } from '../api/queries'
 import { cancelRecording, createManualRecording, deleteRecordingFile, deleteRecordingRule, type ManualRecording, type Recording, type RecordingRule } from '../api/recordings'
 import { canChooseClash, conflictWords, gapWords, localDateTime, manualRepeatWords, reasonWords, recordingProgress, validateManual, type RecordingSection } from '../lib/liveRecordings'
-import { clashAlert, dayWords, groupRecordings, recordedWords, recordingEpisodeWords, recordingMinutes, roomWords, ruleWords, scheduleDays, type RecordingGroup } from '../lib/liveWords'
+import {
+  alsoOnWords,
+  clashAlert,
+  dayWords,
+  groupLine,
+  groupRecordings,
+  hasWatchState,
+  inRecordedChip,
+  oneOffWords,
+  recordedChips,
+  recordedWords,
+  recordingEpisodeWords,
+  recordingLeftWords,
+  recordingMinutes,
+  recordingPct,
+  roomWords,
+  ruleWords,
+  scheduleDays,
+  storageFacts,
+  type RecordedChip,
+  type RecordingGroup,
+} from '../lib/liveWords'
 import { timeOfDay, timeRange } from '../lib/liveGuide'
 import { formatBytes } from '../lib/format'
 import { useAuth } from '../authContext'
@@ -14,7 +35,7 @@ import { textInput } from '../components/SettingsPanel'
 import { primaryAction, secondaryAction } from '../components/liveTV/LiveReminders'
 import { ClashDialog, RecordingOptions, RuleOptions } from '../components/liveTV/LiveRecordings'
 import { LiveTabs } from '../components/liveTV/LiveTabs'
-import { MoreIcon, PlayIcon, PlusIcon, WarnIcon } from '../components/icons'
+import { CheckIcon, MoreIcon, PlayIcon, PlusIcon, WarnIcon } from '../components/icons'
 
 type Tab = 'recorded' | 'scheduled' | 'series'
 const TABS: { id: Tab; label: string }[] = [
@@ -65,10 +86,17 @@ function RecordingsBody() {
   const clashes = conflicts.items.filter((r) => !left.includes(r.id))
   const scheduled = [...upcoming.items, ...conflicts.items.filter((c) => !upcoming.items.some((u) => u.id === c.id))]
   const facts = upcoming.first ?? recorded.first
+  // Each section's first page counts the whole section (API level 34); the loaded items count otherwise.
+  const sections = recorded.first?.counts ?? upcoming.first?.counts ?? series.first?.counts
+  const recordedComplete = recorded.query.isSuccess && !recorded.query.hasNextPage
+  const unwatched = recordedComplete && hasWatchState(recorded.first) ? recorded.items.filter((r) => !r.watched).length : undefined
+  const recordedCount = sections?.recorded.items ?? recorded.items.length
+  const scheduledCount = sections ? sections.upcoming.items + sections.conflicts.items : scheduled.length
+  const seriesCount = sections?.series.items ?? series.rules.length
   const counts: Record<Tab, ReactNode> = {
-    recorded: recorded.items.length ? <span className="n">{recorded.items.length}{recorded.query.hasNextPage ? '+' : ''}</span> : null,
-    scheduled: <>{scheduled.length ? <span className="n">{scheduled.length}</span> : null}{conflicts.items.length > 0 && <span role="img" aria-label=", one won’t record" className="text-warn"><WarnIcon size={14} /></span>}</>,
-    series: series.rules.length ? <span className="n">{series.rules.length}</span> : null,
+    recorded: unwatched ? <span className="n">{unwatched} unwatched</span> : recordedCount ? <span className="n">{recordedCount}{!sections && recorded.query.hasNextPage ? '+' : ''}</span> : null,
+    scheduled: <>{scheduledCount ? <span className="n">{scheduledCount}</span> : null}{conflicts.items.length > 0 && <span role="img" aria-label=", one won’t record" className="text-warn"><WarnIcon size={14} /></span>}</>,
+    series: seriesCount ? <span className="n">{seriesCount}</span> : null,
   }
   function onTabKey(event: KeyboardEvent<HTMLButtonElement>, i: number) {
     const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
@@ -81,7 +109,7 @@ function RecordingsBody() {
   return <>
     <div className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(min(420px,100%),1fr))] gap-4">
       {recordingNow.map((r) => <RecordingNowPanel key={r.id} r={r} now={clock} />)}
-      <RoomPanel freeBytes={facts?.freeBytes} tuners={facts?.tuners} recordingNow={recordingNow.length} recorded={recorded.items} complete={recorded.query.isSuccess && !recorded.query.hasNextPage} keeps={rules.some((r) => r.keep > 0)} />
+      <RoomPanel facts={recorded.first ?? facts} tuners={facts?.tuners} recordingNow={recordingNow.length} recorded={recorded.items} complete={recordedComplete} keeps={rules.some((r) => r.keep > 0)} />
     </div>
     {clashes.map((r) => <ClashAlert key={r.id} r={r} now={clock} onLeave={() => setLeft((ids) => [...ids, r.id])} />)}
     <div role="tablist" aria-label="Recordings" className="tabs mt-6">
@@ -103,11 +131,14 @@ function WatchLink({ r, className, children, label }: { r: Recording; className:
     : <Link to="/live-tv/recordings/$recordingId/watch" params={{ recordingId: r.id }} search={{ title: r.title, back: '/live-tv/recordings' }} aria-label={label} className={className}>{children}</Link>
 }
 
-function Still({ r, className, flag }: { r: Pick<Recording, 'pictureUrl' | 'title'>; className: string; flag?: ReactNode }) {
+function Still({ r, className, flag }: { r: Pick<Recording, 'pictureUrl' | 'title'> & Partial<Pick<Recording, 'watched' | 'progress'>>; className: string; flag?: ReactNode }) {
   const [broken, setBroken] = useState(false)
+  const pct = recordingPct(r)
   return <span className={`relative block aspect-video shrink-0 overflow-hidden rounded-lg bg-surface-2 ring-1 ring-inset ring-white/[.07] ${className}`}>
     {r.pictureUrl && !broken ? <img src={r.pictureUrl} alt="" loading="lazy" onError={() => setBroken(true)} className="size-full object-cover" /> : <span aria-hidden="true" className="absolute inset-x-2 bottom-2 line-clamp-2 text-[12px] font-semibold uppercase tracking-wide text-neutral-300">{r.title}</span>}
     {flag}
+    {r.watched && <span role="img" aria-label="Watched" className="absolute right-1.5 top-1.5 grid size-5 place-items-center rounded-full bg-ground/80 text-accent ring-1 ring-inset ring-accent/70"><CheckIcon size={11} /></span>}
+    {pct > 0 && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1 bg-black/60"><span className="block h-full bg-accent" style={{ width: `${pct}%` }} /></span>}
   </span>
 }
 
@@ -136,20 +167,26 @@ function RecordingNowPanel({ r, now }: { r: Recording; now: number }) {
   </section>
 }
 
-/** The room left as hours of recording; the gigabytes and tuners behind it stay closed until asked for. */
-function RoomPanel({ freeBytes, tuners, recordingNow, recorded, complete, keeps }: { freeBytes?: number; tuners?: number; recordingNow: number; recorded: Recording[]; complete: boolean; keeps: boolean }) {
-  const room = roomWords(freeBytes, recorded)
-  const bytes = recorded.reduce((n, r) => n + (r.bytes ?? 0), 0)
+/**
+ * The room left as hours of recording, with how full the disk is; the
+ * gigabytes and tuners behind it stay closed until asked for. The room
+ * leaves out the space the recorder keeps free (API level 34).
+ */
+function RoomPanel({ facts, tuners, recordingNow, recorded, complete, keeps }: { facts?: Parameters<typeof storageFacts>[0] & { freeBytes?: number }; tuners?: number; recordingNow: number; recorded: Recording[]; complete: boolean; keeps: boolean }) {
+  const store = storageFacts(facts)
+  const room = roomWords(store.usable, recorded)
+  const kept = store.recordings ?? (complete ? { items: recorded.length, bytes: recorded.reduce((n, r) => n + (r.bytes ?? 0), 0) } : undefined)
   if (!room && tuners === undefined) return null
   return <section aria-labelledby="h-room" className="panel flex flex-col gap-2.5 p-4">
     <h2 id="h-room" className="text-lg font-[650] leading-tight">{room ?? 'Recordings'}</h2>
-    <p className="text-[13px] text-neutral-400">{complete ? `${recorded.length} ${recorded.length === 1 ? 'recording' : 'recordings'} kept.` : 'Recordings join your library when they finish.'}{keeps ? ' Each series clears its own old episodes.' : ''}</p>
+    {store.usedPct !== undefined && <span className="meter" role="img" aria-label={`${store.usedPct}% of the recording disk is used`}><i style={{ width: `${store.usedPct}%` }} /></span>}
+    <p className="text-[13px] text-neutral-400">{kept ? `${kept.items} ${kept.items === 1 ? 'recording' : 'recordings'} kept.` : 'Recordings join your library when they finish.'}{keeps ? ' Each series clears its own old episodes.' : ''}</p>
     <details className="tech mt-auto bg-surface-2">
       <summary className="!min-h-11">Storage and tuners</summary>
       <div className="tech-body">
         <dl className="dl">
-          {freeBytes !== undefined && <><dt>Free space</dt><dd>{formatBytes(freeBytes)}</dd></>}
-          {complete && <><dt>Recordings</dt><dd>{recorded.length} · {formatBytes(bytes)}</dd></>}
+          {facts?.freeBytes !== undefined && <><dt>Free space</dt><dd>{formatBytes(facts.freeBytes)}{facts.totalBytes ? ` of ${formatBytes(facts.totalBytes)}` : ''}</dd></>}
+          {kept && <><dt>Recordings</dt><dd>{kept.items} · {formatBytes(kept.bytes)}</dd></>}
           {tuners !== undefined && <><dt>Tuners</dt><dd>{tuners}{recordingNow ? ` · ${recordingNow} recording now` : ''}</dd></>}
         </dl>
       </div>
@@ -162,7 +199,7 @@ function ClashAlert({ r, now, onLeave }: { r: Recording; now: number; onLeave: (
   const words = clashAlert(r, now)
   return <section role="alert" className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2.5 rounded-xl border border-warn/60 bg-warn/[.07] px-4 py-3.5">
     <span className="text-warn"><WarnIcon size={18} /></span>
-    <p className="min-w-[240px] flex-1"><b className="font-semibold">{words.heading}</b> <span className="text-neutral-300">{words.detail}</span></p>
+    <p className="min-w-[240px] flex-1"><b className="font-semibold">{words.heading}</b> <span className="text-neutral-300">{words.detail}</span>{r.repeat && r.nextAiring && <span className="text-neutral-300"> It’s a repeat. {alsoOnWords(r.nextAiring, now)}.</span>}</p>
     {r.canCancel && canChooseClash(r) && <button type="button" aria-haspopup="dialog" onClick={() => setOpen(true)} className="btn btn-sm">Record it instead of…</button>}
     <button type="button" onClick={onLeave} className="btn btn-ghost btn-sm">Leave it</button>
     {open && <ClashDialog recording={r} onClose={() => setOpen(false)} />}
@@ -171,12 +208,21 @@ function ClashAlert({ r, now, onLeave }: { r: Recording; now: number; onLeave: (
 
 function RecordedTab({ section, rules, recordingNow, now }: { section: ReturnType<typeof useSection>; rules: RecordingRule[]; recordingNow: Recording[]; now: number }) {
   const { query, items } = section
-  const { groups, oneOffs } = groupRecordings(items, rules)
+  const [chip, setChip] = useState<RecordedChip>('')
+  const watchState = hasWatchState(section.first)
+  const chips = recordedChips(items, watchState)
+  const on = chips.some((c) => c.value === chip) ? chip : ''
+  const shown = on ? items.filter((r) => inRecordedChip(r, on)) : items
+  const { groups, oneOffs } = groupRecordings(shown, rules)
   if (query.isPending) return <p role="status" className="mt-4 text-sm text-neutral-400">Loading…</p>
   if (query.isError) return <QueryError error={query.error} retry={() => void query.refetch()} />
   if (!items.length) return <Empty>Nothing recorded yet. Record a programme from the guide, or choose New recording.</Empty>
   return <>
-    {groups.map((g) => <ShowGroup key={g.key} g={g} now={now} recording={recordingNow.find((r) => r.title.trim().toLowerCase() === g.key)} />)}
+    {chips.length > 1 && <div role="group" aria-label="Show" className="mt-4 flex flex-wrap items-center gap-2">
+      {chips.map((c) => <button key={c.value} type="button" aria-pressed={on === c.value} onClick={() => setChip(c.value)} className="chip max-md:min-h-10">{c.label}{c.count !== undefined && <span className="n">{c.count}</span>}</button>)}
+    </div>}
+    {!shown.length && <Empty>{on === 'unwatched' ? 'You’ve watched every recording here.' : 'No recordings of this kind.'}</Empty>}
+    {groups.map((g) => <ShowGroup key={g.key} g={g} now={now} watchState={watchState} recording={recordingNow.find((r) => r.title.trim().toLowerCase() === g.key)} />)}
     {oneOffs.length > 0 && <section aria-labelledby="h-one" className="mt-8">
       <div className="rowh"><h2 id="h-one">Movies and one-offs</h2><span className="note">{oneOffs.length} {oneOffs.length === 1 ? 'recording' : 'recordings'}</span></div>
       <div className="mt-3.5 grid grid-cols-[repeat(auto-fill,minmax(min(250px,100%),1fr))] gap-x-4 gap-y-5">
@@ -194,7 +240,7 @@ function trouble(r: Recording): string | undefined {
   return undefined
 }
 
-function ShowGroup({ g, now, recording }: { g: RecordingGroup; now: number; recording?: Recording }) {
+function ShowGroup({ g, now, recording, watchState }: { g: RecordingGroup; now: number; recording?: Recording; watchState: boolean }) {
   const newest = g.items.find((r) => r.state !== 'failed')
   const latest = dayWords(g.latest, now)
   return <section aria-label={g.title} className="panel mt-3.5 px-4 pb-1 pt-4">
@@ -202,7 +248,7 @@ function ShowGroup({ g, now, recording }: { g: RecordingGroup; now: number; reco
       <Still r={{ title: g.title, pictureUrl: g.picture }} className="w-[150px]" />
       <div className="min-w-[200px] flex-1">
         <h3 className="text-[17px] font-[650]">{g.title}</h3>
-        <p className="mt-0.5 text-[13.5px] text-neutral-300">{g.items.length} {g.items.length === 1 ? 'episode' : 'episodes'}{recording ? ` · ${recordingEpisodeWords(recording)} is recording now` : ''}</p>
+        <p className="mt-0.5 text-[13.5px] text-neutral-300">{groupLine(g.items, watchState)}{recording ? ` · ${recordingEpisodeWords(recording)} is recording now` : ''}</p>
         <p className="text-[13px] text-neutral-400">{[`Latest recorded ${latest === 'Today' || latest === 'Yesterday' ? latest.toLowerCase() : latest}`, g.rule?.keep ? `keeps the latest ${g.rule.keep}` : ''].filter(Boolean).join(' · ')}</p>
       </div>
       {newest && <WatchLink r={newest} className="btn btn-primary btn-sm"><PlayIcon size={13} />Watch {newest.season != null && newest.episode != null ? `S${newest.season} E${newest.episode}` : 'the latest'}</WatchLink>}
@@ -218,10 +264,11 @@ function EpisodeRow({ r, show, now }: { r: Recording; show: string; now: number 
   return <li className="flex flex-wrap items-center gap-x-3.5 gap-y-2.5 border-t border-line py-3">
     {playable ? <WatchLink r={r} label={`Watch ${show}, ${name}`} className="block w-[128px] shrink-0 rounded-lg hover:ring-2 hover:ring-accent"><Still r={r} className="w-full" /></WatchLink> : <Still r={r} className="w-[128px] opacity-60" />}
     <div className="min-w-[180px] flex-1">
-      <p className="font-semibold">{name}</p>
+      <p className="flex flex-wrap items-center gap-2 font-semibold">{name}{r.new && !r.watched && <span className="pill pill-gold">New</span>}</p>
       <p className="text-[13px] text-neutral-400">{recordedWords(r, now)}{r.mediaFileId ? '' : r.state === 'done' ? ' · joining your library' : ''}</p>
       {problem && <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-warn"><WarnIcon size={13} />{problem}</p>}
     </div>
+    {recordingLeftWords(r) && <span className={`whitespace-nowrap text-[13px] ${r.watched ? 'text-neutral-400' : 'text-accent'}`}>{recordingLeftWords(r)}</span>}
     {playable && <WatchLink r={r} className="btn btn-sm">Watch</WatchLink>}
     <RecordingMenu r={r} name={`${show}, ${name}`} />
   </li>
@@ -233,8 +280,8 @@ function OneOff({ r, now }: { r: Recording; now: number }) {
   const body = <>
     <Still r={r} className="w-full" />
     <span className="mt-2 block truncate text-sm font-medium group-hover:text-accent">{r.title}</span>
-    <span className="block truncate text-[12.5px] text-neutral-300">{[r.episodeTitle, `${r.number} ${r.channelName}`, minutes ? `${minutes} min` : ''].filter(Boolean).join(' · ')}</span>
-    <span className={`block truncate text-[12.5px] ${problem ? 'text-warn' : 'text-neutral-400'}`}>{problem ?? recordedWords(r, now).replace(/ · \d+ min$/, '')}</span>
+    <span className="block truncate text-[12.5px] text-neutral-300">{r.kind !== undefined ? oneOffWords(r) : [r.episodeTitle, `${r.number} ${r.channelName}`, minutes ? `${minutes} min` : ''].filter(Boolean).join(' · ')}</span>
+    <span className={`block truncate text-[12.5px] ${problem ? 'text-warn' : 'text-neutral-400'}`}>{problem ?? [recordedWords(r, now).replace(/ · \d+ min$/, ''), r.watched ? '' : recordingLeftWords(r)].filter(Boolean).join(' · ')}</span>
   </>
   return <div className="relative">
     {r.state === 'failed' ? <div className="opacity-70">{body}</div> : <WatchLink r={r} className="card group block rounded-lg">{body}</WatchLink>}
@@ -278,13 +325,13 @@ function ScheduledTab({ items, loading, error, rules, now, you, more }: { items:
     <p className="mt-4 text-[13.5px] text-neutral-400">This schedule is what will happen. A mark in the guide means the same thing.</p>
     {scheduleDays(items, now).map((d) => <section key={d.key} aria-labelledby={`day-${d.key}`} className="mt-5">
       <h2 id={`day-${d.key}`} className="text-xs font-bold uppercase tracking-[.08em] text-dim">{d.label}</h2>
-      <ul className="panel mt-2 px-4">{d.items.map((r) => <ScheduledRow key={r.id} r={r} rule={rules.find((rule) => rule.id === r.ruleId)} you={you} />)}</ul>
+      <ul className="panel mt-2 px-4">{d.items.map((r) => <ScheduledRow key={r.id} r={r} rule={rules.find((rule) => rule.id === r.ruleId)} you={you} now={now} />)}</ul>
     </section>)}
     {more.hasNextPage && <button type="button" className={`${secondaryAction} mt-4`} disabled={more.isFetchingNextPage} onClick={() => void more.fetchNextPage()}>{more.isFetchingNextPage ? 'Loading…' : 'Show more'}</button>}
   </>
 }
 
-function ScheduledRow({ r, rule, you }: { r: Recording; rule?: RecordingRule; you?: string }) {
+function ScheduledRow({ r, rule, you, now }: { r: Recording; rule?: RecordingRule; you?: string; now: number }) {
   const [clash, setClash] = useState(false)
   const [options, setOptions] = useState(false)
   const skip = useRecordingMutation(cancelRecording)
@@ -298,6 +345,7 @@ function ScheduledRow({ r, rule, you }: { r: Recording; rule?: RecordingRule; yo
       <p className="font-semibold">{r.title}</p>
       <p className="text-[13px] text-neutral-400">{sub}</p>
       {conflict && <p className="mt-0.5 flex items-center gap-1.5 text-[13px] text-warn"><WarnIcon size={13} />{conflictWords(r.reason, r.conflictsWith)}</p>}
+      {conflict && r.repeat && r.nextAiring && <p className="text-[13px] text-neutral-400">A repeat. {alsoOnWords(r.nextAiring, now)}.</p>}
     </div>
     <span className="flex-[0_1_250px] text-[13px] text-neutral-400">{how}</span>
     {r.canCancel && <div className="flex flex-wrap gap-1.5">

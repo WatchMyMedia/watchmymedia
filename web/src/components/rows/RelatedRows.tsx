@@ -10,9 +10,10 @@ import { ScreenRows } from './ScreenRows'
  * nothing is drawn while they load, when none qualify or when the request
  * fails.
  */
-export function RelatedRows({ kind, id }: { kind: 'movie' | 'show'; id: number }) {
+export function RelatedRows({ kind, id, notes = {} }: { kind: 'movie' | 'show'; id: number; notes?: Record<string, string> }) {
   const related = useQuery(kind === 'movie' ? movieRelatedQuery(id) : showRelatedQuery(id))
-  const rows = relatedRows(related.data)
+  // A note the page knows better, by row id: the collection's "Part 2 of 3".
+  const rows = relatedRows(related.data).map((r) => (notes[r.id] ? { ...r, subtitle: notes[r.id] } : r))
   if (rows.length === 0) return null
   return (
     <div className="mt-9 space-y-8 border-t border-line pt-6 sm:mt-12 sm:space-y-10 sm:pt-8">

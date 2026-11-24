@@ -1,8 +1,23 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useQueries, useQuery } from '@tanstack/react-query'
-import { itemsQuery, type ItemFilter, type ItemSort } from '../api/queries'
+import { itemsQuery, type ItemSort } from '../api/queries'
 import { sortOptions } from '../lib/browseOptions'
-import { DEFAULT_SIZE, filtersActive, pictureChoices, posterMin, showChips, startingChoices, type BrowseChoices, type BrowsePrefs } from '../lib/browsePrefs'
+import {
+  DEFAULT_SIZE,
+  NO_FILTERS,
+  filtersActive,
+  pictureChoices,
+  posterMin,
+  ratedChoices,
+  serverFilters,
+  showChips,
+  startingChoices,
+  type BrowseChoices,
+  type BrowsePrefs,
+  type ChipFilter,
+  type PictureFilter,
+} from '../lib/browsePrefs'
+import type { ItemFilter } from '../lib/browseOptions'
 import { BrowseAZRail, BrowseChips, BrowsePosterSize, BrowseSelect, BrowseViewToggle } from './BrowseControls'
 import { BrowseList, LibraryCard } from './LibraryCard'
 import { ChevronRightIcon } from './icons'
@@ -15,18 +30,19 @@ type Props = {
   type: 'movie' | 'tv'
   q?: string
   /** A row's See all: the sort and filters it opens the grid with, ahead of what was remembered. */
-  initial?: Partial<BrowseChoices>
+  initial?: { sort?: ItemSort; filter?: ItemFilter; genre?: string; decade?: number }
   prefs: BrowsePrefs
   save: (change: Partial<BrowsePrefs>) => void
-  /** Counts for the Show chips, where the page knows them. */
-  counts?: Partial<Record<ItemFilter, number>>
+  /** Counts for the Show chips, from the library's totals. */
+  counts?: Partial<Record<ChipFilter, number>>
 }
 
 /**
- * A library's titles: the Show chips, Genre, Decade and More (picture), Clear
- * filters, Sort, Grid or List, the poster size, and the A–Z rail at the side.
- * Every choice is remembered on this browser for the library. Titles come a
- * page at a time, Show more adding the next.
+ * A library's titles: the Show chips, Genre, Decade, Rated and More
+ * (picture), Clear filters, Sort, Grid or List, the poster size, and the A–Z
+ * rail at the side. The chip, the picture, the rating, the genre and the
+ * decade combine. Every choice is remembered on this browser for the
+ * library. Titles come a page at a time, Show more adding the next.
  */
 export function BrowseGrid({ libraryId, type, q, initial = {}, prefs, save, counts = {} }: Props) {
   const [choices, setChoices] = useState<BrowseChoices>(() => startingChoices(initial, prefs))
@@ -38,8 +54,9 @@ export function BrowseGrid({ libraryId, type, q, initial = {}, prefs, save, coun
   const listRef = useRef<HTMLUListElement | HTMLDivElement>(null)
   // The offset an A–Z jump scrolls to once its page has loaded.
   const jumpTo = useRef<number | null>(null)
-  const { sort, filter, genre, decade } = choices
-  const results = useQueries({ queries: pages.map((offset) => itemsQuery(libraryId, { sort, filter, genre, decade, q, limit: PAGE, offset })) })
+  const { sort, genre, decade, rated } = choices
+  const filters = serverFilters(choices)
+  const results = useQueries({ queries: pages.map((offset) => itemsQuery(libraryId, { sort, filter: '', filters, contentRating: rated, genre, decade, q, limit: PAGE, offset })) })
   const first = results[0]
   const loaded = results.every((r) => r.data && !r.isPlaceholderData)
   const list = results.flatMap((r) => r.data?.items ?? [])
@@ -52,7 +69,7 @@ export function BrowseGrid({ libraryId, type, q, initial = {}, prefs, save, coun
     setChoices(next)
     setPages([0])
     setCurrent(undefined)
-    save({ sort: next.sort, filter: next.filter, genre: next.genre, decade: next.decade })
+    save({ sort: next.sort, filter: next.filter, picture: next.picture, rated: next.rated, genre: next.genre, decade: next.decade })
   }
 
   // The server lists every letter in the whole filtered list, not just the pages loaded.
@@ -89,8 +106,7 @@ export function BrowseGrid({ libraryId, type, q, initial = {}, prefs, save, coun
   const facets = first.data?.facets
   const genreCounts = first.data?.genreCounts ?? {}
   const pictures = pictureChoices(type)
-  const picture = pictures.some((p) => p.value === filter) ? filter : ''
-  const chipValue = picture ? ('' as ItemFilter) : filter
+  const ratings = ratedChoices(facets?.contentRatings, first.data?.contentRatingCounts)
   const narrowed = filtersActive(choices)
   const sorts = sortOptions(type)
   const gridStyle = { '--pm': `${posterMin(size)}px`, '--pms': `${posterMin(size, true)}px` } as CSSProperties
@@ -102,7 +118,7 @@ export function BrowseGrid({ libraryId, type, q, initial = {}, prefs, save, coun
           <BrowseChips
             label="Show"
             options={showChips(type).map((c) => ({ ...c, count: c.value ? counts[c.value] : undefined }))}
-            value={chipValue}
+            value={choices.filter}
             onChange={(v) => choose({ filter: v })}
           />
           {facets && facets.genres.length > 0 && (
@@ -121,15 +137,18 @@ export function BrowseGrid({ libraryId, type, q, initial = {}, prefs, save, coun
               onChange={(v) => choose({ decade: Number(v) })}
             />
           )}
+          {(ratings.length > 1 || rated) && (
+            <BrowseSelect label="Rated" value={rated} options={ratings.some((r) => r.value === rated) ? ratings : [...ratings, { value: rated, label: rated }]} onChange={(v) => choose({ rated: v })} />
+          )}
           <BrowseSelect
             label="More"
             name="Picture"
-            value={picture}
-            options={[{ value: '' as ItemFilter, label: 'Any' }, ...pictures]}
-            onChange={(v) => choose({ filter: v })}
+            value={choices.picture}
+            options={[{ value: '' as PictureFilter, label: 'Any' }, ...pictures]}
+            onChange={(v) => choose({ picture: v })}
           />
           {narrowed && (
-            <button type="button" onClick={() => choose({ filter: '', genre: '', decade: 0 })} className="btn btn-ghost btn-sm text-accent hover:text-neutral-100 max-md:min-h-10">
+            <button type="button" onClick={() => choose(NO_FILTERS)} className="btn btn-ghost btn-sm text-accent hover:text-neutral-100 max-md:min-h-10">
               Clear filters
             </button>
           )}
@@ -168,7 +187,7 @@ export function BrowseGrid({ libraryId, type, q, initial = {}, prefs, save, coun
               {narrowed && (
                 <>
                   {' '}
-                  <button type="button" onClick={() => choose({ filter: '', genre: '', decade: 0 })} className="underline hover:text-neutral-100">
+                  <button type="button" onClick={() => choose(NO_FILTERS)} className="underline hover:text-neutral-100">
                     Clear filters
                   </button>
                 </>

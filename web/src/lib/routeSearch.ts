@@ -68,7 +68,9 @@ export function validateGuideSearch(s: Record<string, unknown>): GuideSearch {
  */
 export type BrowseSearch = EditSearch & {
   q?: string
-  view?: 'unmatched' | 'all'
+  view?: 'unmatched' | 'all' | 'collections'
+  /** The collection open in Collections. */
+  collection?: number
   sort?: ItemSort
   filter?: Exclude<ItemFilter, ''>
   genre?: string
@@ -84,7 +86,8 @@ const positive = (v: unknown) => {
 export function validateBrowseSearch(s: Record<string, unknown>): BrowseSearch {
   return {
     q: typeof s.q === 'string' && s.q ? s.q : undefined,
-    view: s.view === 'unmatched' || s.view === 'all' ? s.view : undefined,
+    view: s.view === 'unmatched' || s.view === 'all' || s.view === 'collections' ? s.view : undefined,
+    collection: positive(s.collection),
     sort: itemSort(s.sort),
     filter: itemFilter(s.filter),
     genre: typeof s.genre === 'string' && s.genre && s.genre.length <= 64 ? s.genre : undefined,

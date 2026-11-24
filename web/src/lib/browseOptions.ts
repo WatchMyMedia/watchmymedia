@@ -4,6 +4,8 @@
 export type LibraryType = 'movie' | 'tv'
 export type ItemSort = 'title' | 'added' | 'year' | 'rating' | 'released' | 'runtime' | 'aired'
 export type ItemFilter = '' | 'continuing' | 'ended' | '4k' | 'hdr' | 'unwatched'
+/** Every filter the server takes, in filter or combined in filters; inProgress and following are from API level 34. */
+export type ItemFilterValue = Exclude<ItemFilter, ''> | 'inProgress' | 'following'
 
 export function filterOptions(type: LibraryType): { value: ItemFilter; label: string }[] {
   return type === 'tv'
