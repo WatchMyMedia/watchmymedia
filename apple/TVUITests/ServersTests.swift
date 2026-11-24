@@ -136,7 +136,7 @@ final class ServersTests: XCTestCase {
         XCTAssertTrue(note.wait(until: NSPredicate(format: "label == %@", "Now on Cabin server"), timeout: 15), "the banner says where this Apple TV is now")
         XCTAssertTrue(app.descendants(matching: .any)["servers-panel"].waitUntilGone(timeout: 10), "Servers closes")
         XCTAssertTrue(app.staticTexts["Harbour Run"].waitUntilExists(timeout: 15), "Home is Cabin server's")
-        XCTAssertFalse(app.homeFirstCard.exists, "and not Living room server's")
+        // Living room server's titles can join its rows now (one card), so its first card isn't looked for.
         XCTAssertTrue(accountTab(app, on: "Cabin server").waitUntilExists(timeout: 10), "the account tab names Cabin server now")
         shot("Now on Cabin server")
         // The banner takes no focus: the remote still drives Home.
@@ -343,15 +343,14 @@ final class ServersTests: XCTestCase {
     }
 
     @MainActor
-    func testSearchOpensAnotherServersResultThereAndMenuReturnsToTheResults() {
+    func testSearchOpensAnotherServersResultInPlaceAndMenuReturnsToTheResults() {
         let app = launch(["-tab", "search", "-search", "harbor"])
         // Cabin server's Harbor Nights is listed with its server named; Den server didn't answer.
         let nights = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Harbor Nights, Cabin server")).firstMatch
         XCTAssertTrue(nights.waitUntilExists(timeout: 20), "a card from another server names it")
         let lights = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Harbor Lights")).allElementsBoundByIndex
-        XCTAssertEqual(lights.count, 2, "the same title on two servers is listed twice")
-        XCTAssertFalse(lights[0].label.contains("Cabin server"), "the server in use's comes first and names no server: \(lights[0].label)")
-        XCTAssertTrue(lights[1].label.contains("Cabin server"), lights[1].label)
+        XCTAssertEqual(lights.count, 1, "a title on two servers is one card")
+        XCTAssertTrue(lights.first?.label.contains("On Living room and Cabin") == true, "it says where it is: \(lights.first?.label ?? "")")
         let den = app.descendants(matching: .any)["search-unlisted-srv-den"]
         XCTAssertTrue(den.waitUntilExists(timeout: 15), "a server that didn't answer has its tile at the end")
         XCTAssertTrue(den.label.contains("Den server didn’t answer, so its titles aren’t listed."), den.label)
@@ -365,23 +364,18 @@ final class ServersTests: XCTestCase {
         XCTAssertTrue(move(.right, to: nights, in: app, presses: 6), "focus reaches Harbor Nights: \(app.focusedButton.label)")
         remote.press(.select)
 
-        let note = app.descendants(matching: .any)["server-note"]
-        XCTAssertTrue(note.wait(until: NSPredicate(format: "label == %@", "Now on Cabin server"), timeout: 15), "it switches to Cabin server")
-        XCTAssertTrue(accountTab(app, on: "Cabin server").waitUntilExists(timeout: 10))
-        // Harbor Nights was left partway on Cabin server: its page offers Resume.
+        // Harbor Nights was left partway on Cabin server: its page, from there, offers Resume. The app doesn't switch.
         let resume = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Resume")).firstMatch
-        XCTAssertTrue(resume.waitUntilExists(timeout: 15), "and opens Harbor Nights there")
+        XCTAssertTrue(resume.waitUntilExists(timeout: 15), "it opens Harbor Nights from Cabin server")
         XCTAssertTrue(app.staticTexts["Harbor Nights"].exists)
-        XCTAssertFalse(nights.exists, "the results are under its page")
-        shot("Harbor Nights, on Cabin server")
+        XCTAssertFalse(app.descendants(matching: .any)["server-note"].exists, "no switch, so no note")
+        XCTAssertTrue(accountTab(app, on: "Living room server").exists, "still on Living room server")
+        shot("Harbor Nights, opened in place from Cabin server")
 
-        // Menu: back to Search with the same words, asked again on Cabin server.
+        // Menu: back to the results as they were.
         remote.press(.menu)
-        let living = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Harbor Lights, Living room server")).firstMatch
-        XCTAssertTrue(living.waitUntilExists(timeout: 20), "the results are back, and the other server is the one named now")
-        let here = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Harbor Nights")).firstMatch
-        XCTAssertTrue(here.waitUntilExists(timeout: 10))
-        XCTAssertFalse(here.label.contains("Cabin server"), "Cabin server's own carry no name now: \(here.label)")
-        shot("Back to the results, on Cabin server")
+        XCTAssertTrue(nights.waitUntilExists(timeout: 20), "the results are back, as they were")
+        XCTAssertTrue(nights.label.contains("Cabin server"), nights.label)
+        shot("Back to the results")
     }
 }

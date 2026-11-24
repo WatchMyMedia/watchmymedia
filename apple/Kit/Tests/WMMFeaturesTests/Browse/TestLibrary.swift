@@ -33,6 +33,8 @@ final class TestLibrary: LibraryRepository {
     var relatedFailure: (any Error)?
     /// Holds relatedRows until it returns, for a reply still on its way.
     var relatedGate: (@MainActor () async -> Void)?
+    /// Holds a lookup of a title by TMDB id until it returns.
+    var tmdbGate: (@MainActor () async -> Void)?
     private var listeners: [UUID: AsyncStream<Void>.Continuation] = [:]
     private var typedListeners: [UUID: AsyncStream<LibraryChange>.Continuation] = [:]
 
@@ -81,6 +83,19 @@ final class TestLibrary: LibraryRepository {
         movieCalls += 1
         try check()
         return try await fake.movie(id: id)
+    }
+
+    func person(id: Int) async throws -> PersonDetail {
+        try check()
+        return try await fake.person(id: id)
+    }
+
+    private(set) var hiddenCalls: [String] = []
+
+    func setHiddenFromContinueWatching(_ kind: WatchKind, id: Int, hidden: Bool) async throws {
+        hiddenCalls.append("\(hidden ? "hide" : "show") \(kind.rawValue) \(id)")
+        try check()
+        try await fake.setHiddenFromContinueWatching(kind, id: id, hidden: hidden)
     }
 
     func search(_ text: String) async throws -> SearchResults {
@@ -171,6 +186,18 @@ final class TestLibrary: LibraryRepository {
         await relatedGate?()
         if let relatedFailure { throw relatedFailure }
         return try await fake.relatedRows(title)
+    }
+
+    func movies(tmdbID: Int) async throws -> [BrowseItem] {
+        await tmdbGate?()
+        try check()
+        return try await fake.movies(tmdbID: tmdbID)
+    }
+
+    func shows(tmdbID: Int) async throws -> [BrowseItem] {
+        await tmdbGate?()
+        try check()
+        return try await fake.shows(tmdbID: tmdbID)
     }
 
     func imageURL(_ path: String?, size: ImageSize) -> URL? { nil }

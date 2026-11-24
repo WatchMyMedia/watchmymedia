@@ -15,6 +15,8 @@ struct PosterCard: View {
     /// The grid's smaller text.
     var compact = false
     var leading = false
+    /// A card from another server, which says so before its line: "On Cabin".
+    var server: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -29,7 +31,7 @@ struct PosterCard: View {
                 .foregroundStyle(Palette.text)
                 .lineLimit(1)
                 .padding(.top, compact ? 5 : 6)
-            if let line = item.gridSubtitle {
+            if let line = [server, item.gridSubtitle].compactMap({ $0 }).joined(separator: " · ").nonEmptyLine {
                 Text(line)
                     .scaledFont(compact ? 11 : 13)
                     .foregroundStyle(Palette.muted)
@@ -39,7 +41,7 @@ struct PosterCard: View {
         }
         .frame(width: width, alignment: .leading)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityText)
+        .accessibilityLabel([accessibilityText, server].compactMap { $0 }.joined(separator: ", "))
     }
 
     @ViewBuilder private var badges: some View {
@@ -194,4 +196,8 @@ extension View {
         }
         .animation(.easeOut(duration: 0.15), value: on)
     }
+}
+
+private extension String {
+    var nonEmptyLine: String? { isEmpty ? nil : self }
 }

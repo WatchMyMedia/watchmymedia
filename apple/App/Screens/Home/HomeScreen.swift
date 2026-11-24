@@ -16,7 +16,8 @@ struct HomeScreen: View {
     @Environment(Navigator.self) private var navigator
 
     var body: some View {
-        HomeView(model: HomeModel(library: services.library, auth: services.auth, navigator: navigator, rows: services.rows))
+        HomeView(model: HomeModel(library: services.library, auth: services.auth, navigator: navigator, rows: services.rows, servers: services.servers,
+                                  oneCard: OneCardContext(services: services, choices: CopyChoices())))
     }
 }
 
@@ -491,6 +492,18 @@ private struct HomeView: View {
             seeAll: { row in
                 guard let link = row.seeAll, let words = model.seeAll(row) else { return nil }
                 return RowSeeAll(words: words) { model.open(link) }
+            },
+            serverLine: { item, server in
+                if let item { return model.whereLine(item) }
+                return server.flatMap { model.serverShortName($0) }.map(OneCardWords.on)
+            },
+            otherServers: { row in
+                // The phones and tablets end the first row filled from the servers this way.
+                guard model.isMerged(row), row.id == model.firstMergedRowID else { return RowServers() }
+                return RowServers(asking: model.others.stillAsking, failed: model.unanswered.map { failed in
+                    let server = failed.server
+                    return (failed.line, { Task { @MainActor in await model.retry(server) } })
+                })
             }
         )
     }
@@ -516,16 +529,16 @@ private struct HomeView: View {
                         .buttonStyle(GoldTextButtonStyle(font: .subheadline.weight(.semibold)))
                 }
             }
-            ForEach(items.prefix(limit)) { item in
+            ForEach(items.prefix(limit), id: \.cardKey) { item in
                 Button { model.resume(item) } label: {
                     HStack(spacing: narrow ? 12 : 14) {
-                        Artwork(url: url(item.stillPath ?? item.backdropPath, .w300), seed: item.title)
+                        Artwork(url: services.library.imageURL(item.stillPath ?? item.backdropPath, size: .w300, on: item.server), seed: item.title)
                             .frame(width: narrow ? 112 : 128, height: narrow ? 63 : 72)
                             .overlay(alignment: .bottom) { ProgressStrip(progress: item.progress) }
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                         VStack(alignment: .leading, spacing: 4) {
                             Text(item.title).scaledFont(15, weight: .semibold).foregroundStyle(Palette.text).lineLimit(1)
-                            Text(item.remainingLine).scaledFont(13).foregroundStyle(Palette.muted).lineLimit(2)
+                            Text([item.remainingLine, model.whereLine(item)].compactMap { $0 }.joined(separator: " · ")).scaledFont(13).foregroundStyle(Palette.muted).lineLimit(2)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -552,7 +565,7 @@ private struct HomeView: View {
 
     private func posterRow(_ title: String, detail: String, items: [BrowseItem], library: AppTab) -> some View {
         CardRow(title, detail: detail, spacing: wide ? 16 : 10, seeAll: seeAll(library)) {
-            ForEach(items) { item in PosterItemCard(item: item, actions: rowActions, width: wide ? 150 : 110) }
+            ForEach(items, id: \.cardID) { item in PosterItemCard(item: item, actions: rowActions, width: wide ? 150 : 110) }
         }
     }
 }

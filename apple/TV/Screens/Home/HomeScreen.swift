@@ -21,7 +21,8 @@ struct HomeScreen: View {
     @Environment(Navigator.self) private var navigator
 
     var body: some View {
-        HomeView(model: HomeModel(library: services.library, auth: services.auth, navigator: navigator, rows: services.rows))
+        HomeView(model: HomeModel(library: services.library, auth: services.auth, navigator: navigator, rows: services.rows, servers: services.servers,
+                                  oneCard: OneCardContext(services: services, choices: CopyChoices())))
     }
 }
 
@@ -298,6 +299,17 @@ private extension TVRowActions {
             resume: { model.resume($0) },
             openPage: { model.openPage(of: $0) },
             setWatched: { await model.setWatched($0, $1) },
+            removeFromContinue: model.canRemoveFromContinueWatching ? { await model.removeFromContinueWatching($0) } : nil,
+            otherServers: { row in
+                // Every Home row is a screen of its own here, so each row filled from the servers ends this way.
+                guard model.isMerged(row) else { return TVRowServers() }
+                let failed: [(server: CardServer, line: String, retry: () -> Void)] = model.unanswered.map { failed in
+                    let server = failed.server
+                    let retry: () -> Void = { Task { @MainActor in await model.retry(server) } }
+                    return (server, failed.line, retry)
+                }
+                return TVRowServers(asking: model.others.stillAsking, failed: failed)
+            },
             seeAll: { row in
                 guard let link = row.seeAll, let words = model.seeAll(row) else { return nil }
                 return TVRowSeeAll(words: words) {
@@ -335,7 +347,7 @@ private struct HomeRowScreen: View {
         let backdrop = picture()
         let focusWords = words()
         ZStack(alignment: .topLeading) {
-            if let backdrop { ScreenBackdrop(url: backdrop.pictureURL ?? url(backdrop.picturePath, .w1280), seed: backdrop.seed) }
+            if let backdrop { ScreenBackdrop(url: backdrop.pictureURL ?? url(backdrop.picturePath, .w1280, on: backdrop.server), seed: backdrop.seed) }
             VStack(alignment: .leading, spacing: 0) {
                 if let focusWords {
                     TVFocusPanel(words: focusWords)
@@ -356,13 +368,13 @@ private struct HomeRowScreen: View {
         // The cards either side are fetched ahead, so ◀ ▶ does not flash the placeholder.
         .task(id: focusedCard) {
             for neighbour in RowPanel.neighbours(for: row, card: focusedCard) {
-                await Artwork.prefetch(neighbour.pictureURL ?? url(neighbour.picturePath, .w1280), maxPixel: 1920, loader: imageLoader)
+                await Artwork.prefetch(neighbour.pictureURL ?? url(neighbour.picturePath, .w1280, on: neighbour.server), maxPixel: 1920, loader: imageLoader)
             }
         }
     }
 
-    private func url(_ path: String?, _ size: ImageSize) -> URL? {
-        services.library.imageURL(path, size: size)
+    private func url(_ path: String?, _ size: ImageSize, on server: String? = nil) -> URL? {
+        services.library.imageURL(path, size: size, on: server)
     }
 
     /// The focused channel on the Live TV row, the first with nothing focused yet; nil on Full guide.
@@ -381,7 +393,12 @@ private struct HomeRowScreen: View {
 
     /// The words above the row for the focused card; on the Live TV row, the focused channel's programme.
     private func words() -> TVFocusWords? {
-        guard row.style == .live else { return TVFocusWords.words(for: row, card: focusedCard) }
+        guard row.style == .live else {
+            // A card from another server says so in its facts: "On Cabin", "from Cabin".
+            var words = TVFocusWords.words(for: row, card: focusedCard)
+            if let line = model.whereLine(row: row, card: focusedCard) { words?.facts.append(line) }
+            return words
+        }
         if focusedChannel == TVLiveHomeRow.guideKey { return .fullGuide }
         return liveChannel().map { TVFocusWords(channel: $0, now: .now) }
     }

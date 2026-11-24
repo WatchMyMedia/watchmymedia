@@ -62,16 +62,23 @@ extension ContinueItem {
         return left
     }
 
-    /// The show or movie it belongs to.
+    /// The show or movie it belongs to, in place on its server.
     public var pageRoute: Route? {
-        if let movieID { return .movie(id: movieID) }
-        if let showID { return .show(id: showID) }
-        return nil
+        let page: Route? = if let movieID { .movie(id: movieID) } else if let showID { .show(id: showID) } else { nil }
+        return page.map { route in server.map { .onServer($0, route) } ?? route }
     }
 
     /// "Go to movie" or "Go to show".
     public var pageLabel: String { kind == .movie ? "Go to movie" : "Go to show" }
+
+    /// The movie's or episode's id, which Remove from Continue watching names it by.
+    public var watchID: Int? { kind == .movie ? movieID : episodeID }
 }
+
+/// Continue watching's card menu: Remove from Continue watching, and the
+/// note after it. The place is kept, so playing it again brings it back.
+public let removeFromContinueLabel = "Remove from Continue watching"
+public let continueRemovedNote = "Removed from Continue watching. Your place is kept."
 
 extension Hero {
     /// The episode's page, or the show or movie it belongs to.
@@ -98,6 +105,16 @@ extension Hero {
 }
 
 extension HomeData {
+    /// Home without `item` in Continue watching, the fixed row and the arranged one.
+    public mutating func removeFromContinue(_ item: ContinueItem) {
+        continueWatching.removeAll { $0.id == item.id }
+        rows = rows?.map { row in
+            var copy = row
+            copy.continueItems.removeAll { $0.id == item.id }
+            return copy
+        }
+    }
+
     /// Nothing scanned yet: no hero and no rows (a Live TV row doesn't count).
     public var isEmpty: Bool {
         if let rows { return hero == nil && rows.allSatisfy { $0.style == .live || $0.isEmpty } }
@@ -171,7 +188,10 @@ extension EpisodeCard {
     }
 
     /// Its page, over its show on its season.
-    public var route: Route { .episode(showID: showID, season: season, id: episodeID) }
+    public var route: Route {
+        let page = Route.episode(showID: showID, season: season, id: episodeID)
+        return server.map { .onServer($0, page) } ?? page
+    }
 }
 
 extension BrowseItem {
@@ -179,7 +199,30 @@ extension BrowseItem {
     /// looked up yet"), else "2026 · 1 h 52 min" for a movie.
     /// A card's identity in a row: a list row mixes movies and shows, whose
     /// IDs come from different tables and can be equal.
-    public var cardID: String { "\(kind.rawValue)-\(id)" }
+    /// Another server's card carries its server: two servers' ids can be equal.
+    public var cardID: String { "\(kind.rawValue)-\(id)" + (server.map { "@\($0)" } ?? "") }
+
+    /// A library grid's identity for the card: the server in use's by its
+    /// id, which a letter jump and Page Down scroll to
+    /// (``LibraryModel/scrollTargetID``), and another server's by its
+    /// ``cardID``, so two servers' ids never stand for each other.
+    public var gridID: AnyHashable { server == nil ? AnyHashable(id) : AnyHashable(cardID) }
+
+    /// A show's card on Apple TV: "2 episodes left · next on Thursday",
+    /// "All watched · next tomorrow"; nil for a movie, and from servers that
+    /// don't count what is left (below API level 34).
+    public func episodesLeftLine(today: Date = .now, calendar: Calendar = .current) -> String? {
+        guard kind == .show, let left = unwatchedCount else { return nil }
+        let count = left > 0 ? "\(plural(left, "episode")) left" : "All watched"
+        return [count, nextAirLine(nextAirDate, today: today, calendar: calendar)].compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// The focused poster's line in Apple TV's grids: a show's episodes
+    /// left and when the next airs where the server counts them, else the
+    /// year and length as everywhere.
+    public func tvGridLine(today: Date = .now) -> String? {
+        episodesLeftLine(today: today) ?? gridSubtitle
+    }
 
     public var gridSubtitle: String? {
         if let subtitle { return subtitle }

@@ -63,6 +63,11 @@ public struct ServerFeatures: Hashable, Sendable {
         public static let related = 30
         /// Watchlists: titles a person saves to watch later.
         public static let watchlists = 33
+        /// What the redesigned pages show (the people behind the cast, a
+        /// card's counts, a library's totals and rating filter, hiding from
+        /// Continue watching, a recording's facts), and finding a title on
+        /// several servers by its TMDB id.
+        public static let redesign = 34
     }
 
     /// The server's API level; 0 when it isn't known.
@@ -123,6 +128,21 @@ public struct ServerFeatures: Hashable, Sendable {
     public var related: Bool { apiLevel >= Level.related }
     /// 33: watchlists, the Watchlist button and the menus' Add to Watchlist.
     public var watchlists: Bool { apiLevel >= Level.watchlists }
+    /// 34: the cast as people (`Credit.personId`), each opening their titles in the library (getPerson).
+    public var people: Bool { apiLevel >= Level.redesign }
+    /// 34: a card's counts and facts: a show's episodes left and new, its seasons.
+    public var cardFacts: Bool { apiLevel >= Level.redesign }
+    /// 34: a library's totals beyond its size (unwatched, in progress, added this month).
+    public var libraryTotals: Bool { apiLevel >= Level.redesign }
+    /// 34: a library filtered by content rating, with the ratings it has and how many of each.
+    public var ratingFilter: Bool { apiLevel >= Level.redesign }
+    /// 34: Remove from Continue watching, which keeps the place.
+    public var hideFromContinueWatching: Bool { apiLevel >= Level.redesign }
+    /// 34: a recording's kind, watched mark, progress, new and repeat, and when a repeat airs again.
+    public var recordingFacts: Bool { apiLevel >= Level.redesign }
+    /// 34: a title found by TMDB id (findMoviesByTMDB, findShowsByTMDB) and the TMDB ids on
+    /// Continue watching and episode cards, so a title on several servers is one card.
+    public var titlesByTMDB: Bool { apiLevel >= Level.redesign }
 }
 
 extension Server {

@@ -75,9 +75,9 @@ struct WatchMyMediaTVApp: App {
                 .preferredColorScheme(.dark)
                 .tint(Palette.gold)
                 // A play or channel link acts only when the app published it for a server this
-                // Apple TV is signed in to; one for a server that isn't in use switches to it first.
+                // Apple TV is signed in to; a title from a server that isn't in use opens in place, from there.
                 .onOpenURL { url in
-                    Task { await servers.open(url, library: services.library, liveTV: services.liveTV) { $0.opensOnAppleTV } }
+                    Task { await servers.open(url, library: services.library, liveTV: services.liveTV, accepts: { $0.opensOnAppleTV }, libraryOn: { services.on($0).library }) }
                 }
                 .task { await navigator.applyLaunchArguments(ProcessInfo.processInfo.arguments, library: services.library, liveTV: services.liveTV) }
                 // The Top Shelf shows only the signed-in person's rows: cleared when the person or

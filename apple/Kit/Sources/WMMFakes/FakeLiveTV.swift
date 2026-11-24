@@ -12,7 +12,7 @@ public final class FakeLiveTVRepository: LiveTVRepository {
         .init(id: "live-4", number: "8.1", name: "Coast Public"),
         .init(id: "live-5", number: "12.1", name: "Valley News"),
     ]
-    private let servers: FakeServerRepository?
+    let servers: FakeServerRepository?
     private var loadedContext: String?
     private var loaded = false
     public var offered = LiveTVCapabilities(enabled: true, allowed: true, playback: true)

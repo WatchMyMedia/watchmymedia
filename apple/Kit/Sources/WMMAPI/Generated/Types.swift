@@ -449,6 +449,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `DELETE /api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}`.
     /// - Remark: Generated from `#/paths//api/me/watchlists/{id}/titles/{mediaType}/{tmdbId}/delete(removeFromWatchlist)`.
     func removeFromWatchlist(_ input: Operations.RemoveFromWatchlist.Input) async throws -> Operations.RemoveFromWatchlist.Output
+    /// The library's copies of a movie, by its TMDB id
+    ///
+    /// For an app signed in to several servers, which shows a title on more than one as one card and offers each server's copy when it plays. Answers with an empty list, never an error, when the library doesn't have it. From API level 34.
+    ///
+    /// - Remark: HTTP `GET /api/movies`.
+    /// - Remark: Generated from `#/paths//api/movies/get(findMoviesByTMDB)`.
+    func findMoviesByTMDB(_ input: Operations.FindMoviesByTMDB.Input) async throws -> Operations.FindMoviesByTMDB.Output
     /// Get a movie with its files
     ///
     /// - Remark: HTTP `GET /api/movies/{id}`.
@@ -482,6 +489,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `POST /api/offline/sync`.
     /// - Remark: Generated from `#/paths//api/offline/sync/post(syncOffline)`.
     func syncOffline(_ input: Operations.SyncOffline.Input) async throws -> Operations.SyncOffline.Output
+    /// A cast member's movies and shows in the library
+    ///
+    /// The titles in every library with the person in their billed cast, matched by TMDB person ID, never by name, with the part played. Titles matched before the server kept person IDs count once their credits are fetched again in the background. 404 when no title in the library has the person. From API level 34.
+    ///
+    /// - Remark: HTTP `GET /api/people/{personId}`.
+    /// - Remark: Generated from `#/paths//api/people/{personId}/get(getPerson)`.
+    func getPerson(_ input: Operations.GetPerson.Input) async throws -> Operations.GetPerson.Output
     /// How files would play for a device, without starting playback
     ///
     /// Runs the playback decision for each file against the client's profile, as starting playback would, but starts no session and records no play. Clients show it on version lists (Direct play, Remux, audio to AAC).
@@ -570,6 +584,13 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /api/server`.
     /// - Remark: Generated from `#/paths//api/server/get(getServer)`.
     func getServer(_ input: Operations.GetServer.Input) async throws -> Operations.GetServer.Output
+    /// The library's copies of a show, by its TMDB id
+    ///
+    /// For an app signed in to several servers, which shows a title on more than one as one card and offers each server's copy when it plays. Answers with an empty list, never an error, when the library doesn't have it. From API level 34.
+    ///
+    /// - Remark: HTTP `GET /api/shows`.
+    /// - Remark: Generated from `#/paths//api/shows/get(findShowsByTMDB)`.
+    func findShowsByTMDB(_ input: Operations.FindShowsByTMDB.Input) async throws -> Operations.FindShowsByTMDB.Output
     /// Get a show with its seasons
     ///
     /// - Remark: HTTP `GET /api/shows/{id}`.
@@ -638,6 +659,20 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /api/watch/continue`.
     /// - Remark: Generated from `#/paths//api/watch/continue/get(listContinueWatching)`.
     func listContinueWatching(_ input: Operations.ListContinueWatching.Input) async throws -> Operations.ListContinueWatching.Output
+    /// Take a movie or episode off Continue watching, keeping its place
+    ///
+    /// The position and watched mark stay. Playing the item again brings it back. Nothing happens when the signed-in person has no progress on it. From API level 34.
+    ///
+    /// - Remark: HTTP `PUT /api/watch/{type}/{id}/hidden`.
+    /// - Remark: Generated from `#/paths//api/watch/{type}/{id}/hidden/put(hideFromContinueWatching)`.
+    func hideFromContinueWatching(_ input: Operations.HideFromContinueWatching.Input) async throws -> Operations.HideFromContinueWatching.Output
+    /// Put a movie or episode taken off Continue watching back on it
+    ///
+    /// Undoes hideFromContinueWatching. From API level 34.
+    ///
+    /// - Remark: HTTP `DELETE /api/watch/{type}/{id}/hidden`.
+    /// - Remark: Generated from `#/paths//api/watch/{type}/{id}/hidden/delete(showInContinueWatching)`.
+    func showInContinueWatching(_ input: Operations.ShowInContinueWatching.Input) async throws -> Operations.ShowInContinueWatching.Output
     /// Mark a movie or episode watched
     ///
     /// - Remark: HTTP `POST /api/watch/{type}/{id}/watched`.
@@ -1650,6 +1685,21 @@ extension APIProtocol {
             headers: headers
         ))
     }
+    /// The library's copies of a movie, by its TMDB id
+    ///
+    /// For an app signed in to several servers, which shows a title on more than one as one card and offers each server's copy when it plays. Answers with an empty list, never an error, when the library doesn't have it. From API level 34.
+    ///
+    /// - Remark: HTTP `GET /api/movies`.
+    /// - Remark: Generated from `#/paths//api/movies/get(findMoviesByTMDB)`.
+    public func findMoviesByTMDB(
+        query: Operations.FindMoviesByTMDB.Input.Query,
+        headers: Operations.FindMoviesByTMDB.Input.Headers = .init()
+    ) async throws -> Operations.FindMoviesByTMDB.Output {
+        try await findMoviesByTMDB(Operations.FindMoviesByTMDB.Input(
+            query: query,
+            headers: headers
+        ))
+    }
     /// Get a movie with its files
     ///
     /// - Remark: HTTP `GET /api/movies/{id}`.
@@ -1723,6 +1773,21 @@ extension APIProtocol {
         try await syncOffline(Operations.SyncOffline.Input(
             headers: headers,
             body: body
+        ))
+    }
+    /// A cast member's movies and shows in the library
+    ///
+    /// The titles in every library with the person in their billed cast, matched by TMDB person ID, never by name, with the part played. Titles matched before the server kept person IDs count once their credits are fetched again in the background. 404 when no title in the library has the person. From API level 34.
+    ///
+    /// - Remark: HTTP `GET /api/people/{personId}`.
+    /// - Remark: Generated from `#/paths//api/people/{personId}/get(getPerson)`.
+    public func getPerson(
+        path: Operations.GetPerson.Input.Path,
+        headers: Operations.GetPerson.Input.Headers = .init()
+    ) async throws -> Operations.GetPerson.Output {
+        try await getPerson(Operations.GetPerson.Input(
+            path: path,
+            headers: headers
         ))
     }
     /// How files would play for a device, without starting playback
@@ -1903,6 +1968,21 @@ extension APIProtocol {
     public func getServer(headers: Operations.GetServer.Input.Headers = .init()) async throws -> Operations.GetServer.Output {
         try await getServer(Operations.GetServer.Input(headers: headers))
     }
+    /// The library's copies of a show, by its TMDB id
+    ///
+    /// For an app signed in to several servers, which shows a title on more than one as one card and offers each server's copy when it plays. Answers with an empty list, never an error, when the library doesn't have it. From API level 34.
+    ///
+    /// - Remark: HTTP `GET /api/shows`.
+    /// - Remark: Generated from `#/paths//api/shows/get(findShowsByTMDB)`.
+    public func findShowsByTMDB(
+        query: Operations.FindShowsByTMDB.Input.Query,
+        headers: Operations.FindShowsByTMDB.Input.Headers = .init()
+    ) async throws -> Operations.FindShowsByTMDB.Output {
+        try await findShowsByTMDB(Operations.FindShowsByTMDB.Input(
+            query: query,
+            headers: headers
+        ))
+    }
     /// Get a show with its seasons
     ///
     /// - Remark: HTTP `GET /api/shows/{id}`.
@@ -2064,6 +2144,36 @@ extension APIProtocol {
     /// - Remark: Generated from `#/paths//api/watch/continue/get(listContinueWatching)`.
     public func listContinueWatching(headers: Operations.ListContinueWatching.Input.Headers = .init()) async throws -> Operations.ListContinueWatching.Output {
         try await listContinueWatching(Operations.ListContinueWatching.Input(headers: headers))
+    }
+    /// Take a movie or episode off Continue watching, keeping its place
+    ///
+    /// The position and watched mark stay. Playing the item again brings it back. Nothing happens when the signed-in person has no progress on it. From API level 34.
+    ///
+    /// - Remark: HTTP `PUT /api/watch/{type}/{id}/hidden`.
+    /// - Remark: Generated from `#/paths//api/watch/{type}/{id}/hidden/put(hideFromContinueWatching)`.
+    public func hideFromContinueWatching(
+        path: Operations.HideFromContinueWatching.Input.Path,
+        headers: Operations.HideFromContinueWatching.Input.Headers = .init()
+    ) async throws -> Operations.HideFromContinueWatching.Output {
+        try await hideFromContinueWatching(Operations.HideFromContinueWatching.Input(
+            path: path,
+            headers: headers
+        ))
+    }
+    /// Put a movie or episode taken off Continue watching back on it
+    ///
+    /// Undoes hideFromContinueWatching. From API level 34.
+    ///
+    /// - Remark: HTTP `DELETE /api/watch/{type}/{id}/hidden`.
+    /// - Remark: Generated from `#/paths//api/watch/{type}/{id}/hidden/delete(showInContinueWatching)`.
+    public func showInContinueWatching(
+        path: Operations.ShowInContinueWatching.Input.Path,
+        headers: Operations.ShowInContinueWatching.Input.Headers = .init()
+    ) async throws -> Operations.ShowInContinueWatching.Output {
+        try await showInContinueWatching(Operations.ShowInContinueWatching.Input(
+            path: path,
+            headers: headers
+        ))
     }
     /// Mark a movie or episode watched
     ///

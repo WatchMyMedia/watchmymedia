@@ -51,10 +51,15 @@ filter:
     - listNewEpisodes
     - getSeason
     - getMovie
+    - findMoviesByTMDB
+    - findShowsByTMDB
+    - getPerson
     - getMovieRelated
     - getShowRelated
     - search
     - listContinueWatching
+    - hideFromContinueWatching
+    - showInContinueWatching
     - markWatched
     - markUnwatched
     - markSeasonWatched

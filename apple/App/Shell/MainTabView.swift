@@ -71,7 +71,8 @@ struct MainTabView: View {
         .fullScreenCover(item: Binding(get: { flow.addingServer == nil ? navigator.playbackPresentation : nil }, set: { if $0 == nil { navigator.closePlayer() } }), onDismiss: continueOnDevice) { target in
             Group {
                 switch target {
-                case .file(let request): CastFilePresentation(request: request)
+                // Another server's copy plays from there, with its own services.
+                case .file(let request): CastFilePresentation(request: request).environment(services.on(request.serverID))
                 case .live(let request): CastLivePresentation(request: request)
                 }
             }.id(target.id)
@@ -153,6 +154,10 @@ struct MainTabView: View {
         case .liveSearch: LiveListingsSearchScreen()
         case .mediaList(let id): MediaListScreen(id: id)
         case .watchlists: WatchlistsScreen()
+        // People open from Apple TV's cast rows; the iPhone's and iPad's cast takes no taps.
+        case .person: EmptyView()
+        // A page from another server, opened in place with that server's services.
+        case .onServer(let id, let page): OnServerPage(serverID: id) { AnyView(destination(page)) }
         }
     }
 }

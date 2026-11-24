@@ -70,7 +70,8 @@ struct MainTabs: View {
         .fullScreenCover(item: Binding(get: { navigator.playbackPresentation }, set: { if $0 == nil { navigator.closePlayer() } })) { target in
             Group {
                 switch target {
-                case .file(let request): PlayerScreen(request: request)
+                // Another server's copy plays from there, with its own services.
+                case .file(let request): PlayerScreen(request: request).environment(services.on(request.serverID))
                 case .live(let request): LivePlayerScreen(request: request)
                 }
             }.id(target.id)
@@ -178,6 +179,9 @@ struct MainTabs: View {
         case .liveSearch: SearchScreen()
         case .mediaList(let id): TVMediaListScreen(id: id)
         case .watchlists: TVWatchlistsScreen()
+        case .person(let id, let name): PersonScreen(id: id, name: name)
+        // A page from another server, opened in place with that server's services.
+        case .onServer(let id, let page): OnServerPage(serverID: id) { AnyView(destination(page, tab: tab)) }
         }
     }
 }

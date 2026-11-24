@@ -123,6 +123,15 @@ public enum DeepLink: Hashable, Sendable {
 }
 
 extension DeepLink {
+    /// A title or its play, which opens in place from another server; the
+    /// rest (Live TV, requests, the Inbox, lists) belong to the server in use.
+    public var opensInPlace: Bool {
+        switch self {
+        case .movie, .show, .play, .playMovie, .filePage: true
+        default: false
+        }
+    }
+
     /// The server a link was published for (it says `source=` or `server=`),
     /// "" when it names none; nil for a link the app didn't publish.
     public static func publishedServer(_ url: URL) -> String? {

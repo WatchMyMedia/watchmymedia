@@ -49,8 +49,9 @@ nothing it signs in to survives a relaunch.
 against two throwaway servers that each have their own id, name and library
 (a copy of one database counts as one server) and a title the same words
 find. It signs in to the first, adds the second from Servers, switches back
-without a password, searches both, opens the second's result and plays it
-there. Run it by itself, from a fresh install (`xcrun simctl uninstall` and
+without a password, searches both and plays the second's copy without
+switching: a title only it has opens from there, and a title both have is
+one result whose Versions plays the second's copy. Run it by itself, from a fresh install (`xcrun simctl uninstall` and
 `simctl keychain <udid> reset`, as `make apple-e2e` does):
 
 ```bash
@@ -494,19 +495,46 @@ each device.
   none, is a server that didn't answer, and is sent nothing. The answer
   also keeps the server's name, version and API level up to date. The server in use's results
   come first in each group and the others' follow in the Servers list's
-  order, each naming its server; the same title on two servers is listed
-  twice. A server gets 4 s; one still out after 1 s is named at the end of
+  order, each naming its server; a title on two servers or more is one
+  row ("On Living room and Cabin"), placed when its first copy comes in. A server gets 4 s; one still out after 1 s is named at the end of
   the list, and one that doesn't answer gets a line with Try again and is
   left alone for 30 s on that visit, so typing doesn't queue timeouts. A
   keystroke cancels the calls still out. Pictures come from the result's own
   server, signed for it (`CachedImageLoader`). Opening a result on another
-  server switches to it and shows Search with the same words and the title
-  there. Not in your library, On Live TV and marking watched stay the server
+  server opens it in place, from there, without switching the app. Not in your library, On Live TV and marking watched stay the server
   in use's. What is typed goes to each server signed in to and nowhere else.
-- **A link or a notification names its server.** One for another registered
-  server that is signed in switches to it first, then opens
-  (`DeepLink.opening(_:signedInServer:others:)`, `ServersModel.open`); one
-  for a server that isn't registered opens nothing.
+- **A link or a notification names its server.** A title from another
+  registered server that is signed in opens in place, from there, without
+  switching (`DeepLink.opening(_:signedInServer:others:)`,
+  `ServersModel.open(_:library:liveTV:accepts:libraryOn:)`); a link to what
+  belongs to one server (Live TV, requests) says which server it is for;
+  one for a server that isn't registered opens nothing.
+- **One card for a title on several servers.** A movie, show or episode
+  more than one signed-in server has (the same TMDB id; an episode, its
+  show's, season and number; never a title TMDB didn't match) is one card
+  in search, on Home, in the libraries and in Continue watching, from API
+  level 34 (`ServerFeatures.titlesByTMDB`). Another server's card carries
+  its server (`BrowseItem.server`, `ContinueItem.server`,
+  `EpisodeCard.server`), opens in place (`Route.onServer`) and plays from
+  there (`PlayRequest.serverID`) through the services for that server
+  (`AppServices.on(_:)`), whose library and playback talk to it alone;
+  requests, Live TV, downloads, casting, rows, follows and watchlists stay
+  the server in use's. Every call there asks the server which one it is
+  first (`RealLibraryRepository`'s `call`, through `askOther`), and keeps
+  the answer so its pictures load.
+  - A title's page asks every other server for its copies by TMDB id
+    (`TitleCopiesModel`, a show's `ShowElsewhere`), each given 4 s; Play
+    plays the copy chosen for the title on this device (`CopyChoices`),
+    else where the person got furthest, and Resume starts from the latest
+    place on any server. Versions on iPhone and iPad, and the button after
+    Play on Apple TV, list every copy grouped by server. No other server's
+    copy offers a download.
+  - Home asks each other server for its Home and fills Continue watching
+    and the Recently rows from all of them (`HomeMerge`); the libraries
+    merge every server's pages in the sort (`MergedGrid`), with counts that
+    read "about" until every server has answered. A server still out, or
+    one that didn't answer (with Try again), ends the merged rows and the
+    library's header line.
 - **Kept for each server:** the sign-in, where the person was, recent
   searches, the new-episode place and the downloads with their sync. The
   Downloads list shows the server in use's, with a line for each other
@@ -540,9 +568,10 @@ published again for that server, whichever screen the switch lands on.
 Settings › Server lists Your servers; a server's page takes the screen
 (`TV/Screens/Settings/ServerPage.swift`), with Switch to this server, or
 Sign in again, and Remove this server, whose question opens on the button
-that keeps it. Search's cards from another server name it under the title,
+that keeps it. Search's cards for a title on several servers say where it
+is ("On Living room and Cabin"); one only another server has names it under the title,
 and the servers still being asked or not listed are tiles at the end of the
-last row. A title opened on another server takes focus, so Menu goes back to
+last row. A title opened from another server opens in place and takes focus, so Menu goes back to
 the results. Apple TV keeps no downloads, so a server that doesn't answer
 offers only Try again. `TVUITests/ServersTests.swift` drives it with the
 remote; `-servers` opens Servers at launch, `-serversChoose <server id>`
@@ -551,9 +580,14 @@ chooses a server in it, and `-serverNoteSeconds <n>` keeps the banner up.
 On the fakes, `-fakesServers` signs Sam in to three servers: Living room
 server (in use, the sample library), Cabin server, with a small library of
 its own (`FakeCabin`: its ids are its own, and Harbor Lights is on both, so
-searching "harbor" lists it twice), and Den server, which doesn't answer and
+Harbor Lights and Ninety Fathoms are on both, so each is one card, and The
+Harbor Choir is Cabin's alone), and Den server, which doesn't answer and
 holds three downloads. Add a server finds the Office Mac mini.
-`-fakesSlowServer` makes Cabin server take 2.5 s to answer a search, to see
+`-fakesServers` puts the three at API level 34, as `-fakesRedesign` puts the
+one server in use (the cast as people, card counts, the rating filter,
+Remove from Continue watching, recording marks).
+`-fakesSlowServer` makes Den server fail only after 6 s, longer than a
+server is given, and Cabin server take 2.5 s to answer a search, to see
 Search say it is still asking. Without `-fakesServers` the fakes are signed in
 to one server, signed out of a second and remember a third that is too old.
 
@@ -1275,9 +1309,11 @@ their own:
 ## Top Shelf
 
 With the app in the top row of the Apple TV's Home Screen, the Top Shelf
-shows Continue watching (16:9 cards with the system's progress bar) and
-New for you (posters, movies and shows in turn, added lately and neither
-watched nor started) as two sections the system draws. Select
+shows Continue watching (16:9 cards with the system's progress bar; with
+several servers signed in to, every server's, as Home has it, each card's
+links published for the server it is on) and New for you (posters, movies
+and shows in turn, added lately and neither watched nor started, the
+server in use's) as two sections the system draws. Select
 opens the page; Play/Pause plays, as on the card in the app: a Continue
 watching item resumes, a movie plays its first version, and a show, which has
 no single episode to play, opens. Signed out, or with nothing to show, the

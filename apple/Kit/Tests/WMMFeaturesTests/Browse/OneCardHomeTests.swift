@@ -1,0 +1,148 @@
+import Foundation
+import Testing
+@testable import WMMFeatures
+import WMMFakes
+import WMMModel
+
+/// Home's rows and Continue watching filled from every server, and the Top Shelf's (one card). On the fakes: Living room server in use, Cabin server with a
+/// library of its own (Harbor Lights and Ninety Fathoms on both, The Harbor
+/// Choir only there), and Den server, which doesn't answer.
+@MainActor
+@Suite struct OneCardHomeTests {
+    let services = AppServices.fake(several: true, redesign: true)
+    let navigator = Navigator()
+    let defaults = UserDefaults(suiteName: "one-card-\(UUID().uuidString)")!
+    var oneCard: OneCardContext { OneCardContext(services: services, choices: CopyChoices(defaults: defaults)) }
+    private let cabin = FakeServers.cabin.id
+    private let den = FakeServers.den.id
+
+    init() { FakeLatency.duration = .zero }
+
+    /// Held still, so every server answers "within a second" of the server
+    /// in use's Home however busy the runner is, and is merged in order.
+    private let clock: @MainActor () -> ContinuousClock.Instant = { [start = ContinuousClock.now] in start }
+
+    private func home() async -> HomeModel {
+        let model = HomeModel(library: services.library, auth: services.auth, navigator: navigator, rows: services.rows, servers: services.servers, oneCard: oneCard, clock: clock)
+        await model.retry()
+        return model
+    }
+
+    private func row(_ model: HomeModel, _ id: String) -> ScreenRow? {
+        guard let home = model.state.value else { return nil }
+        return home.rows?.first { $0.id == id } ?? MergedHomeRow(rawValue: id).flatMap { home.cards($0) }
+    }
+
+    @Test func aCardsLineRedrawsWhenTheServerInUseTurnsOutToHaveItToo() async throws {
+        // The lookup of what the server in use has lands after the card is on screen.
+        let library = TestLibrary()
+        let (gate, open) = AsyncStream.makeStream(of: Void.self)
+        library.tmdbGate = { for await _ in gate { return } }
+        let model = HomeModel(library: library, auth: services.auth, navigator: navigator, rows: services.rows, servers: services.servers, oneCard: oneCard, clock: clock)
+        let loading = Task { await model.retry() }
+        #expect(await eventually { row(model, "continue")?.continueItems.contains { $0.title == "Ninety Fathoms" && $0.server == cabin } == true })
+        let fathoms = try #require(row(model, "continue")?.continueItems.first { $0.title == "Ninety Fathoms" })
+        let redrawn = Flag()
+        let line = withObservationTracking { model.whereLine(fathoms) } onChange: { redrawn.set() }
+        #expect(line == "On Cabin", "not known yet")
+
+        open.finish()
+        await loading.value
+        #expect(await eventually { model.whereLine(fathoms) == "from Cabin" }, "the server in use has it too")
+        #expect(redrawn.isSet, "and a screen showing the card is told, so it redraws")
+    }
+
+    @Test func continueWatchingIsEveryServersOneCardATitleByWhenLastPlayed() async throws {
+        let model = await home()
+        #expect(await eventually { row(model, "continue")?.continueItems.contains { $0.server == cabin } == true })
+        let items = try #require(row(model, "continue")?.continueItems)
+        let dates = items.compactMap(\.updatedAt)
+        #expect(dates == dates.sorted(by: >), "by when each was last played, on any server")
+        let fathoms = try #require(items.first { $0.title == "Ninety Fathoms" })
+        #expect(fathoms.server == cabin, "Resume plays from where it was last played")
+        #expect(items.filter { $0.title == "Ninety Fathoms" }.count == 1)
+        #expect(await eventually { model.whereLine(fathoms) == "from Cabin" }, "the server in use has it too")
+        let nights = try #require(items.first { $0.title == "Harbor Nights" })
+        #expect(model.whereLine(nights) == "On Cabin", "only Cabin server has it")
+        model.resume(fathoms)
+        #expect(navigator.playing?.serverID == cabin)
+
+        // A copy chosen on this device for the title plays instead, from the same place.
+        CopyChoices(defaults: defaults).choose("\(FakeServers.livingRoom.id)/9902", for: .movie(tmdbID: FakeData.tmdbID(movieID: 502)))
+        model.resume(fathoms)
+        #expect(navigator.playing?.serverID == nil)
+        #expect(navigator.playing?.fileID == 9902)
+        #expect(navigator.playing?.startMs == fathoms.positionMs)
+    }
+
+    @Test func recentlyAddedIsFilledFromEveryServerOneCardATitle() async throws {
+        let model = await home()
+        #expect(await eventually { row(model, "recentlyAddedMovies")?.items.contains { $0.server == cabin } == true })
+        let items = try #require(row(model, "recentlyAddedMovies")?.items)
+        #expect(items.filter { $0.title == "Ninety Fathoms" }.count == 1, "one card for a title on two servers")
+        #expect(items.first { $0.title == "Ninety Fathoms" }?.server == nil, "the server in use's card")
+        let choir = try #require(items.first { $0.title == "The Harbor Choir" })
+        #expect(model.whereLine(choir) == "On Cabin")
+        model.open(choir)
+        #expect(navigator.path(for: .home) == [.onServer(cabin, .movie(id: 804))], "opened in place, from Cabin server")
+    }
+
+    @Test func aServerThatDoesntAnswerEndsTheRowsWithTryAgain() async throws {
+        let model = await home()
+        #expect(await eventually { model.unanswered.map(\.server.id) == [den] })
+        #expect(model.unanswered.first?.line == "Den server didn’t answer, so its titles aren’t on Home.")
+        let continuing = try #require(row(model, "continue"))
+        #expect(model.isMerged(continuing))
+        #expect(model.firstMergedRowID == "continue")
+        await model.retry(try #require(model.unanswered.first?.server))
+        #expect(model.unanswered.map(\.server.id) == [den], "still not answering")
+    }
+
+    @Test func markingATitleOnTwoServersMarksItOnEach() async throws {
+        let model = await home()
+        #expect(await eventually { row(model, "continue")?.continueItems.contains { $0.server == cabin } == true })
+        let fathoms = try #require(row(model, "continue")?.continueItems.first { $0.title == "Ninety Fathoms" })
+        await model.setWatched(try #require(fathoms.watchTarget), true)
+        #expect(model.message == "Marked as watched")
+        let fake = try #require(services.library as? FakeLibraryRepository)
+        #expect(fake.marks[.movie(id: 502)] == true, "Living room server's copy too")
+    }
+
+    @Test func cardsAlreadyShownKeepTheirPlacesAndALateServersJoinTheEnd() {
+        func item(_ id: Int, _ minutesAgo: Double) -> ContinueItem {
+            ContinueItem(kind: .movie, title: "T\(id)", fileID: id, movieID: id, positionMs: 1, durationMs: 10,
+                         tmdbID: 10 + id, updatedAt: Date(timeIntervalSince1970: 1_000_000 - minutesAgo * 60))
+        }
+        func home(_ items: [ContinueItem]) -> HomeData {
+            HomeData(hero: nil, continueWatching: items, recentlyAddedShows: [], recentlyAired: [], recentlyAddedMovies: [], recentlyReleased: [],
+                     totals: LibraryTotals(movies: 0, shows: 0, episodes: 0, files: 0, totalSizeBytes: 0), lastScannedAt: nil, movieLibraryID: nil, tvLibraryID: nil)
+        }
+        let mine = home([item(1, 10), item(2, 20)])
+        let theirs = home([item(7, 1)])
+        let inOrder = HomeMerge.merge(mine, others: [(server: cabin, home: theirs)])
+        #expect(inOrder.continueWatching.map(\.title) == ["T7", "T1", "T2"], "within a second: by when each was last played")
+        let late = HomeMerge.merge(mine, others: [(server: cabin, home: theirs)], shown: HomeMerge.shownKeys(mine))
+        #expect(late.continueWatching.map(\.title) == ["T1", "T2", "T7"], "later: the cards on screen stay put, the new one at the end")
+    }
+
+    @Test func theTopShelfsContinueWatchingLinksNameTheirServer() {
+        var item = ContinueItem(kind: .movie, title: "Ninety Fathoms", backdropPath: "/b.jpg", fileID: 80_803, movieID: 803, positionMs: 1, durationMs: 2)
+        item.server = cabin
+        let home = HomeData(hero: nil, continueWatching: [item], recentlyAddedShows: [], recentlyAired: [], recentlyAddedMovies: [], recentlyReleased: [],
+                            totals: LibraryTotals(movies: 0, shows: 0, episodes: 0, files: 0, totalSizeBytes: 0), lastScannedAt: nil, movieLibraryID: nil, tvLibraryID: nil)
+        let plan = TopShelfPlan(home, serverID: FakeServers.livingRoom.id)
+        let card = plan.sections.first?.cards.first
+        #expect(card?.server == cabin, "its picture comes from Cabin server")
+        #expect(card?.item.open.absoluteString.contains("server=\(cabin)") == true)
+        #expect(card?.item.id == "continue-\(cabin)/80803")
+    }
+
+}
+
+/// Set once, from any thread: observation's onChange is not isolated.
+private final class Flag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+    func set() { lock.withLock { value = true } }
+    var isSet: Bool { lock.withLock { value } }
+}

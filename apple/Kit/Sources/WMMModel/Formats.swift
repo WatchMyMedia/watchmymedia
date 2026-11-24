@@ -106,6 +106,27 @@ public func formatDay(_ iso: String?, today: Date = .now, calendar: Calendar = .
     }
 }
 
+/// When a show's next episode airs, after its count on a card: "next
+/// today", "next tomorrow", "next on Thursday" within the week, else "next
+/// on Nov 30" (with the year when it is not this year); nil without a date
+/// or for one already past.
+public func nextAirLine(_ iso: String?, today: Date = .now, calendar: Calendar = .current) -> String? {
+    guard let date = parseDay(iso) else { return nil }
+    let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: today), to: calendar.startOfDay(for: date)).day ?? 0
+    switch days {
+    case ..<0: return nil
+    case 0: return "next today"
+    case 1: return "next tomorrow"
+    case 2...6:
+        var style = Date.FormatStyle.dateTime.weekday(.wide)
+        style.timeZone = calendar.timeZone
+        return "next on \(date.formatted(style))"
+    default:
+        let sameYear = calendar.component(.year, from: date) == calendar.component(.year, from: today)
+        return "next on \(sameYear ? date.formatted(.dateTime.month(.abbreviated).day()) : date.formatted(.dateTime.month(.abbreviated).day().year()))"
+    }
+}
+
 /// "Aired yesterday", "Aired Oct 21" or "Airs Nov 4"; nil without a date.
 public func airedLabel(_ iso: String?, today: Date = .now, calendar: Calendar = .current) -> String? {
     guard let date = parseDay(iso), let day = formatDay(iso, today: today, calendar: calendar) else { return nil }

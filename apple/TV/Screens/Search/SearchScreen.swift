@@ -223,13 +223,16 @@ private struct SearchView: View {
 
     private func posterButton(_ found: FoundTitle) -> some View {
         Button { model.open(found) } label: {
-            GridPoster(item: found.item, imageURL: url(found.posterPath, .w500, on: found.server), line: found.item.tvSearchLine,
-                       server: found.server?.name, centred: false)
+            // A title on several servers is one card: its line says where ("On Home and Cabin");
+            // one only another server has keeps that server's name on its picture.
+            GridPoster(item: found.item, imageURL: url(found.posterPath, .w500, on: found.server),
+                       line: [found.alsoOn.isEmpty ? nil : model.whereLine(found), found.item.tvSearchLine].compactMap { $0 }.joined(separator: " · "),
+                       server: found.alsoOn.isEmpty ? found.server?.name : nil, centred: false)
         }
         .buttonStyle(.borderless)
         // Play/Pause plays on the server in use; on another server it opens, as Select does.
         .playPauseCard(found.server == nil ? .card(found.item) : .select) { model.open(found) }
-        .accessibilityHint(found.server.map { "Switches to \($0.name)" } ?? "")
+        .accessibilityHint(found.server.map { "Opens from \($0.name)" } ?? "")
         .contextMenu {
             // Saving and marking watched are the server in use's.
             if found.server == nil { TVWatchlistMenuButton(found.item) }
@@ -253,11 +256,11 @@ private struct SearchView: View {
         return Button { model.open(found) } label: {
             WideCard(
                 title: episode.title,
-                line: episode.searchLine(),
+                line: [found.alsoOn.isEmpty ? nil : model.whereLine(found), episode.searchLine()].compactMap { $0 }.joined(separator: " · "),
                 imageURL: url(episode.stillPath ?? episode.showBackdropPath, .w780, on: found.server),
                 seed: episode.showTitle,
                 missing: !episode.hasFile,
-                server: found.server?.name
+                server: found.alsoOn.isEmpty ? found.server?.name : nil
             ) {
                 if !episode.hasFile {
                     TVBadge("Not in library", style: .warning).pinned(.topLeading)
@@ -269,7 +272,7 @@ private struct SearchView: View {
             }
         }
         .buttonStyle(.borderless)
-        .accessibilityHint(found.server.map { "Switches to \($0.name)" } ?? "Opens the episode on its show")
+        .accessibilityHint(found.server.map { "Opens from \($0.name)" } ?? "Opens the episode on its show")
         .playPauseCard(found.server == nil ? .card(episode) : .select) { model.open(found) }
         .contextMenu {
             if found.server == nil {

@@ -7,8 +7,8 @@ import WMMModel
 /// Search across the servers a device is signed in to: every one asked at
 /// once, the server in use's rows first and the others' added after them, a
 /// slow one named and then given up on, a failed one in one line, a
-/// keystroke cancelling the calls, and a result on another server switching
-/// the app to it.
+/// keystroke cancelling the calls, a title on several servers listed once,
+/// and a result on another server opening in place without a switch.
 @MainActor
 @Suite struct SearchAcrossServersTests {
     let servers = FakeServerRepository(several: true)
@@ -62,12 +62,19 @@ import WMMModel
     @Test func theServerInUseComesFirstAndTheOthersAreAddedAfterItInEachGroup() async throws {
         await search("harbor")
         let listing = try listing()
-        // Harbor Lights is on both servers, so it is listed twice.
-        #expect(listing.shows.map(\.title) == ["Harbor Lights", "Harbor Lights"])
-        #expect(listing.shows.map(\.server) == [nil, cabin], "only a row from another server names it")
-        #expect(listing.shows.map(\.id) == ["/show/100", "srv-cabin/show/701"], "each keeps its own server's id")
-        #expect(listing.movies.map(\.title) == ["Harbor Nights"])
-        #expect(listing.movies.map(\.server) == [cabin])
+        // Harbor Lights is on both servers (the same TMDB id): one row, the server in use's, naming both.
+        #expect(listing.shows.map(\.title) == ["Harbor Lights"])
+        #expect(listing.shows.map(\.server) == [nil], "drawn from the server in use's copy")
+        #expect(listing.shows.map(\.alsoOn) == [[cabin]])
+        #expect(listing.shows.map(\.id) == ["/show/100"], "it keeps its own server's id")
+        #expect(model.whereLine(listing.shows[0]) == "On Living room and Cabin")
+        #expect(listing.movies.map(\.title) == ["Harbor Nights", "The Harbor Choir"])
+        #expect(listing.movies.map(\.server) == [cabin, cabin])
+        #expect(model.whereLine(listing.movies[0]) == "Cabin server", "a title only another server has names it")
+        // Read out once, whichever: VoiceOver read "On On Living room and Cabin" on iPhone.
+        #expect(model.whereSpoken(listing.shows[0]) == "On Living room and Cabin")
+        #expect(model.whereSpoken(listing.movies[0]) == "On Cabin server")
+        #expect(model.whereSpoken(listing.episodes.first!) == nil, "the server in use's alone says nothing")
         #expect(listing.episodes.first?.server == nil)
         #expect(listing.episodes.last?.server == cabin)
         #expect(model.results?.shows.map(\.title) == ["Harbor Lights"], "the server in use's own are kept apart, for marking watched")
@@ -86,7 +93,8 @@ import WMMModel
         await model.pending?.value
         await time.settle()
         let listing = try listing()
-        #expect(listing.shows.map(\.server) == [nil, cabin])
+        #expect(listing.shows.map(\.server) == [nil])
+        #expect(listing.shows.map(\.alsoOn) == [[cabin]])
     }
 
     @Test func rowsOnScreenNeverMoveWhenASlowerServerAnswers() async throws {
@@ -100,9 +108,10 @@ import WMMModel
         gate.open()
         await time.settle()
         let after = try listing()
-        #expect(Array(after.shows.prefix(before.shows.count)) == before.shows, "what was there stays where it was")
-        #expect(after.shows.map(\.server) == [nil, cabin])
-        #expect(after.movies.map(\.server) == [cabin])
+        #expect(Array(after.shows.map(\.id).prefix(before.shows.count)) == before.shows.map(\.id), "what was there stays where it was")
+        #expect(after.shows.map(\.server) == [nil])
+        #expect(after.shows.map(\.alsoOn) == [[cabin]], "Cabin's copy joins the row already there")
+        #expect(after.movies.map(\.server) == [cabin, cabin])
     }
 
     /// The order is the Servers list's, whichever answers first: a server's
@@ -116,8 +125,8 @@ import WMMModel
 
         gate.open()
         await time.settle()
-        #expect(try listing().movies.map(\.title) == ["Harbor Nights", "Harbor Fog"])
-        #expect(try listing().movies.map(\.server) == [cabin, den])
+        #expect(try listing().movies.map(\.title) == ["Harbor Nights", "The Harbor Choir", "Harbor Fog"])
+        #expect(try listing().movies.map(\.server) == [cabin, cabin, den])
     }
 
     @Test func aServerThatGivesUpLetsTheOnesAfterItIn() async throws {
@@ -133,7 +142,7 @@ import WMMModel
     @Test func aResultOnAnotherServerGetsItsPictureFromThatServer() async throws {
         await search("harbor")
         let listing = try listing()
-        let near = try #require(listing.shows.first), far = try #require(listing.shows.last)
+        let near = try #require(listing.shows.first), far = try #require(listing.movies.last)
         #expect(library.imageURL("/p.jpg", size: .w342, on: far.server)?.host() == "srv-cabin.example")
         #expect(library.imageURL("/p.jpg", size: .w342, on: near.server) == library.imageURL("/p.jpg", size: .w342))
     }
@@ -161,7 +170,7 @@ import WMMModel
         // Den server doesn't answer.
         #expect(model.unlisted.map(\.line) == ["Den server didn’t answer, so its titles aren’t listed."])
         #expect(model.unlisted.first?.canRetry == true)
-        #expect(try listing().shows.count == 2, "the others' titles are listed all the same")
+        #expect(try listing().movies.count == 2, "the others' titles are listed all the same")
 
         // Typing on doesn't ask it again, so no timeouts queue up; its line stays.
         clock.now += 10
@@ -234,7 +243,7 @@ import WMMModel
         library.otherAnswers = [:]
         await model.retry()
         await time.settle()
-        #expect(try listing().shows.count == 2)
+        #expect(try listing().movies.count == 2)
         #expect(library.otherSearches.filter { $0.server == FakeServers.den.id }.count == 2)
     }
 
@@ -307,44 +316,21 @@ import WMMModel
         #expect(servers.current?.server.id == FakeServers.livingRoom.id)
     }
 
-    @Test func aResultOnAnotherServerSwitchesToItThenShowsSearchAndTheTitleThere() async throws {
+    @Test func aResultOnAnotherServerOpensInPlaceWithoutASwitch() async throws {
         await search("harbor")
         let movie = try #require(try listing().movies.first { $0.server == cabin })
-        let probesBefore = servers.probes
         model.open(movie)
-        #expect(await eventually { servers.current?.server.id == FakeServers.cabin.id })
-        #expect(servers.probes == probesBefore, "it answered the search a moment ago, so it isn't asked which server it is")
-        #expect(switcher.note == "Now on Cabin server")
-        #expect(navigator.path(for: .search).isEmpty, "nothing opens on the server it left")
-
-        // The apps rebuild their screens on the switch, then land: Search with the same words, and the title over it.
-        navigator.tab = .home
-        navigator.land(on: FakeServers.cabin.id)
-        #expect(navigator.tab == .search)
-        #expect(navigator.path(for: .search) == [.movie(id: movie.item.id)])
-        #expect(navigator.takeSearchWords() == "harbor")
-        #expect(navigator.takeSearchWords() == nil, "taken once")
-
-        // Back from the title: the search is asked again, there, and the rows that name a server are the others now.
-        let there = SearchModel(library: library, navigator: navigator, debounce: .zero, servers: servers, switcher: switcher)
-        there.selectRecentQuery("harbor")
-        await there.pending?.value
-        for call in there.asking.values { await call.value }
-        guard case .results(let listing) = there.phase else { Issue.record("no results on Cabin server"); return }
-        #expect(listing.movies.first?.server == nil, "Cabin server's own carry no name now")
-        #expect(listing.shows.contains { $0.server?.name == "Living room server" })
+        #expect(navigator.path(for: .search) == [.onServer(FakeServers.cabin.id, .movie(id: movie.item.id))], "its page, from Cabin server")
+        #expect(servers.current?.server.id == FakeServers.livingRoom.id, "the app stays where it is")
+        #expect(switcher.note == nil)
     }
 
-    /// A result whose server's answer no longer stands (the network changed
-    /// while Search was open): its server is asked which it is before the switch.
-    @Test func aResultWhoseServersAnswerNoLongerStandsAsksBeforeSwitching() async throws {
+    @Test func aTitleOnSeveralServersOpensTheServerInUsesCopy() async throws {
         await search("harbor")
-        let movie = try #require(try listing().movies.first { $0.server == cabin })
-        library.forgotten = [FakeServers.cabin.id]
-        let probesBefore = servers.probes
-        model.open(movie)
-        #expect(await eventually { servers.current?.server.id == FakeServers.cabin.id })
-        #expect(servers.probes == probesBefore + 1, "asked which server it is, as a switch from Servers is")
+        let show = try #require(try listing().shows.first)
+        #expect(show.alsoOn == [cabin])
+        model.open(show)
+        #expect(navigator.path(for: .search) == [.show(id: 100)])
     }
 
     // MARK: The visit
@@ -368,7 +354,7 @@ import WMMModel
         #expect(library.answerStands(serverID: FakeServers.cabin.id))
         #expect(library.searches == ["harbor"], "nothing is searched again")
         #expect(library.otherSearches.count == 2)
-        #expect(try listing().movies.map(\.server) == [cabin], "the rows stay as they were")
+        #expect(try listing().movies.map(\.server) == [cabin, cabin], "the rows stay as they were")
 
         model.visitBegan()
         #expect(library.asked.count == 1, "only after a visit ended")
@@ -417,13 +403,12 @@ import WMMModel
         #expect(!model.unlisted.contains { $0.id == FakeServers.cabin.id })
     }
 
-    @Test func anEpisodeOnAnotherServerSwitchesToo() async throws {
+    @Test func anEpisodeOnAnotherServerOpensInPlaceToo() async throws {
         await search("harbour run")
         let episode = try #require(try listing().episodes.first { $0.server == cabin })
         model.open(episode)
-        #expect(await eventually { servers.current?.server.id == FakeServers.cabin.id })
-        navigator.land(on: FakeServers.cabin.id)
-        #expect(navigator.path(for: .search) == [episode.episode.route])
+        #expect(navigator.path(for: .search) == [.onServer(FakeServers.cabin.id, episode.episode.route)])
+        #expect(servers.current?.server.id == FakeServers.livingRoom.id)
     }
 
     // MARK: One server

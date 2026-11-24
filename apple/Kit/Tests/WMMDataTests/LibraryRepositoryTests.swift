@@ -145,9 +145,10 @@ struct LibraryRepositoryTests {
             """))
         let page = try await library.items(ItemQuery(libraryID: 1))
         let item = try #require(page.items.first)
+        #expect(item.addedAt != nil, "Date added sorts by it, across servers too")
         #expect(item == BrowseItem(
             kind: .unmatched, id: 1, libraryID: 1, title: "Glass Tide (2023).mkv", isNew: true, subtitle: "Not looked up yet",
-            fileName: "Glass Tide (2023)/Glass Tide (2023).mkv", fileCount: 1
+            fileName: "Glass Tide (2023)/Glass Tide (2023).mkv", fileCount: 1, addedAt: item.addedAt
         ))
         #expect(page.summary == nil, "a server that does not count the library")
     }

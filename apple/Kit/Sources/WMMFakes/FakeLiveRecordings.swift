@@ -137,5 +137,28 @@ extension FakeLiveTVRepository {
                   mediaFileID: 9102, canDelete: admin),
         ]
         recordingRules = [.init(id: "dvr-rule", title: "Station 9", userName: "Sam", number: "7.1", canCancel: admin)]
+        guard ServerFeatures(apiLevel: servers?.current?.server.apiLevel).recordingFacts else { return }
+        // What a server at API level 34 adds: the person's marks, new and repeat, and when a repeat airs again.
+        let friday = Calendar.current.nextDate(after: now().addingTimeInterval(86_400), matching: DateComponents(hour: 14, weekday: 6), matchingPolicy: .nextTime) ?? now().addingTimeInterval(3 * 86_400)
+        let again = LiveAiring(channelID: "ch-7.1", number: "7.1", channelName: "Lakeside", programmeID: "prog-station9-again", start: friday)
+        for index in recordingItems.indices {
+            switch recordingItems[index].id {
+            case "dvr-conflict":
+                recordingItems[index].isNew = true
+                recordingItems[index].conflictsWith = recordingItems[index].conflictsWith.map { holder in
+                    var copy = holder
+                    copy.isRepeat = holder.id == "dvr-upcoming"
+                    copy.nextAiring = holder.id == "dvr-upcoming" ? again : nil
+                    return copy
+                }
+            case "dvr-upcoming": recordingItems[index].isRepeat = true
+            case "dvr-recorded": recordingItems[index].watched = false
+            case "dvr-partial": recordingItems[index].watched = true
+            default: break
+            }
+        }
+        recordingItems.append(.init(id: "dvr-recorded-2", userName: "Sam", channelID: "ch-4.2", number: "4.2", title: "Inspector Vane", episodeTitle: "Slack Water", season: 2, episode: 2,
+                                    start: now().addingTimeInterval(-8 * 86400), end: now().addingTimeInterval(-8 * 86400 + 3600), state: .done, bytes: 3_500_000_000,
+                                    mediaFileID: 9103, canDelete: admin, watched: false, isNew: true))
     }
 }

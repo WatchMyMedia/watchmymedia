@@ -347,7 +347,7 @@ import WMMModel
         let den = try #require(s.model.page(FakeServers.den.id, device: "iPhone", showsDownloads: true))
         #expect(den.name == "Den server")
         #expect(den.facts.map(\.label) == ["Address", "Version", "Signed in as", "Downloads from it"])
-        #expect(den.facts.map(\.value) == ["192.0.2.52:27587", "v1.3.2 · API 6", "Sam", "3 · 12.4 GB"])
+        #expect(den.facts.map(\.value) == ["192.0.2.52:27587", "v1.3.2 · API 34", "Sam", "3 · 12.4 GB"])
         #expect(den.canSwitch && !den.canSignIn)
         #expect(den.removeQuestion.title == "Remove Den server from this iPhone?")
         #expect(den.removeQuestion.lines.first == "This iPhone is signed out of it, and its 3 downloads here are deleted.")

@@ -4,21 +4,81 @@ import WMMModel
 
 /// Browsing the current server's libraries as the signed-in user
 /// (android/core/data/.../RealLibraryRepository.kt).
+///
+/// Made for another server signed in to (`serverID`), it talks to that
+/// server alone: its address, its sign-in, through an API built for it
+/// (``LocalStore/other(serverID:)``), which asks the server which one it is
+/// before the sign-in goes out unless an answer stands. A title opened in
+/// place from another server, its copies and a play from there use one.
 @MainActor
 final class RealLibraryRepository: LibraryRepository {
     private let store: LocalStore
     private let events: ServerEvents
     /// Asks a server that isn't in use which server it is, before its sign-in goes to it.
     private let askOther: @MainActor (_ serverID: String) async throws -> Void
+    /// The server this repository talks to; nil for the server in use.
+    let serverID: String?
 
     private static let maxPage = 1000
     private static let maxSearch = 100
     private static let maxShowGuesses = 3
 
-    init(store: LocalStore, events: ServerEvents, askOther: @escaping @MainActor (_ serverID: String) async throws -> Void) {
+    init(store: LocalStore, events: ServerEvents, serverID: String? = nil, askOther: @escaping @MainActor (_ serverID: String) async throws -> Void) {
         self.store = store
         self.events = events
+        self.serverID = serverID
         self.askOther = askOther
+    }
+
+    var serverScope: String? { serverID }
+
+    /// A call as the signed-in person: to the server in use, or this
+    /// repository's server. Another server is asked which one it is first,
+    /// with no sign-in, unless its answer stands, and the answer is kept
+    /// (as Search keeps it), so its pictures load with its sign-in. A call
+    /// to it that fails forgets the answer, so the next asks again.
+    private func call<T: Sendable>(_ operation: @Sendable (Client) async throws -> T) async throws -> T {
+        guard let serverID else { return try await store.call(operation) }
+        do {
+            try await askOther(serverID)
+            return try await store.other(serverID: serverID).api.call(operation)
+        } catch {
+            if !(error is CancellationError), !Task.isCancelled { store.forgetAnswer(serverID) }
+            throw error
+        }
+    }
+
+    /// What this repository's server offers.
+    private var features: ServerFeatures {
+        guard let serverID else { return store.features }
+        return ServerFeatures(apiLevel: store.state.servers.first { $0.server.id == serverID }?.server.apiLevel)
+    }
+
+    /// A mark made on another server: the screens of the server in use can't
+    /// tell its ids from their own, so they hear only that something changed.
+    private func notify(_ change: LibraryChange) {
+        events.notify(serverID == nil ? change : .unknown)
+    }
+
+    /// A change this device is making, whose echo is dropped; none for another server, which sends no events here.
+    private func expect(_ echo: ExpectedEcho) -> UUID? {
+        serverID == nil ? events.expect(echo) : nil
+    }
+
+    private func forget(_ echo: UUID?) {
+        if let echo { events.forget(echo) }
+    }
+
+    /// GET /api/movies?tmdbId=: every copy of the movie this server has.
+    func movies(tmdbID: Int) async throws -> [BrowseItem] {
+        guard features.titlesByTMDB else { return [] }
+        return try await call { try await $0.findMoviesByTMDB(query: .init(tmdbId: Int64(tmdbID))).ok.body.json }.items.map(\.browseItem)
+    }
+
+    /// GET /api/shows?tmdbId=: every copy of the show this server has.
+    func shows(tmdbID: Int) async throws -> [BrowseItem] {
+        guard features.titlesByTMDB else { return [] }
+        return try await call { try await $0.findShowsByTMDB(query: .init(tmdbId: Int64(tmdbID))).ok.body.json }.items.map(\.browseItem)
     }
 
     /// From ``rowsAPILevel`` Home comes arranged: its rows in the person's
@@ -27,8 +87,8 @@ final class RealLibraryRepository: LibraryRepository {
     /// arranged Home. A reply with fixed rows and no `rows` keeps them, as
     /// older servers' do.
     func home() async throws -> HomeData {
-        let arranged = store.features.rows
-        var home = try await store.call { try await $0.getHome(query: .init(arranged: arranged ? true : nil)).ok.body.json }.model
+        let arranged = features.rows
+        var home = try await call { try await $0.getHome(query: .init(arranged: arranged ? true : nil)).ok.body.json }.model
         if !arranged {
             home.rows = nil
         } else if home.rows == nil && home.continueWatching.isEmpty && home.recentlyAddedShows.isEmpty && home.recentlyAired.isEmpty
@@ -39,7 +99,7 @@ final class RealLibraryRepository: LibraryRepository {
     }
 
     func libraries() async throws -> [Library] {
-        try await store.call { try await $0.listLibraries().ok.body.json }.items
+        try await call { try await $0.listLibraries().ok.body.json }.items
             .filter { $0._type == .movie || $0._type == .tv }.map(\.model)
     }
 
@@ -47,6 +107,7 @@ final class RealLibraryRepository: LibraryRepository {
         let parameters = Operations.ListLibraryItems.Input.Query(
             sort: query.sort.api,
             filter: query.filter.api,
+            contentRating: query.contentRatings.isEmpty || !features.ratingFilter ? nil : query.contentRatings,
             genre: Mapping.nonBlank(query.genre),
             decade: query.decade.map(Int64.init),
             q: Mapping.nonBlank(query.text?.trimmingCharacters(in: .whitespacesAndNewlines)),
@@ -54,28 +115,28 @@ final class RealLibraryRepository: LibraryRepository {
             offset: Int64(max(query.offset, 0))
         )
         let id = Int64(query.libraryID)
-        return try await store.call { try await $0.listLibraryItems(path: .init(id: id), query: parameters).ok.body.json }.model
+        return try await call { try await $0.listLibraryItems(path: .init(id: id), query: parameters).ok.body.json }.model
     }
 
     func show(id: Int) async throws -> ShowDetail {
-        try await store.call { try await $0.getShow(path: .init(id: Int64(id))).ok.body.json }.model
+        try await call { try await $0.getShow(path: .init(id: Int64(id))).ok.body.json }.model
     }
 
     func season(showID: Int, number: Int) async throws -> SeasonDetail {
-        try await store.call { try await $0.getSeason(path: .init(id: Int64(showID), number: Int64(number))).ok.body.json }.model
+        try await call { try await $0.getSeason(path: .init(id: Int64(showID), number: Int64(number))).ok.body.json }.model
     }
 
     func movie(id: Int) async throws -> MovieDetail {
-        try await store.call { try await $0.getMovie(path: .init(id: Int64(id))).ok.body.json }.model
+        try await call { try await $0.getMovie(path: .init(id: Int64(id))).ok.body.json }.model
     }
 
-    var offersRelated: Bool { store.features.related && store.currentCredential != nil }
+    var offersRelated: Bool { features.related && (serverID != nil || store.currentCredential != nil) }
 
     /// Below ``ServerFeatures/related`` nothing is asked. Rows of a style
     /// this app doesn't draw, and rows with nothing in them, are left out.
     func relatedRows(_ title: RelatedTitle) async throws -> [ScreenRow] {
         guard offersRelated else { return [] }
-        let reply = try await store.call { api in
+        let reply = try await call { api in
             switch title {
             case .movie(let id): try await api.getMovieRelated(path: .init(id: Int64(id))).ok.body.json
             case .show(let id): try await api.getShowRelated(path: .init(id: Int64(id))).ok.body.json
@@ -84,10 +145,34 @@ final class RealLibraryRepository: LibraryRepository {
         return reply.rows.compactMap(\.model)
     }
 
+    /// GET /api/people/{personId}: their titles in this server's libraries.
+    func person(id: Int) async throws -> PersonDetail {
+        try await call { try await $0.getPerson(path: .init(personId: Int64(id))).ok.body.json }.model
+    }
+
+    /// PUT or DELETE /api/watch/{type}/{id}/hidden. Home hears it as a
+    /// change to the title, as it hears a mark, and the server's echo is dropped.
+    func setHiddenFromContinueWatching(_ kind: WatchKind, id: Int, hidden: Bool) async throws {
+        let echo = expect(.watched(kind, ids: [id]))
+        do {
+            if hidden {
+                let type: Operations.HideFromContinueWatching.Input.Path._TypePayload = kind == .movie ? .movie : .episode
+                _ = try await call { try await $0.hideFromContinueWatching(path: .init(_type: type, id: Int64(id))).noContent }
+            } else {
+                let type: Operations.ShowInContinueWatching.Input.Path._TypePayload = kind == .movie ? .movie : .episode
+                _ = try await call { try await $0.showInContinueWatching(path: .init(_type: type, id: Int64(id))).noContent }
+            }
+        } catch {
+            forget(echo)
+            throw error
+        }
+        notify(.watched(kind, ids: [id], watched: nil))
+    }
+
     func search(_ text: String) async throws -> SearchResults {
         let q = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(Self.maxSearch))
         guard !q.isEmpty else { return SearchResults() }
-        let r = try await store.call { try await $0.search(query: .init(q: q)).ok.body.json }
+        let r = try await call { try await $0.search(query: .init(q: q)).ok.body.json }
         return SearchResults(movies: r.movies.map(\.browseItem), shows: r.shows.map(\.browseItem), episodes: r.episodes.map(\.card))
     }
 
@@ -132,67 +217,67 @@ final class RealLibraryRepository: LibraryRepository {
     /// it is dropped (``ServerEvents/expect(_:)``), so every screen showing it
     /// loads once.
     func setWatched(_ kind: WatchKind, id: Int, watched: Bool) async throws {
-        let echo = events.expect(.watched(kind, ids: [id]))
+        let echo = expect(.watched(kind, ids: [id]))
         let id64 = Int64(id)
         do {
             if watched {
                 let type: Operations.MarkWatched.Input.Path._TypePayload = kind == .movie ? .movie : .episode
-                _ = try await store.call { try await $0.markWatched(path: .init(_type: type, id: id64)).noContent }
+                _ = try await call { try await $0.markWatched(path: .init(_type: type, id: id64)).noContent }
             } else {
                 let type: Operations.MarkUnwatched.Input.Path._TypePayload = kind == .movie ? .movie : .episode
-                _ = try await store.call { try await $0.markUnwatched(path: .init(_type: type, id: id64)).noContent }
+                _ = try await call { try await $0.markUnwatched(path: .init(_type: type, id: id64)).noContent }
             }
         } catch {
-            events.forget(echo)
+            forget(echo)
             throw error
         }
-        events.notify(.watched(kind, ids: [id], watched: watched))
+        notify(.watched(kind, ids: [id], watched: watched))
     }
 
     func setSeasonWatched(showID: Int, season: Int, watched: Bool) async throws {
-        let echo = events.expect(.episodes)
+        let echo = expect(.episodes)
         do {
             try await markSeason(showID: showID, season: season, watched: watched)
         } catch {
-            events.forget(echo)
+            forget(echo)
             throw error
         }
-        events.notify(.markedShow(id: showID, season: season, watched: watched))
+        notify(.markedShow(id: showID, season: season, watched: watched))
     }
 
     /// One call for the whole show; a server without it gets one per season.
     func setShowWatched(showID: Int, watched: Bool) async throws {
         let id = Int64(showID)
-        let echo = events.expect(.episodes)
+        let echo = expect(.episodes)
         do {
             if watched {
-                _ = try await store.call { try await $0.markShowWatched(path: .init(id: id)).noContent }
+                _ = try await call { try await $0.markShowWatched(path: .init(id: id)).noContent }
             } else {
-                _ = try await store.call { try await $0.markShowUnwatched(path: .init(id: id)).noContent }
+                _ = try await call { try await $0.markShowUnwatched(path: .init(id: id)).noContent }
             }
         } catch let error as APIError where error.status == 404 || error.status == 405 {
             do {
                 for season in try await show(id: showID).seasons {
-                    events.expect(.episodes)
+                    _ = expect(.episodes)
                     try await markSeason(showID: showID, season: season.number, watched: watched)
                 }
             } catch {
-                events.forget(echo)
+                forget(echo)
                 throw error
             }
         } catch {
-            events.forget(echo)
+            forget(echo)
             throw error
         }
-        events.notify(.markedShow(id: showID, season: nil, watched: watched))
+        notify(.markedShow(id: showID, season: nil, watched: watched))
     }
 
     private func markSeason(showID: Int, season: Int, watched: Bool) async throws {
         let path = Operations.MarkSeasonWatched.Input.Path(id: Int64(showID), number: Int64(season))
         if watched {
-            _ = try await store.call { try await $0.markSeasonWatched(path: path).noContent }
+            _ = try await call { try await $0.markSeasonWatched(path: path).noContent }
         } else {
-            _ = try await store.call { try await $0.markSeasonUnwatched(path: .init(id: path.id, number: path.number)).noContent }
+            _ = try await call { try await $0.markSeasonUnwatched(path: .init(id: path.id, number: path.number)).noContent }
         }
     }
 
@@ -264,11 +349,12 @@ final class RealLibraryRepository: LibraryRepository {
 
     /// GET /api/files/{id}: what the server knows about a file.
     private func fileInfo(_ id: Int) async throws -> Components.Schemas.MediaFileDetail {
-        try await store.call { try await $0.getFile(path: .init(id: Int64(id))).ok.body.json }
+        try await call { try await $0.getFile(path: .init(id: Int64(id))).ok.body.json }
     }
 
     func imageURL(_ path: String?, size: ImageSize) -> URL? {
-        Self.imageURL(path, size: size, base: store.current?.server.baseURL)
+        if let serverID { return imageURL(path, size: size, serverID: serverID) }
+        return Self.imageURL(path, size: size, base: store.current?.server.baseURL)
     }
 
     func imageURL(_ path: String?, size: ImageSize, serverID: String) -> URL? {

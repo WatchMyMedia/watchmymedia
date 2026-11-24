@@ -49,6 +49,9 @@ struct SeveralServersTests {
                 let status = searchStatus.withLock { $0 }
                 return status == 200 ? (200, Data(#"{"movies":[],"shows":[],"episodes":[]}"#.utf8)) : (status, Data(#"{"title":"Error","status":\#(status),"detail":"refused"}"#.utf8))
             case "GET /api/images/w342/far.jpg": return (200, Data([7, 7]))
+            case "GET /api/movies":
+                return (200, Data(#"{"items":[{"id":21,"libraryId":1,"tmdbId":7001,"title":"Paper Moons","overview":"","genres":[],"fileCount":1,"credits":[],"progress":0.4}]}"#.utf8))
+            case "POST /api/watch/movie/21/watched": return (204, Data())
             case "POST /api/offline/downloads/d1/token": return (200, Data(#"{"token":"o1.cabin","expiresAt":"2099-01-01T00:00:00Z","param":"token"}"#.utf8))
             case "POST /api/auth/logout", "POST /api/offline/sync": return (204, Data())
             default: return (404, Data())
@@ -433,5 +436,61 @@ struct SeveralServersTests {
         #expect(heard.owners.map(\.serverID) == ["srv-test"])
         #expect(h.services.auth.user == nil)
         #expect(h.services.servers.saved.first { $0.server.id == cabin.id }?.signedIn == true, "the other server keeps its sign-in")
+    }
+
+    // MARK: One card
+
+    /// A title's copy on another server (one card): asked for by TMDB id
+    /// at that server's own address with its own sign-in, once it has said
+    /// which server it is; the server in use hears nothing of it.
+    @Test func aTitlesCopyOnAnotherServerIsAskedForThereAlone() async throws {
+        try await h.signIn()
+        let second = Second()
+        second.itself.withLock { $0 = Second.info(apiLevel: ServerFeatures.Level.redesign) }
+        let cabin = Server(id: "srv-cabin", name: "Cabin server", baseURL: second.server.baseURL, version: "1.0.0", apiLevel: ServerFeatures.Level.redesign)
+        try await h.services.servers.select(cabin)
+        _ = try await h.services.auth.signIn(name: "sam", password: "fixture-sam-1")
+        try await h.services.servers.select(h.testServer)
+
+        let other = h.services.library(serverID: "srv-cabin")
+        #expect(other.serverScope == "srv-cabin")
+        let copies = try await other.movies(tmdbID: 7001)
+        #expect(copies.map(\.id) == [21])
+        #expect(copies.first?.progress == 0.4, "the person's place there")
+        let asked = try #require(second.requests("GET /api/movies").first)
+        #expect(URLComponents(url: asked.url!, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "tmdbId" }?.value == "7001")
+        #expect(authorizations(second.requests("GET /api/movies")) == ["Bearer tok-cabin"], "its own sign-in")
+        #expect(second.requests("GET /api/server").count >= 1, "asked which server it is first")
+        #expect(h.router.requests("GET /api/movies").isEmpty, "the server in use is asked nothing")
+        // A picture of its card is signed for it while that answer stands.
+        let picture = try #require(other.imageURL("/far.jpg", size: .w342))
+        #expect(picture.host() == second.server.baseURL.host())
+        #expect(try await h.services.images.data(for: picture) == Data([7, 7]))
+
+        // A mark made there is sent there, and the server in use's screens hear only that something changed.
+        let changes = Counter()
+        let listening = Task { for await change in h.services.library.libraryChanges() { if change == .unknown { changes.count += 1 } } }
+        defer { listening.cancel() }
+        #expect(await eventually { h.services.events.listenerCount == 1 })
+        try await other.mark(.onServer("srv-cabin", .movie(id: 21)), watched: true)
+        #expect(second.requests("POST /api/watch/movie/21/watched").count == 1)
+        #expect(h.router.requests("POST /api/watch/movie/21/watched").isEmpty)
+        #expect(await eventually { changes.count >= 1 })
+    }
+
+    /// Where another server answers at the address kept for it, a title's
+    /// copies aren't asked for there, and no sign-in goes.
+    @Test func noCopyIsAskedForWhereAnotherServerAnswers() async throws {
+        try await h.signIn()
+        let second = Second()
+        second.itself.withLock { $0 = Second.info(apiLevel: ServerFeatures.Level.redesign) }
+        let cabin = Server(id: "srv-cabin", name: "Cabin server", baseURL: second.server.baseURL, version: "1.0.0", apiLevel: ServerFeatures.Level.redesign)
+        try await h.services.servers.select(cabin)
+        _ = try await h.services.auth.signIn(name: "sam", password: "fixture-sam-1")
+        try await h.services.servers.select(h.testServer)
+        second.itself.withLock { $0 = Second.info(id: "srv-someone-else", apiLevel: ServerFeatures.Level.redesign) }
+
+        await #expect(throws: (any Error).self) { _ = try await h.services.library(serverID: "srv-cabin").movies(tmdbID: 7001) }
+        #expect(second.requests("GET /api/movies").isEmpty, "no sign-in goes to whatever answered there")
     }
 }

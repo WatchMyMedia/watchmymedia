@@ -17,7 +17,8 @@ struct LibraryScreen: View {
     @Environment(Navigator.self) private var navigator
 
     var body: some View {
-        LibraryView(model: LibraryModel(library: services.library, navigator: navigator, type: type, rows: services.rows))
+        LibraryView(model: LibraryModel(library: services.library, navigator: navigator, type: type, rows: services.rows,
+                                        oneCard: OneCardContext(services: services, choices: CopyChoices())))
     }
 }
 
@@ -167,14 +168,27 @@ private struct LibraryView: View {
     }
 
     private var resultsHeader: some View {
-        HStack {
-            if wide { filterButton }
-            Text(model.resultLine ?? "")
-                .scaledFont(13)
-                .foregroundStyle(Palette.muted)
-                .lineLimit(wide ? 2 : 1)
-            Spacer(minLength: 8)
-            if !wide { sortMenu }
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                if wide { filterButton }
+                Text(model.resultLine ?? "")
+                    .scaledFont(13)
+                    .foregroundStyle(Palette.muted)
+                    .lineLimit(wide ? 2 : 1)
+                Spacer(minLength: 8)
+                if !wide { sortMenu }
+            }
+            // Other servers: still asking, one that didn't answer (with Try again), one that can't filter.
+            if let line = model.otherServersLine {
+                HStack(spacing: 8) {
+                    Text(line).scaledFont(12).foregroundStyle(Palette.muted).lineLimit(2)
+                    if model.merged?.retryable != nil {
+                        Button("Try again") { Task { await model.retryOtherServer() } }
+                            .buttonStyle(SmallGhostButtonStyle())
+                    }
+                }
+                .accessibilityIdentifier("library-other-servers")
+            }
         }
         .padding(.horizontal, margin)
     }
@@ -327,9 +341,11 @@ private struct LibraryView: View {
                 empty
             } else {
                 LazyVGrid(columns: columns, spacing: wide ? 18 : 14) {
-                    ForEach(grid.items) { item in
+                    ForEach(model.gridItems, id: \.gridID) { item in
                         Button { model.open(item) } label: {
-                            PosterCard(item: item, imageURL: services.library.imageURL(item.posterPath, size: .w342), compact: true)
+                            // Every signed-in server's titles, one card each; one only another server has says so.
+                            PosterCard(item: item, imageURL: services.library.imageURL(item.posterPath, size: .w342, on: item.server), compact: true,
+                                       server: item.server.flatMap { model.serverName($0) }.map(OneCardWords.on))
                         }
                         .buttonStyle(CardButtonStyle())
                         .contextMenu {
@@ -338,7 +354,7 @@ private struct LibraryView: View {
                             }
                             WatchlistMenuButton(item)
                         }
-                        .id(item.id)
+                        .id(item.cardID)
                         .onAppear { Task { await model.itemAppeared(item) } }
                     }
                 }

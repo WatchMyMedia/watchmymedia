@@ -19,6 +19,9 @@ import WMMPlayback
 /// the server at API level 22, with arranged rows and lists.
 /// `-fakesFollows` puts it at API level 29: the bell on a show's page,
 /// Settings › Notifications' list and Home's New from shows you follow.
+/// `-fakesRedesign` puts it at API level 34: the cast as people who open
+/// their titles, a card's counts, the library's totals and rating filter,
+/// and Remove from Continue watching (`-fakesServers` does too).
 /// `-fakesRelated` puts it at API level 30: movie
 /// and show pages end in their collection and More like this.
 /// `-fakesServers` signs Sam in to three servers: Living room server (in
@@ -43,7 +46,17 @@ enum ServicesFactory {
             // Now Playing's picture. No `servers`: the AirPlay restart is the sender's, never the TV's.
             images: data.images
         )
-        return data.makeAppServices(playback: playback, livePlayback: LivePlaybackEngine(repository: data.liveTV, profile: profile, userAgent: APIPlaybackGateway.userAgent))
+        let services = data.makeAppServices(playback: playback, livePlayback: LivePlaybackEngine(repository: data.liveTV, profile: profile, userAgent: APIPlaybackGateway.userAgent))
+        // Another server signed in to, for one card: a title opened in place, a copy played from there.
+        services.makeScoped = { serverID in
+            let library = data.library(serverID: serverID)
+            let playback = PlaybackEngine(
+                gateway: APIPlaybackGateway(api: { try data.api(serverID: serverID) }, apiLevel: { data.apiLevel(serverID: serverID) }),
+                preferences: data.preferences, client: { data.client }, profile: profile, library: library, images: data.images
+            )
+            return data.makeScopedServices(serverID: serverID, library: library, playback: playback)
+        }
+        return services
     }
 
     #if DEBUG
@@ -68,12 +81,17 @@ enum ServicesFactory {
             follows: arguments.contains("-fakesFollows"),
             related: arguments.contains("-fakesRelated"),
             watchlists: arguments.contains("-fakesWatchlists"),
-            several: arguments.contains("-fakesServers")
+            several: arguments.contains("-fakesServers"),
+            redesign: arguments.contains("-fakesRedesign") || arguments.contains("-fakesServers")
         )
         (services.library as? FakeLibraryRepository)?.firstRun = FakeFirstRunState.from(arguments)
         // The server in use doesn't answer at all: Home's Can't reach.
         if arguments.contains("-fakesUnreachable") { (services.library as? FakeLibraryRepository)?.offline = true }
-        if arguments.contains("-fakesSlowServer") { (services.library as? FakeLibraryRepository)?.otherServerDelay = .milliseconds(2500) }
+        if arguments.contains("-fakesSlowServer") {
+            (services.library as? FakeLibraryRepository)?.otherServerDelay = .milliseconds(2500)
+            // Den server doesn't answer within the time a server is given: screens say they are still asking, then that it didn't.
+            (services.library as? FakeLibraryRepository)?.denWaits = .seconds(6)
+        }
         if arguments.contains("-fakesOneWatchlist") { (services.watchlists as? FakeWatchlistsRepository)?.keepOnlyFirst() }
         if let i = arguments.firstIndex(of: "-fakesAudioLanguages"), arguments.indices.contains(i + 1), !arguments[i + 1].hasPrefix("-") {
             (services.preferences as? FakePreferencesRepository)?.seedLanguages(arguments[i + 1].split(separator: ",").map(String.init))

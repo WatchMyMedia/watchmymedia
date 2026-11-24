@@ -19,7 +19,8 @@ struct MovieScreen: View {
     var body: some View {
         // How a version would play is said for this device: "on this iPad", else "on this phone".
         let device = deviceFamily(model: services.client.model) == "iPad" ? "this iPad" : "this phone"
-        MovieView(model: MovieModel(library: services.library, playback: services.playback, navigator: navigator, movieID: id, device: device, downloads: services.downloads))
+        MovieView(model: MovieModel(library: services.library, playback: services.playback, navigator: navigator, movieID: id, device: device, downloads: services.downloads,
+                                    oneCard: OneCardContext(services: services, choices: CopyChoices())))
     }
 }
 
@@ -92,6 +93,7 @@ private struct MovieView: View {
                         DetailColumnHeader(title: movie.title, backdropURL: url(movie.backdropPath, .w1280), posterURL: url(movie.posterPath, .w342)) {
                             DetailTitle(text: movie.title, size: 30)
                             Text(movie.facts).scaledFont(14).foregroundStyle(Palette.textSecondary)
+                            AlsoOnLine(text: model.copies?.alsoLine)
                             FlowLayout(spacing: 4) { ForEach(movie.tags, id: \.self) { Tag($0) } }
                         }
                         VStack(alignment: .leading, spacing: 22) {
@@ -152,6 +154,7 @@ private struct MovieView: View {
                     .scaledFont(13)
                     .foregroundStyle(Palette.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
+                AlsoOnLine(text: model.copies?.alsoLine)
                 if !movie.tags.isEmpty {
                     FlowLayout(spacing: 4) { ForEach(movie.tags, id: \.self) { Tag($0) } }
                         .accessibilityElement(children: .combine)
@@ -185,6 +188,7 @@ private struct MovieView: View {
                     ForEach(movie.tags, id: \.self) { Tag($0) }
                 }
                 .accessibilityElement(children: .combine)
+                AlsoOnLine(text: model.copies?.alsoLine)
                 if let download = movie.download { StatusLineView(download.line(), fontSize: 13).frame(maxWidth: 440, alignment: .leading) }
                 if !movie.overview.isEmpty { OverviewText(text: movie.overview, lines: 3, size: 15) }
             }
@@ -238,7 +242,7 @@ private struct MovieView: View {
                 Button { model.play() } label: { Label(model.playLabel, systemImage: "play.fill") }
                     .buttonStyle(PrimaryButtonStyle(height: 46))
             }
-            if model.resumable, let watch = movie.watch {
+            if model.resumable, let watch = model.copies?.latest?.watch ?? movie.watch {
                 ProgressStrip(progress: watch.progress)
                     .clipShape(Capsule())
                     .padding(.horizontal, 2)
@@ -291,17 +295,22 @@ private struct MovieView: View {
         }
     }
 
-    private func versionCards(_ movie: MovieDetail, tiled: Bool = false) -> some View {
-        ForEach(movie.versions) { version in
-            VersionCard(
-                version: version,
-                planLine: model.planLine(for: version),
-                isDefault: model.isDefault(version),
-                selected: movie.versions.count > 1 && model.selectedVersion?.id == version.id,
-                tiled: tiled,
-                onSelect: { model.select(version) },
-                onPlay: { model.play(version) }
-            )
+    @ViewBuilder private func versionCards(_ movie: MovieDetail, tiled: Bool = false) -> some View {
+        if model.offersCopies, let copies = model.copies {
+            // On two servers or more: every copy, grouped by server, each with the person's place there and Play this.
+            CopyGroups(copies: copies, tiled: tiled, planLine: { model.planLine(for: $0) }, choose: { model.choose($0) }, play: { model.play($0) })
+        } else {
+            ForEach(movie.versions) { version in
+                VersionCard(
+                    version: version,
+                    planLine: model.planLine(for: version),
+                    isDefault: model.isDefault(version),
+                    selected: movie.versions.count > 1 && model.selectedVersion?.id == version.id,
+                    tiled: tiled,
+                    onSelect: { model.select(version) },
+                    onPlay: { model.play(version) }
+                )
+            }
         }
     }
 
@@ -343,7 +352,7 @@ private struct MovieView: View {
 
 /// One file of a movie: its title and tags, how it would play here, and
 /// Play this. Tapping the card shows its tracks.
-private struct VersionCard: View {
+struct VersionCard: View {
     let version: MediaVersion
     let planLine: String
     let isDefault: Bool

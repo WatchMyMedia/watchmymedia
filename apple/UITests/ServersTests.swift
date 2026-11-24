@@ -7,9 +7,10 @@ import UIKit
 /// opens from the account button (a sheet on iPhone, a popover on iPad) and
 /// switches; a server that doesn't answer says so with Try again and Watch
 /// its downloads; Add a server runs to its last step; a server is removed
-/// from its page in Settings; search lists the other servers' titles and
-/// opening one switches to its server; the Downloads list names the other
-/// servers' downloads; and signing out moves to the next server.
+/// from its page in Settings; search lists the other servers' titles, a
+/// title on several once, and opens another server's from there; the
+/// Downloads list names the other servers' downloads; and signing out moves
+/// to the next server.
 final class ServersTests: XCTestCase {
     override func setUp() async throws { continueAfterFailure = false }
 
@@ -310,18 +311,17 @@ final class ServersTests: XCTestCase {
     // MARK: Search
 
     @MainActor
-    func testSearchListsEveryServersTitlesAndOpeningAnothersSwitchesToIt() {
+    func testSearchListsEveryServersTitlesOnceAndOpensAnothersInPlace() {
         let app = launch(["-tab", "search", "-search", "harbor"])
         defer { app.terminate() }
-        // Living room server's Harbor Lights, with no server named; Cabin server's titles name it.
+        // Harbor Lights is on Living room and Cabin: one row, saying so. Cabin server's own titles name it.
         let near = result(app, "/show/100"), far = result(app, "srv-cabin/movie/800")
         XCTAssertTrue(far.waitForExistence(timeout: 20), "Cabin server's Harbor Nights is listed")
         XCTAssertTrue(near.exists)
-        XCTAssertFalse(near.label.contains("server"), near.label)
+        XCTAssertTrue(describes(near, "On Living room and Cabin"), "one row says where it is: \(near.label) / \(near.value ?? "")")
+        XCTAssertFalse(result(app, "srv-cabin/show/701").exists, "and Cabin server's copy has no row of its own")
         XCTAssertTrue(far.label.contains("Harbor Nights"), far.label)
         XCTAssertTrue(describes(far, "On Cabin server"), "a row from another server names it: \(far.label) / \(far.value ?? "")")
-        // The same title on both servers is listed twice.
-        XCTAssertTrue(result(app, "srv-cabin/show/701").exists)
         // Den server didn't answer: one line, with Try again.
         let unlisted = app.descendants(matching: .any)["search-unlisted-srv-den"]
         scroll(app, to: unlisted)
@@ -329,22 +329,19 @@ final class ServersTests: XCTestCase {
         XCTAssertTrue(app.buttons["search-retry-srv-den"].exists)
         shot("Search across servers")
 
-        // Opening Cabin server's result switches to it and opens the title there.
+        // Opening Cabin server's result opens it from there, without switching.
         scroll(app, to: far)
         far.tap()
-        let note = app.descendants(matching: .any)["server-note"]
-        XCTAssertTrue(note.waitForExistence(timeout: 15))
-        XCTAssertEqual(note.label, "Now on Cabin server")
-        XCTAssertTrue(app.staticTexts["Harbor Nights"].firstMatch.waitForExistence(timeout: 20), "its page, on Cabin server")
+        XCTAssertTrue(app.staticTexts["Harbor Nights"].firstMatch.waitForExistence(timeout: 20), "its page, from Cabin server")
         XCTAssertTrue(text(app, "One night on the quay").waitForExistence(timeout: 10), "Cabin server's own film")
-        shot("Another server's title, opened there")
+        XCTAssertFalse(app.descendants(matching: .any)["server-note"].exists, "no switch, so no note")
+        shot("Another server's title, opened in place")
 
-        // Back: Search with the same words, asked again; the rows that name a server are the others now.
+        // Back: the results as they were, still on Living room server.
         app.navigationBars.buttons.firstMatch.tap()
-        let here = result(app, "/movie/800"), there = result(app, "srv-living/show/100")
-        XCTAssertTrue(here.waitForExistence(timeout: 20), "Harbor Nights is this server's now")
-        XCTAssertTrue(there.exists, "Living room server's Harbor Lights names its server")
-        XCTAssertTrue(describes(there, "On Living room server"), "\(there.label) / \(there.value ?? "")")
+        XCTAssertTrue(far.waitForExistence(timeout: 20), "the results are back")
+        XCTAssertTrue(describes(far, "On Cabin server"), "\(far.label) / \(far.value ?? "")")
+        XCTAssertTrue(near.exists)
         let field = app.searchFields.firstMatch
         XCTAssertEqual(field.value as? String, "harbor", "the same words")
     }

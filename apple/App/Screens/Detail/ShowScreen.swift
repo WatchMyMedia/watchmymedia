@@ -34,7 +34,8 @@ struct ShowScreen: View {
             downloadSession: {
                 guard let user = services.auth.user, let server = services.servers.current?.server else { return nil }
                 return "\(server.baseURL.absoluteString)|\(server.id)|\(user.id)"
-            }
+            },
+            oneCard: OneCardContext(services: services, choices: CopyChoices())
         ))
     }
 }
@@ -306,8 +307,8 @@ private struct ShowPageView: View {
 
     /// An episode in the list: its still, "7. The Long Dark" and the card's line.
     private func listRow(_ episode: EpisodeDetail, current: Bool) -> some View {
-        let missing = episode.aired && !episode.hasFile
-        let line = episode.rowCardLine()
+        let missing = episode.aired && !episode.hasFile && model.onlyOn(episode) == nil
+        let line = model.onlyOn(episode).map { OneCardWords.on($0.shortName) } ?? episode.rowCardLine()
         return Button { model.select(episode) } label: {
             HStack(spacing: 12) {
                 episodeStill(episode)
@@ -445,8 +446,21 @@ private struct ShowPageView: View {
             if model.reason == .watchedItAll {
                 Text(watchedItAllLine).scaledFont(14).foregroundStyle(Palette.textSecondary)
             }
-            if episode.hasFile {
+            if let server = model.onlyOn(episode) {
+                // Only another server has it: it plays from there.
+                AlsoOnLine(text: OneCardWords.on(server.name))
+            }
+            if episode.hasFile || model.onlyOn(episode) != nil {
                 buttons(episode, column: column).padding(.top, wide ? 6 : 8)
+                // On two servers or more: the episode's copies, grouped by server.
+                if let copies = model.episodeCopies, copies.onSeveralServers {
+                    VStack(alignment: .leading, spacing: 10) {
+                        DetailHeading(title: "Versions").padding(.top, 4)
+                        CopyGroups(copies: copies, planLine: { $0.label }, choose: { model.choose($0) }, play: { model.play($0) })
+                    }
+                    .padding(.top, 12)
+                    .accessibilityIdentifier("episode-versions")
+                }
             } else if !episode.aired {
                 Label(episode.actions().unavailable ?? "Not aired yet", systemImage: "circle.fill")
                     .labelStyle(DotLabelStyle())
@@ -472,19 +486,20 @@ private struct ShowPageView: View {
             if wide {
                 // On iPad the buttons wrap rather than squeeze, beside a portrait still.
                 FlowLayout(spacing: 10, lineSpacing: 10) {
-                    if episode.playable { play.fixedSize() }
-                    secondaryButtons(episode, actions: actions)
+                    if model.canPlay(episode) { play.fixedSize() }
+                    if episode.playable { secondaryButtons(episode, actions: actions) }
                 }
             } else {
-                if episode.playable { play }
-                HStack(spacing: 8) { secondaryButtons(episode, actions: actions) }
+                if model.canPlay(episode) { play }
+                if episode.playable { HStack(spacing: 8) { secondaryButtons(episode, actions: actions) } }
             }
             if model.offline {
                 Text("Where you leave off and watched marks will reach the server when you’re back online.")
                     .font(.footnote)
                     .foregroundStyle(Palette.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
-            } else if let fileID = episode.fileID {
+            } else if let fileID = episode.fileID, services.scope == nil {
+                // Downloads are the server in use's: another server's copy isn't offered.
                 ItemDownloadButton(fileID: fileID) { model.play() }
                     .id(fileID)
                     .frame(maxWidth: wide ? 480 : .infinity)
@@ -716,8 +731,8 @@ private struct ShowPageView: View {
 
     private func card(_ episode: EpisodeDetail, current: Bool) -> some View {
         let width: CGFloat = wide ? 192 : 152, height: CGFloat = wide ? 108 : 86
-        let missing = episode.aired && !episode.hasFile
-        let line = episode.rowCardLine()
+        let missing = episode.aired && !episode.hasFile && model.onlyOn(episode) == nil
+        let line = model.onlyOn(episode).map { OneCardWords.on($0.shortName) } ?? episode.rowCardLine()
         return Button { model.select(episode) } label: {
             VStack(alignment: .leading, spacing: 5) {
                 episodeStill(episode)

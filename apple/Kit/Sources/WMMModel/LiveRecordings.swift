@@ -127,6 +127,19 @@ public struct LiveRecordingMark: Hashable, Sendable {
     }
 }
 
+/// When a programme airs again in the listings: where a repeat that gives
+/// way could be recorded instead (API level 34).
+public struct LiveAiring: Hashable, Sendable {
+    public var channelID: String
+    public var number: String
+    public var channelName: String
+    public var programmeID: String
+    public var start: Date
+    public init(channelID: String, number: String, channelName: String = "", programmeID: String, start: Date) {
+        self.channelID = channelID; self.number = number; self.channelName = channelName; self.programmeID = programmeID; self.start = start
+    }
+}
+
 /// A recording holding the tuners while a clashing one would run.
 public struct LiveRecordingHolder: Hashable, Sendable, Identifiable {
     public var id: String
@@ -138,9 +151,15 @@ public struct LiveRecordingHolder: Hashable, Sendable, Identifiable {
     public var userName: String
     /// Already recording, so it can't give way.
     public var running: Bool
-    public init(id: String, title: String, number: String, channelName: String = "", start: Date, end: Date, userName: String = "", running: Bool = false) {
+    /// A repeat, rather than a new episode; nil when the server doesn't say (below API level 34).
+    public var isRepeat: Bool?
+    /// For a repeat: when it airs again, so it could give way and be recorded then.
+    public var nextAiring: LiveAiring?
+    public init(id: String, title: String, number: String, channelName: String = "", start: Date, end: Date, userName: String = "", running: Bool = false,
+                isRepeat: Bool? = nil, nextAiring: LiveAiring? = nil) {
         self.id = id; self.title = title; self.number = number; self.channelName = channelName
         self.start = start; self.end = end; self.userName = userName; self.running = running
+        self.isRepeat = isRepeat; self.nextAiring = nextAiring
     }
 }
 
@@ -183,13 +202,24 @@ public struct LiveRecording: Hashable, Sendable, Identifiable {
     public var pictureURL: URL?
     /// A clashing recording's holders of the tuners while it would run (API level 19).
     public var conflictsWith: [LiveRecordingHolder]
+    /// The signed-in person has watched it; nil when the server doesn't say (below API level 34).
+    public var watched: Bool?
+    /// How far the signed-in person got, 0–1, while partway; nil otherwise.
+    public var watchProgress: Double?
+    /// A new episode, as the listings had it.
+    public var isNew: Bool?
+    /// A repeat, as the listings had it.
+    public var isRepeat: Bool?
+    /// For a repeat that won't record: when it airs again.
+    public var nextAiring: LiveAiring?
     public init(id: String, ruleID: String? = nil, userID: Int? = nil, userName: String = "", channelID: String,
                 sourceID: String = "", number: String, channelName: String = "", programmeID: String? = nil,
                 title: String, episodeTitle: String? = nil, season: Int? = nil, episode: Int? = nil, start: Date, end: Date,
                 startedAt: Date? = nil, endedAt: Date? = nil, state: LiveRecordingState = .scheduled, reason: String? = nil,
                 series: Bool = false, padBefore: Int = 1, padAfter: Int = 2, bytes: Int64 = 0, gaps: [LiveRecordingGap] = [],
                 mediaFileID: Int? = nil, canCancel: Bool = false, canDelete: Bool = false, pictureURL: URL? = nil,
-                conflictsWith: [LiveRecordingHolder] = []) {
+                conflictsWith: [LiveRecordingHolder] = [], watched: Bool? = nil, watchProgress: Double? = nil, isNew: Bool? = nil,
+                isRepeat: Bool? = nil, nextAiring: LiveAiring? = nil) {
         self.id = id; self.ruleID = ruleID; self.userID = userID; self.userName = userName
         self.channelID = channelID; self.sourceID = sourceID; self.number = number; self.channelName = channelName
         self.programmeID = programmeID; self.title = title; self.episodeTitle = episodeTitle; self.season = season; self.episode = episode
@@ -197,7 +227,11 @@ public struct LiveRecording: Hashable, Sendable, Identifiable {
         self.series = series; self.padBefore = padBefore; self.padAfter = padAfter; self.bytes = bytes; self.gaps = gaps
         self.mediaFileID = mediaFileID; self.canCancel = canCancel; self.canDelete = canDelete; self.pictureURL = pictureURL
         self.conflictsWith = conflictsWith
+        self.watched = watched; self.watchProgress = watchProgress; self.isNew = isNew; self.isRepeat = isRepeat; self.nextAiring = nextAiring
     }
+
+    /// Recorded and not yet watched by the signed-in person, where the server says (API level 34).
+    public var unwatched: Bool { watched == false && [.done, .partial].contains(state) }
     public var mark: LiveRecordingMark { .init(id: id, state: state, series: series, canCancel: canCancel, reason: reason) }
     /// The row's words: "Will record", "Won’t record: Inspector Vane and Conference Football have the tuners", "Not enough free space".
     public var statusTitle: String {

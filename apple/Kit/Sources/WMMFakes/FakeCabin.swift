@@ -5,33 +5,39 @@ import WMMModel
 /// (``FakeServers/cabin``), with a few shows and movies of its own, so a
 /// test or a screenshot can tell whose title it is looking at. Every title
 /// is fictional. Its ids are its own (shows from 700, movies from 800), as
-/// two real servers' ids never stand for each other. Harbor Lights is on
-/// both servers, so a search across them lists it twice.
+/// two real servers' ids never stand for each other. Harbor Lights and
+/// Ninety Fathoms are on both servers (the same TMDB ids as the sample
+/// library's), so they are one card across them; The Harbor Choir is only
+/// here. Cabin has Harbor Lights' season 2 episodes 1 to 3, which Living
+/// room server lacks.
 public enum FakeCabin {
     public static let tvLibrary = 2
     public static let movieLibrary = 1
 
     private struct S {
         var title: String, year: Int, seasons: Int, q: String
-        var isNew = false, watched = false, genres = ["Drama"]
+        var isNew = false, watched = false, genres = ["Drama"], tmdb: Int
     }
 
     private struct M {
         var title: String, year: Int, q: String, released: String
-        var isNew = false, runtime = 108, watched = false, pct: Double? = nil
+        var isNew = false, runtime = 108, watched = false, pct: Double? = nil, tmdb: Int
     }
 
     private static let showRows: [S] = [
-        S(title: "Harbour Run", year: 2024, seasons: 1, q: "1080p", isNew: true),
-        S(title: "Harbor Lights", year: 2022, seasons: 2, q: "1080p", genres: ["Drama", "Crime"]),
-        S(title: "Tideline", year: 2021, seasons: 2, q: "1080p"),
-        S(title: "Lowland Radio", year: 2023, seasons: 2, q: "1080p", isNew: true, genres: ["Comedy"]),
+        S(title: "Harbour Run", year: 2024, seasons: 1, q: "1080p", isNew: true, tmdb: 77_700),
+        S(title: "Harbor Lights", year: 2022, seasons: 2, q: "1080p", genres: ["Drama", "Crime"], tmdb: FakeData.tmdbID(showID: 100)),
+        S(title: "Tideline", year: 2021, seasons: 2, q: "1080p", tmdb: 77_702),
+        S(title: "Lowland Radio", year: 2023, seasons: 2, q: "1080p", isNew: true, genres: ["Comedy"], tmdb: 77_703),
     ]
 
     private static let movieRows: [M] = [
-        M(title: "Harbor Nights", year: 2015, q: "1080p", released: "2015-04-17", pct: 0.42),
-        M(title: "Safe Harbour", year: 1998, q: "1080p", released: "1998-10-02", runtime: 125, watched: true),
-        M(title: "The Ferry Line", year: 2019, q: "720p", released: "2019-06-14", isNew: true),
+        M(title: "Harbor Nights", year: 2015, q: "1080p", released: "2015-04-17", pct: 0.42, tmdb: 88_800),
+        M(title: "Safe Harbour", year: 1998, q: "1080p", released: "1998-10-02", runtime: 125, watched: true, tmdb: 88_801),
+        M(title: "The Ferry Line", year: 2019, q: "720p", released: "2019-06-14", isNew: true, tmdb: 88_802),
+        // On Living room server too (FakeData's movie 502), and further along here.
+        M(title: "Ninety Fathoms", year: 2026, q: "1080p", released: "2026-08-08", runtime: 112, pct: 0.58, tmdb: FakeData.tmdbID(movieID: 502)),
+        M(title: "The Harbor Choir", year: 2022, q: "1080p", released: "2022-05-06", isNew: true, runtime: 101, tmdb: 88_804),
     ]
 
     public static let shows: [BrowseItem] = showRows.enumerated().map { i, s in
@@ -39,7 +45,9 @@ public enum FakeCabin {
             kind: .show, id: 700 + i, libraryID: tvLibrary, title: s.title, year: s.year,
             overview: "With the trawler impounded, the Marsh brothers borrow a boat they can’t afford to lose.",
             genres: s.genres, rating: 7.1 + Double(i) / 10, backdropPath: FakeBackdrops.path(for: s.title), quality: s.q, isNew: s.isNew,
-            subtitle: "\(s.year) · \(plural(s.seasons, "season"))", watched: s.watched, episodeCount: s.seasons * 6
+            subtitle: "\(s.year) · \(plural(s.seasons, "season"))", watched: s.watched, episodeCount: s.seasons * 6, tmdbID: s.tmdb,
+            contentRating: "TV-14", unwatchedCount: s.watched ? 0 : 4, seasonCount: s.seasons,
+            addedAt: Date(timeIntervalSince1970: 1_795_050_000 - Double(i) * 172_800)
         )
     }
 
@@ -48,7 +56,8 @@ public enum FakeCabin {
             kind: .movie, id: 800 + i, libraryID: movieLibrary, title: m.title, year: m.year,
             overview: "One night on the quay, and nobody who was there tells it the same way.",
             genres: ["Drama"], rating: 6.8 + Double(i) / 10, backdropPath: FakeBackdrops.path(for: m.title), quality: m.q, isNew: m.isNew,
-            watched: m.watched, progress: m.pct, runtimeMin: m.runtime, releaseDate: m.released
+            watched: m.watched, progress: m.pct, runtimeMin: m.runtime, releaseDate: m.released, tmdbID: m.tmdb,
+            contentRating: "PG-13", addedAt: Date(timeIntervalSince1970: 1_795_050_000 - Double(i) * 172_800 - 7_200)
         )
     }
 
@@ -106,7 +115,7 @@ public enum FakeCabin {
                 episode.fileID.map { NextUp(episodeID: episode.id, season: episode.season, episode: episode.number, title: episode.title, fileID: $0) }
             },
             cast: [Person(name: "Odile Marsh", role: "Inés"), Person(name: "Corin Vale", role: "Tam Marsh")],
-            contentRating: "TV-14"
+            contentRating: "TV-14", tmdbID: s.tmdbID
         )
     }
 
@@ -135,7 +144,7 @@ public enum FakeCabin {
             cast: [Person(name: "Odile Marsh", role: "The harbourmaster"), Person(name: "Corin Vale", role: "Lew")],
             watch: m.progress.map { WatchProgress(positionMs: Int($0 * Double(runtime * 60_000)), durationMs: runtime * 60_000, completed: false) }
                 ?? (m.watched ? WatchProgress(positionMs: 0, durationMs: runtime * 60_000, completed: true) : nil),
-            contentRating: "PG-13"
+            contentRating: "PG-13", tmdbID: m.tmdbID
         )
     }
 
@@ -147,15 +156,14 @@ public enum FakeCabin {
             return EpisodeCard(
                 episodeID: episode.id, showID: showID, showTitle: show.title, season: season, episode: number, title: episode.title,
                 overview: episode.overview, airDate: episode.airDate, showBackdropPath: show.backdropPath,
-                hasFile: episode.hasFile, fileID: episode.fileID, isNew: isNew, watched: episode.watched
+                hasFile: episode.hasFile, fileID: episode.fileID, isNew: isNew, watched: episode.watched, showTMDBID: show.tmdbID,
+                addedAt: parseDay(episode.airDate)?.addingTimeInterval(20 * 3600), runtimeMin: episode.runtimeMin
             )
         }
     }
 
     public static func home(now: Date = .now) -> HomeData {
         let harbourRun = shows[0]
-        let nights = movies[0]
-        let tideline = episodeRows(showID: 702, number: 2)[2]
         return HomeData(
             hero: Hero(
                 kind: .episode, kicker: "New episode · aired Tuesday", title: harbourRun.title, facts: "S01 E04 · Slack Water · 48 min",
@@ -163,10 +171,7 @@ public enum FakeCabin {
                 backdropPath: harbourRun.backdropPath,
                 showID: harbourRun.id, episodeID: harbourRun.id * 1000 + 14, fileID: fileID(episodeID: harbourRun.id * 1000 + 14), contentRating: "TV-14", quality: "1080p", hdr: false
             ),
-            continueWatching: [
-                ContinueItem(kind: .movie, title: nights.title, backdropPath: nights.backdropPath, fileID: fileID(movieID: nights.id), movieID: nights.id, positionMs: 46 * 60_000, durationMs: 108 * 60_000),
-                ContinueItem(kind: .episode, title: "Tideline", subtitle: "S02 E03 · Borrowed Boat", backdropPath: FakeBackdrops.path(for: "Tideline"), fileID: fileID(episodeID: tideline.id), showID: 702, episodeID: tideline.id, season: 2, episode: 3, positionMs: 28 * 60_000, durationMs: 47 * 60_000),
-            ],
+            continueWatching: continueWatching(now: now),
             recentlyAddedShows: shows.enumerated().map { i, s in
                 var c = s
                 c.subtitle = ["S01 E04 · Tuesday", "Season 2 · 3 days ago", "S02 E04 · 4 days ago", "S02 E04 · 5 days ago"][i % 4]
@@ -184,6 +189,23 @@ public enum FakeCabin {
             movieLibraryID: movieLibrary,
             tvLibraryID: tvLibrary
         )
+    }
+
+    /// Cabin's Continue watching, each with when it was last played, so
+    /// Home orders every server's by it: Ninety Fathoms (further here than
+    /// on Living room server), Harbor Nights and Tideline.
+    public static func continueWatching(now: Date = .now) -> [ContinueItem] {
+        let nights = movies[0], fathoms = movies[3]
+        let tideline = episodeRows(showID: 702, number: 2)[2]
+        return [
+            ContinueItem(kind: .movie, title: fathoms.title, backdropPath: fathoms.backdropPath, fileID: fileID(movieID: fathoms.id), movieID: fathoms.id,
+                         positionMs: 65 * 60_000, durationMs: 112 * 60_000, tmdbID: fathoms.tmdbID, updatedAt: now.addingTimeInterval(-3_600), contentRating: "PG-13"),
+            ContinueItem(kind: .movie, title: nights.title, backdropPath: nights.backdropPath, fileID: fileID(movieID: nights.id), movieID: nights.id,
+                         positionMs: 46 * 60_000, durationMs: 108 * 60_000, tmdbID: nights.tmdbID, updatedAt: now.addingTimeInterval(-26 * 3_600), contentRating: "PG-13"),
+            ContinueItem(kind: .episode, title: "Tideline", subtitle: "S02 E03 · Borrowed Boat", backdropPath: FakeBackdrops.path(for: "Tideline"), fileID: fileID(episodeID: tideline.id),
+                         showID: 702, episodeID: tideline.id, season: 2, episode: 3, positionMs: 28 * 60_000, durationMs: 47 * 60_000,
+                         tmdbID: shows[2].tmdbID, updatedAt: now.addingTimeInterval(-50 * 3_600), contentRating: "TV-14"),
+        ]
     }
 
     public static func search(_ text: String) -> SearchResults {
