@@ -14,7 +14,8 @@ export function keptChoices(serverId: string, libraryId: number, storage: Pick<S
     const raw = storage?.getItem(key(serverId, libraryId))
     if (!raw) return DEFAULT_CHOICES
     const v = JSON.parse(raw) as Record<string, unknown>
-    return choicesFrom({ sort: str(v.sort), filter: str(v.filter), genre: str(v.genre), decade: typeof v.decade === 'number' ? v.decade : undefined })
+    // `filter` is how a TV kept its one filter before API level 34's filters combined.
+    return choicesFrom({ sort: str(v.sort), filter: str(v.filter), filters: Array.isArray(v.filters) ? v.filters : undefined, genre: str(v.genre), decade: typeof v.decade === 'number' ? v.decade : undefined, rating: str(v.rating) })
   } catch {
     return DEFAULT_CHOICES
   }

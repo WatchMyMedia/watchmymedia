@@ -28,10 +28,14 @@ const iso = (offsetDays: number) => new Date(now + offsetDays * DAY).toISOString
 const day = (offsetDays: number) => iso(offsetDays).slice(0, 10)
 const GB = 1024 ** 3
 
+// Each with a made-up TMDB person id, but the last: a credit the server hasn't matched to a person yet, as after an upgrade.
 const CAST: Credit[] = [
-  { name: 'Ida Markham', character: 'Nell Kerr' }, { name: 'Tomas Reyes', character: 'Aldo' }, { name: 'June Okafor', character: 'Harbourmaster' },
-  { name: 'Piet Lindqvist', character: 'The buyer' }, { name: 'Rosa Bell', character: 'Coastguard' }, { name: 'Wren Adeyemi', character: 'Diver' },
+  { personId: 70_001, name: 'Ida Markham', character: 'Nell Kerr' }, { personId: 70_002, name: 'Tomas Reyes', character: 'Aldo' }, { personId: 70_003, name: 'June Okafor', character: 'Harbourmaster' },
+  { personId: 70_004, name: 'Piet Lindqvist', character: 'The buyer' }, { personId: 70_005, name: 'Rosa Bell', character: 'Coastguard' }, { name: 'Wren Adeyemi', character: 'Diver' },
 ]
+
+/** A movie's billed cast, as its page lists it. */
+const movieCast = (base: number, index: number) => (base === 102 ? CAST : CAST.slice(index % 3, index % 3 + 4))
 
 function fileDetail(id: number, relativePath: string, over: Partial<MediaFileDetail>): MediaFileDetail {
   return {
@@ -83,7 +87,7 @@ function movieDetail(item: BrowseItem, index: number): MovieDetail {
     overview: base === 102 ? 'A salvage diver takes a cash job to raise a yacht that sank in calm water, and finds the manifest was written after it went down.' : item.overview,
     genres: base === 102 ? ['Thriller'] : item.genres, runtimeMin: runtime, contentRating: index % 3 === 0 ? 'R' : 'PG-13', rating: base === 102 ? 7.6 : item.rating,
     quality: base === 102 ? '4K' : '1080p', hdr: base === 102, files: versions, fileCount: versions.length, totalSize: versions.reduce((n, v) => n + v.size, 0),
-    credits: base === 102 ? CAST : CAST.slice(index % 3, index % 3 + 4), trailers, managedBy: 'Radarr',
+    credits: movieCast(base, index), trailers, managedBy: 'Radarr',
     watch: watchOf(`movie:${item.id}`, versions[0].id, runtime * 60_000),
   }
 }
@@ -248,6 +252,16 @@ export function registerDetails(server: FakeServer, mode = '', titles?: Readonly
   server.route('GET', '/api/movies/:id', ({ params }) => {
     const found = findMovie(Number(params.id))
     return found ? named(movieDetail(found.item, found.index)) : problem(404, 'no such movie')
+  })
+  // A cast member's titles (API level 34): the movies and shows whose cast lists them, with the part they played.
+  server.route('GET', '/api/people/:id', ({ params }) => {
+    const personId = Number(params.id)
+    const person = CAST.find((c) => c.personId === personId)
+    if (!person) return problem(404, 'no such person')
+    const movies = MOVIE_ITEMS.map((m, i) => ({ m, i })).filter(({ m, i }) => movieCast(m.id % 1000, i).some((c) => c.personId === personId))
+      .map(({ m }) => ({ ...named(withWatch(m)), character: person.character }))
+    const shows = SHOW_ITEMS.slice(0, personId % 2 ? 2 : 1).map((x) => ({ ...named(x), character: person.character }))
+    return { personId, name: person.name, movies, shows }
   })
   server.route('GET', '/api/movies/:id/related', ({ params }) => {
     const id = Number(params.id)

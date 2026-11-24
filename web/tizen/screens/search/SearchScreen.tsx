@@ -7,9 +7,8 @@ import { searchTerm } from '../../../src/lib/liveReminders'
 import { isOn, progress } from '../../../src/lib/liveGuide'
 import { SUGGEST_DELAY_MS, SUGGEST_MIN_CHARS } from '../../../src/lib/searchSuggestions'
 import { nearest } from '../../app/geometry'
-import { useApp, useAppState, useBack, useEntry, useFocus, useHold, useKeys, useMediaUrls, useNav, useSession } from '../../app/hooks'
-import { leftOutReason, otherServers, serversLeftOut, type LeftOut, type PeerServer } from '../../session/peers'
-import type { OpenTarget } from '../../session/session'
+import { useApp, useAppState, useBack, useEntry, useFocus, useHold, useKeys, useLevel34, useMediaUrls, useNav, usePeers, useSession } from '../../app/hooks'
+import { leftOutReason, serversLeftOut, type LeftOut, type PeerServer } from '../../session/peers'
 import { Button } from '../../ui/Button'
 import { Card } from '../../ui/Card'
 import { Icon } from '../../ui/Icon'
@@ -18,7 +17,7 @@ import { TextField } from '../../ui/TextField'
 import { problemWords } from '../../ui/problemWords'
 import { placeholderTone } from '../../ui/tones'
 import { RequestDialog, type RequestTarget } from '../requests/RequestDialog'
-import { CrossSearch, CURRENT, mergeResults, noneAnswered, resultKey, searchLines, SERVER_MS, type Tagged } from './crossSearch'
+import { CrossSearch, CURRENT, mergeResults, noneAnswered, resultKey, searchLines, SERVER_MS, serversLine, type Tagged } from './crossSearch'
 import { keepSearch, keptSearch, searchScope } from './keptSearch'
 import { Keyboard } from './OnScreenKeyboard'
 import { readRecent, recentScope, rememberSearch } from './recentSearches'
@@ -41,13 +40,15 @@ const BOTTOM_KEYS = new Set(['key/space', 'key/delete', 'key/clear', 'key/tv'])
 
 /**
  * The other servers this TV is signed in to, asked for this visit to
- * Search: each through a client of its own, never the session's. Their
- * pictures come with their own media tokens, drawn as those arrive.
+ * Search: each through a client of its own, never the session's, kept for
+ * the session (so each is asked which server it is once). Their pictures
+ * come with their own media tokens, drawn as those arrive.
  */
 function useOtherServers(): { peers: PeerServer[]; cross: CrossSearch; leftOut: LeftOut[] } {
   const app = useApp()
+  const known = usePeers()
   const [made] = useState(() => {
-    const peers = otherServers(app)
+    const peers = known
     return {
       peers, cross: new CrossSearch(peers, leftOutReason),
       // The servers a search doesn't ask get a line each, but only beside servers that are asked.
@@ -57,10 +58,7 @@ function useOtherServers(): { peers: PeerServer[]; cross: CrossSearch; leftOut: 
     }
   })
   useSyncExternalStore(made.subscribe, made.version)
-  useEffect(() => () => {
-    made.cross.stop()
-    for (const p of made.peers) p.stop()
-  }, [made])
+  useEffect(() => () => { made.cross.stop() }, [made])
   return made
 }
 
@@ -115,8 +113,8 @@ function NotInLibraryCard({ item, focusId, onPress }: { item: Requestable; focus
 }
 
 /** The library's best match: its picture with your place in it, what it is, and Resume (when you are partway) and Open. */
-function BestMatch({ title, line, place, progressOf, image, onResume, onOpen }: {
-  title: string; line: string; place?: string; progressOf?: number; image?: string; onResume?: () => void; onOpen(): void
+function BestMatch({ title, line, servers, place, progressOf, image, onResume, onOpen }: {
+  title: string; line: string; servers?: string; place?: string; progressOf?: number; image?: string; onResume?: () => void; onOpen(): void
 }) {
   return <section className="search-best" data-vitem aria-label="Best match">
     <h2 className="search-label">Best match</h2>
@@ -128,6 +126,7 @@ function BestMatch({ title, line, place, progressOf, image, onResume, onOpen }: 
       </span>
       <div className="search-best__text">
         <h3 className="tv-head tv-cut">{title}</h3>
+        {servers && <p className="search-best__servers">{servers}</p>}
         <p className="search-best__line">{line}</p>
         {place && <p className="search-best__place">{place}</p>}
         <div className="tv-actions search-best__actions" data-edge>
@@ -172,7 +171,6 @@ function AskFeature({ item, onPress }: { item: Requestable; onPress(): void }) {
  * and Return go back to the keyboard, on the key used last.
  */
 export function SearchScreen() {
-  const app = useApp()
   const appState = useAppState()
   const session = useSession()
   const entry = useEntry()
@@ -243,7 +241,8 @@ export function SearchScreen() {
 
   // The current server's results first; each other server's after them, as mergeResults orders them.
   const results = searching && !currentFailed ? library.data : undefined
-  const merged = mergeResults(results, searching && (currentIn || currentFailed || library.isError), searching ? parts : [])
+  const oneCard = useLevel34()
+  const merged = mergeResults(results, searching && (currentIn || currentFailed || library.isError), searching ? parts : [], oneCard)
   const { shows, movies, episodes } = merged
   const best = searching ? bestMatch(shows, movies, q) : undefined
   const place = placeIn(best, continueItems(home.data))
@@ -320,35 +319,30 @@ export function SearchScreen() {
     if (act?.kind === 'request') setAsking({ kind: r.mediaType, tmdbId: r.tmdbId, title: r.title })
     else if (act) nav.push({ name: act.kind, id: act.id })
   }
-  // A result on another server: its pictures come from that server, and OK switches the app to it, then opens the title there.
+  // A result on another server: its pictures come from that server, and OK opens the title in place, from that
+  // server, without switching the app; Return comes back here. A title the current server has opens from it.
   const mediaOf = (t: Tagged<unknown>) => t.server ? peers.find((p) => p.id === t.server?.id)?.media : media
-  const openOn = (server: { id: string }, target: OpenTarget) => {
-    const info = peers.find((p) => p.id === server.id)?.info
-    used()
-    void app.switchTo(server.id, { ...(info ? { info } : {}), open: { text: text.trim(), target } })
-  }
+  const on = (t: Tagged<unknown>) => (t.server ? { server: t.server.id } : {})
   const openTitle = (t: Title) => {
-    const target: OpenTarget = t.kind === 'show' ? { kind: 'show', id: t.tagged.item.id } : { kind: 'movie', id: t.tagged.item.id }
-    if (t.tagged.server) { openOn(t.tagged.server, target); return }
     used()
-    nav.push(t.kind === 'show' ? { name: 'show', id: t.tagged.item.id } : { name: 'movie', id: t.tagged.item.id })
+    nav.push(t.kind === 'show' ? { name: 'show', id: t.tagged.item.id, ...on(t.tagged) } : { name: 'movie', id: t.tagged.item.id, ...on(t.tagged) })
   }
   const titleCard = (t: Title, id: string) => {
     const item = t.tagged.item
-    return <Card id={id} variant="poster" title={item.title} server={t.tagged.server?.name} subtitle={kindLine(t.kind, t.kind === 'show' ? { year: item.year, episodeCount: (item as Show).episodeCount } : { year: item.year })}
+    return <Card id={id} variant="poster" title={item.title} server={serversLine(t.tagged, session.server.name)} subtitle={kindLine(t.kind, t.kind === 'show' ? { year: item.year, episodeCount: (item as Show).episodeCount } : { year: item.year })}
       image={mediaOf(t.tagged)?.imageUrl(item.posterPath, 'w342')} onPress={() => openTitle(t)}/>
   }
   const episodeCard = (t: Tagged<SearchEpisode>, id: string) => {
     const e = t.item
     const open = () => {
-      if (t.server) { openOn(t.server, { kind: 'show', id: e.showId, season: e.seasonNumber, episodeId: e.id }); return }
       used()
-      nav.push({ name: 'show', id: e.showId, season: e.seasonNumber, episodeId: e.id })
+      nav.push({ name: 'show', id: e.showId, season: e.seasonNumber, episodeId: e.id, ...on(t) })
     }
-    // Hold OK plays an episode on this server, as a shortcut; on another it opens there first, as OK does.
-    return <Card id={id} variant="episode" title={e.showTitle} server={t.server?.name} subtitle={episodeSub(e)} image={mediaOf(t)?.imageUrl(e.stillPath ?? e.showPosterPath, 'w780')}
-      label={`${e.showTitle}, season ${e.seasonNumber} episode ${e.number}, ${e.title}${t.server ? `, on ${t.server.name}` : ''}`}
-      onPress={open} onHold={t.server ? open : () => { used(); nav.play({ kind: 'file', fileId: e.fileId, title: e.showTitle, subtitle: episodeSub(e) }) }}/>
+    // Hold OK plays the episode, as a shortcut: from the server it is drawn from, which keeps its place.
+    const line = serversLine(t, session.server.name)
+    return <Card id={id} variant="episode" title={e.showTitle} server={line} subtitle={episodeSub(e)} image={mediaOf(t)?.imageUrl(e.stillPath ?? e.showPosterPath, 'w780')}
+      label={`${e.showTitle}, season ${e.seasonNumber} episode ${e.number}, ${e.title}${line ? `, ${line.startsWith('On ') ? line.toLowerCase() : `on ${line}`}` : ''}`}
+      onPress={open} onHold={() => { used(); nav.play({ kind: 'file', fileId: e.fileId, title: e.showTitle, subtitle: episodeSub(e), ...on(t) }) }}/>
   }
   // Try again keeps its line, and focus on it, while the server is asked: it stays if the server fails again.
   const askAgain = (id: string) => {
@@ -397,7 +391,7 @@ export function SearchScreen() {
           <p>{problemWords(library.error ?? new DOMException('The server took too long', 'TimeoutError')).body}</p></div>}
         {nothing && <div className="search-none" data-vitem role="status"><h2 className="tv-head">{none.title}</h2>{none.body && <p>{none.body}</p>}</div>}
 
-        {best && bestItem && <BestMatch title={bestItem.title}
+        {best && bestItem && <BestMatch title={bestItem.title} servers={best.also ? serversLine({ also: best.also }, session.server.name) : undefined}
           line={kindLine(best.kind, best.kind === 'show' ? { year: bestItem.year, episodeCount: (bestItem as Show).episodeCount } : { year: bestItem.year })}
           place={place?.line} progressOf={place && place.item.durationMs ? place.item.positionMs / place.item.durationMs : undefined}
           image={media.imageUrl(place?.item.stillPath ?? bestItem.backdropPath, 'w780')}

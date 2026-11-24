@@ -11,6 +11,12 @@ export type ClientOptions = {
   timeoutMs?: number
   /** Stands in for the global fetch (tests); by default the global one, looked up per request. */
   fetch?: typeof fetch
+  /**
+   * Awaited before the sign-in goes on any request, and the request fails
+   * with what it throws: for a server that isn't the current one, the check
+   * that it is the server remembered at its address (`PeerServer`).
+   */
+  beforeSignIn?: (signal: AbortSignal) => Promise<void>
 }
 
 /** Routes whose 401 is an answer about signing in, not a lost session. */
@@ -23,12 +29,13 @@ const SIGN_IN = /^\/api\/auth\/(login|pair)/
  * openapi-fetch client type as the web app's, so `setApiClient` can hand it to
  * the web's query options.
  */
-export function bearerClient(baseUrl: string, { token, onUnauthorized, timeoutMs = 20_000, fetch: fetcher }: ClientOptions = {}): ApiClient {
+export function bearerClient(baseUrl: string, { token, onUnauthorized, timeoutMs = 20_000, fetch: fetcher, beforeSignIn }: ClientOptions = {}): ApiClient {
   const timers = new WeakMap<Request, ReturnType<typeof setTimeout>>()
   // fetch is looked up per request, so the browser preview's fakes and tests can stand in for it.
   const client = createClient<paths>({ baseUrl, credentials: 'omit', fetch: (request) => (fetcher ?? fetch)(request) })
   client.use({
-    onRequest({ request }) {
+    async onRequest({ request }) {
+      if (token && beforeSignIn) await beforeSignIn(request.signal)
       if (token) request.headers.set('Authorization', `Bearer ${token}`)
       const controller = new AbortController()
       const abort = () => controller.abort()

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { airedDay, cardPanel, panelHint } from './cardPanel'
-import { channelCard, holdWords, itemActions, posterLine, rowCards, rowHeading, rowVariant, seeAllRoute, spacedCode, timeLeft, type RowContext } from './rowCards'
+import { channelCard, continueCard, holdHint, holdWords, itemActions, posterLine, rowCards, rowHeading, rowVariant, seeAllRoute, spacedCode, timeLeft, type RowContext } from './rowCards'
 import { channel, episode, item, libraries, resume, row } from './testData'
 
 const NOW = Date.UTC(2026, 10, 19, 20, 30)
@@ -170,5 +170,20 @@ describe('the panel over a row screen', () => {
     const card = rowCards(row(), ctx())[0]
     expect(panelHint('movie', card, true)).toBe('opens the movie · hold OK marks it watched · ▶ more in this row · ◀ menu · ▼ next row')
     expect(panelHint('show', undefined, false)).toBe('opens the show · ◀ ▶ more in this row · ▼ next row')
+  })
+})
+
+describe('a Continue watching card', () => {
+  const movie = { kind: 'movie', title: 'Low Water', fileId: 11, movieId: 4, positionMs: 30 * 60_000, durationMs: 90 * 60_000, updatedAt: '2026-11-20T00:00:00Z' } as const
+
+  it('resumes on OK and opens its page on Hold OK below API level 34', () => {
+    const card = continueCard(movie)
+    expect(card.press).toMatchObject({ kind: 'play', request: { kind: 'file', fileId: 11, startMs: 30 * 60_000 } })
+    expect(card.hold).toEqual({ kind: 'open', route: { name: 'movie', id: 4 } })
+  })
+
+  it('opens its actions on Hold OK from level 34, Remove from Continue watching among them', () => {
+    expect(continueCard(movie, true).hold).toEqual({ kind: 'continueMenu', item: movie })
+    expect(holdHint(continueCard(movie, true).hold)).toBe('Its menu')
   })
 })

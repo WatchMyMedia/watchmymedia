@@ -36,6 +36,7 @@ export class ActiveSession {
   private attached = false
   private online = true
   private onlineListeners = new Set<() => void>()
+  private endings = new Set<() => void>()
   /** A number per session, so the shell starts afresh for each one. */
   readonly serial = ++serials
 
@@ -113,10 +114,18 @@ export class ActiveSession {
     this.events.start()
   }
 
+  /** Calls `fn` once when this session ends here (what it kept for other servers stops with it). */
+  onDetach(fn: () => void): () => void {
+    this.endings.add(fn)
+    return () => { this.endings.delete(fn) }
+  }
+
   /** Ends this session here: closes the stream, drops the cache and the token. Does not sign out on the server. */
   detach() {
     if (this.ended) return
     this.ended = true
+    for (const fn of this.endings) fn()
+    this.endings.clear()
     this.events.stop()
     this.tokens.stop()
     this.listeners.clear()

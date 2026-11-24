@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useNav, usePlayer } from '../../app/hooks'
+import { useNav, usePlayer, useSource } from '../../app/hooks'
 import type { ScreenProps } from '../../app/routes'
 import { ProblemScreen } from '../../ui/States'
 import { YouTubeTrailerScreen } from '../details/YouTubeTrailerScreen'
@@ -24,11 +24,17 @@ function FilePlayerScreen({ route }: ScreenProps<'player'>) {
   const nav = useNav()
   const player = usePlayer()
   const request = useMemo(() => fileRequest(route.play), [route.play])
+  const source = useSource(route.play.kind === 'file' ? route.play.server : undefined)
+  if (source === 'gone') {
+    return <ProblemScreen icon="alert" title="This copy’s server isn’t here any more" actions={[{ id: 'back', label: 'Back', onPress: () => nav.back() }]}>
+      This TV is no longer signed in to the server it’s on.
+    </ProblemScreen>
+  }
   if (!player || !request) {
     return <ProblemScreen icon="alert" title={player ? 'This can’t play here' : 'Playing needs the TV'}
       actions={[{ id: 'back', label: 'Back', onPress: () => nav.back() }]}>
       {player ? 'There is no file to play for this.' : 'This browser has no Samsung player. Open WatchMyMedia on the TV to watch.'}
     </ProblemScreen>
   }
-  return <FilePlayer play={route.play} request={request} player={player}/>
+  return <FilePlayer play={route.play} request={request} player={player} source={source}/>
 }
