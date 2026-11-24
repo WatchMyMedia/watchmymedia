@@ -71,6 +71,10 @@ import WMMModel
         #expect(listing.movies.map(\.title) == ["Harbor Nights", "The Harbor Choir"])
         #expect(listing.movies.map(\.server) == [cabin, cabin])
         #expect(model.whereLine(listing.movies[0]) == "Cabin server", "a title only another server has names it")
+        // Read out once, whichever: VoiceOver read "On On Living room and Cabin" on iPhone.
+        #expect(model.whereSpoken(listing.shows[0]) == "On Living room and Cabin")
+        #expect(model.whereSpoken(listing.movies[0]) == "On Cabin server")
+        #expect(model.whereSpoken(listing.episodes.first!) == nil, "the server in use's alone says nothing")
         #expect(listing.episodes.first?.server == nil)
         #expect(listing.episodes.last?.server == cabin)
         #expect(model.results?.shows.map(\.title) == ["Harbor Lights"], "the server in use's own are kept apart, for marking watched")

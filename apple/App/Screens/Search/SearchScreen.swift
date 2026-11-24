@@ -314,11 +314,11 @@ private struct SearchView: View {
                                     .foregroundStyle(Palette.muted)
                                 // The server it is on, when that isn't the one in use.
                                 // Where it is: "On Home and Cabin" for one on several servers, a server's name for one only it has.
-                                if let line = model.whereLine(found) { ServerLabel(name: line) }
+                                if let line = model.whereLine(found) { ServerLabel(name: line, spoken: model.whereSpoken(found) ?? line) }
                             }
                         }
                         .buttonStyle(CardButtonStyle())
-                        .accessibilityValue(model.whereLine(found).map { found.alsoOn.isEmpty ? "On \($0)" : $0 } ?? "")
+                        .accessibilityValue(model.whereSpoken(found) ?? "")
                         .accessibilityIdentifier("search-result-\(found.id)")
                         .contextMenu {
                             // Marking watched stays the server in use's.
@@ -360,7 +360,7 @@ private struct SearchView: View {
 
     private func itemRow(_ found: FoundTitle, first: Bool) -> some View {
         Button { model.open(found) } label: {
-            ResultRow(title: found.title, line: found.item.searchLine, server: model.whereLine(found)) {
+            ResultRow(title: found.title, line: found.item.searchLine, server: model.whereLine(found), spoken: model.whereSpoken(found)) {
                 Artwork(url: services.library.imageURL(found.posterPath, size: .w185, on: found.server), seed: found.title, maxPixel: 200)
                     .frame(width: wide ? 48 : 44, height: wide ? 72 : 66)
                     .overlay { if found.watched { WatchedCheck(size: 16).pinned(.bottomTrailing, padding: 4) } }
@@ -382,7 +382,7 @@ private struct SearchView: View {
     private func episodeRow(_ found: FoundEpisode, first: Bool) -> some View {
         let episode = found.episode
         return Button { model.open(found) } label: {
-            ResultRow(title: episode.title, line: episode.searchLine(), server: model.whereLine(found)) {
+            ResultRow(title: episode.title, line: episode.searchLine(), server: model.whereLine(found), spoken: model.whereSpoken(found)) {
                 Group {
                     if episode.hasFile {
                         Artwork(url: services.library.imageURL(episode.stillPath ?? episode.showBackdropPath, size: .w300, on: found.server), seed: episode.showTitle, maxPixel: 300)
@@ -416,10 +416,12 @@ private struct SearchView: View {
     }
 }
 
-/// The name of the server a result is on, when that isn't the one in use: a
-/// small label at the end of its row, or under its poster.
+/// Where a result is, when that isn't the server in use alone: a small
+/// label at the end of its row, or under its poster. `spoken` is what
+/// VoiceOver reads ("On Cabin server").
 private struct ServerLabel: View {
     let name: String
+    let spoken: String
 
     var body: some View {
         Text(name)
@@ -430,7 +432,7 @@ private struct ServerLabel: View {
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Palette.outlineStrong))
-            .accessibilityLabel("On \(name)")
+            .accessibilityLabel(spoken)
     }
 }
 
@@ -467,6 +469,8 @@ private struct ResultRow<Art: View>: View {
     let title: String
     let line: String
     var server: String?
+    /// What VoiceOver reads of `server`.
+    var spoken: String?
     @ViewBuilder var art: () -> Art
 
     private var lines: some View {
@@ -486,11 +490,11 @@ private struct ResultRow<Art: View>: View {
                     HStack(spacing: 12) {
                         lines.fixedSize(horizontal: true, vertical: false)
                         Spacer(minLength: 0)
-                        ServerLabel(name: server)
+                        ServerLabel(name: server, spoken: spoken ?? server)
                     }
                     VStack(alignment: .leading, spacing: 4) {
                         lines
-                        ServerLabel(name: server)
+                        ServerLabel(name: server, spoken: spoken ?? server)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }

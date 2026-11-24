@@ -316,6 +316,17 @@ public final class SearchModel {
 
     public func whereLine(_ found: FoundEpisode) -> String? { whereLine(found.server, alsoOn: found.alsoOn) }
 
+    /// What VoiceOver reads of where a result is: "On Cabin server" for one
+    /// only another server has, "On Living room and Cabin" for one on
+    /// several; nil for the server in use's alone.
+    public func whereSpoken(_ found: FoundTitle) -> String? { spoken(whereLine(found), alsoOn: found.alsoOn) }
+
+    public func whereSpoken(_ found: FoundEpisode) -> String? { spoken(whereLine(found), alsoOn: found.alsoOn) }
+
+    private func spoken(_ line: String?, alsoOn: [SearchSource]) -> String? {
+        line.map { alsoOn.isEmpty ? "On \($0)" : $0 }
+    }
+
     /// "Still asking Cabin server…", at the end of the list while a server
     /// asked more than ``stillAskingAfter`` ago hasn't answered; nil otherwise.
     public var stillAsking: String? {
