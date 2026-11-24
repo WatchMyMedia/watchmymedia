@@ -46,7 +46,7 @@ and QN90D steps still to do.
   filters and Rated (`gridQuery` sends one filter and no rating below it),
   and recordings' New, watched and time left. The level 34 queries the web
   doesn't use yet are files of their own in `../src/api/` (`people.ts`,
-  `continueWatching.ts`, `libraryItems.ts`), not additions to `queries.ts`.
+  `continueHidden.ts`, `libraryItems.ts`), not additions to `queries.ts`.
 - **The store identity** in `public/config.xml` is permanent: the widget id,
   package id `cPFf0iV3Li` and application id `cPFf0iV3Li.WatchMyMedia` never
   change, and every update is signed with the same Samsung author certificate.

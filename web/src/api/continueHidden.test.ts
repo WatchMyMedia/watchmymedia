@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { components } from './schema'
-import { continueTarget, withoutContinueItem } from './continueWatching'
+import { hiddenTarget, withoutContinueItem } from './continueHidden'
 
 type HomeData = components['schemas']['HomeData']
 type ContinueItem = components['schemas']['ContinueItem']
@@ -11,9 +11,9 @@ const home = { continueWatching: [movie, episode], rows: [{ id: 'continue', styl
 
 describe('Continue watching’s hidden cards', () => {
   it('names a movie by its id and an episode by its own', () => {
-    expect(continueTarget(movie)).toEqual({ type: 'movie', id: 1 })
-    expect(continueTarget(episode)).toEqual({ type: 'episode', id: 7 })
-    expect(continueTarget({ kind: 'episode', showId: 5 } as ContinueItem)).toBeUndefined()
+    expect(hiddenTarget(movie)).toEqual({ type: 'movie', id: 1 })
+    expect(hiddenTarget(episode)).toEqual({ type: 'episode', id: 7 })
+    expect(hiddenTarget({ kind: 'episode', showId: 5 } as ContinueItem)).toBeUndefined()
   })
 
   it('takes a card out of Home’s list and its arranged row, and leaves the other rows', () => {

@@ -10,7 +10,7 @@ import type { components } from './schema'
 export type PersonDetail = components['schemas']['PersonDetail']
 export type PersonTitle = components['schemas']['PersonTitle']
 
-export const personQuery = (personId: number) =>
+export const personTitlesQuery = (personId: number) =>
   queryOptions({
     queryKey: ['person', personId],
     queryFn: async () => unwrap(await api.GET('/api/people/{personId}', { params: { path: { personId } } })),

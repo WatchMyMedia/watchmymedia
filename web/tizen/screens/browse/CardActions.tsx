@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { components } from '../../../src/api/schema'
 import { useMarkWatched } from '../../../src/api/watch'
-import { hideFromContinueWatching, type ContinueTarget } from '../../../src/api/continueWatching'
+import { hideContinueItem, type HiddenTarget } from '../../../src/api/continueHidden'
 import { unwrap } from '../../../src/api/client'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePeers, useSession } from '../../app/hooks'
@@ -59,11 +59,11 @@ export function CardActions({ children, onGrid, onRetry }: { children: ReactNode
   const [menu, setMenu] = useState<BrowseItem>()
   const [continued, setContinued] = useState<TaggedContinue>()
   // Removing a card takes it off every server that has it (one card across servers); each through its own client.
-  const remove = useCallback((item: TaggedContinue, target: ContinueTarget) => {
+  const remove = useCallback((item: TaggedContinue, target: HiddenTarget) => {
     const copies = item.copies ?? [{ server: item.oneCard?.server.id ?? session.server.id, target }]
-    const hide = (server: string, t: ContinueTarget) => {
+    const hide = (server: string, t: HiddenTarget) => {
       const peer = server === session.server.id ? undefined : peers.find((p) => p.id === server)
-      if (!peer) return hideFromContinueWatching(t)
+      if (!peer) return hideContinueItem(t)
       return peer.api.PUT('/api/watch/{type}/{id}/hidden', { params: { path: { type: t.type, id: t.id } } }).then(unwrap)
     }
     void Promise.all(copies.map((c) => hide(c.server, c.target))).then(

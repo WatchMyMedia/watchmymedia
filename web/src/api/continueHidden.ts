@@ -10,21 +10,21 @@ type HomeData = components['schemas']['HomeData']
 type ContinueItem = components['schemas']['ContinueItem']
 
 /** What is hidden: a movie, or an episode (a show's card is its episode). */
-export type ContinueTarget = { type: 'movie' | 'episode'; id: number }
+export type HiddenTarget = { type: 'movie' | 'episode'; id: number }
 
 /** A Continue watching card's target, when it names one. */
-export function continueTarget(item: Pick<ContinueItem, 'kind' | 'movieId' | 'episodeId'>): ContinueTarget | undefined {
+export function hiddenTarget(item: Pick<ContinueItem, 'kind' | 'movieId' | 'episodeId'>): HiddenTarget | undefined {
   if (item.kind === 'movie') return item.movieId !== undefined ? { type: 'movie', id: item.movieId } : undefined
   return item.episodeId !== undefined ? { type: 'episode', id: item.episodeId } : undefined
 }
 
-const same = (item: ContinueItem, t: ContinueTarget) => {
-  const of = continueTarget(item)
+const same = (item: ContinueItem, t: HiddenTarget) => {
+  const of = hiddenTarget(item)
   return !!of && of.type === t.type && of.id === t.id
 }
 
 /** Home's reply without the card, in its own list and in the arranged rows. */
-export function withoutContinueItem(home: HomeData, t: ContinueTarget): HomeData {
+export function withoutContinueItem(home: HomeData, t: HiddenTarget): HomeData {
   return {
     ...home,
     continueWatching: home.continueWatching.filter((c) => !same(c, t)),
@@ -32,10 +32,10 @@ export function withoutContinueItem(home: HomeData, t: ContinueTarget): HomeData
   }
 }
 
-export const hideFromContinueWatching = (t: ContinueTarget) =>
+export const hideContinueItem = (t: HiddenTarget) =>
   api.PUT('/api/watch/{type}/{id}/hidden', { params: { path: { type: t.type, id: t.id } } }).then(unwrap)
 
-export const showInContinueWatching = (t: ContinueTarget) =>
+export const unhideContinueItem = (t: HiddenTarget) =>
   api.DELETE('/api/watch/{type}/{id}/hidden', { params: { path: { type: t.type, id: t.id } } }).then(unwrap)
 
 /**
@@ -43,10 +43,10 @@ export const showInContinueWatching = (t: ContinueTarget) =>
  * loses the card at once and gets it back if the server refuses; Home is
  * asked again either way.
  */
-export function useContinueWatchingHidden() {
+export function useContinueItemHidden() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ target, hidden }: { target: ContinueTarget; hidden: boolean }) => (hidden ? hideFromContinueWatching(target) : showInContinueWatching(target)),
+    mutationFn: ({ target, hidden }: { target: HiddenTarget; hidden: boolean }) => (hidden ? hideContinueItem(target) : unhideContinueItem(target)),
     onMutate: async ({ target, hidden }) => {
       if (!hidden) return undefined
       await qc.cancelQueries({ queryKey: ['home'] })

@@ -1,4 +1,4 @@
-import { continueTarget, type ContinueTarget } from '../../../src/api/continueWatching'
+import { hiddenTarget, type HiddenTarget } from '../../../src/api/continueHidden'
 import type { TaggedContinue } from './oneCardHome'
 import { useNav } from '../../app/hooks'
 import { MorePanel, type MenuItem } from '../details/DetailParts'
@@ -14,10 +14,10 @@ import { resumeLine } from './homePages'
  * `onRemove` (whoever opened it, which stays) sends the removal and says how
  * it went.
  */
-export function ContinueMenu({ item, onRemove, onClose }: { item: TaggedContinue; onRemove(target: ContinueTarget): void; onClose(): void }) {
+export function ContinueMenu({ item, onRemove, onClose }: { item: TaggedContinue; onRemove(target: HiddenTarget): void; onClose(): void }) {
   const nav = useNav()
   const words = continueMenuWords(item)
-  const target = continueTarget(item)
+  const target = hiddenTarget(item)
   // A card from another server plays from there, and its page opens in place when only that server has it.
   const from = item.oneCard ? { server: item.oneCard.server.id } : {}
   const only = item.oneCard?.where === 'only' ? from : {}
