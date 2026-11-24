@@ -127,11 +127,11 @@ describe('a title’s actions', () => {
 })
 
 describe('the panel over a row screen', () => {
-  it('tells the focused card’s kicker, facts, tags and rating', () => {
+  it('tells the focused card’s kicker, facts and rating, and no quality', () => {
     const r = row({ id: 'recentlyAddedShows', title: 'Recently added · TV Shows', items: [item({ kind: 'show', title: 'Harbor Lights', subtitle: 'S03E07', episodeId: 70, seasonNumber: 3, year: 2022, episodeCount: 27, genres: ['Drama', 'Mystery', 'Crime'], quality: '4K', hdr: true, rating: 7.84, backdropPath: '/b.jpg' })] })
     const cards = rowCards(r, ctx())
     expect(cardPanel(r, cards, 0, ctx())).toEqual({
-      kicker: 'Recently added · S03 E07 · added yesterday', title: 'Harbor Lights', facts: ['2022', '27 episodes', 'Drama, Mystery'], tags: ['4K', 'HDR'], rating: '★ 7.8',
+      kicker: 'Recently added · S03 E07 · added yesterday', title: 'Harbor Lights', facts: ['2022', '27 episodes', 'Drama, Mystery'], rating: '★ 7.8',
       overview: '', target: 'episode', picture: '/b.jpg', seed: 'Harbor Lights',
     })
     expect(cardPanel(r, cards, 5, ctx())).toBeUndefined()

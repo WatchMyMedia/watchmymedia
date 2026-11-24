@@ -1,15 +1,15 @@
 import type { components } from '../../../src/api/schema'
 import { formatBytes, knownLanguage, languageName, resolutionLabel } from '../../../src/lib/format'
+import { qualityLine } from '../../../src/lib/titlePage'
 import { codecWords } from '../../player'
-import { channelsText, fileName, movieVersions } from './movieLabels'
+import { channelsText, fileName } from './movieLabels'
 
-// A title's file in words for the people watching: three tags about the
+// A title's file in words for the people watching: one line about the
 // picture and sound, the audio and subtitles line, each version's name and
 // line, and File details, which starts with a sentence on how it plays on
 // this TV and keeps the numbers under it, one press from the first screen.
 
 type MediaFileDetail = components['schemas']['MediaFileDetail']
-type MovieDetail = components['schemas']['MovieDetail']
 type PlaybackPlan = components['schemas']['PlaybackPlan']
 type MediaInfo = components['schemas']['MediaInfo']
 
@@ -58,17 +58,15 @@ export function versionName(f: MediaFileDetail): string {
 }
 
 /**
- * The three words on a title's first screen about its picture and sound,
- * from its default version: "4K", "Dolby Vision", "Surround sound".
- * Nothing about codecs or containers.
+ * The line on a movie's first screen about the picture and sound of the
+ * version Play uses, in the words every app says it: "In 4K with Dolby
+ * Vision and 7.1 sound"; empty when it is nothing past the usual. Codecs
+ * and containers are File details'.
  */
-export function titleTags(m: Pick<MovieDetail, 'quality' | 'hdr' | 'files'>): string[] {
-  const v = movieVersions(m)[0]
-  const { video, audio } = v ? streams(v) : { video: undefined, audio: undefined }
-  const size = m.quality || (v ? resolutionLabel(v.width ?? video?.width, v.height ?? video?.height) : '')
-  const colour = (v && colourWords(v.hdr ?? video?.hdr)) ?? (m.hdr ? 'HDR' : undefined)
-  const surround = audio && (audio.channels ?? 0) > 2 ? 'Surround sound' : undefined
-  return [size, colour, surround].filter((t): t is string => !!t)
+export function titleQuality(v: MediaFileDetail | undefined): string {
+  if (!v) return ''
+  const { video } = streams(v)
+  return qualityLine({ width: v.width ?? video?.width, height: v.height ?? video?.height, hdr: v.hdr ?? video?.hdr, probe: v.probe })
 }
 
 /** A track's language, or its title when the language isn't known. */
@@ -77,7 +75,7 @@ function trackName(language: string | undefined, title: string | undefined): str
 }
 
 /**
- * Beside the tags: the sound's language and the subtitles the file shows
+ * Beside the picture and sound: the sound's language and the subtitles the file shows
  * by itself, "English · subtitles off" or "English · Spanish subtitles".
  * The player can change both.
  */

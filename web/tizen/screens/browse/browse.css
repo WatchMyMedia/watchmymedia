@@ -28,7 +28,6 @@
 .home-facts { display: flex; align-items: center; gap: .875rem; min-width: 0; max-width: 100%; font-size: var(--t-body); color: var(--text-2); white-space: nowrap; }
 .home-facts__text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .home-facts__sep { color: var(--dim); }
-.home-facts__tags { display: flex; gap: .625rem; }
 
 .home-start-row { position: absolute; left: var(--content-left); top: 38.25rem; }
 .home-page-row { position: absolute; left: var(--content-left); top: 30rem; }

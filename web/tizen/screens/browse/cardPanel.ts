@@ -9,8 +9,9 @@ import { bareName } from '../search/crossSearch'
 import { oneCardWords, type OneCardTag } from './oneCardHome'
 
 // What the panel over a Home row screen says about its focused card
-// (Android's CardPanel): a kicker, the title, facts,
-// tags, an overview and what OK does, over the card's picture.
+// (Android's CardPanel): a kicker, the title, facts, an overview and what
+// OK does, over the card's picture. No quality: every app says that on the
+// title's page only.
 
 type BrowseItem = components['schemas']['BrowseItem']
 type ContinueItem = components['schemas']['ContinueItem']
@@ -24,8 +25,6 @@ export type CardPanel = {
   title: string
   /** "2022 · 27 episodes · Drama", joined with " · ". */
   facts: string[]
-  /** "4K", "HDR". */
-  tags: string[]
   /** "★ 7.8". */
   rating?: string
   overview: string
@@ -55,7 +54,6 @@ function itemPanel(row: ScreenRow, item: BrowseItem, index: number, card: RowCar
     kicker,
     title: item.title,
     facts: [...facts, on ?? ''].filter(Boolean),
-    tags: [item.quality || '', item.hdr ? 'HDR' : ''].filter(Boolean),
     rating: item.rating ? `★ ${item.rating.toFixed(1)}` : undefined,
     overview: item.overview,
     target: item.kind === 'movie' ? 'movie' : item.kind === 'show' ? (item.episodeId !== undefined ? 'episode' : 'show') : 'file',
@@ -86,7 +84,7 @@ function episodePanel(row: ScreenRow, e: EpisodeCard): CardPanel {
     kicker: [e.isNew ? 'New episode' : heading, e.airDate ? `aired ${airedDay(e.airDate)}` : ''].filter(Boolean).join(' · '),
     title: e.title || e.showTitle,
     facts: [e.showTitle, episodeCode(e.seasonNumber, e.episodeNumber), e.hasFile ? '' : 'Not in library', oneCardWords((e as { oneCard?: OneCardTag }).oneCard, bareName) ?? ''].filter(Boolean),
-    tags: [],
+    
     overview: e.overview,
     target: 'episode',
     picture: e.stillPath ?? e.showBackdropPath,
@@ -99,7 +97,7 @@ function continuePanel(c: ContinueItem): CardPanel {
     kicker: `Continue watching · ${timeLeft(c.durationMs - c.positionMs)}`,
     title: c.title,
     facts: [resumeLine(c), c.durationMs > 0 ? formatRuntime(Math.round(c.durationMs / 60_000)) : ''].filter(Boolean),
-    tags: [],
+    
     overview: '',
     target: 'resume',
     picture: c.stillPath ?? c.backdropPath,
@@ -110,13 +108,13 @@ function continuePanel(c: ContinueItem): CardPanel {
 function channelPanel(channel: LiveChannel, listings: boolean, now: number): CardPanel {
   const on = listings ? nowAndNext(channel, now).now : undefined
   const where = `${channel.number} ${channel.name}`
-  if (!on) return { kicker: `Live TV · ${where}`, title: channel.name, facts: [listings ? 'No listings' : 'Watch live'], tags: [], overview: '', target: 'channel', seed: channel.name }
+  if (!on) return { kicker: `Live TV · ${where}`, title: channel.name, facts: [listings ? 'No listings' : 'Watch live'], overview: '', target: 'channel', seed: channel.name }
   const start = Date.parse(on.start), end = Date.parse(on.end)
   return {
     kicker: `On now · ${where} · ${timeRange(start, end)}`,
     title: on.title,
     facts: [`${duration(end - now)} left`, on.categories?.[0] ?? ''].filter(Boolean),
-    tags: [],
+    
     overview: on.description ?? '',
     target: 'channel',
     seed: on.title,
@@ -132,12 +130,12 @@ export function cardPanel(row: ScreenRow, cards: readonly RowCard[], index: numb
   const card = cards[index]
   if (!card) return undefined
   // A server still being asked, or Try again: the row's own name above it, and its words.
-  if (card.tile) return { kicker: titleParts(row)[0], title: card.tile.kind === 'retry' ? 'Try again' : 'Still asking', facts: [card.tile.text], tags: [], overview: '', target: 'library', seed: row.title }
+  if (card.tile) return { kicker: titleParts(row)[0], title: card.tile.kind === 'retry' ? 'Try again' : 'Still asking', facts: [card.tile.text], overview: '', target: 'library', seed: row.title }
   if (card.more) {
     const target: PanelTarget = card.more.glyph === 'guide' ? 'guide' : card.more.glyph === 'list' ? 'list' : 'library'
     const kicker = row.style === 'live' ? 'Live TV' : titleParts(row)[0]
     const detail = target === 'list' && row.subtitle ? row.subtitle : card.more.detail
-    return { kicker, title: card.more.title, facts: detail ? [detail] : [], tags: [], overview: '', target, seed: kicker }
+    return { kicker, title: card.more.title, facts: detail ? [detail] : [], overview: '', target, seed: kicker }
   }
   switch (row.style) {
     case 'continue': { const c = row.continue?.[index]; return c && continuePanel(c) }

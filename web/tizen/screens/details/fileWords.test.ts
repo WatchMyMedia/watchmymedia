@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { components } from '../../../src/api/schema'
-import { fileNumbers, playSentence, soundName, speakerWords, titleTags, trackLine, versionLine, versionName, versionsLine } from './fileWords'
+import { fileNumbers, playSentence, soundName, speakerWords, titleQuality, trackLine, versionLine, versionName, versionsLine } from './fileWords'
 
 type MediaFileDetail = components['schemas']['MediaFileDetail']
-type MovieDetail = components['schemas']['MovieDetail']
 type PlaybackPlan = components['schemas']['PlaybackPlan']
 
 function file(over: Partial<MediaFileDetail> = {}): MediaFileDetail {
@@ -53,10 +52,13 @@ describe('a title’s file in words', () => {
     expect(versionsLine([file(), hd])).toBe('4K with Dolby Vision, or 1080p')
   })
 
-  it('puts three words about the picture and sound on the first screen', () => {
-    const m = { quality: '4K', hdr: true, files: [file(), hd] } as Pick<MovieDetail, 'quality' | 'hdr' | 'files'>
-    expect(titleTags(m)).toEqual(['4K', 'Dolby Vision', 'Surround sound'])
-    expect(titleTags({ quality: '1080p', hdr: false, files: [file({ hdr: '', probe: { ...file().probe!, video: [], audio: [{ index: 1, codec: 'aac', channels: 2, language: 'eng', default: true }] } })] })).toEqual(['1080p'])
+  it('says the picture and sound in one line on the first screen', () => {
+    expect(titleQuality(file())).toBe('In 4K with Dolby Vision and 7.1 sound')
+    expect(titleQuality(hd)).toBe('In 1080p with 5.1 sound')
+    // The probe's picture when the file's own fields are missing.
+    expect(titleQuality(file({ width: undefined, height: undefined, hdr: undefined }))).toBe('In 4K with Dolby Vision and 7.1 sound')
+    expect(titleQuality(file({ width: 1920, height: 1080, hdr: '', probe: { ...file().probe!, video: [], audio: [{ index: 1, codec: 'aac', channels: 2, language: 'eng', default: true }] } }))).toBe('')
+    expect(titleQuality(undefined)).toBe('')
   })
 
   it('says the sound’s language and whether subtitles show', () => {

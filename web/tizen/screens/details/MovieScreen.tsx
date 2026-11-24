@@ -21,7 +21,7 @@ import { problemWords } from '../../ui/problemWords'
 import { useNow } from '../live/clock'
 import { Backdrop, NoticeBanner, PeopleRow, RelatedSection, WatchBar } from './DetailParts'
 import { markedMessage, reportSent, useNotice } from './detailWords'
-import { titleTags, trackLine, versionsLine } from './fileWords'
+import { titleQuality, trackLine, versionsLine } from './fileWords'
 import { moviePlay, movieVersions, partway, resumeVersion, trailerPlay } from './movieLabels'
 import { AudioPanel, FileDetailsPanel, MorePanelRows, ReportPanel, VersionsPanel } from './TitlePanels'
 import { movieFactLine, movieShortLine, movieWatch } from './titleWords'
@@ -159,9 +159,9 @@ function MoviePage({ m, source }: { m: MovieDetail; source: Source }) {
     return playOn(request, source)
   }
   const play = playRequest()
-  // The three words about the picture and sound are the copy Play uses: another server's when that is the one.
+  // The line about the picture and sound is the copy Play uses: another server's when that is the one.
   const usesOther = several && view.play && view.play.ref.server !== source.id ? others.found.find((f) => f.source.id === view.play?.ref.server)?.detail : undefined
-  const tags = titleTags(usesOther ?? m)
+  const quality = titleQuality(usesOther ? (usesOther.files.find((f) => f.id === view.play?.ref.file) ?? movieVersions(usesOther)[0]) : chosen)
   const startOver = several && view.play ? copyPlay(view.play.ref, 0) : chosen ? playOn(moviePlay(m, chosen, 0), source) : undefined
   // Another server's later place shows on the bar, and Play says where it resumes from.
   const barLine: typeof line = view.where ? { play: 'Resume', where: view.where.text, ends: endsAtWords(now, view.where.leftMs), progress: view.where.progress } : line
@@ -254,10 +254,10 @@ function MoviePage({ m, source }: { m: MovieDetail; source: Source }) {
               onProblem={(title) => say({ title, problem: true })}/>}
             <Button id="more" autoFocus={!play && !trailer} onPress={() => open('more')}>More</Button>
           </div>
-          {(tags.length > 0 || tracks) && <div className="dt-tags">
-            {tags.map((t) => <span key={t} className="tv-tag">{t}</span>)}
-            {tracks && <span className="dt-tags__line">{tracks}</span>}
-          </div>}
+          {(quality || tracks) && <p className="dt-quality">
+            {quality && <span>{quality}</span>}
+            {tracks && <span className="dt-quality__tracks">{tracks}</span>}
+          </p>}
         </section>
         {cast.length > 0 && <section className="dt-below dt-below--cast" aria-label="Cast" data-zone="cast">
           <h2 className="tv-head">Cast</h2>
