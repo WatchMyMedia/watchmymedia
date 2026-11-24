@@ -65,6 +65,52 @@ fun episodeTags(v: MediaVersion): List<String> = listOfNotNull(
     audioLabel(v.audioSummary),
 )
 
+/**
+ * A title page's one quiet line about the picture and sound, in words: "In
+ * 4K with Dolby Vision and 7.1 sound", "In HD with stereo sound", "With 5.1
+ * sound"; null with nothing to say. Worded as the Apple apps' WMMFeatures
+ * pictureAndSoundLine. Tags and codecs stay in File details.
+ */
+fun pictureAndSoundLine(quality: QualityLabel?, hdr: String?, audioSummary: String?): String? {
+    val picture = when (quality) {
+        "4K" -> "4K"
+        "1080p", "720p" -> "HD"
+        else -> null
+    }
+    val range = hdrLabel(hdr)?.let { if (it == DOLBY_VISION) it else "HDR" }
+    val sound = soundWords(audioSummary)
+    return when {
+        picture != null -> buildString {
+            append("In ").append(picture)
+            if (range != null) append(" with ").append(range)
+            if (sound != null) append(if (range == null) " with " else " and ").append(sound)
+        }
+        range != null -> "With $range" + (sound?.let { " and $it" } ?: "")
+        sound != null -> "With $sound"
+        else -> null
+    }
+}
+
+/** "5.1 sound", "7.1 sound", "stereo sound", from "TrueHD 7.1 · English"; null for mono or nothing known. */
+private fun soundWords(summary: String?): String? {
+    summary ?: return null
+    channelsLabel(summary)?.let { channels ->
+        return when (channels) {
+            "2.0" -> "stereo sound"
+            "1.0" -> null
+            else -> "$channels sound"
+        }
+    }
+    return "stereo sound".takeIf { summary.contains("stereo", ignoreCase = true) }
+}
+
+/** The movie page's picture-and-sound line, from [version] (the one Play plays), else its first, else the movie's own. */
+fun MovieDetail.pictureAndSound(version: MediaVersion? = null): String? {
+    val v = version ?: versions.firstOrNull()
+        ?: return pictureAndSoundLine(quality, "hdr10".takeIf { hdr }, null)
+    return pictureAndSoundLine(resolutionLabel(v.width, v.height) ?: quality, v.hdr, v.audioSummary)
+}
+
 /** "4K", "Dolby Vision", "7.1", from the movie and its first version. */
 fun MovieDetail.tags(): List<String> {
     val v = versions.firstOrNull()

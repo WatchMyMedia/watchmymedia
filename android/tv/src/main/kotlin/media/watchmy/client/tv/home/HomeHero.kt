@@ -24,7 +24,6 @@ import media.watchmy.client.model.ImageSize
 import media.watchmy.client.model.episodeCards
 import media.watchmy.client.model.LibraryRepository
 import media.watchmy.client.model.PlayRequest
-import media.watchmy.client.model.heroBadges
 import media.watchmy.client.model.playRequest
 import media.watchmy.client.tv.components.Backdrop
 import media.watchmy.client.tv.components.ContentStart
@@ -33,7 +32,6 @@ import media.watchmy.client.tv.components.Kicker
 import media.watchmy.client.tv.components.TextBright
 import media.watchmy.client.tv.components.TvButton
 import media.watchmy.client.tv.components.TvButtonStyle
-import media.watchmy.client.tv.components.TvTag
 import media.watchmy.client.tv.components.bringWholeIntoView
 import media.watchmy.client.tv.components.focusMemory
 import media.watchmy.client.tv.components.inter
@@ -42,19 +40,14 @@ import media.watchmy.client.ui.open
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
 
-/** "S03 E07 · The Long Dark · 52 min · [4K] [HDR] · TV-14". */
+/** "S03 E07 · The Long Dark · 52 min · TV-14". The picture and sound are said on the title's page, never on Home. */
 @Composable
-private fun HeroFacts(hero: Hero, tags: List<String>) {
+private fun HeroFacts(hero: Hero) {
     val style = inter(24.sp)
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         var before = false
         if (hero.facts.isNotBlank()) {
             Text(hero.facts, style = style, color = TextBright, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-            before = true
-        }
-        if (tags.isNotEmpty()) {
-            if (before) Text("·", style = style, color = WmmColors.TextFaint)
-            tags.forEach { TvTag(it) }
             before = true
         }
         hero.contentRating?.let {
@@ -98,7 +91,7 @@ internal fun HeroSection(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            HeroFacts(hero, home.heroBadges)
+            HeroFacts(hero)
             Text(
                 hero.overview,
                 style = inter(22.sp, lineHeight = 33.sp),
