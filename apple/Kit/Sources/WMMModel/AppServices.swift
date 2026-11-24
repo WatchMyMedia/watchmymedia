@@ -33,8 +33,17 @@ public final class AppServices {
     public let follows: any FollowsRepository
     /// The person's watchlists; ``UnavailableWatchlists`` below ``watchlistsAPILevel``.
     public let watchlists: any WatchlistsRepository
+    /// The server these services talk to when it isn't the one in use: a
+    /// title opened in place from another server, or a copy played from
+    /// there. Nil for the server in use.
+    public let scope: String?
+    /// Makes the services for another server signed in to (``on(_:)``).
+    @ObservationIgnored public var makeScoped: (@MainActor (_ serverID: String) -> AppServices?)?
+    @ObservationIgnored private var scoped: [String: AppServices] = [:]
+    /// The app's services, from those for another server, which ask them for every other.
+    @ObservationIgnored public private(set) weak var root: AppServices?
 
-    public init(servers: any ServerRepository, auth: any AuthRepository, library: any LibraryRepository, requests: any RequestsRepository, preferences: any PreferencesRepository, playback: any PlaybackControllerFactory, images: any ImageLoader, client: ClientInfo, liveTV: (any LiveTVRepository)? = nil, livePlayback: (any LivePlaybackControllerFactory)? = nil, downloads: any DownloadRepository = UnavailableDownloads(), casting: any CastGateway = UnavailableCastGateway(), rows: (any RowsRepository)? = nil, follows: (any FollowsRepository)? = nil, watchlists: (any WatchlistsRepository)? = nil) {
+    public init(servers: any ServerRepository, auth: any AuthRepository, library: any LibraryRepository, requests: any RequestsRepository, preferences: any PreferencesRepository, playback: any PlaybackControllerFactory, images: any ImageLoader, client: ClientInfo, liveTV: (any LiveTVRepository)? = nil, livePlayback: (any LivePlaybackControllerFactory)? = nil, downloads: any DownloadRepository = UnavailableDownloads(), casting: any CastGateway = UnavailableCastGateway(), rows: (any RowsRepository)? = nil, follows: (any FollowsRepository)? = nil, watchlists: (any WatchlistsRepository)? = nil, scope: String? = nil) {
         self.servers = servers
         self.auth = auth
         self.library = library
@@ -50,5 +59,23 @@ public final class AppServices {
         self.rows = rows ?? UnavailableRows()
         self.follows = follows ?? UnavailableFollows()
         self.watchlists = watchlists ?? UnavailableWatchlists()
+        self.scope = scope
+    }
+
+    /// The services for `serverID`: these, for the server in use (or nil);
+    /// for another server signed in to, a set that talks to it alone, with
+    /// its own address and sign-in, which a title opened in place and a copy
+    /// played from there use. Those hold only the library and playback:
+    /// requests, Live TV, downloads, casting, rows, follows and watchlists
+    /// stay the server in use's, so they offer nothing. These, when the
+    /// server can't be used.
+    public func on(_ serverID: String?) -> AppServices {
+        if let root { return serverID == scope ? self : root.on(serverID ?? root.servers.current?.server.id) }
+        guard let serverID, serverID != servers.current?.server.id else { return self }
+        if let made = scoped[serverID] { return made }
+        guard let made = makeScoped?(serverID) else { return self }
+        made.root = self
+        scoped[serverID] = made
+        return made
     }
 }

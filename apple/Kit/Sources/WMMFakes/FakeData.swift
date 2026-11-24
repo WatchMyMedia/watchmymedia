@@ -112,7 +112,17 @@ public enum FakeData {
         remaining: 18
     )
 
-    public static let continueWatching: [ContinueItem] = [
+    /// Continue watching, newest first, each with its TMDB id and when it was
+    /// last played (two hours apart), so Home can order every server's together.
+    public static let continueWatching: [ContinueItem] = continueRows.enumerated().map { i, item in
+        var copy = item
+        copy.tmdbID = item.movieID.map { tmdbID(movieID: $0) } ?? item.showID.map { tmdbID(showID: $0) }
+        copy.updatedAt = Date(timeIntervalSinceNow: -Double(i) * 7_200 - 1_800)
+        copy.contentRating = item.kind == .movie ? "PG-13" : "TV-14"
+        return copy
+    }
+
+    private static let continueRows: [ContinueItem] = [
         ContinueItem(kind: .episode, title: "The Quiet Meridian", subtitle: "S02 E04 · Drift", backdropPath: FakeBackdrops.path(for: "The Quiet Meridian"), fileID: 9001, showID: 101, episodeID: 101024, season: 2, episode: 4, positionMs: 28 * 60_000, durationMs: 51 * 60_000),
         ContinueItem(kind: .movie, title: "Dead Reckoning Bay", backdropPath: FakeBackdrops.path(for: "Dead Reckoning Bay"), fileID: 9002, movieID: 500, positionMs: 31 * 60_000, durationMs: 103 * 60_000),
         ContinueItem(kind: .episode, title: "Saltmarsh", subtitle: "S01 E09 · Undertow", backdropPath: FakeBackdrops.path(for: "Saltmarsh"), fileID: 9003, showID: 102, episodeID: 102019, season: 1, episode: 9, positionMs: 45 * 60_000, durationMs: 53 * 60_000),
@@ -132,6 +142,8 @@ public enum FakeData {
             // The show's backdrop stands in for a still, as the server's `showBackdropPath` does.
             var copy = card
             copy.showBackdropPath = FakeBackdrops.path(for: card.showTitle)
+            copy.showTMDBID = tmdbID(showID: card.showID)
+            copy.addedAt = parseDay(card.airDate)?.addingTimeInterval(20 * 3600)
             return copy
         }
     }

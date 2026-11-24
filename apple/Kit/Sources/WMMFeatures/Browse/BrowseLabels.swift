@@ -62,11 +62,10 @@ extension ContinueItem {
         return left
     }
 
-    /// The show or movie it belongs to.
+    /// The show or movie it belongs to, in place on its server.
     public var pageRoute: Route? {
-        if let movieID { return .movie(id: movieID) }
-        if let showID { return .show(id: showID) }
-        return nil
+        let page: Route? = if let movieID { .movie(id: movieID) } else if let showID { .show(id: showID) } else { nil }
+        return page.map { route in server.map { .onServer($0, route) } ?? route }
     }
 
     /// "Go to movie" or "Go to show".
@@ -189,7 +188,10 @@ extension EpisodeCard {
     }
 
     /// Its page, over its show on its season.
-    public var route: Route { .episode(showID: showID, season: season, id: episodeID) }
+    public var route: Route {
+        let page = Route.episode(showID: showID, season: season, id: episodeID)
+        return server.map { .onServer($0, page) } ?? page
+    }
 }
 
 extension BrowseItem {
@@ -197,7 +199,8 @@ extension BrowseItem {
     /// looked up yet"), else "2026 · 1 h 52 min" for a movie.
     /// A card's identity in a row: a list row mixes movies and shows, whose
     /// IDs come from different tables and can be equal.
-    public var cardID: String { "\(kind.rawValue)-\(id)" }
+    /// Another server's card carries its server: two servers' ids can be equal.
+    public var cardID: String { "\(kind.rawValue)-\(id)" + (server.map { "@\($0)" } ?? "") }
 
     /// A show's card on Apple TV: "2 episodes left · next on Thursday",
     /// "All watched · next tomorrow"; nil for a movie, and from servers that

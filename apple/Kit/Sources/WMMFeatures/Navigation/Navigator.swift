@@ -37,7 +37,7 @@ public enum AppTab: String, CaseIterable, Hashable, Sendable {
 }
 
 /// A screen pushed onto a tab's stack.
-public enum Route: Hashable, Sendable, Codable {
+public indirect enum Route: Hashable, Sendable, Codable {
     /// A show's page with its up-next episode on top, or
     /// on `season` with that season's first unfinished one. With `episode`
     /// it is pushed as ``episode(showID:season:id:)``.
@@ -66,6 +66,23 @@ public enum Route: Hashable, Sendable, Codable {
     /// A person's movies and shows in the library, from a cast row
     /// (Apple TV); `name` heads the page while it loads.
     case person(id: Int, name: String)
+    /// A page from another server signed in to, opened in place: the app
+    /// doesn't switch, and the page loads from that server with its
+    /// sign-in (a title only it has, a result from search, a link or a
+    /// notification from it). Its ids are that server's.
+    case onServer(String, Route)
+
+    /// The page itself, without the server it is on.
+    public var page: Route {
+        if case .onServer(_, let inner) = self { return inner.page }
+        return self
+    }
+
+    /// The server the page is on; nil for the server in use.
+    public var server: String? {
+        if case .onServer(let id, _) = self { return id }
+        return nil
+    }
 }
 
 /// One player presentation, with separate domain targets and lifecycles.
@@ -156,9 +173,17 @@ public final class Navigator {
         switch route {
         case .show(let id, let season, let episode?):
             open(.episode(showID: id, season: season, id: episode))
+        case .onServer(let server, .show(let id, let season, let episode?)):
+            open(.onServer(server, .episode(showID: id, season: season, id: episode)))
         default:
             paths[tab, default: []].append(route)
         }
+    }
+
+    /// Pushes `route` on `serverID`, in place: the server in use's route as
+    /// it is when `serverID` is nil.
+    public func open(_ route: Route, on serverID: String?) {
+        open(serverID.map { Route.onServer($0, route.page) } ?? route)
     }
 
     /// Switches tab; choosing the tab already shown goes back to its root.
@@ -226,8 +251,12 @@ public final class Navigator {
     }
 
     /// Opens a `watchmymedia://` link the app was opened with, as
-    /// ``DeepLink/opening(_:signedInServer:others:)`` read it.
+    /// ``DeepLink/opening(_:signedInServer:others:)`` read it. With another
+    /// server's `library` (``LibraryRepository/serverScope``), a title opens
+    /// in place from there, and a play plays its copy there.
     public func open(_ link: DeepLink, library: any LibraryRepository, liveTV: (any LiveTVRepository)? = nil) async {
+        let server = library.serverScope
+        if server != nil, !link.opensInPlace { return }
         switch link {
         case .filePage(let fileID):
             // Not this app's link: the page, with Play ready, rather than playing.
@@ -236,9 +265,9 @@ public final class Navigator {
             guard let page = try? await library.filePage(fileID: fileID), intent == liveIntent else { return }
             closePlayer()
             switch page {
-            case .movie(let id): open(.movie(id: id))
-            case .episode(let showID, let season, let episode?): open(.episode(showID: showID, season: season, id: episode))
-            case .episode(let showID, let season, nil): open(.show(id: showID, season: season))
+            case .movie(let id): open(.movie(id: id), on: server)
+            case .episode(let showID, let season, let episode?): open(.episode(showID: showID, season: season, id: episode), on: server)
+            case .episode(let showID, let season, nil): open(.show(id: showID, season: season), on: server)
             }
         case .liveRecordings:
             closePlayer()
@@ -260,13 +289,13 @@ public final class Navigator {
             }
         case .play(let fileID):
             let request = (try? await library.playRequest(fileID: fileID)) ?? PlayRequest(fileID: fileID, title: "")
-            play(request)
+            play(request.on(server))
         case .show(let id, let season, let episode):
             closePlayer()
-            open(.show(id: id, season: season, episode: episode))
+            open(.show(id: id, season: season, episode: episode), on: server)
         case .movie(let id):
             closePlayer()
-            open(.movie(id: id))
+            open(.movie(id: id), on: server)
         case .playMovie(let id):
             // As Play/Pause on its card: loaded, then played; its page if it can't be.
             await playPause(.playMovie(id: id), library: library) {}

@@ -430,12 +430,28 @@ public final class ServersModel {
     /// are rebuilt there (``Navigator/land(on:)``); when it doesn't answer
     /// the app stays where it was and the note says so. `accepts` leaves out
     /// links a device doesn't take (Link a TV on Apple TV).
-    public func open(_ url: URL, library: any LibraryRepository, liveTV: (any LiveTVRepository)? = nil, accepts: (DeepLink) -> Bool = { _ in true }) async {
+    ///
+    /// With `libraryOn`, which gives another server's library, a title
+    /// published for another server opens in place, from that server, and
+    /// the app stays where it is; a link to what belongs to one server (Live
+    /// TV, requests, the Inbox) opens nothing and the note says which server
+    /// it is for. Without it, as before, the app switches first.
+    public func open(_ url: URL, library: any LibraryRepository, liveTV: (any LiveTVRepository)? = nil,
+                     accepts: (DeepLink) -> Bool = { _ in true }, libraryOn: ((String) -> (any LibraryRepository)?)? = nil) async {
         let current = servers.current?.server.id
         let others = servers.registered.filter { $0.server.id != current && $0.signedIn && !$0.server.tooOld }.map(\.server.id)
         guard let opening = DeepLink.opening(url, signedInServer: current, others: others), accepts(opening.link) else { return }
         guard let server = opening.server else {
             await navigator.open(opening.link, library: library, liveTV: liveTV)
+            return
+        }
+        if let libraryOn {
+            guard opening.link.opensInPlace, let other = libraryOn(server), other.serverScope == server else {
+                let name = servers.saved.first { $0.server.id == server }?.server.name ?? "another server"
+                note = OneCardWords.forAnotherServer(name)
+                return
+            }
+            await navigator.open(opening.link, library: other, liveTV: nil)
             return
         }
         await switchTo(server, arriving: ServerArrival(serverID: server, link: opening.link), quietly: true)

@@ -331,6 +331,12 @@ extension AppServices {
         )
         // `-fakesSaveFails` and `-fakesPasswordFails`, read here as `-fakesLargeLibrary` is.
         services.applyFakeRefusals(ProcessInfo.processInfo.arguments)
+        // Another server signed in to: its own library, played from there (one card).
+        services.makeScoped = { [weak services] serverID in
+            guard let services, servers.signedIn(on: serverID), serverID != servers.current?.server.id else { return nil }
+            return AppServices(servers: servers, auth: services.auth, library: library.scoped(to: serverID), requests: UnavailableRequests(),
+                               preferences: services.preferences, playback: FakePlaybackFactory(), images: services.images, client: client, scope: serverID)
+        }
         return services
     }
 }

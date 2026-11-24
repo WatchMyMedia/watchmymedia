@@ -1,32 +1,57 @@
 import Foundation
 
 /// Something that can be marked watched or unwatched.
-public enum WatchTarget: Hashable, Sendable {
+public indirect enum WatchTarget: Hashable, Sendable {
     case movie(id: Int)
     case episode(id: Int)
     case season(showID: Int, number: Int)
     case show(id: Int)
+    /// A card from another server signed in to: its ids are that server's.
+    case onServer(String, WatchTarget)
+
+    /// The target without its server.
+    public var plain: WatchTarget {
+        if case .onServer(_, let inner) = self { return inner.plain }
+        return self
+    }
+
+    /// The server it is on; nil for the server in use.
+    public var server: String? {
+        if case .onServer(let id, _) = self { return id }
+        return nil
+    }
 }
 
 extension LibraryRepository {
-    /// Marks `target` watched or unwatched.
+    /// Marks `target` watched or unwatched. Another server's target is
+    /// marked only by that server's repository.
     public func mark(_ target: WatchTarget, watched: Bool) async throws {
         switch target {
         case .movie(let id): try await setWatched(.movie, id: id, watched: watched)
         case .episode(let id): try await setWatched(.episode, id: id, watched: watched)
         case .season(let showID, let number): try await setSeasonWatched(showID: showID, season: number, watched: watched)
         case .show(let id): try await setShowWatched(showID: id, watched: watched)
+        case .onServer(let server, let inner):
+            guard server == serverScope else { throw APIError(status: nil, message: "That title is on another server.") }
+            try await mark(inner, watched: watched)
         }
     }
 }
 
 extension BrowseItem {
     public var watchTarget: WatchTarget? {
-        switch kind {
+        let target: WatchTarget? = switch kind {
         case .movie: .movie(id: id)
         case .show: .show(id: id)
         case .unmatched: nil
         }
+        return target.map { t in server.map { .onServer($0, t) } ?? t }
+    }
+}
+
+extension EpisodeCard {
+    public var watchTarget: WatchTarget {
+        server.map { .onServer($0, .episode(id: episodeID)) } ?? .episode(id: episodeID)
     }
 }
 
@@ -42,16 +67,18 @@ extension BrowseItem {
 
 extension ContinueItem {
     public var watchTarget: WatchTarget? {
-        switch kind {
+        let target: WatchTarget? = switch kind {
         case .movie: movieID.map { .movie(id: $0) }
         case .episode: episodeID.map { .episode(id: $0) }
         }
+        return target.map { t in server.map { .onServer($0, t) } ?? t }
     }
 
     /// Resumes where the viewer left off.
     public var playRequest: PlayRequest {
         let code: String? = season.flatMap { s in episode.map { episodeCode(season: s, episode: $0) } }
-        return PlayRequest(fileID: fileID, title: title, subtitle: subtitle ?? code, backdropPath: backdropPath ?? stillPath, stillPath: stillPath, posterPath: posterPath, showID: showID, seasonNumber: season)
+        return PlayRequest(fileID: fileID, title: title, subtitle: subtitle ?? code, backdropPath: backdropPath ?? stillPath, stillPath: stillPath, posterPath: posterPath, showID: showID, seasonNumber: season,
+                           overview: overview, contentRating: contentRating, serverID: server)
     }
 }
 
@@ -62,7 +89,7 @@ extension EpisodeCard {
             PlayRequest(
                 fileID: $0, title: showTitle, subtitle: "\(episodeCode(season: season, episode: episode)) · \(title)",
                 backdropPath: showBackdropPath ?? stillPath, stillPath: stillPath, posterPath: showPosterPath, showID: showID, seasonNumber: season,
-                overview: overview.isEmpty ? nil : overview
+                overview: overview.isEmpty ? nil : overview, serverID: server
             )
         }
     }

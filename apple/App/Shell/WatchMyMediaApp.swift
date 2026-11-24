@@ -110,10 +110,11 @@ extension WatchMyMediaApp {
     }
 
     /// A `watchmymedia://` link from outside the app or one it published
-    /// (``ServersModel/open(_:library:liveTV:accepts:)``): one published for
-    /// another server this device is signed in to switches to it, then opens.
+    /// (``ServersModel/open(_:library:liveTV:libraryOn:accepts:)``): a title
+    /// published for another server this device is signed in to opens in
+    /// place, from there, without switching.
     private func open(_ url: URL) {
-        Task { await servers.open(url, library: services.library, liveTV: services.liveTV) }
+        Task { await servers.open(url, library: services.library, liveTV: services.liveTV, libraryOn: { services.on($0).library }) }
     }
 }
 

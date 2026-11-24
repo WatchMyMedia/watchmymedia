@@ -46,7 +46,17 @@ enum ServicesFactory {
             // Now Playing's picture. No `servers`: the AirPlay restart is the sender's, never the TV's.
             images: data.images
         )
-        return data.makeAppServices(playback: playback, livePlayback: LivePlaybackEngine(repository: data.liveTV, profile: profile, userAgent: APIPlaybackGateway.userAgent))
+        let services = data.makeAppServices(playback: playback, livePlayback: LivePlaybackEngine(repository: data.liveTV, profile: profile, userAgent: APIPlaybackGateway.userAgent))
+        // Another server signed in to, for one card: a title opened in place, a copy played from there.
+        services.makeScoped = { serverID in
+            let library = data.library(serverID: serverID)
+            let playback = PlaybackEngine(
+                gateway: APIPlaybackGateway(api: { try data.api(serverID: serverID) }, apiLevel: { data.apiLevel(serverID: serverID) }),
+                preferences: data.preferences, client: { data.client }, profile: profile, library: library, images: data.images
+            )
+            return data.makeScopedServices(serverID: serverID, library: library, playback: playback)
+        }
+        return services
     }
 
     #if DEBUG
@@ -77,7 +87,11 @@ enum ServicesFactory {
         (services.library as? FakeLibraryRepository)?.firstRun = FakeFirstRunState.from(arguments)
         // The server in use doesn't answer at all: Home's Can't reach.
         if arguments.contains("-fakesUnreachable") { (services.library as? FakeLibraryRepository)?.offline = true }
-        if arguments.contains("-fakesSlowServer") { (services.library as? FakeLibraryRepository)?.otherServerDelay = .milliseconds(2500) }
+        if arguments.contains("-fakesSlowServer") {
+            (services.library as? FakeLibraryRepository)?.otherServerDelay = .milliseconds(2500)
+            // Den server doesn't answer within the time a server is given: screens say they are still asking, then that it didn't.
+            (services.library as? FakeLibraryRepository)?.denWaits = .seconds(6)
+        }
         if arguments.contains("-fakesOneWatchlist") { (services.watchlists as? FakeWatchlistsRepository)?.keepOnlyFirst() }
         if let i = arguments.firstIndex(of: "-fakesAudioLanguages"), arguments.indices.contains(i + 1), !arguments[i + 1].hasPrefix("-") {
             (services.preferences as? FakePreferencesRepository)?.seedLanguages(arguments[i + 1].split(separator: ",").map(String.init))

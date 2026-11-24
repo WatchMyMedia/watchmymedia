@@ -220,6 +220,37 @@ public final class DataServices {
     /// foreground), for what the playback calls send; nil with no server.
     public var apiLevel: Int? { servers.current?.server.apiLevel }
 
+    /// Another server signed in to: its API with its sign-in, for a copy
+    /// played from there. Throws ``SignedOutError`` when no sign-in is kept
+    /// for it. Its sign-in goes out only once the server has said, asked with
+    /// none, that it is the one remembered.
+    public func api(serverID: String) throws -> ServerAPI {
+        try store.other(serverID: serverID).api
+    }
+
+    /// Another server's API level as last refreshed.
+    public func apiLevel(serverID: String) -> Int? {
+        store.state.servers.first { $0.server.id == serverID }?.server.apiLevel
+    }
+
+    /// The library of another server signed in to, which talks to it alone.
+    public func library(serverID: String) -> any LibraryRepository {
+        let servers = serverRepository
+        return RealLibraryRepository(store: store, events: events, serverID: serverID, askOther: { try await servers.askOther($0) })
+    }
+
+    /// The services for another server signed in to (``AppServices/on(_:)``):
+    /// its library (`library`, from ``library(serverID:)``) and `playback`
+    /// for it; requests, Live TV, downloads, casting, rows, follows and
+    /// watchlists offer nothing, since they stay the server in use's. Nil
+    /// for a server this device isn't signed in to, or one too old.
+    public func makeScopedServices(serverID: String, library: any LibraryRepository, playback: any PlaybackControllerFactory) -> AppServices? {
+        guard serverID != store.state.currentID, let server = store.state.servers.first(where: { $0.server.id == serverID })?.server,
+              store.credentials[serverID] != nil, !server.tooOld else { return nil }
+        return AppServices(servers: servers, auth: auth, library: library, requests: UnavailableRequests(), preferences: preferences,
+                           playback: playback, images: images, client: client, scope: serverID)
+    }
+
     /// The services for the screens, with `playback` from WMMPlayback and `downloads` from WMMDownloads.
     public func makeAppServices(playback: any PlaybackControllerFactory, livePlayback: (any LivePlaybackControllerFactory)? = nil, downloads: any DownloadRepository = UnavailableDownloads()) -> AppServices {
         AppServices(servers: servers, auth: auth, library: library, requests: requests, preferences: preferences, playback: playback, images: images, client: client, liveTV: liveTV, livePlayback: livePlayback, downloads: downloads, casting: casting, rows: rows, follows: follows, watchlists: watchlists)

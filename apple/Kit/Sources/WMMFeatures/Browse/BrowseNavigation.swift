@@ -16,13 +16,16 @@ extension BrowseItem {
     /// other show cards open the show.
     public var opening: ItemOpening {
         switch kind {
-        case .movie: return .page(.movie(id: id))
+        case .movie: return .page(onServer(.movie(id: id)))
         case .show:
-            if let episodeID { return .page(.episode(showID: id, season: seasonNumber, id: episodeID)) }
-            return .page(.show(id: id))
-        case .unmatched: return unmatchedPlayRequest.map(ItemOpening.play) ?? .needsMatching
+            if let episodeID { return .page(onServer(.episode(showID: id, season: seasonNumber, id: episodeID))) }
+            return .page(onServer(.show(id: id)))
+        case .unmatched: return unmatchedPlayRequest.map { ItemOpening.play($0.on(server)) } ?? .needsMatching
         }
     }
+
+    /// `route` in place on the card's server, when it isn't the one in use.
+    private func onServer(_ route: Route) -> Route { server.map { .onServer($0, route) } ?? route }
 }
 
 extension Navigator {
@@ -41,6 +44,30 @@ extension Navigator {
     /// Opens an episode's page, over its show.
     public func open(_ episode: EpisodeCard) {
         open(episode.route)
+    }
+
+    /// Opens a card from `library`'s server: in place, when that isn't the
+    /// one in use. An unmatched film plays from there.
+    @discardableResult
+    public func open(_ item: BrowseItem, on library: any LibraryRepository) -> Notice? {
+        open(item, on: library.serverScope)
+    }
+
+    /// Opens a card that is on `serverID` (nil: the server in use), in place.
+    @discardableResult
+    public func open(_ item: BrowseItem, on serverID: String?) -> Notice? {
+        guard let serverID, item.server == nil else { return open(item) }
+        switch item.opening {
+        case .page(let route): open(route, on: serverID)
+        case .play(let request): play(request.on(serverID))
+        case .needsMatching: return .notMatched
+        }
+        return nil
+    }
+
+    /// Opens an episode's page from `serverID` (nil: the server in use), in place.
+    public func open(_ episode: EpisodeCard, on serverID: String?) {
+        open(episode.route, on: serverID)
     }
 }
 

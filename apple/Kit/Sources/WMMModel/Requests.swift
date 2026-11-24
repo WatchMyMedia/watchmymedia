@@ -379,3 +379,31 @@ public protocol RequestsRepository: AnyObject, Observable {
     /// Each call is a new listener; it ends when the task is cancelled.
     func changes() -> AsyncStream<Void>
 }
+
+/// Requests where a server offers none: a title opened in place from
+/// another server, whose requests, reports and deletes stay that server's
+/// to do from there. Asks nothing; what would change something refuses.
+@MainActor
+@Observable
+public final class UnavailableRequests: RequestsRepository {
+    public init() {}
+    public var options: RequestOptions { .none }
+    public func refreshOptions() async {}
+    public func search(_ text: String) async throws -> [Requestable] { [] }
+    public func lookup(_ type: MediaType, tmdbID: Int) async throws -> Requestable { throw Self.refused }
+    public func ask(_ type: MediaType, tmdbID: Int, seasons: [Int]) async throws -> CreatedRequest { throw Self.refused }
+    public func mine() async throws -> [MediaRequest] { [] }
+    public func cancel(requestID: Int) async throws { throw Self.refused }
+    public func inbox() async throws -> Inbox { throw Self.refused }
+    public func decide(requestID: Int, approve: Bool, note: String) async throws { throw Self.refused }
+    public func report(_ item: WatchKind, id: Int, fileID: Int?, kind: ProblemKind, note: String) async throws -> Problem { throw Self.refused }
+    public func resolve(problemID: Int) async throws { throw Self.refused }
+    public func searchMissing(showID: Int, season: Int, episodes: [Int]) async throws { throw Self.refused }
+    public func monitor(showID: Int, season: Int, episodes: [Int], monitored: Bool) async throws { throw Self.refused }
+    public func previewDelete(episodeID: Int) async throws -> DeletePreview { throw Self.refused }
+    public func deleteEpisode(id: Int) async throws -> DeleteOutcome { throw Self.refused }
+    public func replaceFile(fileID: Int) async throws -> ReplaceOutcome { throw Self.refused }
+    public func changes() -> AsyncStream<Void> { AsyncStream { _ in } }
+
+    private static let refused = APIError(status: nil, message: "Do this from the server the title is on: switch to it in Servers.")
+}

@@ -157,12 +157,16 @@ extension Components.Schemas.PersonDetail {
 }
 
 extension Components.Schemas.Movie {
+    /// A search result or a copy found by TMDB id, as a card: the person's
+    /// mark and place come from API level 34.
     var browseItem: BrowseItem {
         BrowseItem(
             kind: .movie, id: Int(id), libraryID: Int(libraryId), title: title, year: Mapping.positive(year),
             overview: overview, genres: genres, rating: Mapping.positive(rating),
             posterPath: Mapping.nonBlank(posterPath), backdropPath: Mapping.nonBlank(backdropPath),
-            runtimeMin: Mapping.positive(runtimeMin), releaseDate: Mapping.nonBlank(releaseDate), fileCount: Int(fileCount)
+            watched: watched ?? false, progress: Mapping.positive(progress),
+            runtimeMin: Mapping.positive(runtimeMin), releaseDate: Mapping.nonBlank(releaseDate), fileCount: Int(fileCount),
+            tmdbID: Mapping.positive(tmdbId), contentRating: Mapping.nonBlank(contentRating)
         )
     }
 }
@@ -173,7 +177,10 @@ extension Components.Schemas.Show {
             kind: .show, id: Int(id), libraryID: Int(libraryId), title: title, year: Mapping.positive(year),
             overview: overview, genres: genres, rating: Mapping.positive(rating),
             posterPath: Mapping.nonBlank(posterPath), backdropPath: Mapping.nonBlank(backdropPath),
-            episodeCount: Int(episodeCount)
+            watched: watched ?? false,
+            episodeCount: Int(episodeCount), tmdbID: Mapping.positive(tmdbId), contentRating: Mapping.nonBlank(contentRating),
+            unwatchedCount: unwatchedCount.map(Int.init), seasonCount: seasonCount.map(Int.init),
+            nextAirDate: Mapping.nonBlank(nextAirDate), lastAirDate: Mapping.nonBlank(lastAirDate)
         )
     }
 }
@@ -195,7 +202,10 @@ extension Components.Schemas.EpisodeCard {
             hasFile: hasFile,
             fileID: fileId.map(Int.init),
             isNew: isNew,
-            watched: watched == true
+            watched: watched == true,
+            showTMDBID: Mapping.positive(showTmdbId),
+            addedAt: addedAt,
+            runtimeMin: Mapping.positive(runtimeMin)
         )
     }
 }
@@ -207,7 +217,7 @@ extension Components.Schemas.SearchEpisode {
             episodeID: Int(id), showID: Int(showId), showTitle: showTitle, season: Int(seasonNumber), episode: Int(number),
             title: title, airDate: Mapping.nonBlank(airDate), stillPath: Mapping.nonBlank(stillPath),
             showPosterPath: Mapping.nonBlank(showPosterPath), hasFile: true, fileID: Int(fileId), isNew: false,
-            watched: watched == true
+            watched: watched == true, showTMDBID: Mapping.positive(showTmdbId), runtimeMin: Mapping.positive(runtimeMin)
         )
     }
 }
@@ -229,7 +239,11 @@ extension Components.Schemas.ContinueItem {
             season: seasonNumber.map(Int.init),
             episode: episodeNumber.map(Int.init),
             positionMs: Int(positionMs),
-            durationMs: Int(durationMs)
+            durationMs: Int(durationMs),
+            tmdbID: Mapping.positive(tmdbId),
+            updatedAt: updatedAt,
+            contentRating: Mapping.nonBlank(contentRating),
+            overview: Mapping.nonBlank(overview)
         )
     }
 }

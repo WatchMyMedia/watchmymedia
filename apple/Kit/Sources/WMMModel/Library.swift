@@ -82,6 +82,9 @@ public struct BrowseItem: Hashable, Sendable, Identifiable {
     public var lastAirDate: String?
     /// When its newest file arrived, which Date added sorts by; nil from fakes that don't say.
     public var addedAt: Date?
+    /// The server the card is on when it isn't the one in use (one card
+    /// across servers): it opens in place from there, and its id is that server's.
+    public var server: String?
 
     public init(kind: ItemKind, id: Int, libraryID: Int, title: String, year: Int? = nil, overview: String = "", genres: [String] = [], rating: Double? = nil, posterPath: String? = nil, backdropPath: String? = nil, quality: QualityLabel? = nil, hdr: Bool = false, isNew: Bool = false, subtitle: String? = nil, watched: Bool = false, progress: Double? = nil, episodeCount: Int? = nil, runtimeMin: Int? = nil, releaseDate: String? = nil, fileName: String? = nil, fileCount: Int? = nil, episodeID: Int? = nil, seasonNumber: Int? = nil, tmdbID: Int? = nil, watchlisted: Bool = false,
                 contentRating: String? = nil, unwatchedCount: Int? = nil, newEpisodeCount: Int? = nil, seasonCount: Int? = nil, nextAirDate: String? = nil, lastAirDate: String? = nil, addedAt: Date? = nil) {
@@ -140,8 +143,16 @@ public struct EpisodeCard: Hashable, Sendable, Identifiable {
     public var isNew: Bool
     /// The signed-in user has watched it.
     public var watched: Bool
+    /// Its show's TMDB id, so an episode on two servers is one card; nil from servers below API level 34.
+    public var showTMDBID: Int?
+    /// When its file arrived (Recently aired); nil when the server doesn't say.
+    public var addedAt: Date?
+    public var runtimeMin: Int?
+    /// The server the card is on when it isn't the one in use.
+    public var server: String?
 
-    public init(episodeID: Int, showID: Int, showTitle: String, season: Int, episode: Int, title: String, overview: String = "", airDate: String? = nil, stillPath: String? = nil, showPosterPath: String? = nil, showBackdropPath: String? = nil, hasFile: Bool, fileID: Int?, isNew: Bool, watched: Bool = false) {
+    public init(episodeID: Int, showID: Int, showTitle: String, season: Int, episode: Int, title: String, overview: String = "", airDate: String? = nil, stillPath: String? = nil, showPosterPath: String? = nil, showBackdropPath: String? = nil, hasFile: Bool, fileID: Int?, isNew: Bool, watched: Bool = false,
+                showTMDBID: Int? = nil, addedAt: Date? = nil, runtimeMin: Int? = nil) {
         self.episodeID = episodeID
         self.showID = showID
         self.showTitle = showTitle
@@ -157,6 +168,9 @@ public struct EpisodeCard: Hashable, Sendable, Identifiable {
         self.fileID = fileID
         self.isNew = isNew
         self.watched = watched
+        self.showTMDBID = showTMDBID
+        self.addedAt = addedAt
+        self.runtimeMin = runtimeMin
     }
 
     public var id: Int { episodeID }
@@ -180,8 +194,19 @@ public struct ContinueItem: Hashable, Sendable, Identifiable {
     public var episode: Int?
     public var positionMs: Int
     public var durationMs: Int
+    /// The movie's TMDB id, or for an episode its show's, so a title on two
+    /// servers is one card; nil from servers below API level 34.
+    public var tmdbID: Int?
+    /// When it was last played, which orders the row across servers.
+    public var updatedAt: Date?
+    /// "TV-14"; nil when it has none, and from servers below API level 34.
+    public var contentRating: String?
+    public var overview: String?
+    /// The server the card is on when it isn't the one in use: Resume plays from there.
+    public var server: String?
 
-    public init(kind: WatchKind, title: String, subtitle: String? = nil, posterPath: String? = nil, backdropPath: String? = nil, stillPath: String? = nil, fileID: Int, movieID: Int? = nil, showID: Int? = nil, episodeID: Int? = nil, season: Int? = nil, episode: Int? = nil, positionMs: Int, durationMs: Int) {
+    public init(kind: WatchKind, title: String, subtitle: String? = nil, posterPath: String? = nil, backdropPath: String? = nil, stillPath: String? = nil, fileID: Int, movieID: Int? = nil, showID: Int? = nil, episodeID: Int? = nil, season: Int? = nil, episode: Int? = nil, positionMs: Int, durationMs: Int,
+                tmdbID: Int? = nil, updatedAt: Date? = nil, contentRating: String? = nil, overview: String? = nil) {
         self.kind = kind
         self.title = title
         self.subtitle = subtitle
@@ -196,9 +221,14 @@ public struct ContinueItem: Hashable, Sendable, Identifiable {
         self.episode = episode
         self.positionMs = positionMs
         self.durationMs = durationMs
+        self.tmdbID = tmdbID
+        self.updatedAt = updatedAt
+        self.contentRating = contentRating
+        self.overview = overview
     }
 
-    public var id: Int { fileID }
+    /// Its file and, for another server's, that server: two servers' file ids can be equal.
+    public var id: String { server.map { "\($0)/\(fileID)" } ?? String(fileID) }
     public var progress: Double { durationMs > 0 ? min(max(Double(positionMs) / Double(durationMs), 0), 1) : 0 }
     public var remainingMs: Int { max(durationMs - positionMs, 0) }
 }
@@ -872,6 +902,15 @@ extension LibraryRepository {
     /// A repository for one server alone has no other's pictures.
     public func imageURL(_ path: String?, size: ImageSize, serverID: String) -> URL? { nil }
 
+    /// The server in use's repository.
+    public var serverScope: String? { nil }
+
+    /// A repository that can't ask finds no copy.
+    public func movies(tmdbID: Int) async throws -> [BrowseItem] { [] }
+
+    /// A repository that can't ask finds no copy.
+    public func shows(tmdbID: Int) async throws -> [BrowseItem] { [] }
+
     /// A repository for one server alone asked no other.
     public func searchVisitEnded() {}
 
@@ -988,6 +1027,18 @@ public protocol LibraryRepository: AnyObject {
     /// ``imageURL(_:size:)`` on a server that isn't the one in use: a picture
     /// loads from the server its title is on, with that server's sign-in.
     func imageURL(_ path: String?, size: ImageSize, serverID: String) -> URL?
+
+    /// The server this repository talks to when it isn't the one in use
+    /// (a title opened in place from another server); nil for the server in use.
+    var serverScope: String? { get }
+
+    /// The movie with this TMDB id in the libraries, every copy the server
+    /// has with a file (GET /api/movies?tmdbId=, ``ServerFeatures/titlesByTMDB``);
+    /// empty when it has none, and from older servers.
+    func movies(tmdbID: Int) async throws -> [BrowseItem]
+
+    /// The show with this TMDB id in the libraries (GET /api/shows?tmdbId=); empty when it has none.
+    func shows(tmdbID: Int) async throws -> [BrowseItem]
 
     /// Yields when watch state or the library changed (a mark watched here, or
     /// the server's watch.changed and library.changed events), so screens

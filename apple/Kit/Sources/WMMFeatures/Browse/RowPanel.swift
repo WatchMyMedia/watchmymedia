@@ -117,7 +117,12 @@ extension RowPanel {
         }
         let opens: String
         var buttons: [Button] = []
-        switch item.opening {
+        let opening: ItemOpening = if case .page(let route) = item.opening { .page(route.page) } else { item.opening }
+        switch opening {
+        case .page(.episode) where item.server != nil:
+            // Another server's episode: its page, in place; its show is that server's to open from there.
+            opens = "opens the episode"
+            buttons = [Button("Go to episode", .open(item))]
         case .page(.episode):
             opens = "opens the episode"
             buttons = [Button("Go to episode", .open(item)), Button("Go to show", .openShow(id: item.id))]
@@ -233,12 +238,12 @@ extension RowPanel {
 
 extension EpisodeCard {
     /// Its identity among a screen's cards, beside ``BrowseItem/cardID``.
-    public var cardKey: String { "episode-\(episodeID)" }
+    public var cardKey: String { "episode-\(episodeID)" + (server.map { "@\($0)" } ?? "") }
 }
 
 extension ContinueItem {
     /// Its identity among a screen's cards, beside ``BrowseItem/cardID``.
-    public var cardKey: String { "continue-\(fileID)" }
+    public var cardKey: String { "continue-\(fileID)" + (server.map { "@\($0)" } ?? "") }
 }
 
 extension ScreenRow {

@@ -31,7 +31,7 @@ import WMMModel
         await #expect(throws: APIError.self) { _ = try await library.movie(id: 500) }
         await #expect(throws: APIError.self) { _ = try await library.show(id: 100) }
         let movies = try await library.items(ItemQuery(libraryID: FakeCabin.movieLibrary))
-        #expect(Set(movies.items.map(\.title)) == ["Harbor Nights", "Safe Harbour", "The Ferry Line"])
+        #expect(Set(movies.items.map(\.title)) == ["Harbor Nights", "Safe Harbour", "The Ferry Line", "Ninety Fathoms", "The Harbor Choir"])
 
         // A file's page and name come from the server it is on.
         let file = try #require(try await library.movie(id: 800).versions.first?.fileID)
@@ -45,7 +45,8 @@ import WMMModel
         #expect(try await library.search("harbor").shows.map(\.id) == [100])
         let cabin = try await library.search("harbor", serverID: FakeServers.cabin.id)
         #expect(cabin.shows.map(\.id) == [701], "Harbor Lights is on both, with each server's own id")
-        #expect(cabin.movies.map(\.title) == ["Harbor Nights"])
+        #expect(cabin.movies.map(\.title) == ["Harbor Nights", "The Harbor Choir"])
+        #expect(cabin.shows.first?.tmdbID == FakeData.tmdbID(showID: 100), "the same TMDB id as Living room server's, so one card")
 
         try await services.servers.select(FakeServers.cabin)
         #expect(try await library.search("harbor").shows.map(\.id) == [701])
@@ -79,5 +80,27 @@ import WMMModel
         #expect(services.downloads.elsewhere.map(\.serverID) == [FakeServers.livingRoom.id, FakeServers.den.id])
         try await services.servers.select(FakeServers.livingRoom)
         #expect(services.downloads.downloads.count == 3)
+    }
+}
+
+@MainActor
+@Suite struct FakeOtherServerTests {
+    init() { FakeLatency.duration = .zero }
+
+    /// The services for another server signed in to talk to it alone: Cabin
+    /// server's own library, played from there; Den server doesn't answer.
+    @Test func eachOtherServerHasServicesOfItsOwn() async throws {
+        let services = AppServices.fake(several: true, redesign: true)
+        let cabin = services.on(FakeServers.cabin.id)
+        #expect(cabin.scope == FakeServers.cabin.id)
+        #expect(cabin.library.serverScope == FakeServers.cabin.id)
+        #expect(try await cabin.library.movie(id: 803).title == "Ninety Fathoms")
+        #expect(try await cabin.library.movies(tmdbID: FakeData.tmdbID(movieID: 502)).map(\.id) == [803])
+        #expect(try await services.library.movies(tmdbID: FakeData.tmdbID(movieID: 502)).map(\.id) == [502])
+        #expect(cabin.on(nil) === services, "from there, the server in use is the app's own")
+        #expect(cabin.on(FakeServers.den.id).scope == FakeServers.den.id)
+        await #expect(throws: APIError.self) { _ = try await services.on(FakeServers.den.id).library.home() }
+        #expect(services.on(FakeServers.livingRoom.id) === services)
+        #expect(services.on("srv-unknown") === services, "a server not signed in to gets the app's own")
     }
 }

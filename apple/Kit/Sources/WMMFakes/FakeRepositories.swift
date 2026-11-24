@@ -380,8 +380,52 @@ public final class FakeLibraryRepository: LibraryRepository {
 
     public init() {}
 
-    /// The server in use is Cabin server, which has its own library (``FakeCabin``).
-    private var onCabin: Bool { servers?.current?.server.id == FakeServers.cabin.id }
+    /// The server this fake talks to when it isn't the one in use (a title
+    /// opened in place from another server); nil for the server in use.
+    public var scope: String?
+
+    public var serverScope: String? { scope }
+
+    /// The server this fake answers for: its scope, else the one in use.
+    private var answering: String? { scope ?? servers?.current?.server.id }
+
+    /// The server answering is Cabin server, which has its own library (``FakeCabin``).
+    private var onCabin: Bool { answering == FakeServers.cabin.id }
+
+    /// A fake like this one for another server signed in to, as the app's
+    /// services for that server have (``AppServices/on(_:)``): Cabin
+    /// server's library, Den server's silence, or the sample's for Living
+    /// room server when it isn't the one in use.
+    public func scoped(to serverID: String) -> FakeLibraryRepository {
+        let other = FakeLibraryRepository()
+        other.scope = serverID
+        other.root = self
+        other.servers = servers
+        other.otherServerDelay = otherServerDelay
+        other.denWaits = denWaits
+        return other
+    }
+
+    /// The fake for the server in use, from one for another server.
+    private weak var root: FakeLibraryRepository?
+
+    /// How long Den server takes to fail to answer (`-fakesSlowServer`
+    /// makes it longer than a server is given, so screens say they are still asking).
+    public var denWaits: Duration = .zero
+
+    public func movies(tmdbID: Int) async throws -> [BrowseItem] {
+        await FakeLatency.wait()
+        try checkOnline()
+        guard features.titlesByTMDB else { return [] }
+        return (onCabin ? FakeCabin.movies : FakeData.movies).filter { $0.tmdbID == tmdbID }.map(applied)
+    }
+
+    public func shows(tmdbID: Int) async throws -> [BrowseItem] {
+        await FakeLatency.wait()
+        try checkOnline()
+        guard features.titlesByTMDB else { return [] }
+        return (onCabin ? FakeCabin.shows : FakeData.shows).filter { $0.tmdbID == tmdbID }.map(applied)
+    }
 
     /// How long Cabin server takes to answer a search from another server,
     /// to see Search say it is still asking (`-fakesSlowServer`).
@@ -429,7 +473,10 @@ public final class FakeLibraryRepository: LibraryRepository {
     /// What the server in use offers: below API level 34 the fakes leave out
     /// what such a server doesn't send (people's IDs, a card's counts, the
     /// library's new totals and ratings).
-    private var features: ServerFeatures { ServerFeatures(apiLevel: servers?.current?.server.apiLevel ?? ServerFeatures.Level.redesign) }
+    private var features: ServerFeatures {
+        guard let servers else { return ServerFeatures(apiLevel: ServerFeatures.Level.redesign) }
+        return ServerFeatures(apiLevel: servers.saved.first { $0.server.id == answering }?.server.apiLevel ?? servers.current?.server.apiLevel)
+    }
 
     /// Taken off Continue watching here (Remove from Continue watching), by file.
     public private(set) var hiddenFromContinue: Set<WatchTarget> = []
@@ -451,6 +498,7 @@ public final class FakeLibraryRepository: LibraryRepository {
         if hidden { hiddenFromContinue.insert(target) } else { hiddenFromContinue.remove(target) }
         for listener in listeners.values { listener.yield() }
         for listener in typedListeners.values { listener.yield(.watched(kind, ids: [id], watched: nil)) }
+        root?.changed(.unknown)
     }
 
     /// Continue watching without what was taken off it here.
@@ -473,8 +521,14 @@ public final class FakeLibraryRepository: LibraryRepository {
 
     public func home() async throws -> HomeData {
         await FakeLatency.wait()
+        try await otherServerWaits()
         try checkOnline()
-        if onCabin { return FakeCabin.home() }
+        if onCabin {
+            // Cabin's Home comes with its fixed rows, which one card reads by the arranged rows' ids.
+            var home = FakeCabin.home()
+            home.continueWatching = shown(home.continueWatching)
+            return home
+        }
         if firstRun != nil {
             return HomeData(hero: nil, continueWatching: [], recentlyAddedShows: [], recentlyAired: [], recentlyAddedMovies: [], recentlyReleased: [], totals: LibraryTotals(movies: 0, shows: 0, episodes: 0, files: 0, totalSizeBytes: 0), lastScannedAt: nil, movieLibraryID: nil, tvLibraryID: nil)
         }
@@ -494,6 +548,7 @@ public final class FakeLibraryRepository: LibraryRepository {
     }
 
     public func libraries() async throws -> [Library] {
+        try await otherServerWaits()
         try checkOnline()
         if let firstRun {
             return switch firstRun {
@@ -508,6 +563,8 @@ public final class FakeLibraryRepository: LibraryRepository {
 
     public func items(_ query: ItemQuery) async throws -> ItemPage {
         await FakeLatency.wait()
+        try await otherServerWaits()
+        try checkOnline()
         let all = onCabin ? (query.libraryID == FakeCabin.movieLibrary ? FakeCabin.movies : FakeCabin.shows)
             : query.libraryID == FakeData.movieLibrary ? (largeLibrary ? FakeData.largeMovies : FakeData.movies) : FakeData.shows
         var list = all.filter { item in
@@ -583,6 +640,7 @@ public final class FakeLibraryRepository: LibraryRepository {
 
     public func show(id: Int) async throws -> ShowDetail {
         await FakeLatency.wait()
+        try await otherServerWaits()
         try checkOnline()
         if onCabin {
             guard FakeCabin.holds(showID: id) else { throw APIError(status: 404, message: "Not found.") }
@@ -606,6 +664,7 @@ public final class FakeLibraryRepository: LibraryRepository {
 
     public func season(showID: Int, number: Int) async throws -> SeasonDetail {
         await FakeLatency.wait()
+        try await otherServerWaits()
         try checkOnline()
         if onCabin {
             guard FakeCabin.holds(showID: showID) else { throw APIError(status: 404, message: "Not found.") }
@@ -640,6 +699,7 @@ public final class FakeLibraryRepository: LibraryRepository {
 
     public func movie(id: Int) async throws -> MovieDetail {
         await FakeLatency.wait()
+        try await otherServerWaits()
         try checkOnline()
         if onCabin {
             guard FakeCabin.holds(movieID: id) else { throw APIError(status: 404, message: "Not found.") }
@@ -742,7 +802,15 @@ public final class FakeLibraryRepository: LibraryRepository {
 
     private func checkOnline() throws {
         // Offline, or the server in use is the one that doesn't answer.
-        if offline || servers?.reachable == false { throw FakeServers.unreachable }
+        if scope == nil, offline || servers?.reachable == false { throw FakeServers.unreachable }
+        if let scope, scope == FakeServers.den.id || servers?.signedIn(on: scope) == false { throw FakeServers.unreachable }
+    }
+
+    /// Den server, asked for anything, fails after ``denWaits``; Cabin server
+    /// takes ``otherServerDelay``, as for a search.
+    private func otherServerWaits() async throws {
+        if scope == FakeServers.den.id, denWaits > .zero { try await Task.sleep(for: denWaits) }
+        if scope == FakeServers.cabin.id, otherServerDelay > .zero { try await Task.sleep(for: otherServerDelay) }
     }
 
     /// The fake library's only pictures are its backdrops (``FakeBackdrops``);
@@ -791,7 +859,10 @@ public final class FakeLibraryRepository: LibraryRepository {
         case .episode(let id): changed(.watched(.episode, ids: [id], watched: watched))
         case .season(let showID, let number): changed(.markedShow(id: showID, season: number, watched: watched))
         case .show(let id): changed(.markedShow(id: id, season: nil, watched: watched))
+        case .onServer: changed(.unknown)
         }
+        // A mark on another server: the server in use's screens hear only that something changed, as with the real ones.
+        root?.changed(.unknown)
     }
 
     /// Tells the screens following ``changes()`` and ``libraryChanges()`` what changed, as the real repository does.

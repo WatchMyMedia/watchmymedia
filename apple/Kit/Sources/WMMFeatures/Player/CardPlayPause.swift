@@ -63,9 +63,9 @@ extension Navigator {
             select()
         case .playMovie(let id):
             if let movie = try? await library.movie(id: id), let request = movie.playRequest() {
-                play(request)
+                play(request.on(library.serverScope))
             } else {
-                open(.movie(id: id))
+                open(.movie(id: id), on: library.serverScope)
             }
         }
     }

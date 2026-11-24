@@ -34,9 +34,13 @@ public struct PlayRequest: Hashable, Sendable, Identifiable {
     public var year: Int?
     public var contentRating: String?
     public var genres: [String]
+    /// The server the file is on when it isn't the one in use: another
+    /// server's copy plays from there, with its sign-in, and its progress is
+    /// kept there. The app doesn't switch.
+    public var serverID: String?
 
     public init(fileID: Int, startMs: Int? = nil, title: String, subtitle: String? = nil, backdropPath: String? = nil, stillPath: String? = nil, posterPath: String? = nil, audioIndex: Int? = nil, subtitleID: String? = nil, subtitleMode: SubtitleSelectionMode = .auto, qualityOverride: StreamQuality? = nil, showID: Int? = nil, seasonNumber: Int? = nil, recordingID: String? = nil,
-                overview: String? = nil, year: Int? = nil, contentRating: String? = nil, genres: [String] = []) {
+                overview: String? = nil, year: Int? = nil, contentRating: String? = nil, genres: [String] = [], serverID: String? = nil) {
         self.recordingID = recordingID
         self.fileID = fileID
         self.startMs = startMs
@@ -55,9 +59,17 @@ public struct PlayRequest: Hashable, Sendable, Identifiable {
         self.year = year
         self.contentRating = contentRating
         self.genres = genres
+        self.serverID = serverID
     }
 
-    public var id: String { "\(recordingID ?? String(fileID))@\(startMs.map(String.init) ?? "resume")" }
+    public var id: String { "\(serverID.map { $0 + ":" } ?? "")\(recordingID ?? String(fileID))@\(startMs.map(String.init) ?? "resume")" }
+
+    /// The same request for a file on `serverID` (nil: the server in use).
+    public func on(_ serverID: String?) -> PlayRequest {
+        var copy = self
+        copy.serverID = serverID
+        return copy
+    }
 }
 
 /// A skippable part of the file. `endMs` nil runs to the end. `final` marks
