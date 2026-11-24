@@ -1,5 +1,6 @@
 package media.watchmy.client.tv.library
 
+import media.watchmy.client.model.cardLine
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -134,6 +135,8 @@ internal fun BrowseItem.gridFacts(): List<HomeFact> = buildList {
     }
     if (kind == ItemKind.Movie) genres.firstOrNull()?.let { add(HomeFact(it)) }
     contentRating?.let { add(HomeFact(it, HomeFact.Kind.Tag)) }
+    // The server it is on, when the server in use doesn't have it.
+    where.cardLine()?.let { add(HomeFact(it)) }
     val partway = progress?.takeIf { it > 0f && it < 1f }
     val left = episodesLeftLine()
     when {

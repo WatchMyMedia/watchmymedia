@@ -1,5 +1,6 @@
 package media.watchmy.client.tv.detail
 
+import media.watchmy.client.model.cardLine
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -303,6 +304,8 @@ private fun SeasonCard(ep: EpisodeDetail, url: String?, seed: String, onTop: Boo
                         }
                     }
                     if (ep.isNew && !ep.watched) ArtBadge("New", Modifier.align(Alignment.TopStart).padding(10.dp), BadgeStyle.Gold)
+                    // Only another server has it so far: it plays from there.
+                    ep.where.cardLine()?.let { ArtBadge(it, Modifier.align(Alignment.BottomStart).padding(start = 10.dp, bottom = 16.dp)) }
                 }
             }
             // The episode on top, while focus is elsewhere: a gold bar, never a ring, so it can't be taken for focus.

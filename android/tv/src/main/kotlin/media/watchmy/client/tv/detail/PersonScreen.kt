@@ -89,8 +89,10 @@ fun PersonScreen(
     onNavigate: (Any) -> Unit,
     modifier: Modifier = Modifier,
     library: LibraryRepository = LocalAppServices.current.library,
+    /** The server the person's page is for, when it isn't the one in use. */
+    key: String? = null,
 ) {
-    val vm = viewModel(key = "tv-person-$personId") { PersonViewModel(library, personId, name) }
+    val vm = viewModel(key = "tv-person-$key-$personId") { PersonViewModel(library, personId, name) }
     ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val memory = rememberFocusMemory()

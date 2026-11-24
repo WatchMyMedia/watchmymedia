@@ -1,5 +1,7 @@
 package media.watchmy.client.tv.detail
 
+import media.watchmy.client.presentation.servers.OtherServers
+import media.watchmy.client.model.at
 import media.watchmy.client.model.watchedLine
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -88,7 +90,10 @@ import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.components.rememberLiveClockFormat
 
 /** Which of the movie's panels is open: More, or one it opened. */
-private enum class MoviePanel { None, More, Details, Tracks, Report }
+private enum class MoviePanel { None, More, Details, Tracks, Report, Copies }
+
+/** A page opened in place on a server no one is signed in to here any more. */
+internal const val SIGNED_OUT_THERE = "You’re no longer signed in to that server. Sign in to it again from Servers."
 
 /**
  * A movie, read from the couch: its title, the facts a viewer asks first
@@ -117,13 +122,24 @@ fun MovieScreen(
     onOpenShow: (Long) -> Unit = {},
     onOpenTrailer: (TrailerPlay.YouTube) -> Unit = {},
     onOpenPerson: (media.watchmy.client.model.Person, from: String) -> Unit = { _, _ -> },
+    /** The registered server the movie is on, opened in place; null is the one in use. */
+    serverId: String? = null,
 ) {
     val services = LocalAppServices.current
     val context = LocalContext.current
     // YouTube's player in a WebView here, else the YouTube app.
     var inApp by remember { mutableStateOf(TrailerWebViews.installed()) }
     val youTubeApp = remember(context) { context.canOpenYouTube() }
-    val vm = viewModel(key = "movie-$movieId") { MovieViewModel(services.library, movieId, services.requests, youTube = inApp || youTubeApp, plans = services.playback::plans, watchlists = services.watchlists) }
+    // Another server's page: its calls go there, as the person signed in there. Signed out there since, the page says so.
+    val library = remember(serverId) { services.library.at(serverId) } ?: return TvScaffold(RailSection.Movies, onNavigate, sectionRoot = false) {
+        ErrorState(SIGNED_OUT_THERE, onBack, title = "Couldn't load this movie")
+    }
+    val vm = viewModel(key = "movie-$serverId-$movieId") {
+        MovieViewModel(
+            library, movieId, services.requests, youTube = inApp || youTubeApp, plans = services.playback::plans, watchlists = services.watchlists,
+            here = serverId, others = OtherServers(services.servers, services.library), choices = services.copyChoices, plansOn = services.playback::plansOn,
+        )
+    }
     ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val memory = rememberFocusMemory()
@@ -156,9 +172,9 @@ fun MovieScreen(
                 val main = movie.versions.firstOrNull()
                 MovieContent(
                     movie,
-                    services.library,
+                    library,
                     memory,
-                    play = { startMs -> movie.playRequest(startMs = startMs)?.withTracks(audio, subtitles)?.let(onPlay) },
+                    play = { startMs -> (if (startMs == 0L) vm.playRequest(fromStart = true) else vm.playRequest())?.withTracks(audio, subtitles)?.let(onPlay) },
                     onMore = {
                         moreFocus = null
                         panel = MoviePanel.More
@@ -168,8 +184,10 @@ fun MovieScreen(
                     onTrailer = onTrailer,
                     hasFile = main != null,
                     onOpenPerson = { p -> onOpenPerson(p, movie.title) },
+                    copies = state,
+                    onChooser = { panel = MoviePanel.Copies },
                 ) {
-                    RelatedRows(state.related, services.library, memory, onOpenMovie, onOpenShow, Modifier.padding(bottom = 60.dp))
+                    RelatedRows(state.related, library, memory, onOpenMovie, onOpenShow, Modifier.padding(bottom = 60.dp))
                 }
                 LaunchedEffect(Unit) {
                     withFrameNanos { }
@@ -200,7 +218,8 @@ fun MovieScreen(
                 tracks = main?.let { tracksLine(it, audio, subtitles) },
                 open = { key, next ->
                     moreFocus = key
-                    panel = next
+                    // On several servers, Version is the chooser grouped by server.
+                    panel = if (key == "version" && state.copies.several) MoviePanel.Copies else next
                 },
                 onWatched = { vm.setWatched(!state.watched) },
             ),
@@ -213,7 +232,7 @@ fun MovieScreen(
             plans = state.plans,
             onPlay = { v ->
                 panel = MoviePanel.None
-                val request = movie.playRequest(startMs = null, version = v)
+                val request = movie.playRequest(startMs = null, version = v)?.copy(serverId = serverId)
                 (if (v == main) request?.withTracks(audio, subtitles) else request)?.let(onPlay)
             },
             onDismiss = { backToMore(moreFocus ?: "details") },
@@ -221,6 +240,17 @@ fun MovieScreen(
         MoviePanel.Tracks -> if (main != null) {
             TracksPanel(movie.title, main, audio, subtitles, onAudio = { audio = it }, onSubtitles = { subtitles = it }, onDismiss = { backToMore("tracks") })
         }
+        MoviePanel.Copies -> CopiesPanel(
+            movie.title,
+            state.copies,
+            note = state.copies.resumeNote(state.copies.all.firstOrNull()?.registeredId),
+            onChoose = { copy, v ->
+                vm.choose(copy, v)
+                panel = MoviePanel.None
+                memory.focus("play")
+            },
+            onDismiss = { panel = MoviePanel.None },
+        )
         MoviePanel.Report -> OptionsDialog(
             title = "Report a problem",
             options = ProblemKind.entries,
@@ -293,6 +323,8 @@ private fun MovieContent(
     onTrailer: () -> Unit,
     hasFile: Boolean,
     onOpenPerson: (media.watchmy.client.model.Person) -> Unit,
+    copies: MovieViewModel.State,
+    onChooser: () -> Unit,
     related: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -307,7 +339,7 @@ private fun MovieContent(
                 Box(Modifier.fillMaxWidth().bringWholeIntoView()) {
                     PageBackdrop(library.imageUrl(movie.backdropPath, ImageSize.W1280), movie.title, Modifier.fillMaxWidth().overflowHeight(1080.dp, reported = 0.dp))
                     Column(Modifier.padding(top = 150.dp, bottom = 36.dp)) {
-                        Header(movie, memory, { lastButton.value = it }, play, onMore, trailer, trailerInApp, onTrailer, hasFile, Modifier.padding(start = ContentStart, end = ContentEnd).heightIn(min = 502.dp))
+                        Header(movie, memory, { lastButton.value = it }, play, onMore, trailer, trailerInApp, onTrailer, hasFile, copies, onChooser, Modifier.padding(start = ContentStart, end = ContentEnd).heightIn(min = 502.dp))
                         CastRow(movie.cast, library, memory, Modifier.padding(top = 18.dp).upTo(memory) { listOf(lastButton.value) + MovieButtons }, onOpenPerson = onOpenPerson)
                     }
                 }
@@ -323,7 +355,7 @@ private fun MovieContent(
 }
 
 /** The movie's buttons' focus keys, in order. */
-private val MovieButtons = listOf("play", "start", "trailer", "watchlist", "more")
+private val MovieButtons = listOf("play", "copy", "start", "trailer", "watchlist", "more")
 
 /** The movie's title, facts, when it would end, what it is about and its buttons. */
 @Composable
@@ -337,15 +369,27 @@ private fun Header(
     trailerInApp: Boolean,
     onTrailer: () -> Unit,
     hasFile: Boolean,
+    state: MovieViewModel.State,
+    onChooser: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val now by rememberNow()
     val format = rememberLiveClockFormat()
-    val partway = movie.partway
+    val copies = state.copies
+    // With several servers, the place is the latest on any of them.
+    val further = state.furtherElsewhere
+    val partway = further?.place ?: movie.partway
     val runtime = movie.runtimeMs
     Column(modifier.widthIn(max = 1500.dp)) {
         Text(movie.title, style = TvType.Display, color = WmmColors.Text, maxLines = 2, overflow = TextOverflow.Ellipsis)
         FactsLine(movie.viewerFacts(), Modifier.padding(top = 18.dp))
+        // Where the title is, when it matters: opened in place from another server, or on others too.
+        val where = when {
+            state.elsewhere -> listOfNotNull("On ${media.watchmy.client.model.serverHeading(state.hereName.orEmpty())}", "away from home".takeIf { state.hereAway }).joinToString(" · ")
+            copies.several -> "Also on " + media.watchmy.client.model.serverList(copies.all.drop(1).map { it.serverName }) + (if (further != null) " · you got further there" else "")
+            else -> null
+        }
+        if (where != null) Text(where, style = TvType.Second, color = WmmColors.TextSoft, maxLines = 1, modifier = Modifier.padding(top = 10.dp))
         if (partway != null) {
             Meter(
                 partway.positionMs.toFloat() / partway.durationMs,
@@ -356,7 +400,7 @@ private fun Header(
         val whenLine = Modifier.padding(top = 14.dp)
         when {
             !hasFile -> Text("No file for this movie is in the library.", style = TvType.Body, color = WmmColors.Warn, modifier = whenLine)
-            partway != null -> WhenLine("${formatDuration(partway.positionMs)} in", " · ${endsAt(partway.durationMs - partway.positionMs, now, format)}", whenLine)
+            partway != null -> WhenLine("${formatDuration(partway.positionMs)} in" + (further?.let { ", on ${it.shortName}" } ?: ""), " · ${endsAt(partway.durationMs - partway.positionMs, now, format)}", whenLine)
             movie.watch?.completed == true -> WhenLine(movie.watch?.watchedLine() ?: "Watched", runtime?.let { " · ${formatDuration(it)} · ${wouldEndAt(it, now, format)} if you started now" }, whenLine)
             runtime != null -> WhenLine(formatDuration(runtime), " · ${wouldEndAt(runtime, now, format)} if you started now", whenLine)
         }
@@ -366,7 +410,10 @@ private fun Header(
             fun Modifier.button(key: String) = focusMemory(memory, key).onFocused { onButtonFocused(key) }
             val first = TransformOrigin(0f, 0.5f)
             if (hasFile) {
-                TvButton(movie.mainLabel(), { play(null) }, Modifier.button("play"), style = TvButtonStyle.Primary, icon = WmmIcons.Play, growFrom = first)
+                val playLabel = copies.resumeLabel(copies.all.firstOrNull()?.registeredId) ?: movie.mainLabel()
+                TvButton(playLabel, { play(null) }, Modifier.button("play"), style = TvButtonStyle.Primary, icon = WmmIcons.Play, growFrom = first)
+                // On two servers or more: the copy Play uses, which opens the versions grouped by server.
+                copies.buttonLabel()?.takeIf { copies.several }?.let { label -> TvButton(label, onChooser, Modifier.button("copy"), icon = WmmIcons.ChevronDown) }
                 if (partway != null) TvButton("From the start", { play(0) }, Modifier.button("start"))
             }
             if (trailer != null) TrailerButton(handOff = trailer is Trailer.YouTube && !trailerInApp, onTrailer, Modifier.button("trailer"))

@@ -1,5 +1,6 @@
 package media.watchmy.client.tv.navigation
 
+import media.watchmy.client.model.at
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -86,7 +87,17 @@ import media.watchmy.client.ui.LocalLiveChannelsShown
 
 /** Opens the player for [request]. */
 fun NavHostController.play(request: PlayRequest) =
-    navigate(TvRoutes.Player(request.fileId, request.startMs, request.title, request.subtitle, request.backdropPath, request.recordingId))
+    navigate(TvRoutes.Player(request.fileId, request.startMs, request.title, request.subtitle, request.backdropPath, request.recordingId, request.serverId))
+
+/** Another server's title, opened in place without switching: Back returns to where the person was. */
+fun NavHostController.openInPlace(serverId: String, page: DeepLink) {
+    when (page) {
+        is DeepLink.Movie -> navigate(TvRoutes.Movie(page.id, serverId))
+        is DeepLink.Show -> navigate(TvRoutes.Show(page.id, page.season, page.episode, serverId))
+        is DeepLink.Play -> navigate(TvRoutes.Player(fileId = page.fileId, startMs = page.startMs, title = page.title.orEmpty(), subtitle = page.subtitle, serverId = serverId))
+        else -> Unit
+    }
+}
 
 /**
  * Goes to a rail section: Home stays at the bottom of the stack, and going
@@ -102,17 +113,19 @@ fun NavHostController.navigateSection(route: Any) = navigate(route) {
 private fun NavHostController.navigateFrom(route: Any) =
     if (route is TvRoutes.MediaList || route is TvRoutes.RowSettings) navigate(route) else navigateSection(route)
 
-/** The one page for a show, a season or an episode: what goes on top first is [arrival]'s. */
+/** The one page for a show, a season or an episode: what goes on top first is [arrival]'s; [serverId] the server it is on. */
 @Composable
-private fun ShowPage(nav: NavHostController, showId: Long, arrival: ShowArrival) {
+private fun ShowPage(nav: NavHostController, showId: Long, arrival: ShowArrival, serverId: String? = null) {
     ShowPageScreen(
         showId = showId,
         arrival = arrival,
+        serverId = serverId,
+        onBack = { nav.popBackStack() },
         onPlay = nav::play,
         onNavigate = { r -> nav.navigateSection(r) },
-        onOpenShow = { id -> nav.navigate(TvRoutes.Show(id)) },
-        onOpenMovie = { id -> nav.navigate(TvRoutes.Movie(id)) },
-        onOpenPerson = { p, from -> p.personId?.let { nav.navigate(TvRoutes.Person(it, p.name, from)) } },
+        onOpenShow = { id -> nav.navigate(TvRoutes.Show(id, serverId = serverId)) },
+        onOpenMovie = { id -> nav.navigate(TvRoutes.Movie(id, serverId)) },
+        onOpenPerson = { p, from -> p.personId?.let { nav.navigate(TvRoutes.Person(it, p.name, from, serverId)) } },
     )
 }
 
@@ -140,6 +153,8 @@ fun TvNavHost(
 ) {
     val handled by rememberUpdatedState(onDeepLinkHandled)
     val services = media.watchmy.client.ui.LocalAppServices.current
+    // A card, result or link from another server opens its title in place, from that server, without switching.
+    media.watchmy.client.ui.ProvideInPlace { serverId, page -> nav.openInPlace(serverId, page) }
     // What Servers, on every screen's rail, needs from the app above these screens.
     val addServer by rememberUpdatedState(onAddServer)
     val openElsewhere by rememberUpdatedState(onOpenElsewhere)
@@ -209,6 +224,14 @@ fun TvNavHost(
     }
     LaunchedEffect(deepLink) {
         if (deepLink == null) return@LaunchedEffect
+        // A link or Watch Next entry another account here published opens in place, from that server.
+        val saved = services.servers.saved.first()
+        DeepLink.elsewhere(deepLink, saved, services.servers.current.value?.server?.id)?.let { (serverId, page) ->
+            val there = if (page is DeepLink.Details) services.library.at(serverId)?.let { attempt { it.filePage(page.fileId) }.getOrNull() } else page
+            there?.let { nav.openInPlace(serverId, it) }
+            handled()
+            return@LaunchedEffect
+        }
         val account = media.watchmy.client.model.watchNextAccount(services.servers.current.value?.server, services.auth.user.value)
         // A reminder's own link watches its channel once the list has it; anything else opens its page.
         val live = media.watchmy.client.model.DeepLink.open(deepLink, account) as? media.watchmy.client.model.DeepLink.Live
@@ -300,34 +323,40 @@ fun TvNavHost(
                         route.season != null -> ShowArrival.Season(route.season)
                         else -> ShowArrival.Show
                     }
-                    ShowPage(nav, route.id, arrival)
+                    ShowPage(nav, route.id, arrival, route.serverId)
                 }
                 composable<TvRoutes.Episode> {
                     val route = it.toRoute<TvRoutes.Episode>()
-                    ShowPage(nav, route.showId, ShowArrival.Episode(route.episodeId, route.season))
+                    ShowPage(nav, route.showId, ShowArrival.Episode(route.episodeId, route.season), route.serverId)
                 }
                 composable<TvRoutes.Movie> {
+                    val route = it.toRoute<TvRoutes.Movie>()
+                    val here = route.serverId
                     MovieScreen(
-                        movieId = it.toRoute<TvRoutes.Movie>().id,
+                        movieId = route.id,
+                        serverId = here,
                         onPlay = nav::play,
                         onBack = { nav.popBackStack() },
                         onNavigate = { r -> nav.navigateSection(r) },
-                        onOpenMovie = { id -> nav.navigate(TvRoutes.Movie(id)) },
-                        onOpenShow = { id -> nav.navigate(TvRoutes.Show(id)) },
+                        onOpenMovie = { id -> nav.navigate(TvRoutes.Movie(id, here)) },
+                        onOpenShow = { id -> nav.navigate(TvRoutes.Show(id, serverId = here)) },
                         onOpenTrailer = { t -> nav.navigate(TvRoutes.Trailer(t.movieId, t.movieTitle, t.trailers.map { it.key }, t.trailers.map { it.name }, t.trailers.map { it.teaser })) },
-                        onOpenPerson = { p, from -> p.personId?.let { nav.navigate(TvRoutes.Person(it, p.name, from)) } },
+                        onOpenPerson = { p, from -> p.personId?.let { nav.navigate(TvRoutes.Person(it, p.name, from, here)) } },
                     )
                 }
                 composable<TvRoutes.Person> {
                     val r = it.toRoute<TvRoutes.Person>()
+                    val there = remember(r.serverId) { services.library.at(r.serverId) } ?: services.library
                     media.watchmy.client.tv.detail.PersonScreen(
                         personId = r.personId,
                         name = r.name,
                         from = r.from,
                         onBack = { nav.popBackStack() },
-                        onOpenMovie = { id -> nav.navigate(TvRoutes.Movie(id)) },
-                        onOpenShow = { id -> nav.navigate(TvRoutes.Show(id)) },
+                        onOpenMovie = { id -> nav.navigate(TvRoutes.Movie(id, r.serverId)) },
+                        onOpenShow = { id -> nav.navigate(TvRoutes.Show(id, serverId = r.serverId)) },
                         onNavigate = { route -> nav.navigateSection(route) },
+                        library = there,
+                        key = r.serverId,
                     )
                 }
                 composable<TvRoutes.Trailer> {
@@ -347,7 +376,8 @@ fun TvNavHost(
                         onOpenLive = { hit -> openInGuide(LiveGuideViewModel.Target(hit.channel.id, hit.programme.id, hit.programme.startMs)) },
                         words = searchWords,
                         onWordsTaken = { searchWords = null },
-                        onOpenElsewhere = onOpenElsewhere,
+                        // Another server's result opens in place, from that server; Back returns to Search as it was.
+                        onOpenElsewhere = { serverId, _, page -> nav.openInPlace(serverId, page) },
                     )
                 }
                 composable<TvRoutes.LiveTV> {
@@ -396,7 +426,7 @@ fun TvNavHost(
                 composable<TvRoutes.Player> {
                     val r = it.toRoute<TvRoutes.Player>()
                     PlayerScreen(
-                        request = PlayRequest(r.fileId, r.startMs, r.title, r.subtitle, r.backdropPath, recordingId = r.recordingId),
+                        request = PlayRequest(r.fileId, r.startMs, r.title, r.subtitle, r.backdropPath, recordingId = r.recordingId, serverId = r.serverId),
                         onExit = { nav.popBackStack() },
                     )
                 }

@@ -1,5 +1,6 @@
 package media.watchmy.client.tv.home
 
+import media.watchmy.client.model.cardLine
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -79,6 +80,8 @@ internal data class HomeFocus(
     val live: Boolean = false,
     /** The card's 16:9 picture in the library, or a programme's picture. */
     val picturePath: String? = null,
+    /** The server the card's picture is on. */
+    val where: media.watchmy.client.model.Where = media.watchmy.client.model.Where.Here,
     val livePicture: String? = null,
     val seed: String = title,
 )
@@ -120,11 +123,14 @@ private fun continueFocus(c: ContinueItem, now: Long, format: LiveClockFormat): 
             HomeFact(timeLeft(c.remainingMs), HomeFact.Kind.Strong),
             HomeFact(endsAt(c.remainingMs, now, format)),
             c.contentRating?.let { HomeFact(it, HomeFact.Kind.Tag) },
+            // Resume plays another server's copy: the card says so.
+            c.where.cardLine(resumes = true)?.let { HomeFact(it) },
         ),
         progress = c.progress.takeIf { c.durationMs > 0 },
         progressLabel = if (totalMin > 0) "$watchedMin of $totalMin minutes watched" else null,
         overview = c.overview.orEmpty(),
         picturePath = c.stillPath ?: c.backdropPath,
+        where = c.where,
     )
 }
 
@@ -173,6 +179,8 @@ private fun ScreenRow.itemFocus(item: BrowseItem, index: Int, headingTitle: Stri
             item.fileCount?.let { facts += HomeFact(plural(it, "file")) }
         }
     }
+    // A title only another server has names it; one the server in use has too names nothing.
+    item.where.cardLine()?.let { facts += HomeFact(it) }
     return HomeFocus(
         kicker = ScreenRowItemKicker(item, index, headingTitle, listId, style),
         title = item.title,
@@ -181,6 +189,7 @@ private fun ScreenRow.itemFocus(item: BrowseItem, index: Int, headingTitle: Stri
         note = note,
         overview = item.overview,
         picturePath = item.backdropPath,
+        where = item.where,
     )
 }
 
@@ -191,6 +200,7 @@ private fun episodeFocus(e: EpisodeCard, headingTitle: String): HomeFocus = Home
     facts = listOfNotNull(HomeFact("Not in your library").takeIf { !e.hasFile }),
     overview = e.overview,
     picturePath = e.stillPath ?: e.showBackdropPath,
+    where = e.where,
     seed = e.showTitle,
 )
 

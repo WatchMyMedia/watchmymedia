@@ -128,7 +128,7 @@ fun HomeScreen(
     liveListings: Boolean = false,
 ) {
     val services = LocalAppServices.current
-    val vm = viewModel { HomeViewModel(services.library, services.auth, services.rows) }
+    val vm = viewModel { HomeViewModel(services.library, services.auth, services.rows, others = media.watchmy.client.presentation.servers.OtherServers(services.servers, services.library)) }
     ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val user by vm.user.collectAsStateWithLifecycle()
@@ -165,6 +165,8 @@ fun HomeScreen(
                             onLiveGuide = { onNavigate(RailSection.LiveTV.route) },
                             onEditRows = { onNavigate(TvRoutes.RowSettings(RowScreens.HOME)) },
                             onOpenLibrary = { type -> onNavigate(if (type == LibraryType.Tv) RailSection.Shows.route else RailSection.Movies.route) },
+                            elsewhere = media.watchmy.client.tv.rows.ElsewhereEnd(state.stillAsking, state.notAnswered, vm::retryElsewhere)
+                                .takeIf { state.stillAsking.isNotEmpty() || state.notAnswered.isNotEmpty() },
                         )
                     } else HomeContent(
                         home = home,
