@@ -199,16 +199,17 @@ private fun HomeData.isEmpty() =
     hero == null && continueWatching.isEmpty() && recentlyAddedShows.isEmpty() && recentlyAired.isEmpty() && recentlyAddedMovies.isEmpty() && recentlyReleased.isEmpty() &&
         rows.orEmpty().none { it.style != RowStyle.Live && it.hasContent }
 
-/** Arranged Home's first focus: the first card of the first row drawn, else the hero (shown only when there are no rows). */
+/** Arranged Home's first focus: the lead's Resume or Play ([homeLead]), else the first card of the first row drawn. */
 internal fun HomeData.arrangedFirstFocusKey(liveChannels: List<LiveChannel>): String? {
-    val first = rows.orEmpty().drawn(live = liveChannels.any { it.available }).firstOrNull()
-        ?: return hero?.let { if (it.fileId != null) "hero:play" else "hero:open" }
+    val (lead, drawn) = homeLead(hero, rows.orEmpty().drawn(live = liveChannels.any { it.available }))
+    lead?.let { return it.key }
+    val first = drawn.firstOrNull() ?: return null
     if (first.style == RowStyle.Live) return liveChannels.firstOrNull { it.available }?.let { "live:${it.id}" }
     return first.cardKey()
 }
 
 private fun HomeData.firstFocusKey(): String? = when {
-    hero != null -> if (hero!!.fileId != null) "hero:play" else "hero:open"
+    fixedLead() != null -> fixedLead()!!.key
     continueWatching.isNotEmpty() -> "cw:${continueWatching.first().fileId}"
     recentlyAddedShows.isNotEmpty() -> "shows:${recentlyAddedShows.first().id}"
     recentlyAired.isNotEmpty() -> "aired:${recentlyAired.first().episodeId}"
@@ -243,21 +244,32 @@ private fun HomeContent(
             contentPadding = PaddingValues(bottom = 0.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            home.hero?.let { hero ->
-                // An episode's season comes from its Recently aired card; without one the hero goes to the show.
-                val episode = hero.episodeId?.takeIf { hero.kind == Hero.Kind.Episode }?.let { id -> home.recentlyAired.firstOrNull { it.episodeId == id } }
-                val openEpisode = episode?.let { e -> { onOpenEpisode(e.showId, e.season, e.episodeId) } }
-                item("hero", contentType = "hero") { HeroSection(hero, home, library, memory, onPlay, onOpenShow, onOpenMovie, openEpisode) }
+            // The lead: what the person was watching, else the server's pick.
+            val lead = home.fixedLead()
+            when (lead) {
+                is HomeLead.Pick -> {
+                    val hero = lead.hero
+                    // An episode's season comes from its Recently aired card; without one the hero goes to the show.
+                    val episode = hero.episodeId?.takeIf { hero.kind == Hero.Kind.Episode }?.let { id -> home.recentlyAired.firstOrNull { it.episodeId == id } }
+                    val openEpisode = episode?.let { e -> { onOpenEpisode(e.showId, e.season, e.episodeId) } }
+                    item("hero", contentType = "hero") { HeroSection(hero, home, library, memory, onPlay, onOpenShow, onOpenMovie, openEpisode) }
+                }
+                is HomeLead.Resume -> item("hero", contentType = "hero") {
+                    val actions = remember(onPlay, onOpenShow, onOpenMovie, onOpenEpisode) { TvRowActions(onPlay, onOpenShow, onOpenMovie, onOpenEpisode, notMatched, onToggleWatched, {}) }
+                    FixedResumeLead(lead, home, library, memory, actions)
+                }
+                null -> item("top", contentType = "top") { Box(Modifier.height(72.dp)) }
             }
-            if (home.hero == null) item("top", contentType = "top") { Box(Modifier.height(72.dp)) }
+            // The lead's title leaves the row, which keeps the rest.
+            val continuing = if (lead is HomeLead.Resume) home.continueWatching.drop(1) else home.continueWatching
 
-            if (home.continueWatching.isNotEmpty()) {
+            if (continuing.isNotEmpty()) {
                 // The rows are all a heading over a CardRow, so one row's composition can be reused for another.
                 item("cw", contentType = "row") {
                     Column {
                         SectionHeader("Continue watching")
                         CardRow {
-                            items(home.continueWatching, key = { it.fileId }) { c ->
+                            items(continuing, key = { it.fileId }) { c ->
                                 MediaCard(
                                     title = c.title,
                                     subtitle = c.remainingLine,

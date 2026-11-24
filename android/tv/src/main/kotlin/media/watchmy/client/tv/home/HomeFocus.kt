@@ -111,14 +111,23 @@ internal fun ScreenRow.homeFocusAt(index: Int, channels: List<LiveChannel>, now:
     }
 }
 
-private fun continueFocus(c: ContinueItem, now: Long, format: LiveClockFormat): HomeFocus {
+/**
+ * The episode's name from a Continue watching subtitle, without the code it
+ * may start with: "Open Late" from the server's "S02E01 Open Late", "Drift"
+ * from "S02 E04 · Drift"; null when nothing is left.
+ */
+internal fun episodeName(subtitle: String?): String? = subtitle?.replace(LEADING_CODE, "")?.trim()?.takeIf { it.isNotEmpty() }
+
+private val LEADING_CODE = Regex("""^\s*S\d+\s*E\d+\s*[·:–-]?\s*""", RegexOption.IGNORE_CASE)
+
+internal fun continueFocus(c: ContinueItem, now: Long, format: LiveClockFormat): HomeFocus {
     val code = if (c.season != null && c.episode != null) episodeCode(c.season!!, c.episode!!) else null
     val watchedMin = (c.positionMs / 60_000L).toInt()
     val totalMin = (c.durationMs / 60_000L).toInt()
     return HomeFocus(
         kicker = "Continue watching",
         title = c.title,
-        episode = if (code != null) listOfNotNull(code, c.subtitle?.takeIf { it.isNotBlank() && !it.startsWith(code) }).joinToString(" · ") else null,
+        episode = if (code != null) listOfNotNull(code, episodeName(c.subtitle)).joinToString(" · ") else null,
         facts = listOfNotNull(
             HomeFact(timeLeft(c.remainingMs), HomeFact.Kind.Strong),
             HomeFact(endsAt(c.remainingMs, now, format)),

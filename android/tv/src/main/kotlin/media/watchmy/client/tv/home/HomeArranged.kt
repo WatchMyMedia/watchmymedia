@@ -44,7 +44,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
-import media.watchmy.client.model.Hero
 import media.watchmy.client.model.HomeData
 import media.watchmy.client.model.ImageSize
 import media.watchmy.client.model.LibraryType
@@ -54,7 +53,6 @@ import media.watchmy.client.model.ScreenRow
 import media.watchmy.client.model.headingLine
 import media.watchmy.client.model.pictureUrl
 import media.watchmy.client.model.drawn
-import media.watchmy.client.model.episodeCards
 import media.watchmy.client.model.seeAllType
 import media.watchmy.client.tv.components.ContentEnd
 import media.watchmy.client.tv.components.SafeY
@@ -83,13 +81,16 @@ import media.watchmy.client.ui.components.WmmIcons
 import media.watchmy.client.ui.onBack
 
 /**
- * Home in the person's order as screens, one row each: the focused card's
- * picture fills the screen, with its title, how long is left and when it
- * ends, and two lines about it above the row; the next row's name sits along
- * the foot. Home opens on the first row (Continue watching, for most), and
- * the last screen is Edit rows and the totals. ▼ at a row pages down and ▲
- * pages up (the D-pad pages, never a fling); each row comes back to the
- * card it had focus on; Back from a later row goes to the first row first.
+ * Home in the person's order as screens. The first is the lead ([HomeLead]):
+ * a large card to resume what the person was watching, with how long is
+ * left and when it ends, or the server's pick when nothing is in progress;
+ * focus starts on its Resume (or Play). Then one row a screen: the focused
+ * card's picture fills the screen, with its title, how long is left and when
+ * it ends, and two lines about it above the row; the next row's name sits
+ * along the foot. The last screen is Edit rows and the totals. ▼ at a row
+ * pages down and ▲ pages up (the D-pad pages, never a fling); each row comes
+ * back to the card it had focus on; Back from a later screen goes to the
+ * first one first.
  * Live TV sits in its place. A row with somewhere to go ends in See all: a
  * list's page, or its library's grid sorted the row's way ([onOpenLibrary]).
  *
@@ -116,23 +117,24 @@ internal fun ArrangedHomeContent(
 ) {
     val live = liveChannels.any { it.available }
     val requests = LocalAppServices.current.browseRequests
-    val rows = home.rows.orEmpty().drawn(live)
-    val pages = remember(home, rows) { homePages(home.hero != null, rows) }
+    // The lead leaves Continue watching, which keeps the rest.
+    val (lead, rows) = remember(home, live) { homeLead(home.hero, home.rows.orEmpty().drawn(live)) }
+    val pages = remember(lead != null, rows) { homePages(lead != null, rows) }
     val pager = rememberPagerState { pages.size }
     val available = liveChannels.filter { it.available }
     // The card each row last had focus on, by row id, so a page restores it (FocusMemory keeps only the last key overall).
     // Saved with the screen: after Back from a page, ▲ into a row left scrolled sideways finds its card again.
     val lastFocus = rememberSaveable(saver = RowFocusSaver) { mutableStateMapOf<String, String>() }
-    val heroKey = home.hero?.let { if (it.fileId != null) "hero:play" else "hero:open" }
+    val leadKey = lead?.key
     // The page Home is on or heading to: the one that holds focus (each page reports it), or one asked for that could not take focus yet.
     var goal by remember { mutableStateOf<PageGoal?>(null) }
 
     fun firstKey(row: ScreenRow): String? = if (row.style == RowStyle.Live) available.firstOrNull()?.let { "live:${it.id}" } else row.cardKey()
     fun focus(key: String?): Boolean = key != null && runCatching { memory.requester(key).requestFocus() }.getOrDefault(false)
 
-    /** Puts focus on [page]: the card its row last had, else the row's first, else the hero. False while the page is not composed. */
+    /** Puts focus on [page]: the lead's main button, or the card its row last had, else the row's first. False while the page is not composed. */
     fun focusPage(page: HomePage): Boolean = when (page) {
-        is HomePage.Start -> page.row?.let { focus(lastFocus[it.id]) || focus(firstKey(it)) } == true || focus(heroKey)
+        HomePage.Lead -> focus(leadKey)
         is HomePage.Row -> focus(lastFocus[page.row.id]) || focus(firstKey(page.row))
         HomePage.End -> focus("end:edit")
     }
@@ -185,8 +187,19 @@ internal fun ArrangedHomeContent(
             withFrameNanos { }
             if (memory.restore(fallback)) return@LaunchedEffect
         }
-        // Neither is there (the remembered card has gone, and the hero is not on the page showing): the page showing takes focus.
+        // Neither is there (the remembered card has gone, and the lead is not on the page showing): the page showing takes focus.
         pages.getOrNull(pager.currentPage)?.let(::ask)
+    }
+
+    // After Remove from Continue watching, the next title takes the lead and Remove keeps the focus; with none left,
+    // the first screen (the server's pick, or the first row) takes it.
+    var afterRemove by remember { mutableStateOf(false) }
+    LaunchedEffect(lead, afterRemove) {
+        if (!afterRemove) return@LaunchedEffect
+        withFrameNanos { }
+        afterRemove = false
+        if (memory.focus(LEAD_REMOVE)) return@LaunchedEffect
+        currentPages.firstOrNull()?.let { if (!focusPage(it)) ask(it) }
     }
 
     // Back from a row page goes to the first page before leaving Home, also while the pager is still on its way down.
@@ -228,13 +241,9 @@ internal fun ArrangedHomeContent(
         // focus group: the rail's way back restores the row or the hero button it left, which a group here would hide.
         Box(Modifier.fillMaxSize().onFocusChanged { if (it.hasFocus) goal = PageGoal(page.key, focus = false) }.stopBringIntoView()) {
             when (page) {
-                is HomePage.Start -> Box(Modifier.fillMaxSize()) {
-                    // Only when there are no rows: the server's pick on its own.
-                    home.hero?.let { hero ->
-                        val episode = hero.episodeId?.takeIf { hero.kind == Hero.Kind.Episode }?.let { id -> home.episodeCards.firstOrNull { it.episodeId == id } }
-                        val openEpisode = episode?.let { e -> { actions.onOpenEpisode(e.showId, e.season, e.episodeId) } }
-                        HeroSection(hero, home, library, memory, actions.onPlay, actions.onOpenShow, actions.onOpenMovie, openEpisode)
-                    }
+                HomePage.Lead -> Box(Modifier.fillMaxSize()) {
+                    // ▼ from its buttons pages to the first row; ▲ has nowhere to go.
+                    lead?.let { LeadScreen(it, home, library, memory, actions, buttons = Modifier.pageKeys(up = null, down = { pageTo(index + 1) }), onRemoved = { afterRemove = true }) }
                     PeekLine(nextName(index), up = false, Modifier.align(Alignment.BottomStart))
                 }
                 is HomePage.Row -> {

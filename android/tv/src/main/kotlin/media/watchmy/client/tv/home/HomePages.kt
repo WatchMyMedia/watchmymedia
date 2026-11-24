@@ -41,16 +41,16 @@ import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
 
 /**
- * Home as screens: every row fills a screen of its own, the first row's
- * first, so Home opens on what the person is most likely to go on with;
- * the last screen is Edit rows and the totals. The server's pick (the hero)
- * has a screen only when there are no rows to show.
+ * Home as screens: the lead first ([HomeLead]: what the person is most
+ * likely to go back to, or the server's pick when nothing is in progress),
+ * then every row on a screen of its own; the last screen is Edit rows and
+ * the totals. Without a lead, Home opens on its first row.
  */
 internal sealed interface HomePage {
     val key: String
 
-    /** The hero, when there are no rows ([row] is then null). */
-    data class Start(val row: ScreenRow?) : HomePage {
+    /** The lead, on its own ([LeadScreen]). */
+    data object Lead : HomePage {
         override val key: String get() = "start"
     }
 
@@ -64,8 +64,8 @@ internal sealed interface HomePage {
     }
 }
 
-internal fun homePages(hero: Boolean, rows: List<ScreenRow>): List<HomePage> = buildList {
-    if (rows.isEmpty() && hero) add(HomePage.Start(null))
+internal fun homePages(lead: Boolean, rows: List<ScreenRow>): List<HomePage> = buildList {
+    if (lead) add(HomePage.Lead)
     rows.forEach { add(HomePage.Row(it)) }
     add(HomePage.End)
 }
@@ -73,7 +73,7 @@ internal fun homePages(hero: Boolean, rows: List<ScreenRow>): List<HomePage> = b
 /** The row a page draws, for its focus and its name along the next page's bottom edge. */
 internal val HomePage.row: ScreenRow?
     get() = when (this) {
-        is HomePage.Start -> row
+        HomePage.Lead -> null
         is HomePage.Row -> row
         HomePage.End -> null
     }

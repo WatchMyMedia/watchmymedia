@@ -64,7 +64,7 @@ class SeeAllTvTest {
 
     @Test
     fun `Recently aired ends in See all, which opens TV Shows by last aired at its grid, and Back returns to it`() {
-        repeat(4) { press(Key.DirectionDown) } // From Continue watching: Live TV, Recently added shows, a list, then Recently aired.
+        repeat(5) { press(Key.DirectionDown) } // From the lead: Continue watching, Live TV, Recently added shows, a list, then Recently aired.
         compose.onNodeWithText("Row 5 of ", substring = true, useUnmergedTree = true).assertExists()
         repeat(home.recentlyAired.size) { if (focused() != "See all TV shows") press(Key.DirectionRight) }
         assertEquals("See all TV shows", focused())
@@ -87,7 +87,7 @@ class SeeAllTvTest {
 
     @Test
     fun `the rail's TV Shows afterwards opens as it always does`() {
-        repeat(4) { press(Key.DirectionDown) }
+        repeat(5) { press(Key.DirectionDown) }
         repeat(home.recentlyAired.size) { if (focused() != "See all TV shows") press(Key.DirectionRight) }
         press(Key.DirectionCenter)
         compose.onNodeWithText("Sort: Last aired", useUnmergedTree = true).assertExists()
@@ -103,7 +103,7 @@ class SeeAllTvTest {
 
     @Test
     fun `Recently released ends in See all movies by release date`() {
-        repeat(7) { press(Key.DirectionDown) } // ... Recently added movies, a list, then Recently released.
+        repeat(8) { press(Key.DirectionDown) } // ... Recently added movies, a list, then Recently released.
         compose.onNodeWithText("Row 8 of ", substring = true, useUnmergedTree = true).assertExists()
         repeat(home.recentlyReleased.size) { if (focused() != "See all movies") press(Key.DirectionRight) }
         assertEquals("See all movies, by release date", spoken())

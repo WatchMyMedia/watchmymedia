@@ -37,6 +37,7 @@ import media.watchmy.client.tv.components.focusMemory
 import media.watchmy.client.tv.components.inter
 import media.watchmy.client.tv.components.overflowHeight
 import media.watchmy.client.ui.open
+import media.watchmy.client.ui.imageFor
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
 
@@ -132,5 +133,30 @@ internal fun HeroSection(
                 }
             }
         }
+    }
+}
+
+/**
+ * Home's lead on servers without rows, when something is in progress: the
+ * words and buttons arranged Home's lead has ([LeadPanel]), over the picture
+ * as the server's pick lays it out, above Continue watching's other titles.
+ */
+@Composable
+internal fun FixedResumeLead(lead: HomeLead.Resume, home: HomeData, library: LibraryRepository, memory: FocusMemory, actions: media.watchmy.client.tv.rows.TvRowActions) {
+    val item = lead.item
+    Box(Modifier.fillMaxWidth().height(600.dp).bringWholeIntoView()) {
+        Backdrop(
+            url = library.imageFor(item.where, item.stillPath ?: item.backdropPath, ImageSize.W1280),
+            seed = item.title,
+            modifier = Modifier
+                .offset(x = 560.dp)
+                .width(1360.dp)
+                .overflowHeight(720.dp, reported = 600.dp),
+            leftFade = listOf(0f to 1f, 0.22f to 0.85f, 0.6f to 0f),
+            bottomFadeFrom = 0.55f,
+            glowX = 0.7f,
+            glowY = 0.3f,
+        )
+        LeadPanel(lead, home, memory, actions, Modifier.padding(start = ContentStart, top = 112.dp).width(1100.dp))
     }
 }

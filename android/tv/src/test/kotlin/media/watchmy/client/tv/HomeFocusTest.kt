@@ -10,6 +10,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
@@ -31,7 +33,8 @@ import org.robolectric.annotation.Config
 
 /**
  * Moving around the TV app with the D-pad, on the fakes at a 1080p TV's
- * size: the rail hands focus back to where it was, Home's screens page on
+ * size: Home leads with what you were watching, the rail hands focus back
+ * to where it was, Home's screens page on
  * ▲ ▼ and restore each row's card, a key pressed
  * while a screen slides in acts on the row arriving, and Back from a page
  * puts focus back on the card that opened it.
@@ -56,17 +59,51 @@ class HomeFocusTest {
     }
 
     @Test
-    fun `Home starts on the first row's first card, and right from the rail goes back to the card left`() {
-        val first = home.continueWatching.first().title
-        assertEquals("Home opens on Continue watching, with no hero to pass", first, focused())
+    fun `Home leads with what you were watching, and the rows follow without it`() {
+        val lead = home.continueWatching.first().title
+        assertEquals("Home opens on Resume", "Resume", focused())
+        compose.onAllNodesWithText(lead, useUnmergedTree = true).fetchSemanticsNodes().single { it.boundsInRoot.height > 0f }
+        compose.onNodeWithText("Go to episode", useUnmergedTree = true).assertIsDisplayed()
+        // The next row's name along the foot (the screen after it, composed below, has one too).
+        compose.onAllNodesWithContentDescription("Next row:", useUnmergedTree = true).onFirst().assertIsDisplayed()
+        press(Key.DirectionLeft)
+        assertEquals("The rail opens on its active section", "Home", focused())
+        press(Key.DirectionRight)
+        assertEquals("Right from the rail puts focus back on Resume", "Resume", focused())
+
+        press(Key.DirectionDown)
+        val first = home.continueWatching[1].title
+        assertEquals("Continue watching follows, without the title on the card", first, focused())
         compose.onNodeWithText("Row 1 of ", substring = true, useUnmergedTree = true).assertIsDisplayed()
+        press(Key.DirectionUp)
+        assertEquals("Up from the first row goes back to Resume", "Resume", focused())
+    }
+
+    @Test
+    fun `Remove from Continue watching puts the next title on the card and keeps the focus`() {
+        press(Key.DirectionRight)
+        press(Key.DirectionRight)
+        assertEquals(media.watchmy.client.model.REMOVE_FROM_CONTINUE, focused())
+        compose.onNodeWithText(media.watchmy.client.tv.home.LEAD_REMOVE_NOTE, useUnmergedTree = true).assertIsDisplayed()
+        press(Key.DirectionCenter)
+        compose.waitUntil(5_000) { compose.onAllNodesWithText(home.continueWatching[1].title, useUnmergedTree = true).fetchSemanticsNodes().any { it.boundsInRoot.height > 0f && it.boundsInRoot.top < 400f } }
+        assertEquals("Remove keeps the focus, for the next one", media.watchmy.client.model.REMOVE_FROM_CONTINUE, focused())
+        press(Key.DirectionDown)
+        assertEquals("Continue watching starts after the new lead", home.continueWatching[2].title, focused())
+    }
+
+    @Test
+    fun `Right from the rail goes back to the card left, and a run of left stops at the first`() {
+        press(Key.DirectionDown)
+        val first = home.continueWatching[1].title
+        assertEquals(first, focused())
         press(Key.DirectionLeft)
         assertEquals("The rail opens on its active section", "Home", focused())
         press(Key.DirectionRight)
         assertEquals("Right from the rail puts focus back on the first card", first, focused())
 
         press(Key.DirectionRight)
-        val second = home.continueWatching[1].title
+        val second = home.continueWatching[2].title
         assertEquals(second, focused())
         press(Key.DirectionLeft)
         // A press by itself, after the run that reached the first card: the rail.
@@ -82,7 +119,8 @@ class HomeFocusTest {
 
     @Test
     fun `Down at a row pages to the next row's screen, and up comes back to the card it had`() {
-        assertEquals(home.continueWatching.first().title, focused())
+        press(Key.DirectionDown) // Continue watching.
+        assertEquals(home.continueWatching[1].title, focused())
         press(Key.DirectionDown) // The second row screen: Live TV, as the fakes arrange it.
         val channel = focused()
         assertTrue("$channel is a channel card", channel.endsWith("Watch live"))
@@ -95,20 +133,20 @@ class HomeFocusTest {
         press(Key.DirectionUp)
         assertEquals("The Live row comes back to the channel it had focus on", second, focused())
         press(Key.DirectionUp)
-        assertEquals("Up from the second row screen returns to the first row", home.continueWatching.first().title, focused())
+        assertEquals("Up from the second row screen returns to the first row", home.continueWatching[1].title, focused())
+        press(Key.DirectionUp)
+        assertEquals("And up from there to the lead", "Resume", focused())
     }
 
     @Test
     fun `Back from a row screen goes to the first screen before leaving Home`() {
-        press(Key.DirectionDown)
-        press(Key.DirectionDown)
-        press(Key.DirectionDown) // Four screens in: a list row.
+        repeat(4) { press(Key.DirectionDown) } // The lead, then four rows in: a list row.
         compose.onNodeWithText("Row 4 of ", substring = true, useUnmergedTree = true).assertExists()
 
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         compose.waitForIdle()
-        assertEquals("Back goes to the first screen, on its row", home.continueWatching.first().title, focused())
-        compose.onNodeWithText("Row 1 of ", substring = true, useUnmergedTree = true).assertExists()
+        assertEquals("Back goes to the first screen, on Resume", "Resume", focused())
+        compose.onNode(isFocused()).assertIsDisplayed()
     }
 
     @Test
@@ -119,11 +157,12 @@ class HomeFocusTest {
         press(Key.DirectionRight)
         assertEquals("Back to the top", focused())
         press(Key.DirectionCenter)
-        assertEquals("Back to the top puts focus on the first screen's row", home.continueWatching.first().title, focused())
+        assertEquals("Back to the top puts focus on the lead's Resume", "Resume", focused())
     }
 
     @Test
     fun `Back from a show puts focus back on its card`() {
+        press(Key.DirectionDown) // Continue watching.
         press(Key.DirectionDown) // Live TV sits below Continue watching.
         press(Key.DirectionDown)
         // Down from a wide card lands on the poster below it, which needn't be the row's first.
@@ -148,6 +187,7 @@ class HomeFocusTest {
 
     @Test
     fun `A row keeps its card while a page opened from the next row comes and goes`() {
+        press(Key.DirectionDown) // Continue watching.
         press(Key.DirectionDown) // Live TV.
         press(Key.DirectionRight)
         val channel = focused()
@@ -166,6 +206,7 @@ class HomeFocusTest {
 
     @Test
     fun `Left or right pressed while the next row slides in moves along that row`() {
+        press(Key.DirectionDown) // Continue watching.
         press(Key.DirectionDown) // Live TV.
         press(Key.DirectionDown) // Recently added shows: which cards ▼ and then ▶ land on.
         val first = focused()
@@ -194,6 +235,7 @@ class HomeFocusTest {
 
     @Test
     fun `OK pressed while the next row slides in opens that row's card`() {
+        press(Key.DirectionDown) // Continue watching.
         press(Key.DirectionDown) // Live TV.
         compose.mainClock.autoAdvance = false
         tap(Key.DirectionDown)
@@ -210,6 +252,7 @@ class HomeFocusTest {
 
     @Test
     fun `Left from a row still sliding in opens the rail, and right comes back to that row`() {
+        press(Key.DirectionDown) // Continue watching.
         press(Key.DirectionDown) // Live TV.
         compose.mainClock.autoAdvance = false
         tap(Key.DirectionDown)
@@ -233,12 +276,13 @@ class HomeFocusTest {
         compose.mainClock.advanceTimeBy(100)
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         settle()
-        assertEquals(home.continueWatching.first().title, focused())
-        assertFocusShowing("Row 1 of ")
+        assertEquals("Resume", focused())
+        compose.onNode(isFocused()).assertIsDisplayed()
     }
 
     @Test
     fun `Up and down pressed against a slide leave focus on the screen showing`() {
+        press(Key.DirectionDown) // Continue watching.
         press(Key.DirectionDown) // Live TV.
         for (at in listOf(0L, 100L, 300L, 416L, 432L)) {
             compose.mainClock.autoAdvance = false
@@ -253,6 +297,7 @@ class HomeFocusTest {
 
             compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
             compose.waitForIdle()
+            press(Key.DirectionDown) // Back went to the lead: Continue watching, then Live TV.
             press(Key.DirectionDown)
             assertFocusShowing("Row 2 of ")
         }
@@ -322,6 +367,7 @@ class HomeFocusTest {
 
     /** Pages to Recently added shows' row screen; its titles, in the row's order. */
     private fun toRecentlyAddedShows(): List<String> {
+        press(Key.DirectionDown) // Continue watching.
         press(Key.DirectionDown) // Live TV.
         press(Key.DirectionDown)
         val shows = home.recentlyAddedShows.map { it.title }

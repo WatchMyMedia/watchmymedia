@@ -67,11 +67,12 @@ class ServersTvTest {
         assertHomeOpened()
     }
 
-    /** Home has opened, with focus on its first row's card. */
+    /** Home has opened, with focus on its lead's Resume (or Play), or on its first row's card when it has no lead. */
     private fun assertHomeOpened() {
-        compose.onNodeWithText("Row 1 of ", substring = true, useUnmergedTree = true).assertIsDisplayed()
         compose.onNode(isFocused()).assertIsDisplayed()
-        assertTrue("${focused()} is a card, not the rail", focused() !in listOf("Home", "Search", "Movies", "TV Shows", "Live TV", "Settings"))
+        val at = focused()
+        assertTrue("$at is the lead or a card, not the rail", at !in listOf("Home", "Search", "Movies", "TV Shows", "Live TV", "Settings"))
+        if (at !in listOf("Resume", "Play")) compose.onNodeWithText("Row 1 of ", substring = true, useUnmergedTree = true).assertIsDisplayed()
     }
 
     /** ◀ to the rail, then down to the account button at its foot. */

@@ -438,9 +438,12 @@ library's Movies or TV screen come in the person's order
 Rows are drawn by their style (`poster`, `wide`, `episode`, `continue`,
 `live`); a style the app doesn't know is skipped, and `live` is the app's
 own Live TV row in that place. The tablet keeps Continue beside the hero only
-while it is the first row drawn; the TV opens on the first row's first
-card, each row a screen of its own, and shows the hero only when there are
-no rows. Movies and TV get their rows above the grid.
+while it is the first row drawn. The TV leads Home with a screen of its own
+(`HomeLead`): a large card to resume Continue watching's first title, which
+then leaves that row, with Resume, Go to episode and Remove from Continue
+watching; the server's pick when nothing is in progress. Focus starts on
+Resume (or Play), and the rows follow a screen each; with neither, Home
+opens on its first row. Movies and TV get their rows above the grid.
 
 - **Edit Home** (end of Home, and Settings › Home rows) and a
   library's **Edit rows**: a page on the phone, a dialog on the tablet.
