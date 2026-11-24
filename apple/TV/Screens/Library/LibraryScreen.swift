@@ -17,7 +17,8 @@ import WMMUI
 /// Page Down move two rows in any sort. Down from the controls lands on the
 /// poster focused last, or the first. A row's See all, on Home or in the
 /// rows above, opens the grid sorted the row's way, with focus on its first
-/// poster.
+/// poster. The sort and filters the person leaves the grid with are kept on
+/// this Apple TV, for this server and person, and the grid opens with them.
 struct LibraryScreen: View {
     let type: LibraryType
     @Environment(AppServices.self) private var services
@@ -25,8 +26,28 @@ struct LibraryScreen: View {
 
     var body: some View {
         LibraryView(model: LibraryModel(library: services.library, navigator: navigator, type: type, rows: services.rows, letterJump: .extend,
-                                        oneCard: OneCardContext(services: services, choices: CopyChoices())))
+                                        oneCard: OneCardContext(services: services, choices: CopyChoices()),
+                                        choices: LibraryChoices(services: services, defaults: LibraryChoiceDefaults.shared)))
     }
+}
+
+/// Where a library's kept sort and filters live. On the fakes they last the
+/// launch, so one UI test's choice doesn't open the next test's grid sorted
+/// or filtered; `-fakesKeepLibraryChoices` keeps them between launches, as
+/// a real server's are.
+private enum LibraryChoiceDefaults {
+    @MainActor static let shared: UserDefaults = {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains(where: { $0.hasPrefix("-fakes") }), !arguments.contains("-fakesKeepLibraryChoices") {
+            let name = "media.watchmy.fakes.libraryChoices"
+            let defaults = UserDefaults(suiteName: name) ?? .standard
+            defaults.removePersistentDomain(forName: name)
+            return defaults
+        }
+        #endif
+        return .standard
+    }()
 }
 
 private struct LibraryView: View {

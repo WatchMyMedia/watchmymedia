@@ -115,13 +115,21 @@ public final class LibraryModel {
     @ObservationIgnored private let letterJump: LetterJump
     /// Every other signed-in server's titles, merged into the grid (one card); nil with one server.
     public let merged: MergedGrid?
+    /// Where the person's sort and filters are kept on this device (Apple
+    /// TV); nil keeps nothing and the grid opens by date added.
+    @ObservationIgnored private let choices: LibraryChoices?
+    /// What the person chose here, as kept: a See all's sort and filters
+    /// apply for its visit without changing it.
+    @ObservationIgnored private var kept = KeptLibraryChoices()
 
     /// `libraryID` skips looking the library up (the Apple TV app knows it from Home).
     /// `rows` gives the screen the library's arranged rows above the grid.
     /// `letterJump` says how a jump past the titles held loads.
     /// With `oneCard`, the grid has every other signed-in server's titles too (``MergedGrid``).
+    /// With `choices`, the grid opens with the sort and filters the person left it with on this device.
     public init(library: any LibraryRepository, navigator: Navigator, type: LibraryType, libraryID: Int? = nil, rows: (any RowsRepository)? = nil, pageSize: Int = LibraryModel.pageSize, debounce: Duration = .milliseconds(300),
-                reloadPageSize: Int = LibraryModel.reloadPageSize, letterJump: LetterJump = .page, oneCard: OneCardContext? = nil, now: @escaping @MainActor () -> Date = { Date() }) {
+                reloadPageSize: Int = LibraryModel.reloadPageSize, letterJump: LetterJump = .page, oneCard: OneCardContext? = nil, choices: LibraryChoices? = nil,
+                now: @escaping @MainActor () -> Date = { Date() }) {
         merged = oneCard.flatMap { $0.applies ? MergedGrid(services: $0.services, type: type, pageSize: pageSize) : nil }
         changes = ScreenChanges(now: now)
         self.letterJump = letterJump
@@ -133,6 +141,23 @@ public final class LibraryModel {
         self.libraryID = libraryID
         self.pageSize = pageSize
         self.debounce = debounce
+        self.choices = choices
+        if let kept = choices?.kept(type) {
+            self.kept = kept
+            sort = ItemSort.options(for: type).contains(kept.sort) ? kept.sort : sort
+            filter = ItemFilter.options(for: type).contains(kept.filter) ? kept.filter : .all
+            genre = kept.genre
+            decade = kept.decade
+            contentRatings = kept.contentRatings
+        }
+    }
+
+    /// Keeps a choice the person made, on this device (with `choices`):
+    /// only what changed, so a See all's sort and filters aren't kept.
+    private func remember(_ change: (inout KeptLibraryChoices) -> Void) {
+        guard let choices else { return }
+        change(&kept)
+        choices.keep(kept, for: type)
     }
 
     // MARK: Wording
@@ -416,12 +441,14 @@ public final class LibraryModel {
     public func setSort(_ sort: ItemSort) async {
         guard sort != self.sort else { return }
         self.sort = sort
+        remember { $0.sort = sort }
         await load(.change)
     }
 
     public func setFilter(_ filter: ItemFilter) async {
         guard filter != self.filter else { return }
         self.filter = filter
+        remember { $0.filter = filter }
         await load(.change)
     }
 
@@ -441,18 +468,23 @@ public final class LibraryModel {
         chosen.sort { (order.firstIndex(of: $0) ?? .max) < (order.firstIndex(of: $1) ?? .max) }
         guard chosen != contentRatings else { return }
         contentRatings = chosen
+        remember { $0.contentRatings = chosen }
         await load(.change)
     }
 
     /// Picking the selected genre again clears it.
     public func toggleGenre(_ genre: String) async {
-        self.genre = self.genre == genre ? nil : genre
+        let chosen = self.genre == genre ? nil : genre
+        self.genre = chosen
+        remember { $0.genre = chosen }
         await load(.change)
     }
 
     /// Picking the selected decade again clears it.
     public func toggleDecade(_ decade: Int) async {
-        self.decade = self.decade == decade ? nil : decade
+        let chosen = self.decade == decade ? nil : decade
+        self.decade = chosen
+        remember { $0.decade = chosen }
         await load(.change)
     }
 
@@ -461,6 +493,7 @@ public final class LibraryModel {
         genre = nil
         decade = nil
         contentRatings = []
+        remember { $0 = KeptLibraryChoices(sort: $0.sort) }
         searchText = ""
         pendingSearch?.cancel()
         await load(.change)

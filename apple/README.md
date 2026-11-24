@@ -125,6 +125,10 @@ can be judged on a simulator. `-fakesSignedOut` starts at sign-in, `-fakesNoServ
 server picker. The scheme's Run action lists `-fakes`, off by default.
 `-fakesLargeLibrary` gives the fakes' Movies library about 1,200 titles (the
 sample's, then made-up ones), for measuring the grid.
+Apple TV keeps each library's sort and filters on the device, for the server
+and person (`LibraryChoices`); on the fakes they last the launch, so one UI
+test's choice doesn't carry into the next, unless `-fakesKeepLibraryChoices`
+is given.
 `-search harbor` searches at launch. The fake player has seek thumbnails drawn in
 code, so `-open watchmymedia://play/9101 -playerKeepControls -playerScrub 0.44`
 holds the scrubber at 44 % with its tile up.
@@ -404,11 +408,14 @@ are made on the web.
 `-fakes -fakesRows` puts the fakes' server at level 22: Home has two list rows
 and Trending this week waits in Add a row; Movies has Best of 2026, whose last
 MDBList fetch failed. On iPad and Apple TV an arranged Home is drawn one row a
-screen (`-fakesRows` is needed to see it). On Apple TV every screen is a row
-with the focused card's words above it (`TVFocusWords`: what it is, time
-left and "Ends at", never the file's format), the first screen is the first
-row, Home opens on its first card, and a server below level 22 has its
-fixed rows drawn the same way. `-editRows` opens Home rows at launch and `-addRow` its
+screen (`-fakesRows` is needed to see it). On Apple TV Home's first screen
+is one large card for the title most likely to be resumed, the first in
+Continue watching, with time left and "Ends at" beside it (the server's
+pick when nothing is in progress; `HomeLead`), and Home opens with focus on
+it. Every screen after it is a row with the focused card's words above it
+(`TVFocusWords`: what it is, time left and "Ends at", never the file's
+format), Continue watching without the title on the card, and a server
+below level 22 has its fixed rows drawn the same way. `-editRows` opens Home rows at launch and `-addRow` its
 Add a row; `-open watchmymedia://lists/9001` opens Top rated science fiction
 (with titles to request) and `lists/9002` Rainy Sunday films (an import with a
 title not found). On Apple TV, `-tab settings -homeRowsSettings` opens Home

@@ -176,16 +176,13 @@ private struct TVMediaListView: View {
         }
     }
 
-    /// Rename, Delete and the switch, with what it does under them; then All, Movies, TV shows and the sort.
+    /// Rename, the switch and Delete, last and in plain words (it asks first), with what the switch does under them; then All, Movies, TV shows and the sort.
     private var watchlistControls: some View {
         VStack(alignment: .leading, spacing: 24) {
             HStack(spacing: 18) {
                 Button { newName = model.title; renaming = true } label: { Text("\(Image(systemName: "pencil"))  \(WatchlistWords.rename)") }
                     .buttonStyle(TVButtonStyle())
                     .accessibilityIdentifier("watchlist-rename")
-                Button { confirmingDelete = true } label: { Text("\(Image(systemName: "trash"))  \(WatchlistWords.delete)") }
-                    .buttonStyle(TVButtonStyle(kind: .redText))
-                    .accessibilityIdentifier("watchlist-delete")
                 Button { Task { await model.setRemovesWatched(!model.removesWatched) } } label: {
                     HStack(spacing: 14) {
                         Text(WatchlistWords.removeWatched)
@@ -196,6 +193,9 @@ private struct TVMediaListView: View {
                 .accessibilityValue(model.removesWatched ? "On" : "Off")
                 .accessibilityHint(WatchlistWords.removeWatchedDetail)
                 .accessibilityIdentifier("watchlist-switch")
+                Button { confirmingDelete = true } label: { Text(WatchlistWords.delete) }
+                    .buttonStyle(TVButtonStyle())
+                    .accessibilityIdentifier("watchlist-delete")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .focusSection()

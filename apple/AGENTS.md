@@ -239,7 +239,10 @@ server, and on iPad in both a regular and a compact width.
   (`Text("\(Image(systemName: …)) …")`). A `Menu`'s label does the same
   with an `Image` beside its words: drawn larger than the label was
   measured, it cut the words short ("Sort: Date add…", tvOS 27.2), so the
-  menu chips put the chevron in the text (`ChipMenuLabel`). The
+  menu chips put the chevron in the text (`ChipMenuLabel`). A `Menu` also
+  made room for its whole label and then laid the label out 20 pt narrower,
+  so a short one lost its chevron to an ellipsis ("Sort: Title…"): the
+  label's text keeps its own size (`.fixedSize()`). The
   library grid's focus section is the grid's own width: stretched under the
   letter index, Left from a letter level with the 100 pt gap between two
   rows found nothing. On iPad a `.presentationSizing(.fitted)`
@@ -288,7 +291,9 @@ server, and on iPad in both a regular and a compact width.
   it (Back to the top, Menu), and each screen has such a state of its own
   (`ScreenFocus`). Apple TV's Home opens on its first card that way: when
   it first has rows at launch, `HomeView` asks the first screen for focus
-  (`openOnFirstCard`), and the row moves it to its first card; reached later
+  (`openOnFirstCard`): the large card for what was being watched
+  (`HomeLead`, that screen's one focusable thing), or with no card the
+  first row, which moves it to its first card; reached later
   (the tab bar, Menu from another tab) focus stays the system's. Menu from a
   later screen goes back to the first and from the first is the system's
   (the tab bar), judged by the screen focus is in (`HomePaging.focusedPage`),

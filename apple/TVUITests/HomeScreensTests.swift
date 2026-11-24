@@ -1,11 +1,12 @@
 import XCTest
 
-/// Home one row a screen on the fakes with arranged
-/// rows: Home opens on the first row's first card with its words above the
-/// row; ▼ pages to the next row's screen, whose words follow the focused
-/// card; the row that comes back restores its card; Menu returns to the
-/// first screen, and so does the last screen's Back to the top; Menu on the
-/// first screen goes to the tab bar. Runs in `make apple-tv-test-sim`.
+/// Home on the fakes with arranged rows: it opens on one large card for the
+/// title most likely to be resumed, with its words beside it; ▼ pages to
+/// Continue watching, which holds the rest, then one row a screen, whose
+/// words follow the focused card; the row that comes back restores its
+/// card; Menu returns to the first screen, and so does the last screen's
+/// Back to the top; Menu on the first screen goes to the tab bar. Runs in
+/// `make apple-tv-test-sim`.
 final class HomeScreensTests: XCTestCase {
     @MainActor private var remote: XCUIRemote { XCUIRemote.shared }
 
@@ -31,32 +32,24 @@ final class HomeScreensTests: XCTestCase {
         panel.waitForLabel(containing: title, timeout: timeout)
     }
 
-    /// The first Continue watching card, which Home opens on: every screen is
-    /// laid out, so a title alone would also match its cards on other screens.
+    /// Home opens on the large card, which says where you were and when it
+    /// would end, and the last screen's Back to the top returns there.
     @MainActor
-    private func continuing(_ app: XCUIApplication) -> XCUIElement {
-        app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "S02 E04 · 23 min left")).firstMatch
-    }
-
-    /// Home opens on its first card with that card's words above the row,
-    /// and the last screen's Back to the top returns there.
-    @MainActor
-    func testHomeOpensOnTheFirstCardAndBackToTheTopReturnsThere() {
+    func testHomeOpensOnTheLargeCardAndBackToTheTopReturnsThere() {
         let app = XCUIApplication()
         app.launchArguments = ["-fakes", "-fakesRows"]
         app.launch()
-        let card = continuing(app)
-        XCTAssertTrue(focused(card, timeout: 20), "Home opens on the first Continue watching card: \(app.focusedButton.label)")
-        XCTAssertTrue(visible(app.staticTexts["1 of 7"]), "the first screen counts the drawn rows")
-        let panel = app.descendants(matching: .any)["homeFocusPanel-continue"]
-        XCTAssertTrue(visible(panel), "the first screen has the focused card's words, not a hero")
-        XCTAssertTrue(panelSays(panel, "The Quiet Meridian. S02 E04 · Drift. 23 min left, Ends at"), "the words say where you were and when it ends: \(panel.label)")
-        XCTAssertFalse(app.buttons["Play"].exists, "no hero with Play")
+        let card = app.homeFirstCard
+        XCTAssertTrue(focused(card, timeout: 20), "Home opens on the large card: \(app.focusedButton.label)")
+        XCTAssertTrue(card.label.hasPrefix("Continue watching. The Quiet Meridian. S02 E04 · Drift. 23 min left, Ends at"),
+                      "it says where you were and when it ends: \(card.label)")
+        XCTAssertTrue(visible(app.descendants(matching: .any)["homeNextRow-lead"]), "the next row is named at its foot")
+        XCTAssertFalse(app.buttons["Play"].exists, "no hero with buttons: the card is the one thing to press")
 
-        // Down through the seven rows to the last screen's buttons.
+        // Down through the card and the seven rows to the last screen's buttons.
         let edit = app.buttons["editRows"]
         let back = app.buttons["homeBackToTop"]
-        for _ in 0..<10 where edit.lookedAt?.hasFocus != true && back.lookedAt?.hasFocus != true {
+        for _ in 0..<12 where edit.lookedAt?.hasFocus != true && back.lookedAt?.hasFocus != true {
             app.press(.down, thenWaitForFocusToMove: 5)
         }
         XCTAssertTrue(visible(back), "Down reaches the last screen: \(app.focusedButton.label)")
@@ -65,7 +58,7 @@ final class HomeScreensTests: XCTestCase {
 
         remote.press(.select)
         XCTAssertTrue(focused(card), "Back to the top returns to the first screen, on its card: \(app.focusedButton.label)")
-        XCTAssertTrue(visible(app.staticTexts["1 of 7"]))
+        XCTAssertTrue(visible(app.homeFirstScreen))
 
         // Menu on the first screen goes to the tab bar.
         remote.press(.menu)
@@ -74,34 +67,40 @@ final class HomeScreensTests: XCTestCase {
     }
 
     @MainActor
-    func testDownPagesToTheNextRowWhosePanelFollowsFocusAndMenuReturnsToTheFirstScreen() {
+    func testDownPagesToContinueWatchingWhosePanelFollowsFocusAndMenuReturnsToTheCard() {
         let app = XCUIApplication()
         app.launchArguments = ["-fakes", "-fakesRows"]
         app.launch()
-        let card = continuing(app)
-        XCTAssertTrue(focused(card, timeout: 20), "Home opens on the first Continue watching card: \(app.focusedButton.label)")
-        XCTAssertTrue(visible(app.staticTexts["1 of 7"]), "the first screen counts the drawn rows")
+        let card = app.homeFirstCard
+        XCTAssertTrue(focused(card, timeout: 20), "Home opens on the large card: \(app.focusedButton.label)")
         // Every screen is laid out (the screens are a VStack), so the others' panels exist off screen.
-        let panel = app.descendants(matching: .any)["homeFocusPanel-recentlyAddedShows"]
-        XCTAssertFalse(app.windows.firstMatch.frame.contains(panel.frame), "the next row's words are on its own screen")
+        let panel = app.descendants(matching: .any)["homeFocusPanel-continue"]
+        XCTAssertFalse(app.windows.firstMatch.frame.contains(panel.frame), "Continue watching's words are on its own screen")
 
         remote.press(.down)
-        XCTAssertTrue(visible(panel), "Down from the row pages to the next row's screen")
-        XCTAssertTrue(visible(app.staticTexts["2 of 7"]))
-        XCTAssertTrue(panelSays(panel, "Recently added · S03 E07 · added today. Harbor Lights"), "the words are the first card's: \(panel.label)")
-        XCTAssertFalse(panel.label.contains("4K") || panel.label.contains("HDR"), "no format on Home: \(panel.label)")
-        XCTAssertFalse(app.windows.firstMatch.frame.contains(app.staticTexts["1 of 7"].frame), "the first screen has gone")
+        XCTAssertTrue(visible(panel), "Down from the card pages to Continue watching")
+        XCTAssertTrue(visible(app.staticTexts["1 of 7"]), "the rows are counted without the card")
+        XCTAssertTrue(panelSays(panel, "Dead Reckoning Bay"), "the row starts after the title on the card: \(panel.label)")
+        XCTAssertFalse(panel.label.contains("The Quiet Meridian"), "the title on the card isn't in the row again: \(panel.label)")
+        XCTAssertFalse(app.windows.firstMatch.frame.contains(app.homeFirstScreen.frame), "the first screen has gone")
 
         remote.press(.right)
-        XCTAssertTrue(panelSays(panel, "Recently added · Season 1 · yesterday. The Quiet Meridian"), "▶ moves the words to the next card: \(panel.label)")
+        XCTAssertTrue(panelSays(panel, "Saltmarsh"), "▶ moves the words to the next card: \(panel.label)")
 
         remote.press(.menu)
         XCTAssertTrue(focused(card), "Menu on a row screen returns to the first screen, on its card")
-        XCTAssertTrue(visible(app.staticTexts["1 of 7"]))
+        XCTAssertTrue(visible(app.homeFirstScreen))
 
         remote.press(.down)
         XCTAssertTrue(visible(panel))
-        XCTAssertTrue(panelSays(panel, "Season 1 · yesterday. The Quiet Meridian"), "the row that comes back restores the card it had focus on: \(panel.label)")
+        XCTAssertTrue(panelSays(panel, "Saltmarsh"), "the row that comes back restores the card it had focus on: \(panel.label)")
+
+        remote.press(.down)
+        let next = app.descendants(matching: .any)["homeFocusPanel-recentlyAddedShows"]
+        XCTAssertTrue(visible(next), "Down again pages to the next row")
+        XCTAssertTrue(visible(app.staticTexts["2 of 7"]))
+        XCTAssertTrue(panelSays(next, "Recently added · S03 E07 · added today. Harbor Lights"), "the words are the first card's: \(next.label)")
+        XCTAssertFalse(next.label.contains("4K") || next.label.contains("HDR"), "no format on Home: \(next.label)")
     }
     /// Where a row starts: moving back along a row,
     /// the card before the focused one stays whole on screen, so the 2nd card
@@ -111,11 +110,11 @@ final class HomeScreensTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-fakes", "-fakesRows"]
         app.launch()
-        XCTAssertTrue(focused(continuing(app), timeout: 20), "Home opens on its first card")
+        XCTAssertTrue(focused(app.homeFirstCard, timeout: 20), "Home opens on its large card")
         let window = app.windows.firstMatch.frame
         let panel = app.descendants(matching: .any)["homeFocusPanel-recentlyAddedShows"]
         // Down to Recently added's screen, however many presses the way there takes: the way down is the other test's to check.
-        for _ in 0..<6 where !(panel.exists && window.contains(panel.frame)) { app.press(.down, thenWaitForFocusToMove: 3) }
+        for _ in 0..<7 where !(panel.exists && window.contains(panel.frame)) { app.press(.down, thenWaitForFocusToMove: 3) }
         XCTAssertTrue(visible(panel), "Recently added's screen shows")
         XCTAssertTrue(panelSays(panel, "Harbor Lights"))
 

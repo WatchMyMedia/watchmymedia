@@ -3,18 +3,21 @@ import WMMFeatures
 import WMMModel
 import WMMUI
 
-/// Home: one row a screen. Every screen is a row with the focused card's
-/// words above it (what it is, where the viewer was, when it would end) and
-/// its picture behind them; the first is the first row, under the tab bar,
-/// and Home opens on its first card, so with something in progress one
-/// press resumes it. ▼ pages to the next row, ▲ back; Menu on a later screen
-/// returns to the first, and from there goes to the tab bar. The last screen
-/// has Edit rows and Back to the top. Select on a Continue watching card
-/// resumes it, on an On now card watches the channel, and on any other card
-/// opens its page; Play/Pause does the same, and a long press has the
-/// card's menu. The rows come in the person's order from API level 22,
-/// arranged in Settings › Home rows; below it Home's fixed rows are drawn
-/// the same way. File and stream detail is never on Home: it is a press
+/// Home: it opens on what the person was watching, one large card under the
+/// tab bar for the title they are most likely to go back to (the first in
+/// Continue watching), with how much is left and when it would end; with
+/// nothing in progress the server's pick takes the card (``HomeLead``). At
+/// launch focus starts on that card, so one press resumes. Then one row a
+/// screen: each is a row with the focused card's words above it and its
+/// picture behind them, Continue watching without the title on the card.
+/// ▼ pages to the next screen, ▲ back; Menu on a later screen returns to the
+/// first, and from there goes to the tab bar. The last screen has Edit rows
+/// and Back to the top. Select on the large card or a Continue watching
+/// card resumes it, on the server's pick or any other card opens its page,
+/// on an On now card watches the channel; Play/Pause plays, and a long
+/// press has the card's menu. The rows come in the person's order from API
+/// level 22, arranged in Settings › Home rows; below it Home's fixed rows
+/// are drawn the same way. File and stream detail is never on Home: it is a press
 /// away, on the title's page.
 struct HomeScreen: View {
     @Environment(AppServices.self) private var services
@@ -53,11 +56,11 @@ private struct HomeView: View {
             case .failed(let message):
                 HomeProblem(message: message, retry: model.retry)
             case .loaded(let home):
-                let rows = drawnRows(home)
-                if home.isEmpty || rows.isEmpty {
+                let (lead, rows) = HomeLead.split(drawnRows(home), hero: home.hero)
+                if home.isEmpty || (lead == nil && rows.isEmpty) {
                     HomeNothingYet(model: model, liveAvailable: liveAvailable)
                 } else {
-                    screens(home, rows: rows)
+                    screens(home, lead: lead, rows: rows)
                 }
             }
         }
@@ -78,7 +81,8 @@ private struct HomeView: View {
     }
 
     /// Once, when Home first has rows at launch: focus goes into the first
-    /// screen, where its row puts it on the first card. Not when Home is
+    /// screen, onto the large card (or, with neither something in progress
+    /// nor the server's pick, the first row's first card). Not when Home is
     /// reached later, from the tab bar or by Menu from another tab (focus is
     /// then the system's, in the tab bar), and not over a page a link or a
     /// switch has opened.
@@ -94,10 +98,10 @@ private struct HomeView: View {
 
     // MARK: One row a screen
 
-    /// The paging screens: a screen per row, then the end screen.
-    private func screens(_ home: HomeData, rows: [ScreenRow]) -> some View {
+    /// The paging screens: the large card, a screen per row, then the end screen.
+    private func screens(_ home: HomeData, lead: HomeLead?, rows: [ScreenRow]) -> some View {
         HomePager(paging: paging) {
-            screenStack(home, rows: rows)
+            screenStack(home, lead: lead, rows: rows)
         }
     }
 
@@ -105,10 +109,15 @@ private struct HomeView: View {
     /// place: a row appearing above another (Live TV once its capabilities
     /// arrive, Continue watching after a first play) leaves the others' focused
     /// cards and the screen on view where they were.
-    private func screenStack(_ home: HomeData, rows: [ScreenRow]) -> some View {
+    private func screenStack(_ home: HomeData, lead: HomeLead?, rows: [ScreenRow]) -> some View {
         VStack(spacing: 0) {
+            if let lead {
+                HomeLeadScreen(lead: lead, nextName: rows.first?.screenName ?? HomeEndScreen.name, model: model)
+                    .modifier(ScreenFocus(page: .start, paging: paging))
+                    .id(HomePage.start)
+            }
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                rowScreen(row, index: index, rows: rows, page: index == 0 ? .start : .row(row.id))
+                rowScreen(row, index: index, rows: rows, first: lead == nil && index == 0, page: lead == nil && index == 0 ? .start : .row(row.id))
             }
             endScreen(home)
                 .id(HomePage.end)
@@ -133,9 +142,9 @@ private struct HomeView: View {
 
     /// A row's screen, a view of its own: moving along
     /// its row redraws that screen alone, not the others.
-    private func rowScreen(_ row: ScreenRow, index: Int, rows: [ScreenRow], page: HomePage) -> some View {
+    private func rowScreen(_ row: ScreenRow, index: Int, rows: [ScreenRow], first: Bool, page: HomePage) -> some View {
         HomeRowScreen(
-            row: row, first: index == 0,
+            row: row, first: first,
             counter: tvRowCounter(index: index, of: rows.count),
             nextName: rows.indices.contains(index + 1) ? rows[index + 1].screenName : HomeEndScreen.name,
             index: index,
@@ -184,7 +193,8 @@ private struct HomeView: View {
     }
 }
 
-/// One of Home's screens, by what it shows: the first (the first row's), a later row's, or the end.
+/// One of Home's screens, by what it shows: the first (the large card's, or
+/// with no card the first row's), a later row's, or the end.
 private enum HomePage: Hashable {
     case start
     case row(String)
@@ -359,7 +369,7 @@ private struct HomeRowScreen: View {
                 TVArrangedRow(row: row, actions: TVRowActions(model, leaving: leaving), counter: counter, focusedCard: $focusedCard, focusedChannel: $focusedChannel)
                     // Its own height: a horizontal scroll view would take all the screen left over the words.
                     .fixedSize(horizontal: false, vertical: true)
-                NextRowLine(name: nextName, index: index)
+                NextRowLine(name: nextName, identifier: "homeNextRow-\(index)")
             }
             .padding(.bottom, TVLayout.safeBottom)
             if first { TabBarAccessories() }
@@ -404,10 +414,185 @@ private struct HomeRowScreen: View {
     }
 }
 
+/// Home's first screen: one large card for what the person was watching (or
+/// the server's pick), its words beside it, and the next row's name at the
+/// foot. The card is the screen's one focusable thing, so Up goes to the tab
+/// bar, Down to the next screen, and focus starts on it at launch.
+private struct HomeLeadScreen: View {
+    let lead: HomeLead
+    let nextName: String
+    let model: HomeModel
+    @Environment(AppServices.self) private var services
+
+    /// A 16:9 card: tvOS's two-across width less the column of words beside it.
+    static let cardWidth: CGFloat = 1120
+    static let cardHeight: CGFloat = 630
+    /// Below the tab bar, with room for the card to grow when focused.
+    static let top: CGFloat = 176
+
+    var body: some View {
+        let words = TVFocusWords(lead: lead)
+        ZStack(alignment: .topLeading) {
+            LeadBackdrop(url: url(.w780), seed: lead.seed)
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .top, spacing: TVLayout.gutter) {
+                    card(words)
+                    LeadWords(words: words, whereLine: whereLine)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+                .padding(.horizontal, TVLayout.gutter)
+                .padding(.top, Self.top)
+                Spacer(minLength: 0)
+                NextRowLine(name: nextName, identifier: "homeNextRow-lead")
+            }
+            .padding(.bottom, TVLayout.safeBottom)
+            TabBarAccessories()
+        }
+        .screen()
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("homeLead")
+    }
+
+    private func url(_ size: ImageSize) -> URL? {
+        services.library.imageURL(lead.picturePath, size: size, on: lead.server)
+    }
+
+    /// "On Cabin" or "from Cabin" for a title in progress on another server.
+    private var whereLine: String? {
+        if case .resume(let item) = lead { return model.whereLine(item) }
+        return nil
+    }
+
+    @ViewBuilder private func card(_ words: TVFocusWords) -> some View {
+        let label = LeadCard(url: url(.w1280), seed: lead.seed, title: words.title, progress: lead.progress)
+        switch lead {
+        case .resume(let item):
+            Button { model.resume(item) } label: { label }
+                .buttonStyle(.borderless)
+                .accessibilityLabel(words.accessibilityLabel)
+                .accessibilityHint(resumesPlayingHint)
+                .accessibilityIdentifier("homeLeadCard")
+                .playPauseCard(.card(item)) { model.resume(item) }
+                .contextMenu {
+                    Button { model.resume(item) } label: { Label("Resume", systemImage: "play.fill") }
+                    if let target = item.watchTarget {
+                        WatchToggleButton(watched: false) { await model.setWatched(target, $0) }
+                    }
+                    if item.pageRoute != nil {
+                        Button { model.openPage(of: item) } label: { Label(item.pageLabel, systemImage: "info.circle") }
+                    }
+                    if model.canRemoveFromContinueWatching {
+                        Button { Task { await model.removeFromContinueWatching(item) } } label: { Label(removeFromContinueLabel, systemImage: "minus.circle") }
+                    }
+                }
+        case .pick(let hero):
+            let play = hero.playRequest(episodes: model.state.value?.allEpisodes ?? [])
+            Button { model.openHero() } label: { label }
+                .buttonStyle(.borderless)
+                .accessibilityLabel(words.accessibilityLabel)
+                .accessibilityIdentifier("homeLeadCard")
+                .playPauseCard(play.map(CardPlayPause.play) ?? .select) { model.openHero() }
+                .contextMenu {
+                    if play != nil {
+                        Button { model.playHero() } label: { Label("Play", systemImage: "play.fill") }
+                    }
+                    if hero.pageRoute != nil {
+                        Button { model.openHero() } label: { Label(hero.pageLabel, systemImage: "info.circle") }
+                    }
+                }
+        }
+    }
+}
+
+/// The large card's picture, how far along in gold across its foot, and the
+/// system's lift when focused, a little less than a small card's so it stays
+/// clear of the words beside it.
+private struct LeadCard: View {
+    let url: URL?
+    let seed: String
+    let title: String
+    let progress: Double?
+    @Environment(\.isFocused) private var focused
+    @Environment(\.displayScale) private var scale
+
+    var body: some View {
+        let width = HomeLeadScreen.cardWidth, height = HomeLeadScreen.cardHeight
+        Artwork(url: url, seed: seed, maxPixel: cardPixels(width: width, height: height, scale: scale, lift: 1.05))
+            .frame(width: width, height: height)
+            .overlay { if url == nil { PlaceholderTitle(title: title) } }
+            .overlay(alignment: .bottom) {
+                if let progress, progress > 0 {
+                    TVProgressBar(progress: progress, height: 10).padding(.horizontal, 48).padding(.bottom, 30)
+                }
+            }
+            .overlay { FocusSheen(focused: focused) }
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .focusLift(focused, scale: 1.05)
+            .accessibilityHidden(true)
+    }
+}
+
+/// Beside the large card: why it is there ("Continue watching", "New
+/// episode · aired yesterday") in gold, the title, the episode, how long is
+/// left in gold and when it would end, the rating, and three lines about it.
+/// Not focusable, and nothing that looks like a control.
+private struct LeadWords: View {
+    let words: TVFocusWords
+    let whereLine: String?
+
+    var body: some View {
+        let parts = words.facts + [whereLine].compactMap { $0 }
+        VStack(alignment: .leading, spacing: 16) {
+            if let kicker = words.kicker { TVKicker(text: kicker) }
+            Text(words.title)
+                .font(.tv(.title2))
+                .foregroundStyle(Palette.text)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+            if let subtitle = words.subtitle {
+                Text(subtitle).font(.tv(.headline)).foregroundStyle(Palette.textSecondary).lineLimit(2)
+            }
+            // The rating goes first when the line doesn't fit, then the facts after the lead.
+            ViewThatFits(in: .horizontal) {
+                FactsLine(lead: words.lead, parts: parts, rating: words.rating)
+                FactsLine(lead: words.lead, parts: parts)
+                FactsLine(lead: words.lead, parts: Array(parts.prefix(1)))
+            }
+            .padding(.top, 4)
+            if !words.overview.isEmpty {
+                Text(words.overview)
+                    .font(.tv(.body))
+                    .foregroundStyle(Palette.textSecondary)
+                    .lineLimit(3)
+                    .padding(.top, 8)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// Behind the large card: its picture, blurred and darkened, so the screen
+/// takes its colour while the card stays the one picture to look at. Small
+/// to decode and blurred on the GPU.
+private struct LeadBackdrop: View {
+    let url: URL?
+    let seed: String
+
+    var body: some View {
+        CrossfadeArtwork(url: url, seed: seed, maxPixel: 780)
+            .frame(width: 1920, height: 1080)
+            .blur(radius: 70, opaque: true)
+            .overlay(Palette.ground.opacity(0.7))
+            .overlay(LinearGradient(stops: [.init(color: Palette.ground.opacity(0), location: 0.45), .init(color: Palette.ground, location: 0.92)], startPoint: .top, endPoint: .bottom))
+            .clipped()
+            .accessibilityHidden(true)
+    }
+}
+
 /// The next row's name at the foot of the screen, with a chevron: where ▼ goes.
 private struct NextRowLine: View {
     let name: String
-    let index: Int
+    let identifier: String
 
     var body: some View {
         HStack(spacing: 12) {
@@ -420,7 +605,7 @@ private struct NextRowLine: View {
         .padding(.horizontal, TVLayout.gutter)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(nextRowLabel(name))
-        .accessibilityIdentifier("homeNextRow-\(index)")
+        .accessibilityIdentifier(identifier)
     }
 }
 
@@ -517,24 +702,26 @@ private struct TVFocusPanel: View {
     }
 }
 
-/// Home while it loads: shapes where the words and the row will be, so
-/// nothing jumps when they arrive. Nothing here takes focus, so focus stays
-/// on the Home tab and Back still works.
+/// Home while it loads: shapes where the large card and its words will be,
+/// so nothing jumps when they arrive. Nothing here takes focus, so focus
+/// stays on the Home tab and Back still works.
 private struct HomeLoading: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
-            VStack(alignment: .leading, spacing: 0) {
-                Skeleton(width: 680, height: 80)
-                Skeleton(width: 420, height: 40).padding(.top, 20)
-                Skeleton(width: 520, height: 34).padding(.top, 22)
-                Skeleton(width: 300, height: 34).padding(.top, 190)
-                HStack(spacing: TVLayout.cardSpacing) {
-                    ForEach(0..<6, id: \.self) { _ in Skeleton(width: TVCardWidth.wide, height: 180) }
+            HStack(alignment: .top, spacing: TVLayout.gutter) {
+                Skeleton(width: HomeLeadScreen.cardWidth, height: HomeLeadScreen.cardHeight)
+                VStack(alignment: .leading, spacing: 0) {
+                    Skeleton(width: 300, height: 30)
+                    Skeleton(width: 440, height: 62).padding(.top, 22)
+                    Skeleton(width: 380, height: 42).padding(.top, 22)
+                    Skeleton(width: 420, height: 36).padding(.top, 24)
+                    Skeleton(width: 560, height: 30).padding(.top, 30)
+                    Skeleton(width: 560, height: 30).padding(.top, 10)
+                    Skeleton(width: 340, height: 30).padding(.top, 10)
                 }
-                .padding(.top, 28)
             }
             .padding(.leading, TVLayout.gutter)
-            .padding(.top, 212)
+            .padding(.top, HomeLeadScreen.top)
             TabBarAccessories()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

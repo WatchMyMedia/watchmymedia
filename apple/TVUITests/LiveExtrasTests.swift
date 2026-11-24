@@ -43,6 +43,17 @@ final class LiveExtrasTests: XCTestCase {
         return first
     }
 
+    /// The guide opens on Favourites on the fakes; All channels is a chip above the grid.
+    @MainActor
+    private func showAllChannels(_ app: XCUIApplication) {
+        let all = app.buttons["live-filter-all"]
+        app.press(.up, thenWaitForFocusToMove: 3)
+        for _ in 0..<8 where !all.hasFocus { app.press(.left, thenWaitForFocusToMove: 3) }
+        XCTAssertTrue(all.hasFocus, "All channels is among the chips")
+        remote.press(.select)
+        app.press(.down, thenWaitForFocusToMove: 3)
+    }
+
     @MainActor
     private func longPress() { remote.press(.select, forDuration: 1.5) }
 
@@ -58,6 +69,8 @@ final class LiveExtrasTests: XCTestCase {
         _ = focusFirstCell(app)
         XCTAssertTrue(app.buttons["live-guide-reminders"].exists, "The chips have Reminders")
         XCTAssertTrue(app.buttons["live-filter-favourites"].exists, "and Favourites")
+        XCTAssertTrue(app.buttons["live-filter-favourites"].isSelected, "which the guide opens on, the fakes having starred channels")
+        XCTAssertFalse(app.buttons["live-filter-all"].isSelected)
         let hero = app.staticTexts["live-hero-title"]
         let dash = app.buttons["live-cell-2.1-Dollar Dash"]
         remote.press(.right)
@@ -67,8 +80,9 @@ final class LiveExtrasTests: XCTestCase {
         XCTAssertTrue(any(app, "Reminder set · 5 min before").waitUntilExists(timeout: 5), "The lines say the reminder is set")
         snap("tv-guide-reminded")
         let football = app.buttons["live-cell-4.1-Conference Football"]
-        // Down three rows to 4.1, then right past The Sleuth Files.
-        for _ in 0..<3 { remote.press(.down) }
+        // Down to 4.1 (the guide opens on Favourites, where it is the next row), then right past The Sleuth Files.
+        let onFour = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND hasFocus == true", "live-cell-4.1-")).firstMatch
+        for _ in 0..<4 where !onFour.exists { app.press(.down, thenWaitForFocusToMove: 3) }
         for _ in 0..<2 where !football.hasFocus { remote.press(.right) }
         XCTAssertTrue(football.hasFocus, "Conference Football at 9:00 on 4.1")
         snap("tv-guide-later")
@@ -89,7 +103,10 @@ final class LiveExtrasTests: XCTestCase {
     @MainActor
     func testAChannelsLongPressStarsIt() {
         let app = launch(["-tab", "liveTV"])
-        _ = focusFirstCell(app)
+        let first = focusFirstCell(app)
+        // Unstarred under Favourites, the channel would leave the grid: star it from All channels.
+        showAllChannels(app)
+        XCTAssertTrue(first.waitForFocus(timeout: 5), "Down from the chips comes back to the first programme")
         let channel = app.buttons["live-channel-2.1"]
         remote.press(.left)
         XCTAssertTrue(channel.hasFocus, "Left from the first programme reaches the channel")
@@ -220,6 +237,7 @@ final class LiveExtrasTests: XCTestCase {
         XCTAssertTrue(app.buttons["live-cell-2.1-Quiz Parlor"].waitUntilExists(timeout: 20))
         XCTAssertFalse(app.buttons["live-guide-reminders"].exists)
         XCTAssertFalse(app.buttons["live-filter-favourites"].exists)
+        XCTAssertTrue(app.buttons["live-filter-all"].isSelected, "without favourites the guide opens on All channels")
         XCTAssertFalse(app.buttons["live-channel-2.1"].exists)
         app.terminate()
     }

@@ -251,10 +251,11 @@ struct TVLiveRecordingsScreen: View {
         .contextMenu {
             if item.recordings.count == 1 {
                 let actions = item.first.actions
-                if actions.delete { Button(liveDeleteRecording) { deleting = item.first } }
                 if actions.cancel {
                     Button(actions.cancelTitle) { Task { await recordings.cancel(item.first.mark, programmeID: item.first.programmeID) } }
                 }
+                // Delete last, and it asks first.
+                if actions.delete { Button(liveDeleteRecording) { deleting = item.first } }
             }
         }
         .accessibilityIdentifier("recording-\(item.id)")
