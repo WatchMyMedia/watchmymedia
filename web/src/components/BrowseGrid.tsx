@@ -163,9 +163,6 @@ export function BrowseGrid({ libraryId, type, q, initial = {}, prefs, save, coun
               <span aria-hidden="true" className="text-[13px] text-neutral-400">
                 Columns
               </span>
-              <button type="button" aria-pressed={!!columns.quality} onClick={() => save({ columns: { ...columns, quality: !columns.quality } })} className="chip">
-                Quality
-              </button>
               <button type="button" aria-pressed={!!columns.size} onClick={() => save({ columns: { ...columns, size: !columns.size } })} className="chip">
                 Size
               </button>

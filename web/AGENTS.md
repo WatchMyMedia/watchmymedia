@@ -123,8 +123,11 @@ the user asks in this conversation; see Authority in the root file.
   does); the
   picture is a pointer target for the most specific link, with `tabIndex={-1}`
   and `aria-hidden`, so a card has one tab stop per destination. Every link
-  carries an `aria-label` naming the whole target. No quality badge on any
-  card; quality is a fact on the hero and the detail pages.
+  carries an `aria-label` naming the whole target. No quality on any card,
+  hover card or list row: a movie's page says its picture and sound in one
+  line (`qualityLine` in `src/lib/titlePage.ts`, which the Samsung TV app
+  uses too), tags and codecs stay in File details, and the libraries'
+  Picture filter finds 4K and HDR.
   `addedEpisode` stays for the apps.
 - **Settings**: each tab opens on a hub, and each
   task with more than one step is a flow at its own address under the tab.

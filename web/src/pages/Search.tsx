@@ -10,7 +10,7 @@ import { useLiveSearch, useNotInLibrary } from '../components/SearchHooks'
 import { CheckIcon, PlayIcon, PlusIcon } from '../components/icons'
 import { OnLiveTV } from '../components/liveTV/OnLiveTV'
 import { useNow } from '../components/useNow'
-import { qualityWords, scoreWords, showStatusWords } from '../lib/cardFacts'
+import { scoreWords, showStatusWords } from '../lib/cardFacts'
 import { leftWords, percentWatched } from '../lib/endTime'
 import { formatRuntime, plural } from '../lib/format'
 import { requestSource } from '../lib/requests'
@@ -181,15 +181,12 @@ function BestMovie({ movie: m }: { movie: Movie }) {
           ))}
         </p>
       )}
-      {d && (watch?.completed || qualityWords(d.quality, d.hdr)) && (
+      {watch?.completed && (
         <p className="flex flex-wrap gap-2">
-          {watch?.completed && (
-            <span className="pill pill-gold">
-              <CheckIcon size={13} />
-              Watched
-            </span>
-          )}
-          {qualityWords(d.quality, d.hdr) && <span className="pill">{qualityWords(d.quality, d.hdr)}</span>}
+          <span className="pill pill-gold">
+            <CheckIcon size={13} />
+            Watched
+          </span>
         </p>
       )}
       {left && (

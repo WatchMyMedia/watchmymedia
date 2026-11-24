@@ -27,7 +27,7 @@ describe('a library’s remembered choices', () => {
   })
 
   it('reads back what it knows and leaves out the rest', () => {
-    expect(parsePrefs(JSON.stringify({ sort: 'added', filter: 'unwatched', genre: 'Drama', decade: 1990, tab: 'all', view: 'list', size: 4, columns: { quality: true } }))).toEqual({
+    expect(parsePrefs(JSON.stringify({ sort: 'added', filter: 'unwatched', genre: 'Drama', decade: 1990, tab: 'all', view: 'list', size: 4, columns: { quality: true, size: true } }))).toEqual({
       sort: 'added',
       filter: 'unwatched',
       genre: 'Drama',
@@ -35,7 +35,7 @@ describe('a library’s remembered choices', () => {
       tab: 'all',
       view: 'list',
       size: 4,
-      columns: { quality: true, size: false },
+      columns: { size: true },
     })
     expect(parsePrefs(JSON.stringify({ sort: 'loudness', filter: 'mine', tab: 'files', view: 'cards', size: 9, decade: -1 }))).toEqual({})
     expect(parsePrefs(JSON.stringify({ filter: '' }))).toEqual({ filter: '' })

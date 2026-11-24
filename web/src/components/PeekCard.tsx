@@ -5,7 +5,7 @@ import { Link } from '@tanstack/react-router'
 import { movieQuery, showQuery } from '../api/queries'
 import { useMarkWatched } from '../api/watch'
 import type { components } from '../api/schema'
-import { peekFacts, qualityWords } from '../lib/cardFacts'
+import { peekFacts } from '../lib/cardFacts'
 import { endsWords } from '../lib/endTime'
 import { img } from '../lib/images'
 import { CheckIcon, PlayIcon } from './icons'
@@ -86,7 +86,7 @@ function PeekCard({ item, anchor, onEnter, onLeave, onClose }: { item: BrowseIte
   const picture = img(item.backdropPath, 'w780') ?? img(item.posterPath, 'w342')
   const now = useNow()
   const ends = item.kind === 'movie' ? endsWords(item.runtimeMin, now) : undefined
-  const foot = [item.genres.slice(0, 2).join(', '), qualityWords(item.quality, item.hdr)].filter(Boolean).join(' · ')
+  const foot = item.genres.slice(0, 2).join(', ')
   const target = { mediaType: item.kind === 'show' ? ('tv' as const) : ('movie' as const), tmdbId: item.tmdbId ?? 0, title: item.title, year: item.year, posterPath: item.posterPath }
   let play: ReactNode = null
   if (item.kind === 'movie') {

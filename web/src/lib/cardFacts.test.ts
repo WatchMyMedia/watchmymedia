@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { continueWords, movieLine, peekFacts, qualityWords, scoreWords, showStatusWords } from './cardFacts'
+import { continueWords, movieLine, peekFacts, scoreWords, showStatusWords } from './cardFacts'
 
 describe('card facts', () => {
   it('says a movie’s year and length', () => {
@@ -8,10 +8,7 @@ describe('card facts', () => {
     expect(movieLine({})).toBe('')
   })
 
-  it('words quality and score', () => {
-    expect(qualityWords('4K', true)).toBe('4K HDR')
-    expect(qualityWords('1080p', false)).toBe('1080p')
-    expect(qualityWords(undefined, false)).toBe('')
+  it('words the score', () => {
     expect(scoreWords(7.25)).toBe('★ 7.3')
     expect(scoreWords(0)).toBe('')
   })
