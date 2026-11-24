@@ -312,6 +312,46 @@ class SeveralServersTest {
     }
 
     @Test
+    fun `another server's title page asks its address first, then goes there as its own person`() = runBlocking {
+        signInOnBoth()
+        h.server.always("GET /api/server", testInfo(level = 34))
+        h.server.always("GET /api/movies", json("""{"items":[]}"""))
+        h.server.always("GET /api/search", found)
+        // What the server says of itself is kept, so its level is known before a level-34 call goes to it.
+        h.services.library.searchOn("srv-test", "harbor")
+        h.server.requests.clear()
+        val there = h.services.library.on("srv-test")!!
+        assertTrue(there.copies(media.watchmy.client.model.ItemKind.Movie, 603).isEmpty())
+        val asked = h.server.last("GET /api/movies")
+        assertEquals("603", asked.requestUrl!!.queryParameter("tmdbId"))
+        assertEquals("Bearer tok-viewer", asked.getHeader("Authorization"))
+        assertTrue("the server in use hears nothing of it", second.requests("GET /api/movies").isEmpty())
+        assertTrue(second.requests.none { it.getHeader("Authorization") == "Bearer tok-viewer" })
+        assertEquals("the in-use library is itself for its own id", h.services.library, h.services.library.on("srv-cabin"))
+        assertNull("no one is signed in to a server never added", h.services.library.on("srv-never"))
+    }
+
+    @Test
+    fun `another server at the address of a page's server gets no sign-in`() = runBlocking {
+        signInOnBoth()
+        h.server.always("GET /api/server", testInfo(level = 34))
+        h.server.always("GET /api/search", found)
+        h.services.library.searchOn("srv-test", "harbor")
+        // Then the address answers as some other server: the page's calls fail, and nothing signed goes there.
+        h.server.always("GET /api/server", json("""{"id":"srv-other","name":"Other","version":"1.0.0","apiLevel":34,"setupRequired":false,"turnstile":false}"""))
+        h.services.library.on("srv-test")!!.let { there ->
+            h.server.requests.clear()
+            // A failed call forgets the answer, so the next asks again.
+            h.server.always("GET /api/movies/5", TestServer.problem(500, "boom"))
+            runCatching { there.movie(5) }
+            h.server.requests.clear()
+            assertTrue(runCatching { there.movie(5) }.isFailure)
+        }
+        assertTrue("asked which server it is, with no sign-in", h.server.requests("GET /api/server").all { it.getHeader("Authorization") == null })
+        assertTrue("and sent it nothing else", h.server.requests.none { it.getHeader("Authorization") != null })
+    }
+
+    @Test
     fun `a search of a server no one is signed in to here is refused without a call`() = runBlocking {
         h.signIn()
         servers.select(cabin)

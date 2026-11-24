@@ -265,19 +265,28 @@ class ServerSwitchViewModelTest {
         assertEquals("Cancel goes back", LivingRoom.id, vm.state.value.returnTo)
     }
 
-    @Test fun `a link for another registered account switches to its server first`() = runTest {
+    @Test fun `a link for another account signed in here opens in place, without switching`() = runTest {
         val vm = model()
         runCurrent()
         val cabin = servers.saved.first().first { it.server.id == Cabin.id }
         val link = DeepLink.newEpisode(showId = 700, season = 2, episodeId = 700023, account = cabin.linkAccount()!!)
         assertTrue(vm.arrive(link))
         runCurrent()
-        assertEquals(Cabin.id, current)
-        assertEquals("asked first, as any switch", listOf(Cabin.id to true), servers.switches)
-        assertEquals("Now on Cabin server", vm.state.value.note)
-        // It opens there: the account in use is the one it names now.
-        val account = watchNextAccount(servers.current.value?.server, auth.user.value)
-        assertEquals(DeepLink.Show(700, 2, 700023), DeepLink.open(link, account))
+        assertEquals("the app stays where it was", LivingRoom.id, current)
+        assertTrue(servers.switches.isEmpty())
+        assertNull(vm.state.value.note)
+        // The nav host opens it from that server.
+        assertEquals(Cabin.id to DeepLink.Show(700, 2, 700023), DeepLink.elsewhere(link, servers.saved.first(), LivingRoom.id))
+    }
+
+    @Test fun `another account's Live TV link says which server it is for and opens nothing`() = runTest {
+        val vm = model()
+        runCurrent()
+        val cabin = servers.saved.first().first { it.server.id == Cabin.id }
+        assertFalse(vm.arrive(DeepLink.live("7.1", cabin.linkAccount()!!)))
+        runCurrent()
+        assertEquals(LivingRoom.id, current)
+        assertEquals("That’s Cabin server’s Live TV. Switch to it from Servers to watch.", vm.state.value.note)
     }
 
     @Test fun `a link for the account in use, for none, or for one not on this device switches nothing`() = runTest {
@@ -293,13 +302,13 @@ class ServerSwitchViewModelTest {
         assertNull("one for an account that isn't here still opens nothing", DeepLink.open(DeepLink.home("someone-else"), mine))
     }
 
-    @Test fun `a link for a server that doesn't answer leaves the app where it was and says so`() = runTest {
+    @Test fun `a link for a server signed in here that doesn't answer still opens in place, and its page says why`() = runTest {
         val vm = model()
         runCurrent()
         val den = servers.saved.first().first { it.server.id == Den.id }
-        assertFalse(vm.arrive(DeepLink.home(den.linkAccount()!!)))
+        assertTrue(vm.arrive(DeepLink.home(den.linkAccount()!!)))
         runCurrent()
         assertEquals(LivingRoom.id, current)
-        assertEquals("Couldn’t reach Den server. You’re still on Living room server.", vm.state.value.note)
+        assertTrue(servers.switches.isEmpty())
     }
 }

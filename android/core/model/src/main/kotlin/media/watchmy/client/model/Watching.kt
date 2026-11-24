@@ -87,11 +87,13 @@ fun ContinueItem.playRequest(): PlayRequest = PlayRequest(
     title = title,
     subtitle = subtitle ?: season?.let { s -> episode?.let { e -> episodeCode(s, e) } },
     backdropPath = backdropPath ?: stillPath,
+    // A card merged from several servers resumes from the one played last, where its place is.
+    serverId = where.serverId,
 )
 
 /** Null when the episode is not on disk. */
 fun EpisodeCard.playRequest(): PlayRequest? = fileId?.let {
-    PlayRequest(fileId = it, title = showTitle, subtitle = "${episodeCode(season, episode)} · $title", backdropPath = showBackdropPath ?: stillPath)
+    PlayRequest(fileId = it, title = showTitle, subtitle = "${episodeCode(season, episode)} · $title", backdropPath = showBackdropPath ?: stillPath, serverId = where.serverId)
 }
 
 /** Null when the hero has nothing to play. [episodes] names the episode when the hero is one. */

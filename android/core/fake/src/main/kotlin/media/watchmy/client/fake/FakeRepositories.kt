@@ -398,12 +398,12 @@ class FakeLibraryRepository(
 
     /** Home's cards with their TMDB ids and watchlist marks, as a server with watchlists sends them. */
     private fun marked(home: HomeData) = home.copy(
-        recentlyAddedShows = home.recentlyAddedShows.map(rows::marked),
-        recentlyAddedMovies = home.recentlyAddedMovies.map(rows::marked),
-        recentlyReleased = home.recentlyReleased.map(rows::marked),
+        recentlyAddedShows = home.recentlyAddedShows.map(::withTmdb),
+        recentlyAddedMovies = home.recentlyAddedMovies.map(::withTmdb),
+        recentlyReleased = home.recentlyReleased.map(::withTmdb),
     )
 
-    private fun List<ScreenRow>.marked() = map { r -> r.copy(items = r.items.map(rows::marked)) }
+    private fun List<ScreenRow>.marked() = map { r -> r.copy(items = r.items.map(::withTmdb)) }
 
     /** Home in the person's order from [ROWS_API_LEVEL], with the fixed arrays empty, as the server sends it. */
     override suspend fun arrangedHome(): HomeData {
@@ -463,7 +463,7 @@ class FakeLibraryRepository(
             ItemSort.Runtime -> list.sortedByDescending { it.runtimeMin }
         }
         return ItemPage(
-            items = list.drop(query.offset).take(query.limit).map(rows::marked), total = list.size, offset = query.offset,
+            items = list.drop(query.offset).take(query.limit).map(::withTmdb), total = list.size, offset = query.offset,
             genres = genres, decades = all.mapNotNull { it.year?.div(10)?.times(10) }.distinct().sortedDescending(),
             summary = shelf.summary(query.libraryId),
             genreCounts = genreCounts,

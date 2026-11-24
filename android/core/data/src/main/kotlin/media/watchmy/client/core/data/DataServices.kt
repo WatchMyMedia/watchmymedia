@@ -153,6 +153,22 @@ class DataServices internal constructor(
     val playbackGateway: PlaybackGateway =
         RealPlaybackGateway(SignedInAccess(http), { store.deviceName.value }, { deviceId }, { RealPlaybackGateway.signedInMediaToken(http) })
 
+    /**
+     * The player's calls for a file on the registered server [serverId]
+     * when it isn't the one in use: a copy of a title on another server,
+     * played without switching. Null for the server in use, which is
+     * [playbackGateway]'s, and for one no one is signed in to here.
+     */
+    fun playbackGatewayOn(serverId: String): PlaybackGateway? {
+        if (serverId == store.value.currentId) return null
+        if (store.value.servers.firstOrNull { it.id == serverId }?.account == null) return null
+        val access = OtherServerAccess(http, store, serverId)
+        return RealPlaybackGateway(access, { store.deviceName.value }, { deviceId }, { RealPlaybackGateway.signedInMediaToken(access) })
+    }
+
+    /** Which server's copy Play uses for each title on several servers. */
+    val copyChoices: media.watchmy.client.model.CopyChoices = StoredCopyChoices(store)
+
     /** A sender's calls for casting to a TV. */
     val castGateway: CastGateway = RealCastGateway(store, http, liveRepository::capabilities)
 

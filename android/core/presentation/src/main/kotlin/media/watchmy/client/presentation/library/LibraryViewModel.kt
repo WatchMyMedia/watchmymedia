@@ -1,5 +1,11 @@
 package media.watchmy.client.presentation.library
 
+import kotlinx.coroutines.withTimeoutOrNull
+import media.watchmy.client.model.at
+import media.watchmy.client.model.serverHeading
+import media.watchmy.client.model.stillAsking
+import media.watchmy.client.model.didntAnswer
+import media.watchmy.client.presentation.servers.OtherServers
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -62,6 +68,12 @@ class LibraryViewModel(
     private val countsLine: Boolean = false,
     /** The app's [BrowseRequests]: the grid takes its library's, once. */
     private val requests: BrowseRequests? = null,
+    /**
+     * The other servers this device is signed in to: with any, the grid is
+     * every server's titles, a card each, merged a page at a time
+     * ([MergedPages]); null is the server in use's alone.
+     */
+    private val others: OtherServers? = null,
 ) : ViewModel() {
     data class Choices(
         val sort: ItemSort = ItemSort.Added,
@@ -127,6 +139,14 @@ class LibraryViewModel(
          * grid's heading once the first page is in, then calls [gridShown].
          */
         val toGrid: Boolean = false,
+        /** The grid is every server's ([MergedPages]). */
+        val merged: Boolean = false,
+        /** With [merged], the count is an estimate: a server is still out ("About 1,240 movies"). */
+        val about: Boolean = false,
+        /** With [merged], what the header's second line says: a server still out, one that didn't answer, one that can't filter so. */
+        val notes: List<String> = emptyList(),
+        /** A server didn't answer: the second line has Try again. */
+        val retryServers: Boolean = false,
     ) {
         val filtered: Boolean get() = choices.filtered
         val hasMore: Boolean get() = end < total
@@ -161,6 +181,14 @@ class LibraryViewModel(
     private val freshness = Freshness(viewModelScope, library.libraryChanges, { change ->
         _state.value.libraryId?.let { change.touchesLibrary(it) } ?: change.libraryContents
     }) { reload(quiet = true) }
+
+    // Declared before init, which starts the first load: a field set there would be set back by its initializer.
+    /** The grid's merge of every server's pages, while there is more than one; null with one. */
+    private var merged: MergedPages? = null
+    /** Whether there were other servers at the last load; null before it, when they are asked. */
+    private var mergedSeveral: Boolean? = null
+    /** The servers whose titles a filter leaves out, since they are too old to apply it. */
+    private var cantFilter: List<String> = emptyList()
 
     init {
         reload()
@@ -232,6 +260,16 @@ class LibraryViewModel(
 
     /** Loads the next page, when there is one and nothing else is loading. */
     fun loadMore() {
+        merged?.let { pages ->
+            val s = _state.value
+            if (s.loading || s.loadingMore || pages.finished) return
+            _state.update { it.copy(loadingMore = true) }
+            job = viewModelScope.launch {
+                pages.next()
+                publish(pages)
+            }
+            return
+        }
         val s = _state.value
         val id = s.libraryId ?: return
         if (!s.hasMore || s.busy() || s.moreError != null) return
@@ -256,6 +294,7 @@ class LibraryViewModel(
 
     /** Loads the page before a jump's window, when there is one and nothing else is loading. */
     fun loadEarlier() {
+        if (merged != null) return
         val s = _state.value
         val id = s.libraryId ?: return
         if (!s.hasEarlier || s.busy() || s.moreError != null) return
@@ -283,6 +322,7 @@ class LibraryViewModel(
      * the window before the first preview.
      */
     fun jumpToLetter(letter: String, preview: Boolean = false) {
+        if (merged != null) return mergedJump(letter)
         val s = _state.value
         val id = s.libraryId ?: return
         if (s.choices.sort != ItemSort.Title || s.loading || s.refreshing) return
@@ -334,6 +374,7 @@ class LibraryViewModel(
 
     /** Shows the mark on the card at once; if the server refuses it, the card goes back as it was and the grid says why. */
     fun setWatched(item: BrowseItem, watched: Boolean) {
+        if (item.where.serverId != null || item.where.copies.isNotEmpty()) return markEverywhere(item, watched)
         val target = item.watchTarget() ?: return
         _state.update { s -> s.copy(items = s.items.map { if (it.id == item.id) it.withWatched(watched) else it }) }
         viewModelScope.launch {
@@ -346,6 +387,108 @@ class LibraryViewModel(
     }
 
     fun messageShown() = _state.update { it.copy(message = null) }
+
+    /** A card from another server, or merged from several: marked on every server that has it. */
+    private fun markEverywhere(item: BrowseItem, watched: Boolean) {
+        val target = { id: Long -> if (item.kind == media.watchmy.client.model.ItemKind.Movie) media.watchmy.client.model.WatchTarget.Movie(id) else media.watchmy.client.model.WatchTarget.Show(id) }
+        _state.update { s -> s.copy(items = s.items.map { if (it === item) it.copy(watched = watched, progress = null) else it }) }
+        viewModelScope.launch {
+            val copies = listOf(item.where.serverId to item.id) + item.where.copies.map { it.serverId to it.id }
+            val failure = copies.map { (server, id) -> attempt { library.at(server)?.markWatched(target(id), watched) } }.firstOrNull { it.isFailure }?.exceptionOrNull()
+            _state.update { it.copy(message = failure?.let(::errorMessage) ?: markedMessage(watched)) }
+        }
+    }
+
+
+
+    /** Asks the servers that didn't answer again, from the start. */
+    fun retryServers() = reload()
+
+    /**
+     * Every server's grid, merged: the server in use's library of this kind
+     * and each other server's, the person's sort and filters sent to each. A
+     * filter a server is too old for leaves its titles out, and the header
+     * says so. With one server after all, the grid loads as it always did.
+     */
+    private fun mergedReload(pull: Boolean, debounce: Boolean, startAt: Map<String?, Int> = emptyMap(), jumpTo: String? = null) {
+        val all = others ?: return
+        job?.cancel()
+        _state.update { it.copy(refreshing = pull, loading = !pull, loadingMore = false, loadingEarlier = false, error = null, moreError = null) }
+        job = viewModelScope.launch {
+            if (debounce) delay(DEBOUNCE_MS)
+            val inUse = all.inUse()
+            val elsewhere = all.others()
+            if (inUse == null || elsewhere.isEmpty()) {
+                mergedSeveral = false
+                merged = null
+                _state.update { it.copy(merged = false, about = false, notes = emptyList(), retryServers = false) }
+                return@launch reload(pull = pull)
+            }
+            mergedSeveral = true
+            val choices = _state.value.choices
+            val asked = (listOf(inUse) + elsewhere).map { o ->
+                o to attempt { withTimeoutOrNull(OtherServers.TIMEOUT_MS) { o.library.libraries().firstOrNull { it.type == type }?.id } }.getOrNull()
+            }
+            val (kept, cant) = if (choices.rating != null) asked.partition { (o, _) -> o.library.features().ratingFilter } else asked to emptyList()
+            val ownId = asked.first().second
+            if (ownId == null && kept.none { it.second != null }) {
+                _state.update { it.copy(loading = false, refreshing = false, noLibrary = true, items = emptyList(), offset = 0, end = 0, total = 0) }
+                return@launch
+            }
+            val query = _state.value.query(ownId ?: 0, offset = 0)
+            val pages = MergedPages(kept, query, pageSize, startAt = { o -> startAt[o.id] ?: 0 })
+            merged = pages
+            cantFilter = cant.map { (o, _) -> o.name }
+            pages.start(viewModelScope, OtherServers.STILL_ASKING_MS) { publish(pages) }
+            if (merged !== pages) return@launch
+            _state.update { it.copy(libraryId = ownId) }
+            publish(pages)
+            if (jumpTo != null) _state.update { it.copy(jump = Jump((it.jump?.revision ?: 0) + 1, jumpTo, 0)) }
+        }
+    }
+
+
+    /** The merged grid as it stands: its cards, its counts and what the header's second line says. */
+    private fun publish(pages: MergedPages) {
+        if (merged !== pages) return
+        val first = pages.first
+        val noun = if (type == LibraryType.Tv) "show" else "movie"
+        val notes = buildList {
+            if (pages.pending.isNotEmpty()) add(stillAsking(pages.pending))
+            pages.failed.forEach { add(didntAnswer(it)) }
+            cantFilter.forEach { add("${serverHeading(it)} can’t filter by rating, so its ${noun}s aren’t listed.") }
+        }
+        val count = if (pages.finished) pages.items.size else maxOf(pages.total, pages.items.size)
+        val line = listOfNotNull(
+            (if (pages.about) "About " else "") + plural(count, noun).let { if (pages.about) it.replaceFirstChar { c -> c.lowercase() } else it },
+            pages.pending.firstOrNull()?.let { "still asking ${serverHeading(it)}…" },
+            pages.failed.firstOrNull()?.let { "${serverHeading(it)} didn’t answer" },
+        ).joinToString(" · ")
+        _state.update {
+            it.copy(
+                merged = true, about = pages.about, notes = notes, retryServers = pages.failed.isNotEmpty(),
+                items = pages.items.toList(), offset = 0, end = pages.items.size,
+                total = if (pages.finished) pages.items.size else maxOf(count, pages.items.size + 1),
+                letters = first?.letters.takeIf { _ -> it.choices.sort == ItemSort.Title },
+                genres = first?.genres ?: it.genres, decades = first?.decades ?: it.decades,
+                ratings = first?.contentRatings?.takeIf { r -> r.isNotEmpty() }, ratingCounts = first?.contentRatingCounts.orEmpty(),
+                summary = null, countsLine = if (countsLine) line else it.countsLine,
+                loading = false, refreshing = false, loadingMore = false, error = null, noLibrary = false,
+            )
+        }
+    }
+
+    /** A letter in the merged grid: each server from its own first title under it, and the grid from there. */
+    private fun mergedJump(letter: String) {
+        val pages = merged ?: return
+        if (_state.value.choices.sort != ItemSort.Title) return
+        val starts = pages.sources.associate { s ->
+            val letters = pages.letters(s).orEmpty()
+            val at = letters.firstOrNull { it.letter == letter }?.offset ?: letters.firstOrNull { it.letter > letter }?.offset ?: s.total.coerceAtLeast(0)
+            s.other.id to at
+        }
+        mergedReload(pull = false, debounce = false, startAt = starts, jumpTo = letter)
+    }
 
     private fun State.busy() = loading || refreshing || loadingMore || loadingEarlier || job?.isActive == true
 
@@ -384,6 +527,7 @@ class LibraryViewModel(
      * the beginning.
      */
     private fun reload(quiet: Boolean = false, pull: Boolean = false, debounce: Boolean = false) {
+        if (others != null && mergedSeveral != false) return mergedReload(pull, debounce)
         job?.cancel()
         if (!quiet && !pull) beforeJump = null
         val previous = _state.value

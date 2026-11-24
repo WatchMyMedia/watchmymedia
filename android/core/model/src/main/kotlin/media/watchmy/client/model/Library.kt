@@ -407,6 +407,12 @@ data class EpisodeDetail(
     val download: Download? = null,
     /** The season's open request covering this episode. */
     val request: RequestState? = null,
+    /**
+     * An episode only another server has, listed in its place on a show on
+     * several servers: [Where.serverId] is that server, and [id] stands for
+     * it on this page alone (its own id there is in the page's copies).
+     */
+    val where: Where = Where.Here,
 )
 
 /** The show with only the seasons that have episodes on disk, and [keep] (the one asked for). */
