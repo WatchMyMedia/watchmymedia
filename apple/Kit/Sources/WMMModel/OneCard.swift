@@ -73,7 +73,7 @@ public struct CardServer: Hashable, Sendable, Identifiable {
     public var shortName: String { cardServerShortName(name) }
 }
 
-/// "Cabin" for "Cabin server", the name as the boards draw it on a card;
+/// "Cabin" for "Cabin server", the short name a card has room for;
 /// a name that doesn't end in " server" is kept whole.
 public func cardServerShortName(_ name: String) -> String {
     for suffix in [" server", " Server"] where name.hasSuffix(suffix) && name.count > suffix.count {
