@@ -228,11 +228,15 @@ public final class HomeModel {
     private func lookUpAlsoHere() async {
         guard let home = state.value else { return }
         let rows = home.rows?.filter { $0.style == .continue }.flatMap(\.continueItems) ?? home.continueWatching
+        // Set once, and only when it changes: each change redraws Home, which on
+        // Apple TV rebuilds every screen.
+        var here = alsoHere
         for item in rows.prefix(20) where item.server != nil {
-            guard let key = TitleKey(item), !alsoHere.contains(key), let tmdb = item.tmdbID else { continue }
+            guard let key = TitleKey(item), !here.contains(key), let tmdb = item.tmdbID else { continue }
             let found = (try? await item.kind == .movie ? library.movies(tmdbID: tmdb) : library.shows(tmdbID: tmdb)) ?? []
-            if !found.isEmpty { alsoHere.insert(key) }
+            if !found.isEmpty { here.insert(key) }
         }
+        if here != alsoHere { alsoHere = here }
     }
 
     /// A card from another server, in a line: "from Cabin" on a Continue
