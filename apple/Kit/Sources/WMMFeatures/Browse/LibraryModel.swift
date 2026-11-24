@@ -215,18 +215,29 @@ public final class LibraryModel {
     /// matched yet" while files wait for a match.
     public var headerCount: String? {
         guard let grid = state.value, !noLibrary else { return nil }
-        if let merged, merged.applies, !merged.feeds.isEmpty || merged.counting {
-            let total = merged.total(own: grid.summary?.items ?? grid.total, ownItems: grid.items)
-            return merged.counting ? "About \(plural(total, noun))" : plural(total, noun)
-        }
+        if let mergedCount { return mergedCount }
         guard let summary = grid.summary else { return plural(grid.total, noun) }
         return [plural(summary.items, noun), unmatchedCount(summary.unmatched)].compactMap { $0 }.joined(separator: " · ")
     }
 
-    /// Over the grid: "16 shows · 312 episodes" for the whole library, or
-    /// what matches: "3 shows in Sci-Fi", "1 movie from the 2010s".
+    /// The whole library across servers while other servers are merged in:
+    /// every server's titles added up, less those on two, "About" until
+    /// every server has answered ("About 12 movies"). The header and the line
+    /// over the grid both say it, so they agree: the line said the server in
+    /// use's count alone ("10 movies") under a header of 12. No episode or
+    /// unmatched counts: other servers' would count a shared show twice.
+    private var mergedCount: String? {
+        guard let grid = state.value, let merged, merged.applies, !merged.feeds.isEmpty || merged.counting else { return nil }
+        let total = merged.total(own: grid.summary?.items ?? grid.total, ownItems: grid.items)
+        return merged.counting ? "About \(plural(total, noun))" : plural(total, noun)
+    }
+
+    /// Over the grid: "16 shows · 312 episodes" for the whole library (every
+    /// server's count with others merged in), or what matches: "3 shows in
+    /// Sci-Fi", "1 movie from the 2010s".
     public var resultLine: String? {
         guard let grid = state.value, !noLibrary else { return nil }
+        if !isFiltered, let mergedCount { return mergedCount }
         if !isFiltered, let summary = grid.summary {
             return [plural(summary.items, noun), summary.episodes > 0 ? plural(summary.episodes, "episode") : nil, unmatchedCount(summary.unmatched)]
                 .compactMap { $0 }.joined(separator: " · ")

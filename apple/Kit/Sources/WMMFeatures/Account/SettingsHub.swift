@@ -49,7 +49,9 @@ public struct SettingsHubFacts: Hashable, Sendable {
     public var server: Server?
     /// "iPhone", "iPad" or "Apple TV".
     public var device: String
-    /// "1.8.6", or "1.0 (12)".
+    /// "1.8.6": the version alone. The About page adds the build
+    /// ("2.2.0 (20200099)"); beside a row's name it wrapped "About
+    /// WatchMyMedia" over three lines in the iPad's list.
     public var appVersion: String
     public var quality: StreamQuality
     public var autoplayNext: Bool
@@ -340,7 +342,7 @@ extension SettingsModel {
                          remindersAvailable: Bool = false, reminderCount: Int = 0, notificationsOff: Bool = false,
                          dismissedSteps: Set<SettingsNextStep.Kind> = []) -> SettingsHubFacts {
         SettingsHubFacts(
-            user: user, server: server, device: facts.family, appVersion: facts.appVersionLabel,
+            user: user, server: server, device: facts.family, appVersion: facts.appVersion,
             quality: quality, autoplayNext: autoplayNext, audioLanguages: audio.languages, subtitleChoice: subtitleChoice,
             preferencesLoaded: preferencesLoaded, suggestedLanguage: deviceLanguage,
             followsAvailable: followsAvailable, followCount: followCount,
