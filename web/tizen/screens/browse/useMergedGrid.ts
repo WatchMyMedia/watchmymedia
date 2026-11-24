@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQueries, type UseQueryResult } from '@tanstack/react-query'
 import { unwrap } from '../../../src/api/client'
-import { fetchLibraryItems } from '../../../src/api/libraryItems'
+import { fetchItems } from '../../../src/api/queries'
 import type { components } from '../../../src/api/schema'
 import type { LibraryType } from '../../../src/lib/browseOptions'
 import { useLevel34, usePeers, useSession } from '../../app/hooks'
@@ -62,14 +62,14 @@ export function useMergedGrid(library: Library, type: LibraryType, choices: Grid
   const current = useQueries({
     queries: Array.from({ length: Math.max(0, pagesOf(session.server.id) - 1) }, (_, k) => ({
       queryKey: ['items', library.id, { ...q, limit: PAGE_SIZE, offset: (k + 1) * PAGE_SIZE }],
-      queryFn: ({ signal }: { signal: AbortSignal }) => fetchLibraryItems(library.id, { ...q, limit: PAGE_SIZE, offset: (k + 1) * PAGE_SIZE }, signal),
+      queryFn: ({ signal }: { signal: AbortSignal }) => fetchItems(library.id, { ...q, limit: PAGE_SIZE, offset: (k + 1) * PAGE_SIZE }, undefined, signal),
     })),
   })
   const pageQueries = theirs.flatMap(({ peer, lib }) => (lib ? Array.from({ length: pagesOf(peer.id) }, (_, k) => ({ peer, lib, k })) : []))
   const pages = useQueries({
     queries: pageQueries.map(({ peer, lib, k }) => ({
       queryKey: ['peer', peer.id, 'items', lib.id, q, k],
-      queryFn: ({ signal }: { signal: AbortSignal }) => within(COPY_MS, signal, (s) => fetchLibraryItems(lib.id, { ...q, limit: PAGE_SIZE, offset: k * PAGE_SIZE }, s, peer.api)),
+      queryFn: ({ signal }: { signal: AbortSignal }) => within(COPY_MS, signal, (s) => fetchItems(lib.id, { ...q, limit: PAGE_SIZE, offset: k * PAGE_SIZE }, peer.api, s)),
       retry: false,
       staleTime: 30_000,
     })),

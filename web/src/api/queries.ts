@@ -1,5 +1,5 @@
 import { infiniteQueryOptions, queryOptions, useMutation, useQuery, useQueryClient, type MutateOptions, type QueryClient } from '@tanstack/react-query'
-import { ApiError, api, unwrap } from './client'
+import { ApiError, api, unwrap, type ApiClient } from './client'
 import type { components } from './schema'
 import { authScope } from '../lib/authScope'
 import type { ItemFilter, ItemFilterValue, ItemSort } from '../lib/browseOptions'
@@ -55,46 +55,53 @@ export type { ItemFilter, ItemSort } from '../lib/browseOptions'
  * are from API level 34: filters combine with filter (an item meets them
  * all), contentRating keeps one rating, collection one TMDB collection.
  */
-export const itemsQuery = (
-  id: number,
-  p: {
-    sort: ItemSort
-    filter: ItemFilter
-    genre?: string
-    decade?: number
-    q?: string
-    limit: number
-    offset: number
-    filters?: readonly ItemFilterValue[]
-    contentRating?: string
-    order?: 'asc' | 'desc'
-    collection?: number
-  },
-) =>
+export type ItemsParams = {
+  sort: ItemSort
+  filter: ItemFilter
+  genre?: string
+  decade?: number
+  q?: string
+  limit: number
+  offset: number
+  filters?: readonly ItemFilterValue[]
+  contentRating?: string
+  order?: 'asc' | 'desc'
+  collection?: number
+}
+
+/**
+ * The page itemsQuery asks for, from `client`: the page's own server unless
+ * another is named (the Samsung TV app asks every server it is signed in to).
+ */
+export async function fetchItems(id: number, p: ItemsParams, client: ApiClient = api, signal?: AbortSignal) {
+  return unwrap(
+    await client.GET('/api/libraries/{id}/items', {
+      params: {
+        path: { id },
+        query: {
+          sort: p.sort,
+          filter: p.filter || undefined,
+          genre: p.genre || undefined,
+          decade: p.decade || undefined,
+          q: p.q || undefined,
+          limit: p.limit,
+          offset: p.offset,
+          // The server reads these comma separated, as one value.
+          filters: p.filters?.length ? [p.filters.join(',') as ItemFilterValue] : undefined,
+          contentRating: p.contentRating ? [p.contentRating] : undefined,
+          order: p.order,
+          collection: p.collection || undefined,
+        },
+      },
+      signal,
+    }),
+  )
+}
+
+export const itemsQuery = (id: number, p: ItemsParams) =>
   queryOptions({
     queryKey: ['items', id, p],
-    queryFn: async () =>
-      unwrap(
-        await api.GET('/api/libraries/{id}/items', {
-          params: {
-            path: { id },
-            query: {
-              sort: p.sort,
-              filter: p.filter || undefined,
-              genre: p.genre || undefined,
-              decade: p.decade || undefined,
-              q: p.q || undefined,
-              limit: p.limit,
-              offset: p.offset,
-              // The server reads these comma separated, as one value.
-              filters: p.filters?.length ? [p.filters.join(',') as ItemFilterValue] : undefined,
-              contentRating: p.contentRating ? [p.contentRating] : undefined,
-              order: p.order,
-              collection: p.collection || undefined,
-            },
-          },
-        }),
-      ),
+    queryFn: () => fetchItems(id, p),
     placeholderData: (prev) => prev,
   })
 

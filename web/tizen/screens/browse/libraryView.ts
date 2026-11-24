@@ -1,6 +1,6 @@
 import type { components } from '../../../src/api/schema'
-import type { LibraryFilter } from '../../../src/api/libraryItems'
-import { itemFilter, itemSort, sortOptions, type ItemSort, type LibraryType } from '../../../src/lib/browseOptions'
+import type { ItemsParams } from '../../../src/api/queries'
+import { itemFilter, itemSort, sortOptions, type ItemFilter, type ItemFilterValue, type ItemSort, type LibraryType } from '../../../src/lib/browseOptions'
 import { formatRuntime } from '../../../src/lib/format'
 
 // TV Shows and Movies on the TV:
@@ -11,7 +11,7 @@ import { formatRuntime } from '../../../src/lib/format'
 type ItemTotals = components['schemas']['ItemTotals']
 
 /** A filter the grid can set: one a row at most. Below API level 34 the server takes one at a time. */
-export type GridFilter = LibraryFilter
+export type GridFilter = ItemFilterValue
 
 /** The grid's choices: the sort, the filters (one per Filter row), genre, decade, and a rating ('' for any). */
 export type GridChoices = { sort: ItemSort; filters: GridFilter[]; genre: string; decade: number; rating: string }
@@ -39,15 +39,16 @@ export function choicesFrom(p: { sort?: string; filter?: string; filters?: reado
   }
 }
 
-/** What the server is asked for these choices; below API level 34 only the first filter, and no rating. */
-export function gridQuery(c: GridChoices, level34: boolean): { sort: ItemSort; filters: GridFilter[]; genre?: string; decade?: number; contentRating?: string[] } {
-  return {
-    sort: c.sort,
-    filters: level34 ? c.filters : c.filters.filter((f) => !LEVEL_34_FILTERS.has(f)).slice(0, 1),
-    genre: c.genre || undefined,
-    decade: c.decade || undefined,
-    ...(level34 && c.rating ? { contentRating: [c.rating] } : {}),
-  }
+/**
+ * What the server is asked for these choices (the web's `itemsQuery`): from
+ * API level 34 every filter, combined, and the rating; below it the first
+ * filter the server knows, as `filter`, and no rating.
+ */
+export function gridQuery(c: GridChoices, level34: boolean): Omit<ItemsParams, 'limit' | 'offset'> {
+  const base = { sort: c.sort, genre: c.genre || undefined, decade: c.decade || undefined }
+  if (level34) return { ...base, filter: '', filters: c.filters, ...(c.rating ? { contentRating: c.rating } : {}) }
+  const first = c.filters.find((f): f is Exclude<ItemFilter, ''> => !LEVEL_34_FILTERS.has(f))
+  return { ...base, filter: first ?? '' }
 }
 
 /** Whether a filter, genre, decade or rating narrows the grid (Nothing matches offers Clear filters). */

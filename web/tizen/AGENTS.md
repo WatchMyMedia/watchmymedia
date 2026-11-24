@@ -44,9 +44,10 @@ and QN90D steps still to do.
   `useLevel34()`): a cast member's titles (the `person` route), Remove from
   Continue watching (a card's Hold OK), the libraries' counts, combined
   filters and Rated (`gridQuery` sends one filter and no rating below it),
-  and recordings' New, watched and time left. The level 34 queries the web
-  doesn't use yet are files of their own in `../src/api/` (`people.ts`,
-  `continueHidden.ts`, `libraryItems.ts`), not additions to `queries.ts`.
+  and recordings' New, watched and time left. These use the web's own
+  calls (`personQuery` and `itemsQuery` in `../src/api/queries.ts`,
+  `hideFromContinueWatching` in `../src/api/watch.ts`); another server's grid
+  pages go through `fetchItems` with that server's client.
 - **The store identity** in `public/config.xml` is permanent: the widget id,
   package id `cPFf0iV3Li` and application id `cPFf0iV3Li.WatchMyMedia` never
   change, and every update is signed with the same Samsung author certificate.
