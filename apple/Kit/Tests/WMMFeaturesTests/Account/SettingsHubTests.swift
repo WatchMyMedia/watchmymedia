@@ -228,6 +228,22 @@ import WMMModel
         #expect(settingsHub(facts, locale: en).first { $0.title == "This iPhone" }?.rows.first?.value == "2 · 1.0 GB")
     }
 
+    /// The root's About row says the version alone, as the boards draw it:
+    /// with the build beside it ("2.2.0 (20200099)") the row's name wrapped
+    /// over three lines in the iPad's list. The About page keeps the build.
+    @Test func aboutSaysTheVersionWithoutTheBuild() {
+        let servers = TestServers()
+        servers.current = SavedServer(server: server(), userName: "Sam", signedIn: true, lastUsedAt: .now)
+        let model = SettingsModel(servers: servers, auth: ScriptedAuth(user: sam), preferences: FakePreferencesRepository(),
+                                  facts: .init(model: "iPad Pro", system: "iPadOS 27.2", appVersion: "2.2.0", build: "20200099"), deviceLanguage: "en")
+        #expect(model.facts.appVersionLabel == "2.2.0 (20200099)", "the About page's")
+        let facts = model.hubFacts()
+        let about = settingsHub(facts, locale: en).flatMap(\.rows).first { $0.destination == .about }
+        #expect(about?.title == "About WatchMyMedia")
+        #expect(about?.value == "2.2.0")
+        #expect(tvSettingsGroups(facts, locale: en).first { $0.destination == .about }?.value == "Version 2.2.0")
+    }
+
     @Test func theBannerShowsWhileTheServerCantBeReached() async {
         let servers = TestServers()
         servers.current = SavedServer(server: server(), userName: "Sam", signedIn: true, lastUsedAt: .now)
