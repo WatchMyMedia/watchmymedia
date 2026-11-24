@@ -298,10 +298,12 @@ struct PeopleRow: View {
     let title: String
     let people: [CastPerson]
     @Environment(Navigator.self) private var navigator
+    @Environment(AppServices.self) private var services
 
     var body: some View {
         ShelfRow(title: title, items: people) { person in
-            Button { navigator.open(person.route) } label: { PersonCard(person: person) }
+            // On a page from another server, their titles there.
+            Button { navigator.open(person.route, on: services.library.serverScope) } label: { PersonCard(person: person) }
                 .buttonStyle(.borderless)
                 .accessibilityLabel(person.accessibilityLabel)
                 .accessibilityIdentifier("cast-person-\(person.personID)")

@@ -4,7 +4,8 @@ import WMMModel
 
 /// Where a person in a cast row leads: their movies and shows in this
 /// library, newest first, one card a title (GET /api/people/{personId}).
-/// The focused card says the year, or that it is a show, and who they play.
+/// A card's line says the year, or that it is a show, and who they play
+/// (on Apple TV, the focused card's alone).
 /// Marks made elsewhere reload it, as on every screen showing those titles.
 @MainActor
 @Observable
@@ -79,8 +80,10 @@ public final class PersonModel {
 
     // MARK: Taps
 
+    /// Opens a title from the person's server: in place, when the page
+    /// itself was opened from another server.
     public func open(_ title: PersonTitle) {
-        notice = navigator.open(title.item)
+        notice = navigator.open(title.item, on: library)
     }
 
     public func setWatched(_ target: WatchTarget, _ watched: Bool) async {

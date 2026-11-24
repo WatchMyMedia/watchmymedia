@@ -484,7 +484,9 @@ public final class FakeLibraryRepository: LibraryRepository {
     public func person(id: Int) async throws -> PersonDetail {
         await FakeLatency.wait()
         try checkOnline()
-        guard features.people, !onCabin, var person = FakePeople.person(id: id) else { throw APIError(status: 404, message: "Nobody by that name is in the library.") }
+        guard features.people, var person = onCabin ? FakeCabin.person(id: id) : FakePeople.person(id: id) else {
+            throw APIError(status: 404, message: "Nobody by that name is in the library.")
+        }
         person.movies = person.movies.map { PersonTitle(item: applied($0.item), character: $0.character) }
         person.shows = person.shows.map { PersonTitle(item: applied($0.item), character: $0.character) }
         return person

@@ -49,6 +49,22 @@ import WMMModel
         #expect(navigator.path(for: .home) == [.movie(id: first.item.id)])
     }
 
+    @Test func aPersonsPageFromAnotherServerOpensItsTitlesThere() async throws {
+        // A cast row on a page opened in place from Cabin server opens the person there,
+        // so their titles are Cabin server's, and open in place too.
+        let services = AppServices.fake(several: true, redesign: true)
+        let navigator = Navigator()
+        let cabin = FakeServers.cabin.id
+        let model = PersonModel(library: services.on(cabin).library, navigator: navigator, personID: FakeCabin.odileMarsh, name: "Odile Marsh")
+        await model.retry()
+        #expect(model.titles.map(\.item.title).contains("The Harbor Choir"), "Cabin server's titles")
+        let first = try #require(model.titles.first)
+        model.open(first)
+        #expect(navigator.path(for: .home) == [.onServer(cabin, .movie(id: first.item.id))])
+        navigator.open(CastPerson(personID: FakeCabin.corinVale, name: "Corin Vale").route, on: cabin)
+        #expect(navigator.path(for: .home).last == .onServer(cabin, .person(id: FakeCabin.corinVale, name: "Corin Vale")))
+    }
+
     @Test func nobodyTheLibraryHasSaysSo() async {
         let model = PersonModel(library: FakeLibraryRepository(), navigator: Navigator(), personID: 1, name: "Nobody")
         await model.retry()
