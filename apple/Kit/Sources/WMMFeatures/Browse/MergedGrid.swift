@@ -131,8 +131,9 @@ public final class MergedGrid {
             page.libraryID = libraryID
             page.offset = feed.items.count
             page.limit = pageSize
+            let request = page
             let scoped = services.on(id)
-            let next = await withinLimit(cardServerTimeout, sleep: sleep) { try await scoped.library.items(page) }
+            let next = await withinLimit(cardServerTimeout, sleep: sleep) { try await scoped.library.items(request) }
             loadingMore.remove(id)
             guard round == mine, var current = feeds[id] else { return }
             if let next {
