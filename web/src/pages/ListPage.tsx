@@ -158,7 +158,7 @@ function ListHeader({ list }: { list: MediaList }) {
                     close()
                     setDeleting(true)
                   }}
-                  className="menu-item text-red-400 hover:text-red-300"
+                  className="menu-item"
                 >
                   Delete list…
                 </button>

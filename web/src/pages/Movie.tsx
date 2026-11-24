@@ -95,8 +95,8 @@ function MovieView({ m }: { m: MovieDetail }) {
     items.push({ label: 'Change poster…', icon: 'poster', group: 'Admin', onSelect: () => setActing('poster') })
   }
   if (manage && m.managedBy && selected) items.push({ label: 'Replace file…', icon: 'replace', group: admin ? 'Admin' : undefined, divider: !admin, onSelect: () => setManaging({ kind: 'replace', file: selected, app: m.managedBy ?? '' }) })
-  // Members delete a movie with a file when admins allow it; admins can also remove one without.
-  if (canDelete && (manage || selected)) items.push({ label: 'Delete movie…', icon: 'delete', danger: true, group: admin ? 'Admin' : undefined, divider: !admin, onSelect: () => setManaging({ kind: 'delete' }) })
+  // Members delete a movie with a file when admins allow it; admins can also remove one without. Last, and it asks first.
+  if (canDelete && (manage || selected)) items.push({ label: 'Delete movie…', icon: 'delete', group: admin ? 'Admin' : undefined, divider: !admin, onSelect: () => setManaging({ kind: 'delete' }) })
 
   return (
     <div>

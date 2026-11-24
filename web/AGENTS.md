@@ -113,6 +113,9 @@ the user asks in this conversation; see Authority in the root file.
   `src/lib/watchlists.ts`. The web has one button (`WatchlistButton`), one
   action for titles the library lacks (`WatchlistAction`) and one picker,
   in `src/components/watchlists/`.
+- **Delete** is the last item of a ⋯ menu (`MoreMenu`), in plain text like
+  the rest, and always asks first in a dialog that names what will go; only
+  that dialog's own button is marked.
 - **Messages with Undo** go through `showToast` (`src/lib/toast.ts`): one
   at a time, drawn once by the layout, ending on their own timer; one
   replaced or left behind by leaving the page is done, not undone.

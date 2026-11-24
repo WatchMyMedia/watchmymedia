@@ -3,8 +3,6 @@ import { Fragment, useEffect, useId, useRef, useState } from 'react'
 export type MoreItem = {
   label: string
   icon?: 'replace' | 'delete' | 'flag' | 'check' | 'checks' | 'plus' | 'missing' | 'skip' | 'poster' | 'file' | 'match'
-  /** Shown in red: deletes something. */
-  danger?: boolean
   /** A line above it, setting it apart from the items before. */
   divider?: boolean
   /**
@@ -70,6 +68,8 @@ const icons = {
 
 /**
  * The ⋯ button and its menu, as on the movie page. Renders nothing without items.
+ * Every item is plain text: Delete is last, and its dialog's own button is the
+ * one marked.
  * tall matches the episode page's 44px buttons.
  */
 export function MoreMenu({
@@ -151,7 +151,7 @@ export function MoreMenu({
                   setOpen(false)
                   it.onSelect()
                 }}
-                className={`menu-item focus:bg-raise ${it.danger ? 'text-red-300 hover:text-red-300' : ''}`}
+                className="menu-item focus:bg-raise"
               >
                 {it.icon && (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
