@@ -7,9 +7,11 @@ import UIKit
 /// against one copied from the other.
 ///
 /// The first test signs in to the first server, adds the second from
-/// Servers, switches back without a password, searches both, opens the
-/// second server's result (which switches to it) and plays it there. It
-/// leaves the app on the second server, signed in to both.
+/// Servers, switches back without a password, searches both, and plays the
+/// second server's copy without switching: a title only the second has
+/// opens from there; a title both have (by TMDB id) is one result that says
+/// so, and its page's Versions plays the second server's copy. It leaves
+/// the app on the first server, signed in to both.
 ///
 /// The second test is for after that, with the second server stopped
 /// (`WMM_E2E_SERVER_2_STOPPED=1`): the app switches to the first server,
@@ -113,28 +115,41 @@ final class ServersEndToEndTests: XCTestCase {
         XCTAssertFalse(app.secureTextFields.firstMatch.exists, "a switch doesn't ask for a password")
         XCTAssertTrue(waitUntil { account.exists && account.label.hasSuffix(", on \(firstName)") }, account.label)
 
-        // Search looks in both: the first server's result, then the second's, which names it.
+        // Search looks in both: a title only the second has names it; one both have is one result that says so.
         tap(tab("Search"))
         let field = app.searchFields.firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 15))
         field.tap()
         field.typeText(words)
+        let secondShort = secondName.hasSuffix(" server") ? String(secondName.dropLast(7)) : secondName
         let here = results(elsewhere: false).firstMatch, there = results(elsewhere: true).firstMatch
-        XCTAssertTrue(there.waitForExistence(timeout: 20), "the second server's title is listed")
+        // A row reads where it is in its label on iPhone, in its value under a poster on iPad.
+        let shared = results(elsewhere: false).matching(NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", " and \(secondShort)", " and \(secondShort)")).firstMatch
+        XCTAssertTrue(waitUntil(timeout: 20) { there.exists || shared.exists }, "the second server's title is listed, or one both have")
         XCTAssertTrue(here.exists, "the first server's title is listed")
-        XCTAssertTrue(there.label.contains("On \(secondName)") || (there.value as? String)?.contains("On \(secondName)") == true,
-                      "a result on another server names it: \(there.label) / \(there.value ?? "")")
+        if there.exists {
+            XCTAssertTrue(there.label.contains("On \(secondName)") || (there.value as? String)?.contains("On \(secondName)") == true,
+                          "a result on another server names it: \(there.label) / \(there.value ?? "")")
+        }
         shot("4 Search across both")
 
-        // Opening the second server's result switches to it and opens the title there.
-        there.tap()
-        XCTAssertTrue(note.waitForExistence(timeout: 15))
-        XCTAssertEqual(note.label, "Now on \(secondName)")
-        let play = app.buttons.matching(NSPredicate(format: "label == 'Play' OR label BEGINSWITH 'Resume ·'")).firstMatch
-        XCTAssertTrue(play.waitForExistence(timeout: 20), "the title's page, on the second server")
-        shot("5 The title on the second server")
+        let play: XCUIElement
+        if there.exists {
+            // A title only the second server has opens from there, without switching.
+            there.tap()
+            play = app.buttons.matching(NSPredicate(format: "label == 'Play' OR label BEGINSWITH 'Resume ·'")).firstMatch
+            XCTAssertTrue(play.waitForExistence(timeout: 20), "the title's page, from the second server")
+        } else {
+            // A title both have opens the first server's page, whose Versions lists the second's copies too.
+            shared.tap()
+            play = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Play this: \(secondShort),")).firstMatch
+            XCTAssertTrue(play.waitForExistence(timeout: 20), "Versions lists the second server's copy")
+            for _ in 0..<6 where !play.isHittable { app.swipeUp() }
+        }
+        XCTAssertFalse(note.exists, "opening it doesn't switch")
+        shot("5 The title, with the second server's copy")
 
-        // It plays from that server.
+        // It plays from the second server.
         play.tap()
         let close = app.buttons["Close"]
         if !close.waitForExistence(timeout: 20) { tapPlayerVideo() }
@@ -154,12 +169,12 @@ final class ServersEndToEndTests: XCTestCase {
         XCTAssertTrue(close.waitForExistence(timeout: 5))
         close.tap()
 
-        // Back from the title: Search with the same words, asked again on the second server.
+        // Back from the title: Search with the same words, still on the first server.
         // Leaving the landscape player rotates back, and until that settles the button has no point to tap.
         tap(app.navigationBars.buttons.firstMatch)
-        XCTAssertTrue(results(elsewhere: true).firstMatch.waitForExistence(timeout: 20), "the first server's title names its server now")
+        XCTAssertTrue(results(elsewhere: false).firstMatch.waitForExistence(timeout: 20), "the results are back")
         XCTAssertEqual(app.searchFields.firstMatch.value as? String, words, "the same words")
-        shot("7 Search again, on the second server")
+        shot("7 Back to the results")
     }
 
     @MainActor
@@ -170,9 +185,9 @@ final class ServersEndToEndTests: XCTestCase {
         app = XCUIApplication()
         app.launch()
 
-        // The first test left the app on the second server, which no longer answers, and on
-        // Search: Home's account button still opens Servers, and the first server is a tap away.
-        // (Run again, the app is already on the first server, and this step is skipped.)
+        // Left on the second server, which no longer answers, Home's account button still opens
+        // Servers, and the first server is a tap away. (The first test leaves the app on the
+        // first server, and this step is skipped.)
         tap(tab("Home"))
         let account = app.buttons["account-button"].firstMatch
         XCTAssertTrue(account.waitForExistence(timeout: 30))

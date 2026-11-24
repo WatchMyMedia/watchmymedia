@@ -49,8 +49,9 @@ nothing it signs in to survives a relaunch.
 against two throwaway servers that each have their own id, name and library
 (a copy of one database counts as one server) and a title the same words
 find. It signs in to the first, adds the second from Servers, switches back
-without a password, searches both, opens the second's result and plays it
-there. Run it by itself, from a fresh install (`xcrun simctl uninstall` and
+without a password, searches both and plays the second's copy without
+switching: a title only it has opens from there, and a title both have is
+one result whose Versions plays the second's copy. Run it by itself, from a fresh install (`xcrun simctl uninstall` and
 `simctl keychain <udid> reset`, as `make apple-e2e` does):
 
 ```bash
