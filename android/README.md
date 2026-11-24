@@ -769,7 +769,10 @@ From API level 15 with listings,
 the guide has a star column left of the channels and a Favourites
 filter first among the chips once there is a favourite. Every client keeps
 one rule (`LiveGuideFilter.keeps`): a favourite shows with or without
-listings, in channel order. Live TV's top bar has Search listings and More
+listings, in channel order. The TV's guide opens on Favourites when there
+are some, else on All channels, deciding once as the listings arrive
+(`LiveGuideViewModel`'s `opensOnFavourites`); the phone and tablet open on
+All channels. Live TV's top bar has Search listings and More
 (Reminders, Reminder time); from 1000 dp they are header buttons that switch
 the panel beside the guide. A later programme that starts more than the lead
 time ahead offers Remind me, and its details then show the reminder, moved

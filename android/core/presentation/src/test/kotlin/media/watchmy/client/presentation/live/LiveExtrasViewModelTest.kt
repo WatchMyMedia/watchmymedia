@@ -84,6 +84,45 @@ class LiveExtrasViewModelTest {
         assertEquals(vm.state.value.guide!!.rows.size, vm.state.value.rows.size)
     }
 
+    @Test fun `the TV's guide opens on Favourites when there are some, with what is on one of them selected`() = runTest(main.dispatcher) {
+        atLevel(LIVE_PERSONAL_API_LEVEL)
+        val vm = LiveGuideViewModel(live, servers, auth, clock = { now }, zone = { zone }, opensOnFavourites = true)
+        vm.show(true, channelId = "live-9-1")
+        advanceUntilIdle()
+        val s = vm.state.value
+        assertEquals(LiveGuideFilter.Favourites, s.shownFilter)
+        assertEquals(listOf("2.1", "4.1", "4.3", "7.1", "11.1"), s.rows.map { it.channel.number })
+        // 9.1, watched last, isn't a favourite: the selection is on one that shows.
+        assertTrue(s.selection!!.channel.number in s.rows.map { it.channel.number })
+
+        // The person's choice stays.
+        vm.filter(LiveGuideFilter.All)
+        advanceUntilIdle()
+        assertEquals(LiveGuideFilter.All, vm.state.value.shownFilter)
+    }
+
+    @Test fun `without favourites the TV's guide opens on All channels, and a star added then doesn't narrow it`() = runTest(main.dispatcher) {
+        atLevel(LIVE_PERSONAL_API_LEVEL)
+        live.favourites = emptySet()
+        val vm = LiveGuideViewModel(live, servers, auth, clock = { now }, zone = { zone }, opensOnFavourites = true)
+        vm.show(true)
+        advanceUntilIdle()
+        assertEquals(LiveGuideFilter.All, vm.state.value.shownFilter)
+        vm.toggleFavourite(vm.state.value.guide!!.rows.first { it.channel.number == "9.1" }.channel)
+        advanceUntilIdle()
+        assertEquals(LiveGuideFilter.All, vm.state.value.shownFilter)
+        assertEquals(vm.state.value.guide!!.rows.size, vm.state.value.rows.size)
+    }
+
+    @Test fun `the phone's guide opens on All channels, favourites or not`() = runTest(main.dispatcher) {
+        atLevel(LIVE_PERSONAL_API_LEVEL)
+        val vm = guide()
+        vm.show(true)
+        advanceUntilIdle()
+        assertTrue(vm.state.value.favourites.isNotEmpty())
+        assertEquals(LiveGuideFilter.All, vm.state.value.shownFilter)
+    }
+
     @Test fun `a refused star goes back and says why`() = runTest(main.dispatcher) {
         atLevel(LIVE_PERSONAL_API_LEVEL)
         val vm = guide()
