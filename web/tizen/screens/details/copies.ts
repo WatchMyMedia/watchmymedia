@@ -139,21 +139,27 @@ export type CopiesView = {
   groups: CopyGroup[]
 }
 
-export function copiesView(page: CopyServer, copies: readonly ServerCopy[], chosen: ChosenCopy | undefined): CopiesView {
+/**
+ * `always` keeps the button and the panel with one copy: a show's episodes
+ * while the show is on two servers or more, so the row doesn't move as
+ * focus moves along the episodes.
+ */
+export function copiesView(page: CopyServer, copies: readonly ServerCopy[], chosen: ChosenCopy | undefined, always = false): CopiesView {
   const uses = playCopy(copies, chosen)
   const latest = latestPlace(copies)
   const ref = uses && { server: uses.copy.server.id, file: uses.file.id }
   const others = copies.filter((c) => c.server.id !== page.id)
   const several = copies.length > 1
+  const offered = several || (always && copies.length > 0)
   // Resume starts from the latest place on any server, whichever copy plays.
   const startMs = latest && uses && latest.copy.server.id !== uses.copy.server.id ? latest.watch.positionMs : undefined
   const furtherElsewhere = latest && latest.copy.server.id !== page.id ? latest : undefined
-  const also = !several
+  const also = !several || !others.length
     ? (page.current ? undefined : `On ${serverHeading(page.name)}${page.away ? ' · away from home' : ''}`)
     : `Also on ${others.map((c) => bareName(c.server.name)).join(' and ')}${furtherElsewhere ? ' · you got further there' : ''}`
   return {
     also,
-    button: several && uses ? `${bareName(uses.copy.server.name)} · ${copyQuality(uses.file)}` : undefined,
+    button: offered && uses ? `${bareName(uses.copy.server.name)} · ${copyQuality(uses.file)}` : undefined,
     play: ref && { ref, ...(startMs !== undefined ? { startMs } : {}) },
     playLabel: several && latest && uses && uses.copy.server.id === latest.copy.server.id && latest.copy.server.id !== page.id ? `Resume · from ${bareName(latest.copy.server.name)}` : undefined,
     where: furtherElsewhere && {
@@ -163,6 +169,6 @@ export function copiesView(page: CopyServer, copies: readonly ServerCopy[], chos
     },
     resumeNote: latest && several && (!uses || uses.copy.server.id !== latest.copy.server.id || latest.copy.server.id !== page.id)
       ? `Resume starts at ${clockWords(latest.watch.positionMs)}, where you got to on ${bareName(latest.copy.server.name)}, whichever you choose.` : undefined,
-    groups: several ? copyGroups(copies, ref) : [],
+    groups: offered ? copyGroups(copies, ref) : [],
   }
 }

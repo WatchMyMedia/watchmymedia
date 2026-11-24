@@ -1,15 +1,24 @@
-import { useCallback, useEffect, useRef, useState, type FocusEvent } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { fileQuery, playbackPlansQuery, seasonQuery, showQuery, showRelatedQuery } from '../../../src/api/queries'
+import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from 'react'
+import { flushSync } from 'react-dom'
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { fileOn, plansOn, seasonOn, showOn, showRelatedOn } from '../../session/sourceQueries'
+import type { Source } from '../../session/peerRegistry'
+import { chosenCopies, titleKey, type ChosenCopy } from '../../session/chosenCopies'
+import { endsAtWords } from '../../ui/timeWords'
+import { copiesView, orderCopies, type CopyRef, type ServerCopy } from './copies'
+import { CopiesPanel } from './CopiesPanel'
+import { mergeSeason, type MergedEpisode, type ServerSeason } from './showCopies'
+import { copyServer, useMarkEverywhere, useShowCopies } from './useCopies'
+import { SourceGone } from './MovieScreen'
 import { requestOptionsQuery, useMonitorEpisodes, useReportProblem, useSearchMissing } from '../../../src/api/requests'
-import { useMarkSeasonWatched, useMarkShowWatched, useMarkWatched } from '../../../src/api/watch'
+import { useMarkSeasonWatched, useMarkShowWatched } from '../../../src/api/watch'
 import { useFollowShow } from '../../../src/api/follows'
 import { watchlistTitle } from '../../../src/lib/watchlists'
 import type { components } from '../../../src/api/schema'
 import { pageEpisodes } from '../../../src/lib/episode'
 import { afterEpisodeDelete, arrivalSeason, askableSeasons, deletedLine, seasonTabs } from '../../../src/lib/showPage'
 import { useShowMissing } from '../../../src/lib/showMissing'
-import { useBack, useEntry, useFocus, useKeys, useNav, useSession } from '../../app/hooks'
+import { playOn, SourceContext, useBack, useEntry, useFocus, useKeys, useNav, usePeers, useSession, useSource } from '../../app/hooks'
 import type { ScreenProps } from '../../app/routes'
 import { Clock } from '../../ui/Clock'
 import { ProblemScreen, Skeleton, SkeletonRow, SkeletonText } from '../../ui/States'
@@ -56,11 +65,18 @@ const kept = new Map<number, { tab: number; pin?: Pin }>()
  * below the top comes back to it first, then leaves.
  */
 export function ShowScreen({ route }: ScreenProps<'show'>) {
-  const show = useQuery(showQuery(route.id))
+  const source = useSource(route.server)
+  if (source === 'gone') return <SourceGone/>
+  return <SourceContext.Provider value={source}><ShowFrom route={route} source={source}/></SourceContext.Provider>
+}
+
+/** The show from `source`: the current server, or another opened in place. */
+function ShowFrom({ route, source }: { route: ScreenProps<'show'>['route']; source: Source }) {
+  const show = useQuery(showOn(source, route.id))
   const nav = useNav()
   if (show.isPending) return <ShowLoading/>
   if (show.isError) return <LoadProblem error={show.error} onRetry={() => void show.refetch()} onBack={() => nav.back()}/>
-  return <ShowPage show={show.data} route={route}/>
+  return <ShowPage show={show.data} route={route} source={source}/>
 }
 
 function ShowLoading() {
@@ -85,9 +101,12 @@ const zoneOf = (el: Element | null): Zone | undefined => {
   return z?.startsWith('related') ? 'related' : ZONES.find((x) => x === z)
 }
 
-function ShowPage({ show, route }: { show: ShowDetail; route: ScreenProps<'show'>['route'] }) {
+function ShowPage({ show, route, source }: { show: ShowDetail; route: ScreenProps<'show'>['route']; source: Source }) {
   const entry = useEntry()
   const session = useSession()
+  const peers = usePeers()
+  // Requests, Sonarr's actions, follows and watchlists are the current server's: a show opened from another server offers none of them.
+  const own = !source.peer
   const focus = useFocus()
   const nav = useNav()
   const qc = useQueryClient()
@@ -104,14 +123,29 @@ function ShowPage({ show, route }: { show: ShowDetail; route: ScreenProps<'show'
     for (const key of kept.keys()) { if (kept.size <= 40) break; kept.delete(key) }
   }, [entry, state])
 
-  const options = useQuery(requestOptionsQuery)
-  const can = abilities(session.isAdmin, options.data)
+  const options = useQuery({ ...requestOptionsQuery, enabled: own })
+  const can = abilities(own && session.isAdmin, own ? options.data : undefined)
   const [showMissing, setShowMissing] = useShowMissing(show.id)
   const missingOn = showMissing && (can.requests || can.admin)
-  const chosen = useQuery(seasonQuery(show.id, tab))
-  const shown = useQuery({ ...seasonQuery(show.id, pin?.season ?? tab), enabled: !!pin })
-  const related = useQuery(showRelatedQuery(show.id))
+  const chosen = useQuery(seasonOn(source, show.id, tab))
+  const shown = useQuery({ ...seasonOn(source, show.id, pin?.season ?? tab), enabled: !!pin })
+  const related = useQuery(showRelatedOn(source, show.id))
   const rows = relatedPosterRows(related.data)
+
+  // One card across servers: the show's copies on the other servers, and the season on screen from each that has it.
+  const others = useShowCopies(show.tmdbId, source)
+  const currentId = session.server.id
+  const pageServer = useMemo(() => copyServer(source, currentId), [source, currentId])
+  const onScreen = pin?.season ?? tab
+  const elsewhere = others.found.filter((f) => f.detail.seasons.some((x) => x.number === onScreen))
+  const otherSeasons = useQueries({ queries: elsewhere.map((f) => ({ ...seasonOn(f.source, f.detail.id, onScreen), retry: false })) })
+  const seasonsElsewhere: ServerSeason[] = elsewhere.flatMap((f, i) => {
+    const data = otherSeasons[i]?.data
+    return data ? [{ server: copyServer(f.source, currentId), episodes: data.episodes }] : []
+  })
+  const sourceOf = (id: string): Source => (id === source.id ? source : others.found.find((f) => f.source.id === id)?.source ?? source)
+  const order = useMemo(() => peers.map((p) => p.id), [peers])
+  const onSeveral = others.found.length > 0
 
   // The chosen season's episode on top, once its episodes are in; then it stays put (`Pin`).
   const loaded = chosen.data
@@ -122,26 +156,32 @@ function ShowPage({ show, route }: { show: ShowDetail; route: ScreenProps<'show'
   }
   // The season on screen is the pinned episode's: a tab just chosen shows once its episodes are in.
   const season: SeasonDetail | undefined = pin ? shown.data : undefined
-  const e = season?.episodes.find((x) => x.id === pin?.episodeId)
+  // The season with every server's copies: an episode only another server has sits in its place, "On Cabin".
+  const seasonKey = seasonsElsewhere.map((x) => `${x.server.id}:${x.episodes.length}`).join(',')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const merged = useMemo(() => (season ? mergeSeason(season.number, { server: pageServer, episodes: season.episodes }, seasonsElsewhere) : undefined), [season, pageServer, seasonKey])
+  const e: MergedEpisode | undefined = merged?.episodes.find((x) => x.id === pin?.episodeId)
   const here = show.seasons.find((s) => s.number === season?.number) ?? season
 
   // Only what the page shows: a season's episodes on disk and to come, every one with Show missing, always the one on top.
-  const listed = season ? pageEpisodes([...season.episodes].sort((a, b) => a.number - b.number), pin?.episodeId ?? -1, missingOn) : []
+  const listed = merged ? pageEpisodes(merged.episodes, pin?.episodeId ?? -1, missingOn) : []
   const tabs = seasonTabs(show.seasons, missingOn, tab)
 
   // The file's tracks for its subtitles line, once the episode has stayed on top a moment.
+  // The episode's own server: another one when only that one has it.
+  const eSource = e?.on ? sourceOf(e.on.id) : source
   const fileId = e?.hasFile ? e.files[0]?.id : undefined
   const [settled, setSettled] = useState<number>()
   useEffect(() => {
     const t = setTimeout(() => setSettled(fileId), 400)
     return () => clearTimeout(t)
   }, [fileId])
-  const file = useQuery({ ...fileQuery(fileId ?? 0), enabled: !!fileId && settled === fileId })
-  const plans = useQuery({ ...playbackPlansQuery(fileId ? [fileId] : [], planProfile()), enabled: !!fileId && settled === fileId })
+  const file = useQuery({ ...fileOn(eSource, fileId ?? 0), enabled: !!fileId && settled === fileId })
+  const plans = useQuery({ ...plansOn(eSource, fileId ? [fileId] : [], planProfile()), enabled: !!fileId && settled === fileId })
 
   const { notice, say, fail } = useNotice()
   const watchlistsOn = useWatchlistsOn()
-  const mark = useMarkWatched()
+  const mark = useMarkEverywhere()
   const markSeason = useMarkSeasonWatched()
   const markShow = useMarkShowWatched()
   const follow = useFollowShow()
@@ -149,7 +189,8 @@ function ShowPage({ show, route }: { show: ShowDetail; route: ScreenProps<'show'
   const search = useSearchMissing(show.id)
   const monitor = useMonitorEpisodes(show.id)
   const [searched, setSearched] = useState<string>()
-  const [dialog, setDialog] = useState<'more' | 'report' | 'tracks' | 'file' | 'replace' | 'delete' | { request: number[] }>()
+  const [dialog, setDialog] = useState<'more' | 'copies' | 'report' | 'tracks' | 'file' | 'replace' | 'delete' | { request: number[] }>()
+  const [remembered, setRemembered] = useState<Record<string, ChosenCopy>>({})
   const [moreAt, setMoreAt] = useState<string>()
 
   // Scrolling: the part with focus decides how far up the page is (zoneOffset).
@@ -172,8 +213,8 @@ function ShowPage({ show, route }: { show: ShowDetail; route: ScreenProps<'show'
   useEffect(() => {
     const numbers = seasonTabs(show.seasons, missingOn, tab).map((t) => t.number)
     const i = numbers.indexOf(tab)
-    for (const n of [numbers[i - 1], numbers[i + 1]]) if (n !== undefined) void qc.prefetchQuery(seasonQuery(show.id, n))
-  }, [show.id, show.seasons, missingOn, tab, qc])
+    for (const n of [numbers[i - 1], numbers[i + 1]]) if (n !== undefined) void qc.prefetchQuery(seasonOn(source, show.id, n))
+  }, [show.id, show.seasons, missingOn, tab, qc, source])
   const toTop = useCallback(() => { focus.focusFirst(page.current?.querySelector('[data-zone="top"]') ?? null) }, [focus])
   // The top's buttons, the one last used: Return from below the top, ▲ from the tabs.
   const toButtons = useCallback(() => focus.focusId(entry?.memory.groups.actions ?? '', page.current) || focus.focusFirst(page.current?.querySelector('[data-zone="top"]') ?? null), [focus, entry])
@@ -221,20 +262,43 @@ function ShowPage({ show, route }: { show: ShowDetail; route: ScreenProps<'show'
   }
 
   const kicker = episodeKicker(show.title, season.number, e.number)
+  // The episode's copies on every server, Play's copy and where the person got to on any of them.
+  const epCopies: ServerCopy[] = orderCopies(merged?.copies.get(e.id) ?? [], order)
+  const epKey = titleKey({ kind: 'episode', showTmdbId: show.tmdbId, season: season.number, episode: e.number })
+  const epChosen = remembered[epKey] ?? chosenCopies().get(epKey)
+  const epView = copiesView(e.on ?? pageServer, epCopies, epChosen, onSeveral)
+  const copyPlay = (ref: CopyRef, fromStart: boolean) => {
+    const base = episodePlay(show, season.number, e)
+    if (!base || base.kind !== 'file') return undefined
+    const start = fromStart ? 0 : epView.play?.startMs
+    return { ...base, fileId: ref.file, ...(start !== undefined ? { startMs: start } : { startMs: undefined }), ...(ref.server !== currentId ? { server: ref.server } : {}) }
+  }
+  const chooseCopy = (ref: CopyRef) => {
+    const next = { server: ref.server, file: ref.file }
+    chosenCopies().set(epKey, next)
+    flushSync(() => { setRemembered((r) => ({ ...r, [epKey]: next })); setDialog(undefined) })
+    focus.focusId('play', page.current)
+  }
+  const epLine = epView.where ? { play: 'Resume' as const, where: epView.where.text, ends: endsAtWords(now, epView.where.leftMs), progress: epView.where.progress } : undefined
+  const ownEpisode = own && !e.on
   const topZone = zone === 'top' || zone === 'seasons' || zone === 'episodes'
   const fileDetail = file.data && file.data.id === fileId ? file.data : undefined
   const todayIso = today.toISOString().slice(0, 10)
   const top = topActions(e, here, show, can, todayIso)
-  const more = episodeMore(e, show, can)
+  const more = episodeMore(e, show, ownEpisode ? can : abilities(false, undefined))
   const seasonOwn = missingOn ? seasonActions(here, season.episodes, show, can, todayIso) : undefined
   const askable = can.requests ? askableSeasons(show.seasons, todayIso) : []
-  const sMark = seasonMark(here)
+  // The season's and the show's marks are each server's own: a show opened from another server leaves them there.
+  const sMark = own ? seasonMark(here) : undefined
   const target = (seasons: number[]): RequestTarget => ({ kind: 'tv', tmdbId: show.tmdbId, title: show.title, seasons })
   const searchKey = (episode?: number) => `${season.number}:${episode ?? 'all'}`
 
-  const doMark = () => mark.mutate({ type: 'episode', id: e.id, watched: !e.watch?.completed }, {
-    onSuccess: () => say({ title: markedMessage(!e.watch?.completed) }), onError: (err) => fail('Couldn’t change the watched mark', err),
-  })
+  // Marks the episode on every server that has it, as the person sees one episode.
+  const doMark = () => {
+    const watched = !e.watch?.completed
+    const targets = epCopies.length ? epCopies.map((c) => ({ source: sourceOf(c.server.id), type: 'episode' as const, id: c.titleId })) : [{ source, type: 'episode' as const, id: e.id }]
+    mark.mark(targets, watched).then(() => say({ title: markedMessage(watched) }), (err: unknown) => fail('Couldn’t change the watched mark', err))
+  }
   const doSearch = (episode?: number) => {
     const searching = () => { setSearched(searchKey(episode)); say({ title: `${show.managedBy ?? 'Sonarr'} is searching for ${episode === undefined ? season.name.toLowerCase() || `season ${season.number}` : `episode ${episode}`}` }) }
     search.mutate({ season: season.number, episodes: episode === undefined ? undefined : [episode] }, {
@@ -263,7 +327,7 @@ function ShowPage({ show, route }: { show: ShowDetail; route: ScreenProps<'show'
   ]
   const closeDialog = () => setDialog(undefined)
   const backToMore = () => setDialog('more')
-  const watchlistTarget = watchlistsOn ? watchlistTitle('show', show.tmdbId) : undefined
+  const watchlistTarget = own && watchlistsOn ? watchlistTitle('show', show.tmdbId) : undefined
   const watchlist = watchlistTarget && { target: watchlistTarget, holding: show.watchlists ?? [] }
 
   // data-vscroll: the page moves itself (zoneOffset), so focus never scrolls it as the browser would.
@@ -273,9 +337,14 @@ function ShowPage({ show, route }: { show: ShowDetail; route: ScreenProps<'show'
     <div ref={track} className="dt-track" style={{ transform: `translateY(${-offset}px)` }}>
       <div className="dt-show">
         <div className={`dt-show__top${topZone ? '' : ' dt-head--away'}`}>
-          <ShowTop show={show} season={season.number} e={e} why={pin?.why} gone={pin?.gone} missing={missingOf(e, options.data)} actions={top}
-            hasMore={moreItems.length > 0} marking={mark.isPending} searching={searched === searchKey(e.number)} today={today} now={now}
-            onPlay={(fromStart) => { const r = episodePlay(show, season.number, e, fromStart ? 0 : undefined); if (r) nav.play(r) }}
+          <ShowTop show={show} season={season.number} e={e} why={pin?.why} gone={pin?.gone} missing={ownEpisode ? missingOf(e, options.data) : undefined} actions={top}
+            hasMore={moreItems.length > 0} marking={mark.busy} searching={searched === searchKey(e.number)} today={today} now={now}
+            also={epView.also} playLabel={epView.playLabel} line={epLine}
+            pick={epView.button ? { label: epView.button, onPress: () => { setMoreAt(undefined); setDialog('copies') } } : undefined}
+            onPlay={(fromStart) => {
+              const r = epView.play && (onSeveral || e.on) ? copyPlay(epView.play.ref, fromStart) : playOn(episodePlay(show, season.number, e, fromStart ? 0 : undefined) ?? { kind: 'file', fileId: 0 }, source)
+              if (r && r.kind === 'file' && r.fileId) nav.play(r)
+            }}
             onMark={doMark} onMore={() => { setMoreAt(undefined); setDialog('more') }} onRequest={() => setDialog({ request: [season.number] })} onSearch={() => doSearch(e.number)}
             onMonitor={doMonitor} onInbox={() => nav.push({ name: 'requests', inbox: true })}/>
         </div>
@@ -289,8 +358,8 @@ function ShowPage({ show, route }: { show: ShowDetail; route: ScreenProps<'show'
             <EpisodeRow show={show.title} season={season.number} episodes={listed} onTopId={e.id} options={options.data} today={today} onPick={pick} onOk={toTop}/>
           </div>
         </div>
-        <ShowAbout show={show} following={show.following} watchlist={watchlist} onWatchlistProblem={(title) => say({ title, problem: true })} mark={showMark(show.seasons)} marking={markShow.isPending}
-          canShowMissing={can.requests || can.admin} showMissing={missingOn} askable={askable} away={topZone}
+        <ShowAbout show={show} following={own ? show.following : undefined} watchlist={watchlist} onWatchlistProblem={(title) => say({ title, problem: true })} mark={own ? showMark(show.seasons) : undefined} marking={markShow.isPending}
+          canShowMissing={own && (can.requests || can.admin)} showMissing={missingOn} askable={own ? askable : []} away={topZone}
           onFollow={doFollow} onShowMissing={setShowMissing} onRequest={() => setDialog({ request: askable })}
           onMark={(watched) => markShow.mutate({ showId: show.id, watched }, { onSuccess: () => say({ title: markedMessage(watched) }), onError: (err) => fail('Couldn’t change the watched marks', err) })}/>
         {rows.map((row) => <RelatedSection key={row.id} row={row}/>)}
@@ -300,6 +369,8 @@ function ShowPage({ show, route }: { show: ShowDetail; route: ScreenProps<'show'
     <NoticeBanner notice={notice}/>
 
     {dialog === 'more' && <MorePanelRows title={e.title || `Episode ${e.number}`} rows={moreItems} start={moreAt} onClose={closeDialog}/>}
+    {dialog === 'copies' && <CopiesPanel sub={`${show.title} · S${season.number} E${e.number}${e.title ? ` · ${e.title}` : ''}`} groups={epView.groups} note={epView.resumeNote}
+      asking={others.asking} onChoose={chooseCopy} onClose={closeDialog}/>}
     {dialog === 'tracks' && probe && <AudioPanel probe={probe} onClose={backToMore}/>}
     {dialog === 'file' && fileDetail && <FileDetailsPanel versions={[fileDetail]} chosen={fileDetail} planFor={(id) => plans.data?.items.find((x) => x.fileId === id)} onChoose={() => undefined} onClose={backToMore}/>}
     {dialog === 'report' && <ReportPanel onClose={backToMore} onPick={(kind) => {

@@ -8,8 +8,8 @@ import { Picture } from './DetailParts'
 import { toneStyle } from './detailWords'
 import { cardLine, episodeProgress, missingOf, seasonName } from './showLabels'
 import { cardTitle } from './titleWords'
+import { elsewhereLine, type MergedEpisode } from './showCopies'
 
-type Episode = components['schemas']['Episode']
 type RequestOptions = components['schemas']['RequestOptions']
 
 /**
@@ -23,7 +23,8 @@ type RequestOptions = components['schemas']['RequestOptions']
 export function EpisodeRow({ show, season, episodes, onTopId, options, today, onPick, onOk }: {
   show: string
   season: number
-  episodes: Episode[]
+  /** The season's episodes; one only another server has carries `on`, and says so. */
+  episodes: MergedEpisode[]
   onTopId?: number
   options?: RequestOptions
   today: Date
@@ -46,11 +47,12 @@ export function EpisodeRow({ show, season, episodes, onTopId, options, today, on
 
 // Moving along the row redraws only the two cards whose On top changes.
 const EpisodeCard = memo(function EpisodeCard({ e, show, season, onTop, options, today, onPick, onOk }: {
-  e: Episode; show: string; season: number; onTop: boolean; options?: RequestOptions; today: Date; onPick(id: number): void; onOk(): void
+  e: MergedEpisode; show: string; season: number; onTop: boolean; options?: RequestOptions; today: Date; onPick(id: number): void; onOk(): void
 }) {
   const media = useMediaUrls()
   const missing = missingOf(e, options)
-  const line = cardLine(e, missing, today)
+  const elsewhere = elsewhereLine(e)
+  const line = elsewhere ? { text: elsewhere, tone: undefined, dot: false } : cardLine(e, missing, today)
   const progress = e.hasFile ? episodeProgress(e) : missing?.progress
   const watched = e.hasFile && !!e.watch?.completed
   const label = [`${seasonName(season)}, episode ${e.number}: ${e.title}`, line.text, onTop ? 'on top' : ''].filter(Boolean).join(', ')
