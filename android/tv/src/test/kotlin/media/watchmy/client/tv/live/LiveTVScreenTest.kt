@@ -1,5 +1,6 @@
 package media.watchmy.client.tv.live
 
+import android.text.format.DateFormat
 import android.view.KeyEvent as AndroidKey
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
@@ -33,6 +34,7 @@ import media.watchmy.client.fake.fakeLatencyMs
 import media.watchmy.client.model.AppServices
 import media.watchmy.client.model.LiveCapabilities
 import media.watchmy.client.model.LiveChannel
+import media.watchmy.client.model.LiveClockFormat
 import media.watchmy.client.model.LivePlaybackController
 import media.watchmy.client.model.LivePlaybackControllerFactory
 import media.watchmy.client.model.LivePlayerState
@@ -41,6 +43,8 @@ import media.watchmy.client.model.LiveSessionState
 import media.watchmy.client.model.LiveTarget
 import media.watchmy.client.model.PlayerStatus
 import media.watchmy.client.model.StreamQuality
+import media.watchmy.client.model.canRemind
+import media.watchmy.client.model.spokenName
 import media.watchmy.client.presentation.live.LiveChannelsViewModel
 import media.watchmy.client.tv.TvTheme
 import media.watchmy.client.tv.TvApp
@@ -57,6 +61,8 @@ import org.robolectric.annotation.Config
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.isFocused
+import java.time.ZoneId
+import java.util.Locale
 
 @OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -162,11 +168,8 @@ class LiveTVScreenTest {
         fakeLatencyMs = 0
         try {
             var watched: LiveChannel? = null
-            showGuide(personal = true, onWatch = { watched = it }, quiet = true)
-            // Two along: far enough ahead for a reminder.
-            press(Key.DirectionRight)
-            press(Key.DirectionRight)
-            val programme = focusedSpoken()
+            val services = showGuide(personal = true, onWatch = { watched = it }, quiet = true)
+            val programme = focusRemindable(services)
             press(Key.DirectionCenter)
             assertEquals("OK on a later programme doesn't tune", null, watched)
             compose.onNode(isFocused() and hasText("Remind me")).assertExists()
@@ -374,7 +377,7 @@ class LiveTVScreenTest {
     }
     /** The guide with listings, opened on 2.2; [personal] adds favourites and reminders, which make a channel's own cell a place focus goes. */
     /** The guide on the fakes; without [favourites] the person has starred none, so it opens on All channels. */
-    private fun showGuide(personal: Boolean = false, onWatch: (LiveChannel) -> Unit = {}, quiet: Boolean = false, favourites: Boolean = false) {
+    private fun showGuide(personal: Boolean = false, onWatch: (LiveChannel) -> Unit = {}, quiet: Boolean = false, favourites: Boolean = false): FakeAppServices {
         val services = if (quiet) quietTvFakes() else FakeAppServices(tv = true)
         if (!favourites) services.live.favourites = emptySet()
         val listed = runBlocking { services.live.channels() }
@@ -389,6 +392,30 @@ class LiveTVScreenTest {
             }
         }
         compose.waitForIdle()
+        return services
+    }
+
+    /**
+     * ▶ along 2.2's row until focus is on a programme that starts later than
+     * the reminder's lead, so Remind me is among its choices whatever the time
+     * of day, and returns what that cell says. The fakes' schedule follows the
+     * wall clock: the programme one along starts at the next hour, too soon for
+     * a reminder in each hour's last five minutes, so a fixed count of presses
+     * failed then (CI, 04:56 UTC on 24 November 2026).
+     */
+    private fun focusRemindable(services: FakeAppServices): String {
+        val format = LiveClockFormat(ZoneId.systemDefault(), DateFormat.is24HourFormat(compose.activity), Locale.getDefault())
+        val channel = services.live.items.first { it.id == "live-2-2" }
+        val now = System.currentTimeMillis()
+        val programmes = services.live.schedule.programmes(channel).filter { it.endMs > now && it.startMs < now + 6 * 3_600_000L }
+        repeat(6) {
+            press(Key.DirectionRight)
+            val spoken = focusedSpoken()
+            val focused = programmes.firstOrNull { it.spokenName(format) == spoken } ?: error("\"$spoken\" isn't one of 2.2's programmes")
+            // A minute to spare for the rest of the test, in which the reminder must still be possible.
+            if (focused.canRemind(System.currentTimeMillis() + 60_000L, services.live.leadMinutes)) return spoken
+        }
+        error("Six presses along 2.2 found no programme far enough ahead for a reminder")
     }
 
     /** What TalkBack is given for the element in focus. */
