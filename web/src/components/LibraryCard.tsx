@@ -3,7 +3,7 @@ import { CardLine, CardPicture, CardTitle } from './CardParts'
 import { Poster } from './Poster'
 import { CardFlag, CardProgress, PosterCard, WatchedTick, type BrowseItem } from './PosterCard'
 import { posterLinks } from '../lib/cardLinks'
-import { movieLine, qualityWords, scoreWords, showStatusWords } from '../lib/cardFacts'
+import { movieLine, scoreWords, showStatusWords } from '../lib/cardFacts'
 import { addedWords, leftToWatch, newFlag, showCardLine, youWords } from '../lib/browsePrefs'
 import { formatDate, formatRuntime, formatBytes } from '../lib/format'
 import { useNow } from './useNow'
@@ -70,7 +70,6 @@ export function BrowseList({ items, type, columns = {} }: { items: BrowseItem[];
             <span className={`${head} w-14 max-md:hidden`}>Rating</span>
           </>
         )}
-        {columns.quality && <span className={`${head} w-24 max-md:hidden`}>Quality</span>}
         {columns.size && <span className={`${head} w-20 text-right max-md:hidden`}>Size</span>}
         {type === 'movie' && <span className={`${head} w-[110px] max-sm:w-[84px]`}>You</span>}
       </div>
@@ -119,7 +118,6 @@ function ListRow({ item, columns, type }: { item: BrowseItem; columns: { quality
         </>
       )}
       {item.kind === 'unmatched' && <span className={`${cell} w-[170px] text-warn`}>{item.subtitle}</span>}
-      {columns.quality && <span className={`${cell} w-24 max-md:hidden`}>{qualityWords(item.quality, item.hdr) || '—'}</span>}
       {columns.size && <span className={`${cell} w-20 text-right tabular-nums max-md:hidden`}>{item.totalSize ? formatBytes(item.totalSize) : '—'}</span>}
       {type === 'movie' && <span className={`${cellBase} w-[110px] max-sm:w-[84px] ${you?.gold ? 'text-accent' : 'text-neutral-400'}`}>{you?.text ?? ''}</span>}
     </>

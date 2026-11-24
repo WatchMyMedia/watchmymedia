@@ -110,6 +110,28 @@ export function versionName(f: Pick<FileFacts, 'height' | 'width' | 'hdr' | 'rel
   return [resolution(f.height, f.width), hdrName(f.hdr, undefined, true)].filter(Boolean).join(' ') || fileType(f.relativePath) || 'Version'
 }
 
+/**
+ * A movie's picture and sound in one line, as every app says it on the
+ * movie's page: "In 4K with Dolby Vision and 7.1 sound", "In 4K with HDR",
+ * "In 1080p with 5.1 sound". Empty when there is nothing past the usual (no
+ * 4K, HDR or surround), and never on a card: the tags and codecs stay in
+ * File details. The sound is the default track's, else the first's.
+ */
+export function qualityLine(f: Pick<FileFacts, 'height' | 'width' | 'hdr'> & { audioChannels?: number; probe?: Pick<MediaInfo, 'audio'> }): string {
+  const audio = f.probe?.audio.find((a) => a.default) ?? f.probe?.audio[0]
+  const channels = audio?.channels ?? f.audioChannels
+  const layout = channelWords(channels, audio?.channelLayout)
+  const surround = (channels ?? 0) > 2 ? (/^\d\.\d$/.test(layout) ? `${layout} sound` : 'surround sound') : ''
+  const size = resolution(f.height, f.width)
+  const colour = hdrName(f.hdr, undefined, true)
+  if (size !== '4K' && !colour && !surround) return ''
+  const extras = [colour, surround].filter(Boolean).join(' and ')
+  // SD says nothing worth a line of its own; the extras do.
+  const head = size && size !== 'SD' ? `In ${size}` : ''
+  if (!head) return `With ${extras}`
+  return extras ? `${head} with ${extras}` : head
+}
+
 /** File details' tags for a version: "2160p", "HEVC", "HDR10", "EAC3 5.1", "MKV". */
 export function versionTags(f: FileFacts): string[] {
   const audio = f.probe?.audio.find((a) => a.default) ?? f.probe?.audio[0]

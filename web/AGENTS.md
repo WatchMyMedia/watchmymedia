@@ -53,8 +53,10 @@ the user asks in this conversation; see Authority in the root file.
 - **Styling**: Tailwind v4 classes and the `@theme` tokens in
   `src/index.css`, no new hex values. Burgundy (`brand`) is only ever a fill,
   never text or a thin line (1.4:1 on the ground); gold (`accent`) marks
-  progress, selection, focus and badges; orange (`warn`) is for warnings. The
-  apps and the site use the same colours. Pages share the component classes
+  progress, selection, focus and badges; orange (`warn`) is for warnings; red
+  (`red-700` under white text, or a red dot) marks Recording and Live, those
+  marks only, never a progress bar. The apps and the site use the same
+  colours. Pages share the component classes
   in `src/index.css` (`btn`, `ib`, `chip`, `tab`, `seg`, `menu`, `meta`,
   `eyebrow`, `pill`, `tag`, `meter`, `panel`, the closed `tech` disclosure,
   `dl`, `rowh`, `tbl`, `wrap`) and the line icons in
@@ -111,6 +113,9 @@ the user asks in this conversation; see Authority in the root file.
   `src/lib/watchlists.ts`. The web has one button (`WatchlistButton`), one
   action for titles the library lacks (`WatchlistAction`) and one picker,
   in `src/components/watchlists/`.
+- **Delete** is the last item of a ⋯ menu (`MoreMenu`), in plain text like
+  the rest, and always asks first in a dialog that names what will go; only
+  that dialog's own button is marked.
 - **Messages with Undo** go through `showToast` (`src/lib/toast.ts`): one
   at a time, drawn once by the layout, ending on their own timer; one
   replaced or left behind by leaving the page is done, not undone.
@@ -123,8 +128,11 @@ the user asks in this conversation; see Authority in the root file.
   does); the
   picture is a pointer target for the most specific link, with `tabIndex={-1}`
   and `aria-hidden`, so a card has one tab stop per destination. Every link
-  carries an `aria-label` naming the whole target. No quality badge on any
-  card; quality is a fact on the hero and the detail pages.
+  carries an `aria-label` naming the whole target. No quality on any card,
+  hover card or list row: a movie's page says its picture and sound in one
+  line (`qualityLine` in `src/lib/titlePage.ts`, which the Samsung TV app
+  uses too), tags and codecs stay in File details, and the libraries'
+  Picture filter finds 4K and HDR.
   `addedEpisode` stays for the apps.
 - **Settings**: each tab opens on a hub, and each
   task with more than one step is a flow at its own address under the tab.

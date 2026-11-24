@@ -7,17 +7,13 @@ type BrowseItem = components['schemas']['BrowseItem']
 type ContinueItem = components['schemas']['ContinueItem']
 
 // The facts a card says beside its title, in words: what a viewer wants
-// to know before opening it. Quality stays off cards (it is a fact on the
-// title's page); a library may offer it as a choice of its own.
+// to know before opening it. Quality stays off cards, hover cards and list
+// rows: it is one line on the movie's page (qualityLine in titlePage.ts),
+// and the libraries' Picture filter finds 4K and HDR.
 
 /** "2025 · 1 h 58 min"; the year alone without a runtime. */
 export function movieLine(item: Pick<BrowseItem, 'year' | 'runtimeMin'>): string {
   return [item.year ? String(item.year) : '', item.runtimeMin ? formatRuntime(item.runtimeMin) : ''].filter(Boolean).join(' · ')
-}
-
-/** "4K HDR", "1080p", or empty: the best version's picture, in the words a viewer knows. */
-export function qualityWords(quality?: string, hdr?: boolean): string {
-  return [quality ?? '', hdr ? 'HDR' : ''].filter(Boolean).join(' ')
 }
 
 /** "★ 7.2", or empty for no score. */

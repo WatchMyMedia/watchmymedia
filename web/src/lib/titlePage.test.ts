@@ -11,6 +11,7 @@ import {
   initials,
   planWords,
   playChoices,
+  qualityLine,
   seasonLine,
   seasonTabWords,
   showState,
@@ -59,6 +60,21 @@ describe('versions', () => {
     expect(versionName({ height: 2160, hdr: 'dolbyvision', relativePath: 'a.mkv' })).toBe('4K Dolby Vision')
     expect(versionName({ height: 1080, relativePath: 'a.mp4' })).toBe('1080p')
     expect(versionName({ relativePath: 'a.mp4' })).toBe('MP4')
+  })
+
+  it('says the picture and sound in one line, only past the usual', () => {
+    const sound = (channels: number, channelLayout?: string) => ({ audio: [{ index: 1, codec: 'truehd', channels, channelLayout, default: true }] }) as never
+    expect(qualityLine({ height: 2160, hdr: 'dolbyvision', probe: sound(8, '7.1') })).toBe('In 4K with Dolby Vision and 7.1 sound')
+    expect(qualityLine({ height: 2160, hdr: 'hdr10', probe })).toBe('In 4K with HDR and 5.1 sound')
+    expect(qualityLine({ width: 3840, height: 1600, hdr: 'hlg' })).toBe('In 4K with HDR')
+    expect(qualityLine({ height: 2160, probe: sound(2) })).toBe('In 4K')
+    expect(qualityLine({ height: 1080, probe })).toBe('In 1080p with 5.1 sound')
+    expect(qualityLine({ height: 1080, audioChannels: 6 })).toBe('In 1080p with 5.1 sound')
+    expect(qualityLine({ height: 720, probe: sound(3) })).toBe('In 720p with surround sound')
+    expect(qualityLine({ height: 480, probe: sound(6) })).toBe('With 5.1 sound')
+    expect(qualityLine({ hdr: 'dolbyvision' })).toBe('With Dolby Vision')
+    expect(qualityLine({ height: 1080, probe: sound(2) })).toBe('')
+    expect(qualityLine({})).toBe('')
   })
 
   it('lists the technical tags and the size and rate', () => {

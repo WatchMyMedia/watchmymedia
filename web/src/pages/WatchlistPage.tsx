@@ -145,7 +145,7 @@ function Header({ list, total, inLibrary }: { list: MediaList; total: number; in
           <button type="button" onClick={() => setActing('rename')} className="btn">
             Rename
           </button>
-          <button type="button" onClick={() => setActing('delete')} className="btn text-red-400 hover:text-red-300">
+          <button type="button" onClick={() => setActing('delete')} className="btn">
             Delete
           </button>
         </div>

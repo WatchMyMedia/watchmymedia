@@ -229,7 +229,7 @@ function EpisodeTop({ show: s, se, e, why, listed }: { show: ShowDetail; se: Sea
     items.push({ label: 'Report a problem…', icon: 'flag', onSelect: () => setActing('report') })
     if (manage && s.managedBy && best) items.push({ label: 'Replace file…', icon: 'replace', onSelect: () => setActing('replace') })
     if (admin && best) items.push({ label: 'Skip segments…', icon: 'skip', onSelect: () => setActing('segments') })
-    if (canDelete) items.push({ label: 'Delete episode…', icon: 'delete', danger: true, divider: true, onSelect: () => setActing('delete') })
+    if (canDelete) items.push({ label: 'Delete episode…', icon: 'delete', divider: true, onSelect: () => setActing('delete') })
   }
   const playLabel = primary.kind === 'play' ? (fromStart ? 'Resume' : 'Play') : ''
   const hidden = spoilerHidden(e, useHideSpoilers().on)
@@ -715,8 +715,8 @@ function AboutShow({ show: s, number, showMissing }: { show: ShowDetail; number?
     })
   if (admin) items.push({ label: 'Change poster…', icon: 'poster', onSelect: () => setActing('poster') })
   if (manage) {
-    if (open) items.push({ label: `Delete ${seasonName(open.number)}…`, icon: 'delete', danger: true, divider: true, onSelect: () => setActing('deleteSeason') })
-    items.push({ label: 'Delete show…', icon: 'delete', danger: true, divider: !open, onSelect: () => setActing('deleteShow') })
+    if (open) items.push({ label: `Delete ${seasonName(open.number)}…`, icon: 'delete', divider: true, onSelect: () => setActing('deleteSeason') })
+    items.push({ label: 'Delete show…', icon: 'delete', divider: !open, onSelect: () => setActing('deleteShow') })
   }
 
   return (

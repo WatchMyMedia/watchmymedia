@@ -33,8 +33,11 @@ export type BrowsePrefs = Partial<BrowseChoices> & {
   view?: BrowseView
   /** Poster size, 1 (smallest) to 5. */
   size?: number
-  /** List view's extra columns. */
-  columns?: { quality?: boolean; size?: boolean }
+  /**
+   * List view's extra column. Quality isn't one: every app says it on the
+   * title's page only, and the Picture filter finds 4K and HDR.
+   */
+  columns?: { size?: boolean }
 }
 
 export const POSTER_SIZES = [1, 2, 3, 4, 5] as const
@@ -72,7 +75,7 @@ export function parsePrefs(raw: string | null): BrowsePrefs {
   if (typeof o.size === 'number' && Number.isInteger(o.size) && o.size >= 1 && o.size <= 5) out.size = o.size
   if (o.columns && typeof o.columns === 'object') {
     const c = o.columns as Record<string, unknown>
-    out.columns = { quality: c.quality === true, size: c.size === true }
+    out.columns = { size: c.size === true }
   }
   return out
 }

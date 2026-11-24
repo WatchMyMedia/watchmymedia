@@ -52,7 +52,7 @@ function OnNowCardView({ card: c }: { card: OnNowCard }) {
           <span className="absolute inset-0 grid place-items-center p-4 text-center text-sm font-semibold text-neutral-400">{c.title}</span>
         )}
         <span className="absolute left-2 top-2 rounded-[5px] bg-ground/80 px-[7px] py-0.5 text-[11px] font-bold text-neutral-100 ring-1 ring-inset ring-white/15">{c.channel}</span>
-        {c.recording && <span className="absolute right-2 top-2 rounded-[5px] bg-brand px-[7px] py-0.5 text-[11px] font-bold text-white ring-1 ring-inset ring-brand-line">Recording</span>}
+        {c.recording && <span className="absolute right-2 top-2 rounded-[5px] bg-red-700 px-[7px] py-0.5 text-[11px] font-bold text-white">Recording</span>}
         <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1 bg-black/60">
           <span className="block h-full bg-accent" style={{ width: `${c.pct}%` }} />
         </span>

@@ -1,6 +1,6 @@
 import type { LiveChannel, LiveGuideChannel, LiveProgramme } from '../../../src/api/liveTV'
 import {
-  HALF_HOUR, HOUR, halfHourStart, isOn, latestStart, moveSelection, startShowing, timeOfDay, timeRange,
+  FAVOURITES, HALF_HOUR, HOUR, halfHourStart, isOn, latestStart, moveSelection, startShowing, timeOfDay, timeRange,
 } from '../../../src/lib/liveGuide'
 import { markHoldsRecord, recordingMarkWords } from '../../../src/lib/liveRecordings'
 import { leadText, movedTo, remindState, type LiveReminder, type RemindState } from '../../../src/lib/liveReminders'
@@ -24,6 +24,18 @@ export type GuideTarget =
   | { kind: 'channel'; channelId: string }
   | { kind: 'programme'; channelId: string; programmeId: string }
   | { kind: 'none'; channelId: string }
+
+/**
+ * The channels the guide opens on: Favourites when the person has chosen
+ * some, otherwise All channels, as every app does. Opened at a channel that
+ * isn't a favourite (the live player's Guide), it shows them all, so that
+ * channel is in it.
+ */
+export function openingFilter(channels: readonly Pick<LiveGuideChannel, 'id' | 'favourite'>[], at?: string): string {
+  if (!channels.some((c) => c.favourite)) return 'all'
+  if (at !== undefined && !channels.some((c) => c.id === at && c.favourite)) return 'all'
+  return FAVOURITES
+}
 
 /** The cell's data-focus id. */
 export function targetId(t: GuideTarget): string {

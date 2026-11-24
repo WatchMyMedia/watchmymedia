@@ -265,7 +265,7 @@ function LocalLivePlayer({ channelId, controller, hold, notLive, castOffered }: 
         {playing && (behind ? <>
           <span className="inline-flex min-h-[26px] items-center rounded-md bg-ground/70 px-2.5 text-xs font-semibold tabular-nums">{behind}</span>
           <button type="button" className="btn btn-clear btn-sm" onClick={goLive}>Go live</button>
-        </> : <span className="inline-flex min-h-[26px] items-center gap-1.5 rounded-md bg-brand px-2.5 text-xs font-bold text-white ring-1 ring-inset ring-brand-line"><span aria-hidden="true" className="size-[7px] rounded-full bg-white" />Live</span>)}
+        </> : <span className="inline-flex min-h-[26px] items-center gap-1.5 rounded-md bg-red-700 px-2.5 text-xs font-bold text-white"><span aria-hidden="true" className="size-[7px] rounded-full bg-white" />Live</span>)}
         {!playing && <span className="text-xs text-neutral-300">Tuning…</span>}
         <span className="ml-1.5 flex items-center gap-1.5 md:ml-3.5">
           <button type="button" className={`${control} px-3`} onClick={() => changeChannel(-1)} aria-label={prev ? `Channel down: ${prev.number} ${prev.name}` : 'Channel down'}>Ch −</button>

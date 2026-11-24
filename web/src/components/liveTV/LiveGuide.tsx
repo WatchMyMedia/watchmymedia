@@ -333,7 +333,7 @@ function ProgrammeCell({ cell, channel, now, cellRefs, selected, tabKey, onSelec
 
 /** A small mark on a guide cell: Live, New, REC, or a clash. */
 function Mark({ tone, children }: { tone: 'live' | 'new' | 'warn'; children: ReactNode }) {
-  const tones = { live: 'bg-brand text-white ring-1 ring-inset ring-brand-line', new: 'bg-accent/15 text-accent', warn: 'bg-warn/15 text-warn' }
+  const tones = { live: 'bg-red-700 text-white', new: 'bg-accent/15 text-accent', warn: 'bg-warn/15 text-warn' }
   return <span aria-hidden="true" className={`shrink-0 whitespace-nowrap rounded px-[5px] text-[10.5px] font-bold leading-4 ${tones[tone]}`}>{children}</span>
 }
 
@@ -377,7 +377,7 @@ function ProgrammePanel({ channel, programme: p, now, playback, loading, extras,
       {showPicture ? <img key={picture.url} src={picture.url} alt="" onError={() => setBrokenPicture(picture.url)} className="size-full object-cover" />
         : logo ? <img src={logo} alt="" onError={() => setBrokenLogo(true)} className="absolute inset-0 m-auto h-1/2 w-1/2 object-contain" />
           : <span aria-hidden="true" className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-neutral-300"><strong className="text-4xl tabular-nums text-neutral-100">{channel.number}</strong><span className="text-sm">{channel.name}</span></span>}
-      <span className={`absolute left-2 top-2 rounded-[5px] px-[7px] py-0.5 text-[11px] font-bold ${on || !p ? 'bg-brand text-white ring-1 ring-inset ring-brand-line' : 'bg-ground/80 text-neutral-100 ring-1 ring-inset ring-white/15'}`}>{when}</span>
+      <span className={`absolute left-2 top-2 rounded-[5px] px-[7px] py-0.5 text-[11px] font-bold ${on || !p ? 'bg-red-700 text-white' : 'bg-ground/80 text-neutral-100 ring-1 ring-inset ring-white/15'}`}>{when}</span>
       {showPicture && picture.tmdb && <span className="absolute bottom-2 right-2 rounded bg-ground/70 px-1.5 text-[11px] text-neutral-300">Picture: TMDB</span>}
     </div>
     <div className="flex flex-col gap-3 p-4">
@@ -396,7 +396,7 @@ function ProgrammePanel({ channel, programme: p, now, playback, loading, extras,
         </div>
         {(p.new || p.live || p.rating || p.categories?.length) && <p className="flex flex-wrap gap-1.5">
           {p.new && <span className="pill pill-gold">New</span>}
-          {p.live && <span className="pill bg-brand text-white">Live</span>}
+          {p.live && <span className="pill bg-red-700 text-white">Live</span>}
           {p.rating && <span className="pill pill-line">{p.rating}</span>}
           {p.categories?.length ? <span className="pill">{p.categories.join(' · ')}</span> : null}
         </p>}

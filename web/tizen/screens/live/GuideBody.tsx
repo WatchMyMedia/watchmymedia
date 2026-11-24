@@ -20,7 +20,7 @@ import { GoToChannelDialog } from './GoToChannel'
 import { GuideHeader, GuideRow } from './GuideGrid'
 import { GuideStrip } from './GuideHero'
 import {
-  GUIDE_HOURS, VISIBLE_ROWS, cellAt, dayHeading, firstRow, guideStep, nowFraction, pageStep, parseTarget, programmePanel, slotLabels, stripFor, targetId,
+  GUIDE_HOURS, VISIBLE_ROWS, cellAt, dayHeading, firstRow, guideStep, nowFraction, openingFilter, pageStep, parseTarget, programmePanel, slotLabels, stripFor, targetId,
   type GuideTarget, type PanelRowId,
 } from './guideModel'
 import { useRecordingAction } from './liveData'
@@ -32,7 +32,7 @@ import { ProgrammePanel } from './ProgrammePanel'
 import { RecordPanel } from './RecordPanel'
 import { DEFAULT_OPTIONS, createBody, recordedNote } from './recordModel'
 
-type View = { start: number; filter: string; target?: GuideTarget; anchor: number }
+type View = { start: number; filter?: string; target?: GuideTarget; anchor: number }
 /** Each guide in the stack keeps its window, filter and focus while a player or page is on top of it. */
 const views = new WeakMap<object, View>()
 
@@ -72,7 +72,8 @@ export function Guide({ tabs, canRecord, channelId, at }: { tabs: TabsProps; can
   const now = useNow()
   const saved = entry ? views.get(entry) : undefined
   const [rawStart, setRawStart] = useState(() => saved?.start ?? halfHourStart(at ?? Date.now()))
-  const [filter, setFilter] = useState(saved?.filter ?? 'all')
+  // Decided once the channels are in (openingFilter), then the person's to change.
+  const [chosenFilter, setFilter] = useState<string | undefined>(saved?.filter)
   const [target, setTarget] = useState<GuideTarget | undefined>(saved?.target)
   const [anchor, setAnchor] = useState(() => saved?.anchor ?? at ?? Date.now())
   const [listedThrough, setListedThrough] = useState<number>()
@@ -96,6 +97,8 @@ export function Guide({ tabs, canRecord, channelId, at }: { tabs: TabsProps; can
   const remind = useLiveReminder()
   const create = useRecordingAction(createRecording)
   const channels = useMemo(() => guide.data?.channels ?? [], [guide.data])
+  if (chosenFilter === undefined && guide.data) setFilter(openingFilter(guide.data.channels, channelId))
+  const filter = chosenFilter ?? 'all'
   const listed = ms(guide.data?.state.listedThrough ?? '')
   // Where the listings end, kept across window moves (a reply for a later block still knows it).
   if (Number.isFinite(listed) && listed !== listedThrough) setListedThrough(listed)
@@ -107,7 +110,7 @@ export function Guide({ tabs, canRecord, channelId, at }: { tabs: TabsProps; can
   const current = resolve(target, navRows, start, anchor, channelId ?? lastChannel())
   // Where focus starts, fixed the first time the rows draw.
   if (!initial && current) setInitial(current)
-  useEffect(() => { if (entry) views.set(entry, { start: rawStart, filter, target: current, anchor }) })
+  useEffect(() => { if (entry) views.set(entry, { start: rawStart, filter: chosenFilter, target: current, anchor }) })
   const focusIndex = Math.max(0, rows.findIndex((r) => r.id === current?.channelId))
   const first = firstRow(focusIndex, rows.length, VISIBLE_ROWS)
   const shown = rows.slice(first, first + VISIBLE_ROWS)

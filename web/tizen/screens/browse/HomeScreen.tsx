@@ -64,11 +64,10 @@ function Backdrop({ url, seed, short }: { url?: string; seed: string; short?: bo
   </div>
 }
 
-/** "2026 · 1 season · TV-14 · Drama", with a row screen's tags in words ("4K", "HDR"). */
-function Facts({ facts, tags, rating }: { facts: string[]; tags: string[]; rating?: string }) {
+/** "2026 · 1 season · TV-14 · Drama", then the rating. */
+function Facts({ facts, rating }: { facts: string[]; rating?: string }) {
   const parts: ReactNode[] = []
   if (facts.length) parts.push(<span key="f" className="home-facts__text">{facts.join(' · ')}</span>)
-  if (tags.length) parts.push(<span key="t" className="home-facts__tags">{tags.map((t) => <span key={t} className="tv-tag">{t}</span>)}</span>)
   if (rating) parts.push(<span key="r">{rating}</span>)
   return <p className="home-facts">
     {parts.flatMap((p, i) => (i ? [<span key={`s${i}`} className="home-facts__sep">·</span>, p] : [p]))}
@@ -96,7 +95,7 @@ function PickHero({ hero, rows }: { hero: Hero; rows: readonly ScreenRow[] }) {
     <section className="home-hero" aria-label={hero.kicker || hero.title}>
       {hero.kicker && <p className="tv-kicker">{hero.kicker}</p>}
       <h1 className="home-hero__title">{hero.title}</h1>
-      <Facts facts={[hero.facts, hero.contentRating ?? ''].filter(Boolean)} tags={[]}/>
+      <Facts facts={[hero.facts, hero.contentRating ?? ''].filter(Boolean)}/>
       {hero.overview && <p className="home-hero__overview">{hero.overview}</p>}
       <div className="tv-actions home-hero__actions" data-group="home/hero">
         {play && <Button id={HERO_PLAY} variant="primary" icon="play" autoFocus onPress={() => nav.play(play)}>Play</Button>}
@@ -178,7 +177,7 @@ function RowPage({ row, rows, base, autoFocus }: { row: ScreenRow; rows: readonl
     {panel && <section className="home-panel" aria-live="polite">
       <p className="tv-kicker home-kicker">{panel.kicker}</p>
       <h1 className="home-panel__title">{panel.title}</h1>
-      {(panel.facts.length > 0 || panel.tags.length > 0 || panel.rating) && <Facts facts={panel.facts} tags={panel.tags} rating={panel.rating}/>}
+      {(panel.facts.length > 0 || panel.rating) && <Facts facts={panel.facts} rating={panel.rating}/>}
       {panel.overview && <p className="home-panel__overview">{panel.overview}</p>}
     </section>}
     <div className="home-page-row" data-autofocus={autoFocus || undefined}>
