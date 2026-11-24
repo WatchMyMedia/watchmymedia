@@ -66,6 +66,15 @@ The native apps all use the same server:
   (`GET /api/server`) and sends nothing unless the id is the one it remembers. Each app's
   README has the details: [Android](../android/README.md#several-servers),
   [Apple](../apple/README.md#several-servers), [Samsung TV](../web/tizen/README.md).
+- **One title across servers (Samsung TV).** With servers newer than 2.1.0 (API level 34), the
+  Samsung TV app shows a title that several servers have once, matched by its TMDB id: in
+  search, on Home (Continue watching, and the recently added, aired and released rows), and in
+  Movies and TV Shows, which are filled from every server. A title only another server has
+  opens in place, without switching servers. On a title's page the button after Play names the
+  copy it will play and lists every server's copies, a server reached away from home last; the
+  choice is remembered on the TV, Resume starts from wherever you got furthest, and what you
+  watch is saved on the server it played from. Live TV, requests and Settings stay the current
+  server's.
 
 ## Casting
 

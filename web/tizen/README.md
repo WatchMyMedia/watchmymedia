@@ -92,7 +92,10 @@ password form takes Sam and `watching`. `?fakes=away` adds a remembered
 server away from home over http; `?fakes=servers` opens signed in to
 Lakeside on a TV that has three more servers (Cabin, with titles of its
 own; Den, which never answers; Attic, signed out here), for Servers, a
-switch and Search across servers; `?fakes=old`, `?fakes=setup` and
+switch and Search across servers; `?fakes=onecard` opens on Lakeside with
+Cabin, away from home and sharing some of its titles, and Den, which never
+answers, for one card across servers (search, Home, Movies and TV Shows, a
+title's versions on each server); `?fakes=old`, `?fakes=setup` and
 `?fakes=expire` show the start problems. `?fakes=member` signs in a member
 instead of an admin; `?fakes=empty`, `scanning` and `unreadable` give Home's
 empty states; `?fakes=player` makes the player step down in Automatic, stop
