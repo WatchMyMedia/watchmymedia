@@ -29,6 +29,25 @@ import WMMModel
         return home.rows?.first { $0.id == id } ?? MergedHomeRow(rawValue: id).flatMap { home.cards($0) }
     }
 
+    @Test func aCardsLineRedrawsWhenTheServerInUseTurnsOutToHaveItToo() async throws {
+        // The lookup of what the server in use has lands after the card is on screen.
+        let library = TestLibrary()
+        let (gate, open) = AsyncStream.makeStream(of: Void.self)
+        library.tmdbGate = { for await _ in gate { return } }
+        let model = HomeModel(library: library, auth: services.auth, navigator: navigator, rows: services.rows, servers: services.servers, oneCard: oneCard)
+        let loading = Task { await model.retry() }
+        #expect(await eventually { row(model, "continue")?.continueItems.contains { $0.title == "Ninety Fathoms" && $0.server == cabin } == true })
+        let fathoms = try #require(row(model, "continue")?.continueItems.first { $0.title == "Ninety Fathoms" })
+        let redrawn = Flag()
+        let line = withObservationTracking { model.whereLine(fathoms) } onChange: { redrawn.set() }
+        #expect(line == "On Cabin", "not known yet")
+
+        open.finish()
+        await loading.value
+        #expect(await eventually { model.whereLine(fathoms) == "from Cabin" }, "the server in use has it too")
+        #expect(redrawn.isSet, "and a screen showing the card is told, so it redraws")
+    }
+
     @Test func continueWatchingIsEveryServersOneCardATitleByWhenLastPlayed() async throws {
         let model = await home()
         #expect(await eventually { row(model, "continue")?.continueItems.contains { $0.server == cabin } == true })
@@ -97,4 +116,12 @@ import WMMModel
         #expect(card?.item.id == "continue-\(cabin)/80803")
     }
 
+}
+
+/// Set once, from any thread: observation's onChange is not isolated.
+private final class Flag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+    func set() { lock.withLock { value = true } }
+    var isSet: Bool { lock.withLock { value } }
 }

@@ -30,8 +30,10 @@ public final class HomeModel {
     @ObservationIgnored private var ownHome: HomeData?
     /// The other servers' Homes, for one card.
     public let others = OtherServerAnswers<HomeData>()
-    /// The titles of other servers' Continue watching cards that the server in use has too, by their keys.
-    @ObservationIgnored private var alsoHere: Set<TitleKey> = []
+    /// The titles of other servers' Continue watching cards that the server
+    /// in use has too, by their keys. Observed: it changes a card's line
+    /// ("On Cabin" to "from Cabin") after the card is on screen.
+    private var alsoHere: Set<TitleKey> = []
     /// When the server in use's Home last came in: other servers that answer
     /// within ``cardStillAskingAfter`` of it are merged in order; a slower
     /// one's cards join the ends of rows already on screen, which don't move.
