@@ -24,7 +24,6 @@ import WMMModel
         #expect(clash.airingNote(repeatHolder, clock: clock, now: now)?.replacingOccurrences(of: "\u{202F}", with: " ") == "a repeat, on again Friday at 2:00 PM")
         #expect(clash.airingNote(newHolder, clock: clock, now: now) == "new episode")
         #expect(clash.line(newHolder, clock: clock, now: now).replacingOccurrences(of: "\u{202F}", with: " ") == "2.1 · 8:00–9:00 PM · new episode")
-        #expect(clash.suggested?.id == "a", "the repeat airs again, so it is the one to leave out")
         let older = LiveRecordingHolder(id: "c", title: "Station 9", number: "7.1", start: now, end: now)
         #expect(clash.airingNote(older, clock: clock, now: now) == nil, "an older server doesn't say")
     }

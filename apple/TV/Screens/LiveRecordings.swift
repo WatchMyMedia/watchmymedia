@@ -77,8 +77,6 @@ struct TVLiveRecordingClashView: View {
     @Environment(LiveRecordingsStore.self) private var recordings
     @State private var failure: String?
     @FocusState private var keepFocused: Bool
-    /// The repeat that airs again, which the sheet suggests leaving out.
-    @FocusState private var suggestedFocused: String?
     init(clash: LiveRecordingClash, done: @escaping (_ kept: Bool) -> Void) { _clash = State(initialValue: clash); self.done = done }
     var body: some View {
         TVSheet {
@@ -94,7 +92,6 @@ struct TVLiveRecordingClashView: View {
                         if choosable { Task { await giveWay(holder) } }
                     }
                     .disabled(!choosable || recordings.changing.contains(clash.id))
-                    .focused($suggestedFocused, equals: holder.id)
                     .accessibilityLabel(choosable ? clash.recordInsteadLabel(holder) : holder.title)
                 }
                 TVSheetRow(title: clash.recording.title, value: clash.choices.isEmpty ? nil : "Left out",
@@ -108,8 +105,9 @@ struct TVLiveRecordingClashView: View {
             .focusSection()
             if let failure { Text(failure).font(.tv(.body)).foregroundStyle(Palette.warning) }
         }
-        .defaultFocus($keepFocused, clash.suggested == nil)
-        .defaultFocus($suggestedFocused, clash.suggested?.id)
+        // The one left out has focus, so a stray press changes nothing; each row says
+        // whether it is a repeat that airs again.
+        .defaultFocus($keepFocused, true)
         .onExitCommand { done(!clash.choices.isEmpty) }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("live-recording-clash")

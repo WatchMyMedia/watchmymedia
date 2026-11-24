@@ -86,12 +86,6 @@ public struct LiveRecordingClash: Hashable, Sendable, Identifiable {
         }
     }
 
-    /// The holder to give way first: one that can, a repeat that airs again,
-    /// so nothing is lost. Apple TV puts focus on it; nil when none is.
-    public var suggested: LiveRecordingHolder? {
-        choices.first { $0.isRepeat == true && $0.nextAiring != nil }
-    }
-
     /// "Recording now" for one that can't give way, else "Set by Sam".
     public func status(_ holder: LiveRecordingHolder) -> String? {
         if holder.running { return "Recording now" }
