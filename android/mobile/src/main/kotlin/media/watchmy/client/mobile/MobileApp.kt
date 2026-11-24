@@ -1,5 +1,6 @@
 package media.watchmy.client.mobile
 
+import kotlinx.coroutines.flow.first
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -84,6 +85,12 @@ fun MobileApp(deepLink: String? = null, deepLinkKey: Any? = deepLink) {
     // One for another account signed in on this phone switches to its server first.
     LaunchedEffect(deepLink, deepLinkKey) {
         if (deepLink == null || !switcher.arrive(deepLink)) return@LaunchedEffect
+        // Published for another account here: it opens in place, from that server, without switching.
+        val elsewhere = DeepLink.elsewhere(deepLink, services.servers.saved.first(), services.servers.current.value?.server?.id)
+        if (elsewhere != null) {
+            pending = DeepLink.OnServer(elsewhere.first, elsewhere.second)
+            return@LaunchedEffect
+        }
         DeepLink.open(deepLink, watchNextAccount(services.servers.current.value?.server, services.auth.user.value))?.let { pending = it }
     }
     val layout = rememberTabletLayout()

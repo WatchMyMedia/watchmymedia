@@ -169,6 +169,11 @@ export function subtitleOptions(probe?: Pick<MediaInfo, 'subtitles'>): SubtitleO
   }))
 }
 
+/** Whether a file has a sound or subtitle choice for Sound and Subtitles to show. */
+export function hasTrackChoice(probe?: Pick<MediaInfo, 'audio' | 'subtitles'>): boolean {
+  return soundOptions(probe).length > 1 || subtitleOptions(probe).length > 0
+}
+
 /** "2 versions · 27.6 GB · sound in 2 languages · 2 subtitle tracks": File details' line while it is closed. */
 export function filesSummary(files: readonly Pick<FileFacts, 'size' | 'probe'>[]): string {
   const size = files.reduce((n, f) => n + (f.size || 0), 0)
@@ -281,3 +286,14 @@ export function initials(name: string): string {
   const parts = name.split(/\s+/).filter(Boolean)
   return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? (parts.at(-1)?.[0] ?? '') : '')).toUpperCase()
 }
+
+/**
+ * Whether Hide spoilers keeps an episode's synopsis and still back: one the
+ * person hasn't finished or started. Titles stay, so the list can be read.
+ */
+export function spoilerHidden(e: Pick<Episode, 'watch'>, hide: boolean): boolean {
+  return hide && !e.watch?.completed && !(e.watch && e.watch.positionMs > 0)
+}
+
+/** What a hidden synopsis says instead. */
+export const HIDDEN_SYNOPSIS = 'Hidden until you have watched it.'

@@ -216,7 +216,7 @@ class GoldenRepliesTest {
         assertEquals("/nsd-backdrop.jpg", first.showBackdropPath)
         assertEquals(listOf("Pilot", "Graveyard Special", "Last Call"), first.episodes.map { it.title })
         assertTrue(first.episodes[0].watch!!.completed)
-        assertEquals(WatchProgress(60_000, 200_000, false), first.episodes[1].watch)
+        assertEquals(WatchProgress(60_000, 200_000, false), first.episodes[1].watch?.copy(updatedAtMs = null))
         assertNull(first.episodes[2].watch)
         val version = first.episodes[1].versions.single()
         assertEquals(2L, version.fileId)

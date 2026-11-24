@@ -292,7 +292,10 @@ class FakeLiveRepository(
         mutableListOf<LiveRecording>().also { rows ->
             if (current != null) rows += current.recordingOn(channel, "fake-recording-now", "recording").copy(startedAtMs = current.startMs, userName = "Sam")
             if (next != null) rows += next.recordingOn(channel, "fake-recording-upcoming", "scheduled").copy(userName = "Sam")
-            rows += LiveRecording("fake-recording-complete", "Inspector Vane", channel.id, channel.number, channel.name, now - 7_200_000L, now - 3_600_000L, "done", mediaFileId = 9101, userName = "Sam", canCancel = true, canDelete = true)
+            rows += LiveRecording("fake-recording-complete", "Inspector Vane", channel.id, channel.number, channel.name, now - 7_200_000L, now - 3_600_000L, "done", mediaFileId = 9101, userName = "Sam", canCancel = true, canDelete = true, startedAtMs = now - 7_200_000L, endedAtMs = now - 3_600_000L, bytes = 5_800_000_000L, isNew = true)
+            // Two more kept: a news hour watched partway, and a film watched to the end.
+            rows += LiveRecording("fake-recording-news-kept", "Harbor Evening News", "live-7-1", "7.1", "LKSD-HD", now - 26 * HOUR, now - 25 * HOUR, "done", mediaFileId = 9102, userName = "Sam", canCancel = true, canDelete = true, startedAtMs = now - 26 * HOUR, endedAtMs = now - 25 * HOUR, bytes = 6_100_000_000L, isNew = true, watchedProgress = 0.4f)
+            rows += LiveRecording("fake-recording-film-kept", "Night of the Lanterns", "live-2-3", "2.3", "Retro Reels", now - 50 * HOUR, now - 48 * HOUR, "done", mediaFileId = 9103, userName = "Sam", canCancel = true, canDelete = true, startedAtMs = now - 50 * HOUR, endedAtMs = now - 48 * HOUR, bytes = 11_900_000_000L, repeat = true, watched = true, watchedProgress = 1f)
             // Both tuners are booked three hours on: Conference Football and Harbor Evening News hold them.
             val football = LiveRecording("fake-recording-football", "Conference Football", "live-4-1", "4.1", "NFLD-HD", now + 3 * HOUR, now + 4 * HOUR + HOUR / 2, "scheduled", userName = "Alex", canCancel = true)
             val news = LiveRecording("fake-recording-news", "Harbor Evening News", "live-7-1", "7.1", "LKSD-HD", now + 3 * HOUR - HOUR / 6, now + 4 * HOUR - HOUR / 6, "scheduled", userName = "Sam", canCancel = true)
@@ -338,7 +341,7 @@ class FakeLiveRepository(
         }
         val start = cursor?.toIntOrNull() ?: 0
         val page = filtered.drop(start).take(20)
-        return RecordingPage(page.map { it.copy(canCancel = ownsRecording(it.userName), canDelete = it.canDelete && canDeleteRecordings()) }, if (section == RecordingSection.Series) dvrRules.map { it.copy(canCancel = ownsRecording(it.userName)) } else emptyList(), (start + page.size).takeIf { it < filtered.size }?.toString(), 2, 500_000_000_000L)
+        return RecordingPage(page.map { it.copy(canCancel = ownsRecording(it.userName), canDelete = it.canDelete && canDeleteRecordings()) }, if (section == RecordingSection.Series) dvrRules.map { it.copy(canCancel = ownsRecording(it.userName)) } else emptyList(), (start + page.size).takeIf { it < filtered.size }?.toString(), 2, 500_000_000_000L, reserveBytes = if (start == 0) 50_000_000_000L else null)
     }
 
     override suspend fun record(programme: LiveProgramme, options: RecordingOptions): LiveRecording? {

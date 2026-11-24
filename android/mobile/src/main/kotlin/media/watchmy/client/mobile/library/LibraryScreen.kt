@@ -1,5 +1,6 @@
 package media.watchmy.client.mobile.library
 
+import media.watchmy.client.ui.imageFor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -106,7 +107,9 @@ fun LibraryScreen(
     val services = LocalAppServices.current
     val notMatched = rememberNotMatchedNotice()
     // A row's See all from Home reaches the grid through the app's browse requests.
-    val vm = viewModel(key = "library-$type") { LibraryViewModel(services.library, type, saved = createSavedStateHandle(), requests = services.browseRequests) }
+    val vm = viewModel(key = "library-$type") {
+        LibraryViewModel(services.library, type, saved = createSavedStateHandle(), requests = services.browseRequests, others = media.watchmy.client.presentation.servers.OtherServers(services.servers, services.library))
+    }
     ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val user by services.auth.user.collectAsStateWithLifecycle()
@@ -177,10 +180,14 @@ fun LibraryScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(14.dp),
                         ) {
-                            items(state.items, key = { it.id }) { item ->
+                            // A grid from every server: what a server still out, one that didn't answer or one that can't filter so means for it.
+                                if (state.merged && state.notes.isNotEmpty()) item(key = "servers", span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                                    ServersNote(state.notes, if (state.retryServers) vm::retryServers else null)
+                                }
+                            items(state.items, key = { "${it.where.serverId}:${it.kind}:${it.id}" }) { item ->
                                 PosterCard(
                                     item = item,
-                                    imageUrl = services.library.imageUrl(item.posterPath, ImageSize.W342),
+                                    imageUrl = services.library.imageFor(item.where, item.posterPath, ImageSize.W342),
                                     subtitle = item.gridSubtitle(),
                                     onClick = { item.open(onOpenShow, onOpenMovie, onPlay, notMatched) },
                                     onSetWatched = { vm.setWatched(item, it) },
@@ -293,4 +300,14 @@ internal fun MenuChoice(label: String, selected: Boolean, onClick: () -> Unit) {
         },
         onClick = onClick,
     )
+}
+
+
+/** A grid from every server: its servers' note, and Try again for one that didn't answer. */
+@Composable
+internal fun ServersNote(notes: List<String>, onRetry: (() -> Unit)?) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(notes.joinToString(" "), color = WmmColors.TextMuted, fontFamily = media.watchmy.client.ui.Inter, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        if (onRetry != null) media.watchmy.client.mobile.components.GoldTextButton("Try again", onRetry)
+    }
 }

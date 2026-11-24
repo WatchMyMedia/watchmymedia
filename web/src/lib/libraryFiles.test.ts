@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filesChips, filesQueryOf, filesSummary } from './libraryFiles'
+import { fileTitle, filesChips, filesQueryOf, filesSummary } from './libraryFiles'
 
 const lib = { fileCount: 236, unmatchedCount: 3, pendingCount: 0, missingCount: 0, lastScannedAt: '' }
 
@@ -41,5 +41,21 @@ describe('the Files page’s filters', () => {
     expect(filesQueryOf('all')).toEqual({})
     expect(filesQueryOf('missing')).toEqual({ status: 'missing' })
     expect(filesQueryOf('unmatched')).toEqual({ status: 'present', match: 'unmatched' })
+    expect(filesQueryOf('unreadable')).toEqual({ status: 'present', probe: 'failed' })
+  })
+})
+
+describe('unreadable files and matched titles', () => {
+  const lib = { fileCount: 10, unmatchedCount: 0, pendingCount: 0, missingCount: 0 }
+  it('offers Unreadable only when there are any, or while chosen', () => {
+    expect(filesChips(lib, 1).at(-1)).toEqual({ value: 'unreadable', label: 'Unreadable', count: 1 })
+    expect(filesChips(lib, 0).map((c) => c.value)).not.toContain('unreadable')
+    expect(filesChips(lib, 0, 'unreadable').map((c) => c.value)).toContain('unreadable')
+    expect(filesChips(lib).map((c) => c.value)).not.toContain('unreadable')
+  })
+  it('titles a row by its match', () => {
+    expect(fileTitle({ title: 'Harbor Lights', year: 2019 })).toEqual({ title: 'Harbor Lights (2019)' })
+    expect(fileTitle({ title: 'Night Shift Diner', episode: { seasonNumber: 1, episodeNumber: 2, title: 'Graveyard Special' } })).toEqual({ title: 'Night Shift Diner · S1 E2', episode: 'Graveyard Special' })
+    expect(fileTitle({})).toBeUndefined()
   })
 })

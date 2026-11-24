@@ -143,8 +143,12 @@ export class CrossSearch {
   }
 }
 
-/** A result, and the server it is on when that isn't the current one. */
-export type Tagged<T> = { item: T; server?: { id: string; name: string } }
+/**
+ * A result, and the server it is drawn from when that isn't the current
+ * one. With one card across servers (API level 34), `also` lists the other
+ * servers that have the same title, in the order they answered.
+ */
+export type Tagged<T> = { item: T; server?: { id: string; name: string }; also?: { id: string; name: string }[] }
 
 export type Merged = {
   shows: Tagged<Show>[]
@@ -167,7 +171,28 @@ export type Merged = {
  * failed and the current server's are in: a server that answers early
  * waits its turn, so a card on screen never moves.
  */
-export function mergeResults(current: SearchResults | undefined, currentDone: boolean, parts: readonly Part[]): Merged {
+/**
+ * The same title, for one card across servers: a movie or show by its TMDB
+ * id, an episode by its show's, its season and number. Undefined for what
+ * can't be matched (no TMDB id), which is never merged.
+ */
+export function sameTitleKey(kind: 'show' | 'movie', item: { tmdbId?: number }): string | undefined
+export function sameTitleKey(kind: 'episode', item: { showTmdbId?: number; seasonNumber: number; number: number }): string | undefined
+export function sameTitleKey(kind: 'show' | 'movie' | 'episode', item: { tmdbId?: number; showTmdbId?: number; seasonNumber?: number; number?: number }): string | undefined {
+  if (kind === 'episode') return item.showTmdbId ? `episode:${item.showTmdbId}:${item.seasonNumber}:${item.number}` : undefined
+  return item.tmdbId ? `${kind}:${item.tmdbId}` : undefined
+}
+
+/**
+ * The results as they are drawn. The current server's come first and carry
+ * no server. Each other server's are added to the end of each group in
+ * Servers' order, and only once every server before it has answered or
+ * failed and the current server's are in: a server that answers early
+ * waits its turn, so a card on screen never moves. With `oneCard` (the
+ * current server answers API level 34), a title already listed from an
+ * earlier server isn't listed again: that server goes in its `also`.
+ */
+export function mergeResults(current: SearchResults | undefined, currentDone: boolean, parts: readonly Part[], oneCard = false): Merged {
   const merged: Merged = {
     shows: (current?.shows ?? []).map((item) => ({ item })),
     movies: (current?.movies ?? []).map((item) => ({ item })),
@@ -178,16 +203,50 @@ export function mergeResults(current: SearchResults | undefined, currentDone: bo
     answered: (currentDone && current ? 1 : 0) + parts.filter((p) => p.state === 'done').length,
   }
   let open = !!current || currentDone
+  const seen = new Map<string, Tagged<unknown>>()
+  if (oneCard) {
+    for (const t of merged.shows) { const k = sameTitleKey('show', t.item); if (k) seen.set(k, t) }
+    for (const t of merged.movies) { const k = sameTitleKey('movie', t.item); if (k) seen.set(k, t) }
+    for (const t of merged.episodes) { const k = sameTitleKey('episode', t.item); if (k) seen.set(k, t) }
+  }
+  /** Adds a result, or the server to the card of the same title already listed. */
+  const add = <T>(list: Tagged<T>[], key: string | undefined, item: T, server: { id: string; name: string }) => {
+    const there = oneCard && key ? seen.get(key) : undefined
+    if (there) { there.also = [...(there.also ?? []), server]; return }
+    const tagged: Tagged<T> = { item, server }
+    list.push(tagged)
+    if (oneCard && key) seen.set(key, tagged as Tagged<unknown>)
+  }
   for (const p of parts) {
     if (p.state === 'failed') continue
     if (!p.results) open = false
     if (!open || !p.results) continue
     const server = { id: p.id, name: p.name }
-    for (const item of p.results.shows) merged.shows.push({ item, server })
-    for (const item of p.results.movies) merged.movies.push({ item, server })
-    for (const item of p.results.episodes) merged.episodes.push({ item, server })
+    for (const item of p.results.shows) add(merged.shows, sameTitleKey('show', item), item, server)
+    for (const item of p.results.movies) add(merged.movies, sameTitleKey('movie', item), item, server)
+    for (const item of p.results.episodes) add(merged.episodes, sameTitleKey('episode', item), item, server)
   }
   return merged
+}
+
+/** A server's name without a trailing "server": "Home server" is "Home" on a card's line. */
+export function bareName(name: string): string {
+  return name.replace(/\s+server$/i, '') || name
+}
+
+/** Names in a line: "Home and Cabin", "Home, Cabin and Den". */
+export function namesLine(names: readonly string[]): string {
+  return names.length <= 1 ? names[0] ?? '' : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
+/**
+ * The line a result's card gives its servers: "On Home and Cabin" for a
+ * title on several (the current one first), the server's name for a title
+ * only another server has, nothing for one only the current server has.
+ */
+export function serversLine(t: Pick<Tagged<unknown>, 'server' | 'also'>, current: string): string | undefined {
+  if (!t.also?.length) return t.server?.name
+  return `On ${namesLine([t.server?.name ?? current, ...t.also.map((s) => s.name)].map(bareName))}`
 }
 
 /** A result's key in its row: its id, with its server's when it is on another one (ids are each server's own). */

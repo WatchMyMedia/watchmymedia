@@ -13,7 +13,17 @@ import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.DeletePreview
 import media.watchmy.client.model.FOLLOW_LIMIT
 import media.watchmy.client.model.FollowsRepository
+import media.watchmy.client.model.CopyChoices
 import media.watchmy.client.model.DownloadRepository
+import media.watchmy.client.model.MediaVersion
+import media.watchmy.client.model.PlaybackPlan
+import media.watchmy.client.model.Where
+import media.watchmy.client.model.at
+import media.watchmy.client.presentation.servers.OtherServers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeoutOrNull
 import media.watchmy.client.model.EPISODE_GONE_NOTE
 import media.watchmy.client.model.EpisodeDetail
 import media.watchmy.client.model.LibraryChange
@@ -89,6 +99,12 @@ interface ShowPageActions {
     fun askDelete()
     fun say(message: String)
 
+    /** Plays [version] of the episode on top's [copy] on a show on several servers. */
+    fun playCopy(copy: ServerCopy, version: MediaVersion, startMs: Long? = null): PlayRequest?
+
+    /** Chooses [version] of [copy] for the episode on top's Play. */
+    fun choose(copy: ServerCopy, version: MediaVersion)
+
     /** Notify me: follows the show, or stops. */
     fun toggleFollow()
 }
@@ -117,6 +133,13 @@ class ShowPageViewModel(
     private val saved: SavedStateHandle = SavedStateHandle(),
     /** The person's watchlists, from [media.watchmy.client.model.WATCHLISTS_API_LEVEL]: where the page reads the show is. */
     private val watchlists: WatchlistRepository = WatchlistRepository.Unavailable,
+    /** The registered server the page is on, opened in place; null is the one in use. */
+    private val here: String? = null,
+    /** The other servers, asked for the show by its TMDB id and then for the season on screen; null asks none. */
+    private val others: OtherServers? = null,
+    /** Which copy Play uses for each episode, on this device. */
+    private val choices: CopyChoices = CopyChoices.None,
+    private val plansOn: suspend (serverId: String?, fileIds: List<Long>) -> Map<Long, PlaybackPlan> = { _, _ -> emptyMap() },
 ) : ViewModel(), ShowPageActions, ShownPage {
     /** The delete dialog: checking with Sonarr, asking, or saying it can't. */
     sealed interface Deleting {
@@ -156,8 +179,20 @@ class ShowPageViewModel(
          * couldn't be had.
          */
         val related: List<ScreenRow> = emptyList(),
+        /** Another server has the show: the TV's chooser button stays for every episode, so the row doesn't move. */
+        val onSeveral: Boolean = false,
+        /** Each episode's copies on every server that has it, by its id on this page. */
+        val episodeCopies: Map<Long, Copies> = emptyMap(),
+        /** The servers still out a moment in ("Still asking Den server…"). */
+        val copiesAsking: List<String> = emptyList(),
+        /** The page's own server when it isn't the one in use: its name, and whether it is away from home. */
+        val hereName: String? = null,
+        val hereAway: Boolean = false,
     ) {
         val show: ShowDetail? get() = page.value?.show
+
+        /** The episode on top's copies, when more than one server has it or it is only another's. */
+        val copies: Copies? get() = episodeCopies[episodeId]
         val season: SeasonDetail? get() = page.value?.season
 
         /** The season the tabs show chosen. */
@@ -251,6 +286,13 @@ class ShowPageViewModel(
 
     /** The related row was asked for, or is on its way: once a page, so a quiet reload keeps it. */
     private var relatedAsked = false
+
+    // Declared before init, which starts the first load: a field set there would be set back by its initializer.
+    /** The show's id on each other server that has it, in Servers' order, once asked. */
+    private var showElsewhere: List<Pair<OtherServers.Other, Long>>? = null
+    /** Each other server's seasons read for this page, by its id and the season's number; null for one that didn't answer. */
+    private val seasonsElsewhere = HashMap<Pair<String, Int>, SeasonDetail?>()
+    private var copiesJob: kotlinx.coroutines.Job? = null
 
     init {
         load()
@@ -351,11 +393,131 @@ class ShowPageViewModel(
         select(id, reason = null)
     }
 
-    /** Null when the episode on top can't play (no file on disk). [startMs] null resumes where the viewer left off. */
+    /**
+     * Null when the episode on top can't play (no file on disk). [startMs]
+     * null resumes where the viewer left off: on a show on several servers,
+     * the copy chosen for the episode (else the one with the latest place),
+     * from the latest place on any of them.
+     */
     override fun playRequest(startMs: Long?): PlayRequest? {
         val show = _state.value.show ?: return null
         val ep = _state.value.episode?.takeIf { it.playable } ?: return null
-        return ep.playRequest(show, startMs)
+        val copies = _state.value.copies
+        val play = copies?.play
+        if (copies != null && play != null && (copies.several || play.copy.serverId != here)) return playCopy(play.copy, play.version, startMs)
+        return ep.playRequest(show, startMs)?.copy(serverId = here)
+    }
+
+    /** Plays [version] of the episode on top's [copy], from the latest place on any copy unless [startMs] says where. */
+    override fun playCopy(copy: ServerCopy, version: MediaVersion, startMs: Long?): PlayRequest? {
+        val show = _state.value.show ?: return null
+        val ep = _state.value.episode ?: return null
+        val start = startMs ?: _state.value.copies?.startFor(copy)
+        return ep.copy(versions = copy.versions).playRequest(show, start, version.fileId)?.copy(serverId = copy.serverId)
+    }
+
+    /** Chooses [version] of [copy] for the episode on top's Play, kept for that episode on this device; nothing plays. */
+    override fun choose(copy: ServerCopy, version: MediaVersion) {
+        val key = episodeKey(_state.value.show, _state.value.episode) ?: return
+        val chosen = CopyChoices.Chosen(copy.registeredId, version.fileId)
+        choices.choose(key, chosen)
+        _state.update { s -> s.copy(episodeCopies = s.episodeCopies.mapValues { (id, c) -> if (id == s.episodeId) c.copy(chosen = chosen) else c }) }
+    }
+
+    private fun episodeKey(show: ShowDetail?, ep: EpisodeDetail?): String? {
+        val tmdb = show?.tmdbId?.takeIf { it > 0 } ?: return null
+        return ep?.let { "Episode:$tmdb:${it.season}:${it.number}" }
+    }
+
+
+
+
+    /**
+     * The season on screen's episodes on the other servers: the show asked
+     * for by its TMDB id once a page, each server's season once, each with
+     * [OtherServers]' time. An episode matches by its season and number. One
+     * that only another server has joins the season in its place ([Where]).
+     */
+    private fun findEpisodeCopies(show: ShowDetail, season: SeasonDetail) {
+        val all = others ?: return
+        val tmdb = show.tmdbId?.takeIf { it > 0 } ?: return
+        copiesJob?.cancel()
+        copiesJob = viewModelScope.launch {
+            val own = all.server(here) ?: return@launch
+            _state.update { it.copy(hereName = own.name.takeIf { here != null }, hereAway = own.away) }
+            val asked = all.others(except = here)
+            if (asked.isEmpty()) return@launch
+            val stillAsking = launch {
+                kotlinx.coroutines.delay(OtherServers.STILL_ASKING_MS)
+                if (showElsewhere == null) _state.update { it.copy(copiesAsking = asked.map { o -> o.name }) }
+            }
+            val there = showElsewhere ?: run {
+                val found = HashMap<OtherServers.Other, Long>()
+                all.ask(asked) { lib -> lib.copies(media.watchmy.client.model.ItemKind.Show, tmdb).firstOrNull()?.id }
+                    .collect { (o, r) -> r.getOrNull()?.let { found[o] = it } }
+                asked.mapNotNull { o -> found[o]?.let { o to it } }.also { showElsewhere = it }
+            }
+            stillAsking.cancel()
+            val number = season.season.number
+            val seasons = coroutineScope {
+                there.map { (o, id) ->
+                    async {
+                        val key = o.registeredId to number
+                        val s = if (seasonsElsewhere.containsKey(key)) seasonsElsewhere[key] else {
+                            withTimeoutOrNull(OtherServers.TIMEOUT_MS) { attempt { o.library.season(id, number) }.getOrNull() }.also { seasonsElsewhere[key] = it }
+                        }
+                        o to s
+                    }
+                }.awaitAll()
+            }
+            val plans = HashMap<Pair<String, Long>, PlaybackPlan>()
+            seasons.forEach { (o, s) ->
+                val ids = s?.episodes?.flatMap { e -> e.versions.map { it.fileId } }.orEmpty()
+                if (ids.isNotEmpty()) attempt { plansOn(o.id, ids) }.getOrNull()?.forEach { (f, p) -> plans[o.registeredId to f] = p }
+            }
+            val byEpisode = HashMap<Long, Copies>()
+            val extra = ArrayList<EpisodeDetail>()
+            val ownHave = season.episodes.filter { it.hasFile && it.where.serverId == null }.associateBy { it.number }
+            val numbers = (ownHave.keys + seasons.flatMap { (_, s) -> s?.episodes?.filter { it.hasFile }?.map { it.number }.orEmpty() }).distinct().sorted()
+            for (n in numbers) {
+                val mine = ownHave[n]
+                val list = buildList {
+                    if (mine != null) add(ServerCopy(here, own.registeredId, own.name, own.away, mine.versions, mine.watch, mine.id))
+                    seasons.forEach { (o, s) ->
+                        s?.episodes?.firstOrNull { it.number == n && it.hasFile }?.let { e ->
+                            add(ServerCopy(o.id, o.registeredId, o.name, o.away, e.versions, e.watch, e.id, e.versions.mapNotNull { v -> plans[o.registeredId to v.fileId]?.let { v.fileId to it } }.toMap()))
+                        }
+                    }
+                }
+                if (list.isEmpty()) continue
+                val id = mine?.id ?: run {
+                    // Only another server has it: listed here, under a page id of its own.
+                    val first = list.first()
+                    val from = seasons.first { (o, _) -> o.registeredId == first.registeredId }.second!!.episodes.first { it.number == n }
+                    val pageId = -first.titleId
+                    extra += from.copy(id = pageId, where = Where(first.serverId, first.serverName))
+                    pageId
+                }
+                val key = episodeKey(show, mine ?: extra.last())
+                // Every episode has its copies while the show is on two servers, one copy or several, so the chooser is there for each.
+                byEpisode[id] = Copies(list, emptyList(), key?.let { choices.chosen(it) })
+            }
+            _state.update { s ->
+                s.copy(
+                    onSeveral = there.isNotEmpty(),
+                    episodeCopies = byEpisode,
+                    copiesAsking = emptyList(),
+                    page = if (extra.isEmpty()) s.page else s.page.withSeason { it.withElsewhere(extra) },
+                )
+            }
+        }
+    }
+
+    /** The season with [extra], episodes only other servers have, in their places, over its own entries for them that have no file. */
+    private fun SeasonDetail.withElsewhere(extra: List<EpisodeDetail>): SeasonDetail {
+        val numbers = extra.map { it.number }.toSet()
+        val kept = episodes.filterNot { (it.number in numbers && !it.hasFile) || it.where.serverId != null }
+        return copy(episodes = (kept + extra).sortedBy { it.number })
     }
 
     /**
@@ -372,7 +534,13 @@ class ShowPageViewModel(
         val held = ep.versions.firstOrNull()?.fileId?.let { f -> downloads.downloads.value.firstOrNull { it.fileId == f && it.downloaded } }
         act({
             try {
-                library.markWatched(WatchTarget.Episode(ep.id), watched)
+                val copies = _state.value.copies?.all.orEmpty()
+                if (ep.where.serverId == null) library.markWatched(WatchTarget.Episode(ep.id), watched)
+                // Watched on any server is watched: every other copy is marked where it can be (an episode only there, there alone).
+                copies.filter { it.serverId != here }.forEach { c ->
+                    val marked = attempt { others?.server(c.serverId)?.library?.markWatched(WatchTarget.Episode(c.titleId), watched) }
+                    if (ep.where.serverId != null) marked.getOrThrow()
+                }
             } catch (e: Exception) {
                 // Offline, a downloaded episode's mark waits for the server in the queue.
                 if (held == null || !e.isUnreachable()) throw e
@@ -531,6 +699,7 @@ class ShowPageViewModel(
         val start = seasonStart(season)
         _state.update { it.copy(page = Load.Ready(Page(show, season)), pendingSeason = null) }
         select(start?.id ?: 0, reason = null)
+        findEpisodeCopies(show, season)
     }
 
     private fun select(id: Long, reason: OnTopReason?) {
@@ -584,6 +753,7 @@ class ShowPageViewModel(
                     }
                     if (top != null) select(top.episodeId, top.reason)
                     loadRelated()
+                    findEpisodeCopies(show, season)
                 }
                 .onFailure { e ->
                     val text = if (e is NoSuchElementException) "No episodes of this show are here yet." else errorMessage(e)

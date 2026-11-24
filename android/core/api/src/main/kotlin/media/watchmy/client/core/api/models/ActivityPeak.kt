@@ -36,6 +36,7 @@ import kotlinx.serialization.encoding.Encoder
 /**
  * @param count
  * @param at
+ * @param converted The overall peak only: how many of its streams were not played directly (API level 34).
  */
 @Serializable
 
@@ -45,7 +46,11 @@ data class ActivityPeak (
     val count: kotlin.Long,
 
     @SerialName(value = "at")
-    val at: kotlin.String? = null
+    val at: kotlin.String? = null,
+
+    /* The overall peak only: how many of its streams were not played directly (API level 34). */
+    @SerialName(value = "converted")
+    val converted: kotlin.Long? = null
 
 ) {
 

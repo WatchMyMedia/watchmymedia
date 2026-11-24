@@ -23,6 +23,7 @@
 
 package media.watchmy.client.core.api.models
 
+import media.watchmy.client.core.api.models.AddedShow
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -45,6 +46,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param title
  * @param totalSize Bytes across present files.
  * @param watched
+ * @param added
  * @param backdropPath
  * @param contentRating
  * @param episodeCount Shows: episodes with a present file.
@@ -53,6 +55,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param fileName Unmatched: the file's path in the library, or the folder for a group of files.
  * @param lastAirDate
  * @param libraryType Unmatched: the library's type, for the link to its Unmatched view.
+ * @param newEpisodeCount Shows marked isNew: how many of the episodes added in the last 7 days the signed-in person hasn't finished (\"2 new\").
  * @param nextAirDate
  * @param posterPath
  * @param progress
@@ -60,10 +63,12 @@ import kotlinx.serialization.encoding.Encoder
  * @param rating
  * @param releaseDate
  * @param runtimeMin
+ * @param seasonCount Shows: seasons with an episode that has a present file, specials left out.
  * @param seasonNumber Recently added shows: that episode's season.
  * @param status
  * @param subtitle
  * @param tmdbId The movie's or show's TMDB id, which saving it to a watchlist takes. Absent for a title TMDB hasn't matched, which can't be saved.
+ * @param unwatchedCount Shows: episodes with a present file the signed-in person hasn't finished (\"4 episodes left\"); equal to episodeCount when they haven't started. Absent for movies and on servers below API level 34.
  * @param watchlisted It is on one of the signed-in person's watchlists: a card's menu offers Remove from Watchlist rather than Add.
  * @param year
  */
@@ -107,6 +112,9 @@ data class BrowseItem (
     @SerialName(value = "watched")
     val watched: kotlin.Boolean,
 
+    @SerialName(value = "added")
+    val added: AddedShow? = null,
+
     @SerialName(value = "backdropPath")
     val backdropPath: kotlin.String? = null,
 
@@ -136,6 +144,10 @@ data class BrowseItem (
     @SerialName(value = "libraryType")
     val libraryType: BrowseItem.LibraryType? = null,
 
+    /* Shows marked isNew: how many of the episodes added in the last 7 days the signed-in person hasn't finished (\"2 new\"). */
+    @SerialName(value = "newEpisodeCount")
+    val newEpisodeCount: kotlin.Long? = null,
+
     @SerialName(value = "nextAirDate")
     val nextAirDate: kotlin.String? = null,
 
@@ -158,6 +170,10 @@ data class BrowseItem (
     @SerialName(value = "runtimeMin")
     val runtimeMin: kotlin.Long? = null,
 
+    /* Shows: seasons with an episode that has a present file, specials left out. */
+    @SerialName(value = "seasonCount")
+    val seasonCount: kotlin.Long? = null,
+
     /* Recently added shows: that episode's season. */
     @SerialName(value = "seasonNumber")
     val seasonNumber: kotlin.Long? = null,
@@ -171,6 +187,10 @@ data class BrowseItem (
     /* The movie's or show's TMDB id, which saving it to a watchlist takes. Absent for a title TMDB hasn't matched, which can't be saved. */
     @SerialName(value = "tmdbId")
     val tmdbId: kotlin.Long? = null,
+
+    /* Shows: episodes with a present file the signed-in person hasn't finished (\"4 episodes left\"); equal to episodeCount when they haven't started. Absent for movies and on servers below API level 34. */
+    @SerialName(value = "unwatchedCount")
+    val unwatchedCount: kotlin.Long? = null,
 
     /* It is on one of the signed-in person's watchlists: a card's menu offers Remove from Watchlist rather than Add. */
     @SerialName(value = "watchlisted")

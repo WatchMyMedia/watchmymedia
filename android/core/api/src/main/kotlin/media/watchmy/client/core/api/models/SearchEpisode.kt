@@ -42,7 +42,10 @@ import kotlinx.serialization.encoding.Encoder
  * @param showTitle
  * @param title
  * @param airDate
+ * @param progress The fraction the signed-in person has watched (0-1) when partway through.
+ * @param runtimeMin Its length in minutes, as TMDB lists it.
  * @param showPosterPath
+ * @param showTmdbId The show's TMDB id, so an app searching several servers shows one row for an episode on more than one.
  * @param stillPath
  * @param watched The signed-in user has watched it.
  */
@@ -74,8 +77,20 @@ data class SearchEpisode (
     @SerialName(value = "airDate")
     val airDate: kotlin.String? = null,
 
+    /* The fraction the signed-in person has watched (0-1) when partway through. */
+    @SerialName(value = "progress")
+    val progress: kotlin.Double? = null,
+
+    /* Its length in minutes, as TMDB lists it. */
+    @SerialName(value = "runtimeMin")
+    val runtimeMin: kotlin.Long? = null,
+
     @SerialName(value = "showPosterPath")
     val showPosterPath: kotlin.String? = null,
+
+    /* The show's TMDB id, so an app searching several servers shows one row for an episode on more than one. */
+    @SerialName(value = "showTmdbId")
+    val showTmdbId: kotlin.Long? = null,
 
     @SerialName(value = "stillPath")
     val stillPath: kotlin.String? = null,

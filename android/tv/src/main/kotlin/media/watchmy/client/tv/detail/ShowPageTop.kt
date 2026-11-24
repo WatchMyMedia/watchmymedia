@@ -1,5 +1,6 @@
 package media.watchmy.client.tv.detail
 
+import media.watchmy.client.model.watchedLine
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -90,10 +91,14 @@ internal fun Top(
     onPlay: (startMs: Long?) -> Unit,
     onMore: () -> Unit,
     onAsk: (Int) -> Unit,
+    onChooser: () -> Unit = {},
 ) {
     val now by rememberNow()
     val format = rememberLiveClockFormat()
-    val partway = ep.partway
+    val copies = state.copies
+    // With several copies, the place is the latest on any of them.
+    val further = copies?.latest?.takeIf { it.serverId != copies.all.firstOrNull()?.serverId && ep.where.serverId == null }
+    val partway = further?.place ?: ep.partway
     val missing = state.missing
     Box(Modifier.fillMaxWidth().height(TopHeight).bringWholeIntoView()) {
         PageBackdrop(library.imageUrl(show.backdropPath, ImageSize.W1280), show.title, Modifier.fillMaxWidth().overflowHeight(1080.dp, reported = 0.dp), solidFrom = 0.6f)
@@ -111,6 +116,14 @@ internal fun Top(
                 modifier = Modifier.padding(top = 8.dp),
             )
             FactsLine(episodeFacts(show, ep, state.reason), Modifier.padding(top = 14.dp))
+            // Where the episode is, when it matters: only another server has it, or others too.
+            val where = when {
+                ep.where.serverName != null -> "On ${media.watchmy.client.model.shortServerName(ep.where.serverName!!)}"
+                state.hereName != null -> listOfNotNull("On ${media.watchmy.client.model.serverHeading(state.hereName!!)}", "away from home".takeIf { state.hereAway }).joinToString(" · ")
+                copies != null && copies.several -> "Also on " + media.watchmy.client.model.serverList(copies.all.drop(1).map { it.serverName }) + (if (further != null) " · you got further there" else "")
+                else -> null
+            }
+            if (where != null) Text(where, style = TvType.Second, color = WmmColors.TextSoft, maxLines = 1, modifier = Modifier.padding(top = 8.dp))
             if (partway != null) Meter(partway.positionMs.toFloat() / partway.durationMs, Modifier.padding(top = 20.dp), spoken = "${formatDuration(partway.positionMs)} of ${formatDuration(partway.durationMs)} watched")
             val line = Modifier.padding(top = 12.dp)
             val runtime = ep.runtimeMin?.takeIf { it > 0 }?.let { it * 60_000L }
@@ -120,12 +133,12 @@ internal fun Top(
                 !ep.aired -> WhenLine(airedLabel(ep.airDate) ?: "Not aired yet", null, line)
                 !ep.hasFile -> WhenLine("Not in library", null, line)
                 partway != null -> WhenLine(timeLeft(partway.durationMs - partway.positionMs), " · ${endsAt(partway.durationMs - partway.positionMs, now, format)}", line)
-                ep.watched -> WhenLine("Watched", runtime?.let { " · ${wouldEndAt(it, now, format)} if you watched it again" }, line)
+                ep.watched -> WhenLine(ep.watch?.watchedLine() ?: "Watched", runtime?.let { " · ${wouldEndAt(it, now, format)} if you watched it again" }, line)
                 else -> WhenLine("Not watched yet", runtime?.let { " · ${wouldEndAt(it, now, format)} if you started now" }, line)
             }
             Overview(ep.overview, lines = 2, Modifier.padding(top = 16.dp))
             Spacer(Modifier.height(28.dp))
-            Buttons(ep, state, vm, missing, memory, onButtonFocused, onPlay, onMore, onAsk)
+            Buttons(ep, state, vm, missing, memory, onButtonFocused, onPlay, onMore, onAsk, onChooser)
         }
     }
 }
@@ -196,11 +209,19 @@ private fun Buttons(
     onPlay: (startMs: Long?) -> Unit,
     onMore: () -> Unit,
     onAsk: (Int) -> Unit,
+    onChooser: () -> Unit,
 ) {
     val play = episodePlayLabel(ep)
+    val copies = state.copies
     val actions = buildList {
         if (play != null) {
-            add(Action("play", play, { onPlay(null) }, TvButtonStyle.Primary, WmmIcons.Play))
+            val further = copies?.latest?.takeIf { it.serverId != copies.all.firstOrNull()?.serverId && ep.where.serverId == null }
+            add(Action("play", (if (further != null) copies.resumeLabel(copies.all.firstOrNull()?.registeredId) else null) ?: play, { onPlay(null) }, TvButtonStyle.Primary, WmmIcons.Play))
+            // While the show is on two servers, every episode has the button naming the copy Play uses, so the row doesn't move along the episodes.
+            if (state.onSeveral) {
+                val label = copies?.buttonLabel()
+                if (label != null) add(Action("copy", label, onChooser, icon = WmmIcons.ChevronDown))
+            }
             if (ep.partway != null) add(Action("start", "From the start", { onPlay(0) }))
         } else if (missing != null) {
             if (missing.request) add(Action("request", requestSeasonLabel(ep.season), { onAsk(ep.season) }, TvButtonStyle.Primary, WmmIcons.Plus))

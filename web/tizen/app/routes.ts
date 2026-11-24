@@ -5,6 +5,7 @@ import { ListScreen } from '../screens/browse/ListScreen'
 import { WatchlistsScreen } from '../screens/watchlists/WatchlistsScreen'
 import { MovieScreen } from '../screens/details/MovieScreen'
 import { ShowScreen } from '../screens/details/ShowScreen'
+import { PersonScreen } from '../screens/details/PersonScreen'
 import { PlayerScreen } from '../screens/player/PlayerScreen'
 import { LiveScreen } from '../screens/live/LiveScreen'
 import { SearchScreen } from '../screens/search/SearchScreen'
@@ -20,7 +21,8 @@ import { RemindersScreen } from '../screens/live/RemindersScreen'
 
 /** What the player opens. The player engine (`player/`) plays each kind. */
 export type PlayRequest =
-  | { kind: 'file'; fileId: number; startMs?: number; playId?: string; title?: string; subtitle?: string; backdropPath?: string }
+  /** `server`: another server's copy, played from there without switching the app (its progress stays there). */
+  | { kind: 'file'; fileId: number; startMs?: number; playId?: string; title?: string; subtitle?: string; backdropPath?: string; server?: string }
   | { kind: 'live'; channelId: string }
   | { kind: 'recording'; id: string; startMs?: number; title?: string }
   | { kind: 'trailer'; movieId: number; title?: string; youtubeKey?: string; fileId?: number }
@@ -43,9 +45,12 @@ export type Route =
   | { name: 'list'; id: number; type?: 'movie' | 'tv' }
   /** The person's watchlists, from Servers. */
   | { name: 'watchlists' }
-  | { name: 'movie'; id: number }
+  /** `server`: a title on another server this TV is signed in to, opened in place from there; none for the current server. */
+  | { name: 'movie'; id: number; server?: string }
+  /** A cast member's movies and shows on this server (API level 34), from a cast card. */
+  | { name: 'person'; personId: number; who?: string; server?: string }
   /** The show page: up next on top, or a season's start, or an episode. */
-  | { name: 'show'; id: number; season?: number; episodeId?: number }
+  | { name: 'show'; id: number; season?: number; episodeId?: number; server?: string }
   | { name: 'requests'; inbox?: boolean }
   /** The guide, at a channel or a time (ms since the epoch). */
   | { name: 'liveGuide'; channelId?: string; at?: number }
@@ -78,6 +83,7 @@ export const ROUTES: { [N in Route['name']]: RouteDef<N> } = {
   watchlists: { screen: WatchlistsScreen },
   movie: { screen: MovieScreen, chrome: 'full' },
   show: { screen: ShowScreen, chrome: 'full' },
+  person: { screen: PersonScreen, chrome: 'full' },
   requests: { screen: RequestsScreen },
   liveGuide: { screen: LiveGuideScreen },
   recordings: { screen: RecordingsScreen },

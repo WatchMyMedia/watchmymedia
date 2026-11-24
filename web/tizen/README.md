@@ -92,7 +92,10 @@ password form takes Sam and `watching`. `?fakes=away` adds a remembered
 server away from home over http; `?fakes=servers` opens signed in to
 Lakeside on a TV that has three more servers (Cabin, with titles of its
 own; Den, which never answers; Attic, signed out here), for Servers, a
-switch and Search across servers; `?fakes=old`, `?fakes=setup` and
+switch and Search across servers; `?fakes=onecard` opens on Lakeside with
+Cabin, away from home and sharing some of its titles, and Den, which never
+answers, for one card across servers (search, Home, Movies and TV Shows, a
+title's versions on each server); `?fakes=old`, `?fakes=setup` and
 `?fakes=expire` show the start problems. `?fakes=member` signs in a member
 instead of an admin; `?fakes=empty`, `scanning` and `unreadable` give Home's
 empty states; `?fakes=player` makes the player step down in Automatic, stop
@@ -102,7 +105,10 @@ without access, and `?fakes=notuner` one whose channels can't play; `?fakes=save
 settings, `?fakes=nosettings` doesn't answer for them, and `?fakes=seerr`
 carries requests out through Seerr. Sam has three watchlists (Watchlist,
 Halloween and With the kids); `?fakes=nowatchlists` is a server too old to
-keep them, where the app offers none. Nothing on the network is asked: every
+keep them, where the app offers none. The fake server answers API level 34
+(cast members' titles, Remove from Continue watching, the libraries' counts
+and combined filters, recordings' New and watched); `?fakes=level33` is one
+from before it, where those screens behave as they did. Nothing on the network is asked: every
 other address fails as an unreachable server would. There is no media to play,
 so the player shows its screens over a simulated stream.
 

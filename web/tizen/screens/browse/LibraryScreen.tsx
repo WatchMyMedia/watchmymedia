@@ -5,7 +5,10 @@ import type { components } from '../../../src/api/schema'
 import { itemsQuery, librariesQuery, rowsQuery, useLibraryByType } from '../../../src/api/queries'
 import { sortOptions, type LibraryType } from '../../../src/lib/browseOptions'
 import { drawable, isListRow, libraryRows, type ScreenRow } from '../../../src/lib/screenRows'
-import { useBack, useFocus, useKeys, useMediaUrls, useNav, useSession } from '../../app/hooks'
+import { useBack, useFocus, useKeys, useLevel34, useMediaFor, useMediaUrls, useNav, useSession } from '../../app/hooks'
+import { bareName } from '../search/crossSearch'
+import { useMergedGrid, type MergedGrid } from './useMergedGrid'
+import type { TaggedItem } from './oneCardHome'
 import type { ScreenProps } from '../../app/routes'
 import { Button } from '../../ui/Button'
 import { Card } from '../../ui/Card'
@@ -21,8 +24,8 @@ import { useCardActions, useFocusOnArrival, useRowCards } from './browseHooks'
 import { useEntryState } from './entryState'
 import { ALPHABET, letterCounts, letterLabel, nextLetter, PAGE_SIZE, pagesAround, slots, stepRows, stripEntry, toStrip, type LetterOffset } from './gridPages'
 import {
-  choicesFrom, countsLine, decadeLabel, DEFAULT_CHOICES, FILTER_ROW_LABEL, filterChoices, filterRows, filterRowValue, filterSummary, genreChips, gridGroup, gridLine, libraryNoun,
-  narrowed, narrowedLine, nothingMatches, sortLabel, type FilterRow, type GridChoices,
+  chooseFilter, choicesFrom, countsLine, decadeLabel, DEFAULT_CHOICES, FILTER_ROW_LABEL, filterChoices, filterRows, filterRowValue, filterSummary, genreChips, gridGroup, gridLine,
+  gridQuery, libraryNoun, narrowed, narrowedLine, nothingMatches, ratingLabel, rowFilter, sortLabel, type FilterRow, type GridChoices,
 } from './libraryView'
 import { keepChoices, keptChoices } from './keptChoices'
 import { itemActions, seeAllRoute, type CardAction, type RowContext } from './rowCards'
@@ -37,7 +40,13 @@ type ItemList = components['schemas']['ItemList']
 /** Posters across the grid. */
 const COLUMNS = 6
 
-const query = (c: GridChoices) => ({ sort: c.sort, filter: c.filter, genre: c.genre || undefined, decade: c.decade || undefined })
+/**
+ * A page of the grid for these choices. From API level 34 the filters
+ * combine and Rated applies; below it the server is asked as it always was,
+ * with one filter.
+ */
+const gridItems = (libraryId: number, c: GridChoices, level34: boolean, offset: number) =>
+  itemsQuery(libraryId, { ...gridQuery(c, level34), limit: PAGE_SIZE, offset })
 const pageData = (results: UseQueryResult<ItemList>[]) => results.map((r) => r.data)
 
 /** One of the library's rows, its See all sorting the grid below (or opening a list's page). */
@@ -52,8 +61,11 @@ type Picker = 'filter' | 'sort'
 /** Filter and Sort, each a button that opens its panel, with what each is set to; Clear filters while the grid is narrowed. */
 function GridButtons({ type, choices, onPick, onClear }: { type: LibraryType; choices: GridChoices; onPick(p: Picker): void; onClear(): void }) {
   // ▶ from the last button stops there, rather than dropping into the grid below.
+  // ▲ goes to Try again beside the count when a server didn't answer, before the rows above.
+  const focus = useFocus()
   useKeys((input) => {
     const active = document.activeElement as HTMLElement | null
+    if (input.action === 'up' && active?.closest('.library-buttons')) return focus.focusId('library/retry-servers')
     return input.action === 'right' && !!active?.closest('.library-buttons') && !active.nextElementSibling
   })
   return <div className="library-buttons">
@@ -73,24 +85,35 @@ function GridButtons({ type, choices, onPick, onClear }: { type: LibraryType; ch
  * at once and comes back to the rows. Return goes up a level, then closes.
  */
 function FilterPanel({ type, choices, facets, line, kept, onChange, onClose }: {
-  type: LibraryType; choices: GridChoices; facets?: Pick<ItemList, 'facets' | 'genreCounts'>; line?: string; kept: boolean; onChange(c: GridChoices): void; onClose(): void
+  type: LibraryType; choices: GridChoices; facets?: Pick<ItemList, 'facets' | 'genreCounts' | 'contentRatingCounts'>; line?: string; kept: boolean; onChange(c: GridChoices): void; onClose(): void
 }) {
+  const level34 = useLevel34()
   const [page, setPage] = useState<FilterRow>()
   const [from, setFrom] = useState<FilterRow>()
   const genres = genreChips(facets?.facets.genres ?? [], facets?.genreCounts, choices.genre)
   const decades = facets?.facets.decades ?? []
-  const rows = filterRows(type, { genres: genres.length > 0, decades: decades.length > 0 })
+  // The library's ratings, those the other choices leave titles for (the chosen one stays, so it can be cleared).
+  const ratings = genreChips(facets?.facets.contentRatings ?? [], facets?.contentRatingCounts, choices.rating)
+  const rows = filterRows(type, { genres: genres.length > 0, decades: decades.length > 0, ratings: ratings.length > 0, level34 })
   const back = (row: FilterRow) => { setFrom(row); setPage(undefined) }
   if (page) {
     const pick = (c: GridChoices) => { onChange(c); back(page) }
     const options = page === 'genre' ? [{ value: '', label: 'Any' }, ...genres.map((g) => ({ value: g, label: g }))]
       : page === 'decade' ? [{ value: '0', label: 'Any' }, ...decades.map((d) => ({ value: String(d), label: decadeLabel(d) }))]
-        : filterChoices(type, page)
-    const chosen = page === 'genre' ? choices.genre : page === 'decade' ? String(choices.decade) : filterRowValue(page, choices) === 'Any' ? '' : choices.filter
+        : page === 'rating' ? [{ value: '', label: 'Any' }, ...ratings.map((r) => ({ value: r, label: ratingLabel(r) }))]
+          : filterChoices(type, page, level34)
+    const chosen = page === 'genre' ? choices.genre : page === 'decade' ? String(choices.decade) : page === 'rating' ? choices.rating : rowFilter(page, choices) ?? ''
+    const choose = (value: string): GridChoices => {
+      switch (page) {
+        case 'genre': return { ...choices, genre: value }
+        case 'decade': return { ...choices, decade: Number(value) }
+        case 'rating': return { ...choices, rating: value }
+        default: return chooseFilter(choices, page, filterChoices(type, page, level34).find((o) => o.value === value)?.value ?? '', level34)
+      }
+    }
     return <SidePanel key={page} title={FILTER_ROW_LABEL[page]} sub={line} onClose={() => back(page)}>
       <VScroll>
-        {options.map((o) => <Option key={o.value || 'any'} id={`filter/${page}/${o.value || 'any'}`} label={o.label} checked={o.value === chosen}
-          onPress={() => pick(page === 'genre' ? { ...choices, genre: o.value } : page === 'decade' ? { ...choices, decade: Number(o.value) } : { ...choices, filter: o.value as GridChoices['filter'] })}/>)}
+        {options.map((o) => <Option key={o.value || 'any'} id={`filter/${page}/${o.value || 'any'}`} label={o.label} checked={o.value === chosen} onPress={() => pick(choose(o.value))}/>)}
       </VScroll>
     </SidePanel>
   }
@@ -130,7 +153,8 @@ function GridBody({ library, type, choices, first, focusFirst, onFocused, autoFo
   const [strip, setStrip] = useState<Strip>()
 
   const wanted = pagesAround(view, total).filter((p) => p > 0)
-  const others = useQueries({ queries: wanted.map((p) => ({ ...itemsQuery(library.id, { ...query(choices), limit: PAGE_SIZE, offset: p * PAGE_SIZE }), placeholderData: undefined })), combine: pageData })
+  const level34 = useLevel34()
+  const others = useQueries({ queries: wanted.map((p) => ({ ...gridItems(library.id, choices, level34, p * PAGE_SIZE), placeholderData: undefined })), combine: pageData })
   const wantedKey = wanted.join(',')
   const items = useMemo(() => {
     const pages = new Map<number, readonly BrowseItem[]>([[0, first.items]])
@@ -240,6 +264,58 @@ function GridBody({ library, type, choices, first, focusFirst, onFocused, autoFo
 }
 
 /**
+ * The grid from every server (one card across servers): the titles merged
+ * a page at a time, each card's picture and page from its own server, a
+ * title only another server has saying "On Cabin" and opening in place.
+ * There is no A–Z strip: the servers' letters can't be told apart in one
+ * order without every page; the position bar stays.
+ */
+function MergedGridBody({ library, choices, grid, focusFirst, onFocused, autoFocus }: {
+  library: Library; choices: GridChoices; grid: MergedGrid; focusFirst: boolean; onFocused(): void; autoFocus: boolean
+}) {
+  const mediaFor = useMediaFor()
+  const focus = useFocus()
+  const { run } = useCardActions()
+  const menu = useWatchlistsOn()
+  const group = `${gridGroup(library.id, choices)}/all-servers`
+  const [view, setView] = useState(0)
+  useLayoutEffect(() => {
+    if (!focusFirst) return
+    focus.focusId(`${group}/${grid.items[0] ? cellKey(grid.items[0]) : ''}`)
+    onFocused()
+  }, [focusFirst, focus, group, grid.items, onFocused])
+  const onFocus = (e: FocusEvent) => {
+    const i = Number((e.target as HTMLElement).closest?.('[data-index]')?.getAttribute('data-index') ?? -1)
+    if (i >= 0 && i !== view) setView(i)
+  }
+  const rowCount = Math.max(1, Math.ceil(grid.items.length / COLUMNS))
+  const atRow = Math.floor(Math.max(0, view) / COLUMNS)
+  return <div className="library-grid__body" onFocus={onFocus} data-autofocus={autoFocus || undefined}>
+    <Grid id={group} items={grid.items} itemKey={cellKey} variant="poster" hasMore={grid.hasMore} onLoadMore={grid.loadMore}
+      renderItem={(item, id) => {
+        const tag = item.oneCard
+        const own = itemActions(item, !tag && menu)
+        const press = own.press
+        const open = press?.kind === 'open' && tag ? { kind: 'open' as const, route: { ...press.route, server: tag.server.id } as typeof press.route } : undefined
+        const actions = tag ? { press: open ?? own.press, hold: open ?? own.press } : own
+        const line = tag ? [`On ${bareName(tag.server.name)}`, item.year ? String(item.year) : ''].filter(Boolean).join(' · ') : gridLine(item)
+        return <div className="browse-cell">
+          <Card id={id} variant="poster" title={item.title} subtitle={line} image={mediaFor(tag?.server.id).imageUrl(item.posterPath, 'w342')}
+            progress={item.progress} badges={item.isNew ? [{ label: 'New', tone: 'gold' }] : undefined} done={!!item.watched && !item.progress}
+            label={[item.title, line, item.watched && 'watched'].filter(Boolean).join(', ')}
+            onPress={actions.press && (() => run(actions.press))} onHold={actions.hold && (() => run(actions.hold))}/>
+        </div>
+      }}/>
+    {rowCount > 2 && <div className="library-pos" role="img" aria-label={`Row ${atRow + 1} of ${rowCount}${grid.hasMore ? ' so far' : ''}`}>
+      <i style={{ height: `${Math.max(6, 200 / rowCount)}%`, top: `${(Math.min(atRow, rowCount - 2) / rowCount) * 100}%` }}/>
+    </div>}
+  </div>
+}
+
+/** A merged card's key: its server's id with its own, as ids are each server's own. */
+const cellKey = (item: TaggedItem) => (item.oneCard ? `${item.oneCard.server.id}:${item.kind}${item.id}` : `${item.kind}${item.id}`)
+
+/**
  * All movies or All shows: the count, Filter and Sort, and the grid.
  * Changing a choice leaves focus on its button, and the grid starts again
  * at its first title. Alone (no rows above), the library's name heads it.
@@ -247,23 +323,30 @@ function GridBody({ library, type, choices, first, focusFirst, onFocused, autoFo
 function GridSection({ library, type, choices, onChange, alone, lists, autoFocus, focusFirst, onFocused, kept }: {
   library: Library; type: LibraryType; choices: GridChoices; onChange(c: GridChoices): void; alone: boolean; lists: number; autoFocus: boolean; focusFirst: boolean; onFocused(): void; kept: boolean
 }) {
-  const page = useQuery(itemsQuery(library.id, { ...query(choices), limit: PAGE_SIZE, offset: 0 }))
+  const level34 = useLevel34()
+  const page = useQuery(gridItems(library.id, choices, level34, 0))
   const [picker, setPicker] = useState<Picker>()
   const title = type === 'tv' ? 'TV Shows' : 'Movies'
   const noun = type === 'tv' ? 'shows' : 'movies'
   const data = page.data
+  // With other servers at API level 34, the grid is every server's: merged a page at a time, the counts "about" until known.
+  const merged = useMergedGrid(library, type, choices, data && !page.isPlaceholderData ? data : undefined)
   const all = data?.totals?.items ?? data?.total
-  const line = data && narrowed(choices) && all !== undefined ? narrowedLine(type, data.total, all) : countsLine(type, { totals: data?.totals, total: data?.total, lists })
+  const line = merged ? merged.counts.line : data && narrowed(choices) && all !== undefined ? narrowedLine(type, data.total, all) : countsLine(type, { totals: data?.totals, total: data?.total, lists })
+  // Try again goes while the server is asked again, so focus moves to Filter rather than nowhere.
+  const focus = useFocus()
+  const retry = merged && merged.failed.length > 0 && <Button id="library/retry-servers" onPress={() => { merged.retry(); focus.focusId('library/filter') }}>Try again</Button>
   const clear = () => onChange({ ...DEFAULT_CHOICES, sort: choices.sort })
   return <section className={`library-grid${alone ? ' library-grid--alone' : ''}${choices.sort === 'title' && data?.letters?.length ? ' library-grid--az' : ''}`}
     data-vitem aria-label={`All ${noun}`}>
     {alone
-      ? <header className="library-head"><h1 className="library-title">{title}</h1><p className="library-counts">{line || ' '}</p></header>
-      : <div className="library-grid__head"><h2 className="library-grid__title">All {noun}{data && !page.isPlaceholderData && <small>{line}</small>}</h2></div>}
+      ? <header className="library-head"><h1 className="library-title">{title}</h1><div className="library-counts-row">{merged?.counts.about && <span className="tv-spinner" aria-hidden="true"/>}<p className="library-counts" role={merged ? 'status' : undefined}>{line || ' '}</p>{retry}</div></header>
+      : <div className="library-grid__head"><h2 className="library-grid__title">All {noun}{data && !page.isPlaceholderData && <small>{line}</small>}</h2>{retry}</div>}
     <GridButtons type={type} choices={choices} onPick={setPicker} onClear={clear}/>
     {page.isPending || page.isPlaceholderData ? <div className="library-grid__body"><SkeletonRow variant="poster" title={false}/></div>
       : page.isError ? <GridProblem error={page.error} onRetry={() => void page.refetch()}/>
-        : data && data.total === 0 ? <div className="library-empty">
+        : merged && merged.items.length > 0 ? <MergedGridBody key={`${gridGroup(library.id, choices)}/all`} library={library} choices={choices} grid={merged} focusFirst={focusFirst} onFocused={onFocused} autoFocus={autoFocus}/>
+        : data && data.total === 0 && !merged?.hasMore ? <div className="library-empty">
           <h2 className="library-empty__title">{narrowed(choices) ? 'Nothing matches' : `No ${noun} yet`}</h2>
           <p className="library-empty__body">{narrowed(choices) ? nothingMatches(type, choices) : 'Add them to the library on the server’s web page and scan it; they appear here.'}</p>
           {narrowed(choices) && <div className="tv-actions">
@@ -317,13 +400,14 @@ function LibraryView({ library, type, initial, toGrid }: { library: Library; typ
   const [choices, setStoredChoices] = useEntryState<GridChoices>('library-choices', () => initial ?? keptChoices(session.server.id, library.id))
   const setChoices = useCallback((c: GridChoices) => { setStoredChoices(c); if (kept) keepChoices(session.server.id, library.id, c) }, [setStoredChoices, kept, session.server.id, library.id])
   // The grid's first page, so first focus has somewhere to go; a new choice keeps the last page until its own is in.
-  const first = useQuery(itemsQuery(library.id, { ...query(choices), limit: PAGE_SIZE, offset: 0 }))
+  const level34 = useLevel34()
+  const first = useQuery(gridItems(library.id, choices, level34, 0))
   const [gridFocus, setGridFocus] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   const refs = libraries.data?.items
   const menu = useWatchlistsOn()
   const base = useMemo<Omit<RowContext, 'now'>>(() => ({
-    libraries: refs ?? [], channels: [], listings: false, menu, screenType: type,
+    libraries: refs ?? [], channels: [], listings: false, menu, continueMenu: level34, screenType: type,
     // A list's page, or the grid below sorted the row's way; a link to another library has none here.
     seeAll: (target, row): CardAction | undefined => {
       const route = seeAllRoute(target, row, refs ?? [])
@@ -332,7 +416,7 @@ function LibraryView({ library, type, initial, toGrid }: { library: Library; typ
       const { sort, filter, genre, decade } = target.search
       return { kind: 'grid', sort, filter, genre, decade }
     },
-  }), [refs, library.id, menu, type])
+  }), [refs, library.id, menu, level34, type])
   const drawn = useMemo(() => (rows.data ? libraryRows(rows.data, type).filter(drawable) : []), [rows.data, type])
   const onGrid = useCallback((a: Extract<CardAction, { kind: 'grid' }>) => { setChoices(choicesFrom(a)); setGridFocus(true) }, [setChoices])
   const onFocused = useCallback(() => setGridFocus(false), [])

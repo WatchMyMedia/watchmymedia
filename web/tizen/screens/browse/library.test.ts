@@ -85,11 +85,12 @@ describe('the grid’s pages', () => {
 describe('a library’s grid', () => {
   it('takes a See all’s choices it knows, and opens newest first otherwise', () => {
     expect(choicesFrom({})).toEqual(DEFAULT_CHOICES)
-    expect(choicesFrom({ sort: 'aired', filter: 'ended', genre: 'Drama', decade: 1980 })).toEqual({ sort: 'aired', filter: 'ended', genre: 'Drama', decade: 1980 })
+    expect(choicesFrom({ sort: 'aired', filter: 'ended', genre: 'Drama', decade: 1980 })).toEqual({ sort: 'aired', filters: ['ended'], genre: 'Drama', decade: 1980, rating: '' })
     expect(choicesFrom({ sort: 'loudness', filter: 'odd', decade: -3 })).toEqual(DEFAULT_CHOICES)
     expect(narrowed(DEFAULT_CHOICES)).toBe(false)
     expect(narrowed({ ...DEFAULT_CHOICES, genre: 'Drama' })).toBe(true)
-    expect(gridGroup(2, { sort: 'title', filter: '', genre: 'Sci-Fi & Fantasy', decade: 0 })).toBe('grid/2/title/all/Sci-Fi%20%26%20Fantasy/any')
+    expect(gridGroup(2, { sort: 'title', filters: [], genre: 'Sci-Fi & Fantasy', decade: 0, rating: '' })).toBe('grid/2/title/all/Sci-Fi%20%26%20Fantasy/any')
+    expect(gridGroup(2, { sort: 'title', filters: ['unwatched', '4k'], genre: '', decade: 0, rating: 'PG-13' })).toBe('grid/2/title/unwatched+4k/any/any/PG-13')
   })
 
   it('words the header’s counts and sort', () => {

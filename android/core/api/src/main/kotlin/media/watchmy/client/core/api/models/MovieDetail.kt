@@ -24,7 +24,9 @@
 package media.watchmy.client.core.api.models
 
 import media.watchmy.client.core.api.models.Credit
+import media.watchmy.client.core.api.models.CrewMember
 import media.watchmy.client.core.api.models.MediaFileDetail
+import media.watchmy.client.core.api.models.MovieCollection
 import media.watchmy.client.core.api.models.MovieTrailer
 import media.watchmy.client.core.api.models.QueueDownload
 import media.watchmy.client.core.api.models.WatchState
@@ -52,13 +54,16 @@ import kotlinx.serialization.encoding.Encoder
  * @param totalSize
  * @param addedAt
  * @param backdropPath
+ * @param collection
  * @param contentRating US certification from TMDB; empty when it has none.
+ * @param crew Its directors, writers, composers and producers, in that order; empty until the server has fetched the movie's credits with person IDs. Absent on servers below API level 34.
  * @param download
  * @param imdbId
  * @param managedBy The Radarr connection that has the movie.
  * @param originalTitle
  * @param posterPath Image path; fetch via /api/images/{size}{posterPath}. TMDB's, or a picture an admin chose.
  * @param posterSource Set when an admin chose the poster: another of TMDB's, an upload or a link. Absent for the match's own poster.
+ * @param progress Search results and findMoviesByTMDB: the fraction watched (0-1) when partway through.
  * @param quality
  * @param rating TMDB vote average, 0-10.
  * @param releaseDate
@@ -66,6 +71,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param tagline
  * @param trailers The movie's trailers, best first: trailer files in the library, then YouTube trailers while they are on. Apps play the first one whose source they know. Absent when it has none, and on older servers.
  * @param watch
+ * @param watched Search results and findMoviesByTMDB: the signed-in person finished it. Absent elsewhere; a movie's page has watch.
  * @param watchlists The signed-in person's watchlists that hold the movie (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33.
  * @param year
  */
@@ -112,9 +118,16 @@ data class MovieDetail (
     @SerialName(value = "backdropPath")
     val backdropPath: kotlin.String? = null,
 
+    @SerialName(value = "collection")
+    val collection: MovieCollection? = null,
+
     /* US certification from TMDB; empty when it has none. */
     @SerialName(value = "contentRating")
     val contentRating: kotlin.String? = null,
+
+    /* Its directors, writers, composers and producers, in that order; empty until the server has fetched the movie's credits with person IDs. Absent on servers below API level 34. */
+    @SerialName(value = "crew")
+    val crew: kotlin.collections.List<CrewMember>? = null,
 
     @SerialName(value = "download")
     val download: QueueDownload? = null,
@@ -136,6 +149,10 @@ data class MovieDetail (
     /* Set when an admin chose the poster: another of TMDB's, an upload or a link. Absent for the match's own poster. */
     @SerialName(value = "posterSource")
     val posterSource: MovieDetail.PosterSource? = null,
+
+    /* Search results and findMoviesByTMDB: the fraction watched (0-1) when partway through. */
+    @SerialName(value = "progress")
+    val progress: kotlin.Double? = null,
 
     @SerialName(value = "quality")
     val quality: MovieDetail.Quality? = null,
@@ -159,6 +176,10 @@ data class MovieDetail (
 
     @SerialName(value = "watch")
     val watch: WatchState? = null,
+
+    /* Search results and findMoviesByTMDB: the signed-in person finished it. Absent elsewhere; a movie's page has watch. */
+    @SerialName(value = "watched")
+    val watched: kotlin.Boolean? = null,
 
     /* The signed-in person's watchlists that hold the movie (by its TMDB id), in the order they were made; empty when none does. Absent on servers below API level 33. */
     @SerialName(value = "watchlists")

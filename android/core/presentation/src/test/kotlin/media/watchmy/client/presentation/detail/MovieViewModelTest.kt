@@ -98,7 +98,7 @@ class MovieViewModelTest {
     @Test
     fun `each version gets how it would play here`() = runTest(main.dispatcher) {
         val asked = mutableListOf<List<Long>>()
-        val vm = MovieViewModel(library, 500) { ids -> asked += ids; ids.mapNotNull(FakeData::plan).associateBy { it.fileId } }
+        val vm = MovieViewModel(library, 500, plans = { ids -> asked += ids; ids.mapNotNull(FakeData::plan).associateBy { it.fileId } })
         advanceUntilIdle()
         val (remux, mp4) = vm.state.value.movie.value!!.versions
         assertEquals(listOf(listOf(remux.fileId, mp4.fileId)), asked)
@@ -107,7 +107,7 @@ class MovieViewModelTest {
 
     @Test
     fun `versions without plans keep the page`() = runTest(main.dispatcher) {
-        val vm = MovieViewModel(library, 500) { throw ApiException(500, "boom") }
+        val vm = MovieViewModel(library, 500, plans = { throw ApiException(500, "boom") })
         advanceUntilIdle()
         assertTrue(vm.state.value.plans.isEmpty())
         assertEquals("Dead Reckoning Bay", vm.state.value.movie.value?.title)

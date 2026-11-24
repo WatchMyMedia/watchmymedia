@@ -44,6 +44,31 @@ internal interface ServerAccess {
     fun features(): ServerFeatures = ServerFeatures(apiLevel())
 }
 
+/**
+ * As the person signed in on the registered server [serverId], whichever is
+ * in use: each call is bound then ([Http.bindTo]), so a sign-in replaced
+ * since is the one sent, and a server that isn't in use is asked which
+ * server it is first, its answer kept for the calls after (a play's reports
+ * come every few seconds). A call that fails forgets the answer, so the next
+ * asks again. One no one is signed in to any more fails as signed out.
+ */
+internal class OtherServerAccess(private val http: Http, private val store: LocalStore, private val serverId: String) : ServerAccess {
+    override suspend fun <T> call(block: suspend (baseUrl: String, client: Call.Factory) -> T): T {
+        val account = store.value.servers.firstOrNull { it.id == serverId }?.account ?: throw media.watchmy.client.model.SignedOutException()
+        val access = http.bindTo(serverId, account.userId, keepAnswer = true) ?: throw media.watchmy.client.model.SignedOutException()
+        return try {
+            access.call(block)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            http.forgetAnswers(serverId)
+            throw e
+        }
+    }
+
+    override fun apiLevel(): Int = store.value.servers.firstOrNull { it.id == serverId }?.apiLevel ?: 0
+}
+
 /** As this device's signed-in user, on the server in use. */
 internal class SignedInAccess(private val http: Http) : ServerAccess {
     override suspend fun <T> call(block: suspend (baseUrl: String, client: Call.Factory) -> T): T =

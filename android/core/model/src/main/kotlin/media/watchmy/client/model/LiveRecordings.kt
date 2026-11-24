@@ -108,6 +108,14 @@ data class LiveRecording(
     val canDelete: Boolean = false,
     /** On a clash: the recordings holding the tuners. */
     val conflictsWith: List<RecordingConflict> = emptyList(),
+    /** The listing marks the programme new (a first airing); false from servers below [REDESIGN_API_LEVEL]. */
+    val isNew: Boolean = false,
+    /** The listing marks it a repeat. */
+    val repeat: Boolean = false,
+    /** How far the signed-in person has watched it, 0 to 1; null when not started, and below [REDESIGN_API_LEVEL]. */
+    val watchedProgress: Float? = null,
+    /** The person has watched it to the end. */
+    val watched: Boolean = false,
 ) {
     val active: Boolean get() = state == "recording"
     val playable: Boolean get() = active || (state in listOf("done", "partial") && mediaFileId != null)
@@ -155,7 +163,39 @@ data class LiveRecordingRule(
     val options: RecordingOptions get() = RecordingOptions(series = kind == "series", newOnly = newOnly, anyChannel = anyChannel, keep = keep, padBefore = padBefore, padAfter = padAfter)
 }
 
-data class RecordingPage(val items: List<LiveRecording> = emptyList(), val rules: List<LiveRecordingRule> = emptyList(), val nextCursor: String? = null, val tuners: Int? = null, val freeBytes: Long? = null)
+data class RecordingPage(
+    val items: List<LiveRecording> = emptyList(),
+    val rules: List<LiveRecordingRule> = emptyList(),
+    val nextCursor: String? = null,
+    val tuners: Int? = null,
+    val freeBytes: Long? = null,
+    /** The space the recorder keeps free, which recordings can't use; null below [REDESIGN_API_LEVEL]. On the first page only. */
+    val reserveBytes: Long? = null,
+)
+
+/**
+ * "Room for about 140 more hours": what is free past the recorder's reserve,
+ * at the rate the recordings kept here took (their bytes over their length),
+ * else at [DEFAULT_RECORDING_BYTES_PER_HOUR]. Null without a free space or a
+ * reserve, as from servers below [REDESIGN_API_LEVEL].
+ */
+fun recordingRoomLine(page: RecordingPage): String? {
+    val free = page.freeBytes ?: return null
+    val reserve = page.reserveBytes ?: return null
+    val kept = page.items.filter { !it.active && it.bytes > 0 && it.endedAtMs != null }
+    val keptMs = kept.sumOf { ((it.endedAtMs ?: it.endMs) - (it.startedAtMs ?: it.startMs)).coerceAtLeast(0) }
+    val perHour = if (keptMs >= 600_000L) (kept.sumOf { it.bytes } * 3_600_000.0 / keptMs) else DEFAULT_RECORDING_BYTES_PER_HOUR.toDouble()
+    val hours = ((free - reserve).coerceAtLeast(0) / perHour.coerceAtLeast(1.0)).toLong()
+    return when {
+        hours < 1 -> "No room for more recordings"
+        hours == 1L -> "Room for about 1 more hour"
+        hours < 10 -> "Room for about $hours more hours"
+        else -> "Room for about ${(hours + 5) / 10 * 10} more hours"
+    }
+}
+
+/** A broadcast HD channel's rate, about 6 GB an hour, for a recorder with nothing recorded yet. */
+const val DEFAULT_RECORDING_BYTES_PER_HOUR = 6_000_000_000L
 
 data class RecordingOptions(val series: Boolean = false, val newOnly: Boolean = true, val anyChannel: Boolean = false, val keep: Int = 0, val padBefore: Int = 1, val padAfter: Int = 2, val customPadding: Boolean = padBefore != 1 || padAfter != 2) {
     val valid: Boolean get() = keep in 0..10 && padBefore in RECORDING_PADDING && padAfter in RECORDING_PADDING

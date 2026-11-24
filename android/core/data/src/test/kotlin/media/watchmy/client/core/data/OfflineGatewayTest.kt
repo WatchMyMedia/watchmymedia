@@ -181,7 +181,7 @@ class OfflineGatewayTest {
         assertEquals(listOf(OfflineRecordState.Ready, OfflineRecordState.Gone, OfflineRecordState.Replaced, OfflineRecordState.Revoked, OfflineRecordState.Restart), reply.downloads.map { it.state })
         assertEquals(77L, reply.downloads[2].replacedBy)
         assertEquals(listOf(SyncOutcome.Applied, SyncOutcome.Newer, SyncOutcome.Unavailable), reply.results.map { it.outcome })
-        assertEquals(WatchProgress(0, 3_000_000, true), reply.results[0].watch)
+        assertEquals(WatchProgress(0, 3_000_000, true), reply.results[0].watch?.copy(updatedAtMs = null))
         assertNull(reply.results[1].watch)
     }
 

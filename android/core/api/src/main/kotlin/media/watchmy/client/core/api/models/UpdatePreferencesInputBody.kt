@@ -38,6 +38,7 @@ import kotlinx.serialization.encoding.Encoder
 /**
  * @param audio
  * @param autoplayNext
+ * @param hideSpoilers From API level 34; older servers reject it.
  * @param liveTVReminderMinutes 0, 1, 5, 10 or 15.
  * @param skip Kinds to change; others keep their setting.
  * @param subtitles
@@ -51,6 +52,10 @@ data class UpdatePreferencesInputBody (
 
     @SerialName(value = "autoplayNext")
     val autoplayNext: kotlin.Boolean? = null,
+
+    /* From API level 34; older servers reject it. */
+    @SerialName(value = "hideSpoilers")
+    val hideSpoilers: kotlin.Boolean? = null,
 
     /* 0, 1, 5, 10 or 15. */
     @SerialName(value = "liveTVReminderMinutes")

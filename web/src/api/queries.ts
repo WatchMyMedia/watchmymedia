@@ -1,8 +1,8 @@
 import { infiniteQueryOptions, queryOptions, useMutation, useQuery, useQueryClient, type MutateOptions, type QueryClient } from '@tanstack/react-query'
-import { api, unwrap } from './client'
+import { ApiError, api, unwrap, type ApiClient } from './client'
 import type { components } from './schema'
 import { authScope } from '../lib/authScope'
-import type { ItemFilter, ItemSort } from '../lib/browseOptions'
+import type { ItemFilter, ItemFilterValue, ItemSort } from '../lib/browseOptions'
 
 export const healthQuery = queryOptions({
   queryKey: ['health'],
@@ -50,29 +50,84 @@ export const rowsQuery = (id: number) =>
 
 export type { ItemFilter, ItemSort } from '../lib/browseOptions'
 
-export const itemsQuery = (id: number, p: { sort: ItemSort; filter: ItemFilter; genre?: string; decade?: number; q?: string; limit: number; offset: number }) =>
+/**
+ * A page of a library's titles. filters, contentRating, order and collection
+ * are from API level 34: filters combine with filter (an item meets them
+ * all), contentRating keeps one rating, collection one TMDB collection.
+ */
+export type ItemsParams = {
+  sort: ItemSort
+  filter: ItemFilter
+  genre?: string
+  decade?: number
+  q?: string
+  limit: number
+  offset: number
+  filters?: readonly ItemFilterValue[]
+  contentRating?: string
+  order?: 'asc' | 'desc'
+  collection?: number
+}
+
+/**
+ * The page itemsQuery asks for, from `client`: the page's own server unless
+ * another is named (the Samsung TV app asks every server it is signed in to).
+ */
+export async function fetchItems(id: number, p: ItemsParams, client: ApiClient = api, signal?: AbortSignal) {
+  return unwrap(
+    await client.GET('/api/libraries/{id}/items', {
+      params: {
+        path: { id },
+        query: {
+          sort: p.sort,
+          filter: p.filter || undefined,
+          genre: p.genre || undefined,
+          decade: p.decade || undefined,
+          q: p.q || undefined,
+          limit: p.limit,
+          offset: p.offset,
+          // The server reads these comma separated, as one value.
+          filters: p.filters?.length ? [p.filters.join(',') as ItemFilterValue] : undefined,
+          contentRating: p.contentRating ? [p.contentRating] : undefined,
+          order: p.order,
+          collection: p.collection || undefined,
+        },
+      },
+      signal,
+    }),
+  )
+}
+
+export const itemsQuery = (id: number, p: ItemsParams) =>
   queryOptions({
     queryKey: ['items', id, p],
-    queryFn: async () =>
-      unwrap(
-        await api.GET('/api/libraries/{id}/items', {
-          params: {
-            path: { id },
-            query: { sort: p.sort, filter: p.filter || undefined, genre: p.genre || undefined, decade: p.decade || undefined, q: p.q || undefined, limit: p.limit, offset: p.offset },
-          },
-        }),
-      ),
+    queryFn: () => fetchItems(id, p),
     placeholderData: (prev) => prev,
+  })
+
+/** A movie library's TMDB collections it has two films of or more (API level 34). */
+export const libraryCollectionsQuery = (id: number) =>
+  queryOptions({
+    queryKey: ['collection', id, 'all'],
+    queryFn: async () => unwrap(await api.GET('/api/libraries/{id}/collections', { params: { path: { id } } })),
+  })
+
+/** One collection: the library's films of it, and those it lacks, to request. */
+export const libraryCollectionQuery = (id: number, collectionId: number) =>
+  queryOptions({
+    queryKey: ['collection', id, collectionId],
+    queryFn: async () => unwrap(await api.GET('/api/libraries/{id}/collections/{collectionId}', { params: { path: { id, collectionId } } })),
   })
 
 export type FileStatus = 'present' | 'missing' | undefined
 export type MatchStatus = 'pending' | 'matched' | 'unmatched' | 'failed' | undefined
 
-export const filesQuery = (id: number, status: FileStatus, match: MatchStatus, limit: number, offset: number) =>
+/** A page of a library's files; find (words in the path) and probe=failed (files ffprobe couldn't read) are from API level 34. */
+export const filesQuery = (id: number, status: FileStatus, match: MatchStatus, limit: number, offset: number, find: { q?: string; probe?: 'failed' } = {}) =>
   queryOptions({
-    queryKey: ['files', id, { status, match, limit, offset }],
+    queryKey: ['files', id, { status, match, limit, offset, q: find.q || undefined, probe: find.probe }],
     queryFn: async () =>
-      unwrap(await api.GET('/api/libraries/{id}/files', { params: { path: { id }, query: { status, match, limit, offset } } })),
+      unwrap(await api.GET('/api/libraries/{id}/files', { params: { path: { id }, query: { status, match, limit, offset, q: find.q || undefined, probe: find.probe } } })),
     placeholderData: (prev) => prev,
   })
 
@@ -107,6 +162,16 @@ export const showRelatedQuery = (id: number) =>
     queryKey: ['related', 'show', id],
     queryFn: async () => unwrap(await api.GET('/api/shows/{id}/related', { params: { path: { id } } })),
     staleTime: 5 * 60_000,
+  })
+
+/** A person's movies and shows in the library, from a credit's personId (API level 34); 404 when none has them. */
+export const personQuery = (personId: number) =>
+  queryOptions({
+    queryKey: ['person', personId],
+    queryFn: async () => unwrap(await api.GET('/api/people/{personId}', { params: { path: { personId } } })),
+    staleTime: 60_000,
+    // Nobody in the library has them: asking again finds no one either.
+    retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 2,
   })
 
 export const seasonQuery = (id: number, number: number) =>

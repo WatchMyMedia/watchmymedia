@@ -97,11 +97,22 @@ export function ChoiceSelect({
 }
 
 /**
- * The cast as cards: a photo (or initials) with the name and the part. Not
- * links yet: opening a person's movies and shows needs the server to keep
- * each person's TMDB id with the credit.
+ * The cast as cards: a photo (or initials) with the name and the part. A
+ * credit with TMDB's person id opens that person's movies and shows in the
+ * library; one stored before the server kept ids opens nothing until the
+ * title's credits are fetched again.
  */
-export function PeopleRow({ people, heading = 'Cast', note, small = false }: { people: { name: string; character?: string; profilePath?: string }[]; heading?: string; note?: string; small?: boolean }) {
+export function PeopleRow({
+  people,
+  heading = 'Cast',
+  note,
+  small = false,
+}: {
+  people: { name: string; character?: string; profilePath?: string; personId?: number }[]
+  heading?: string
+  note?: string
+  small?: boolean
+}) {
   if (!people.length) return null
   return (
     <section aria-label={heading}>
@@ -110,15 +121,33 @@ export function PeopleRow({ people, heading = 'Cast', note, small = false }: { p
         {note && <span className="note">{note}</span>}
       </div>
       <ul className="scrollbar-hide -mx-1 mt-3.5 flex gap-3 overflow-x-auto px-1 pb-1.5 pt-1 md:gap-4">
-        {people.map((p, i) => (
-          <li key={`${p.name}-${i}`} className={`shrink-0 ${small ? 'w-[100px] md:w-[112px]' : 'w-[104px] md:w-[124px]'}`}>
-            <span aria-hidden="true" className="grid aspect-[4/5] place-items-center overflow-hidden rounded-[10px] bg-surface-2 text-[26px] font-medium tracking-[.04em] text-neutral-500 ring-1 ring-inset ring-white/[.07]">
-              {p.profilePath ? <img src={`/api/images/w185${p.profilePath}`} alt="" loading="lazy" className="size-full object-cover" /> : initials(p.name)}
-            </span>
-            <span className="mt-2 block truncate text-sm font-medium">{p.name}</span>
-            {p.character && <span className="block truncate text-[12.5px] text-neutral-400">{p.character}</span>}
-          </li>
-        ))}
+        {people.map((p, i) => {
+          const body = (
+            <>
+              <span aria-hidden="true" className="grid aspect-[4/5] place-items-center overflow-hidden rounded-[10px] bg-surface-2 text-[26px] font-medium tracking-[.04em] text-neutral-500 ring-1 ring-inset ring-white/[.07] group-hover:ring-2 group-hover:ring-accent">
+                {p.profilePath ? <img src={`/api/images/w185${p.profilePath}`} alt="" loading="lazy" className="size-full object-cover" /> : initials(p.name)}
+              </span>
+              <span className="mt-2 block truncate text-sm font-medium group-hover:text-accent">{p.name}</span>
+              {p.character && <span className="block truncate text-[12.5px] text-neutral-400">{p.character}</span>}
+            </>
+          )
+          return (
+            <li key={`${p.personId ?? p.name}-${i}`} className={`shrink-0 ${small ? 'w-[100px] md:w-[112px]' : 'w-[104px] md:w-[124px]'}`}>
+              {p.personId ? (
+                <Link
+                  to="/people/$personId"
+                  params={{ personId: String(p.personId) }}
+                  aria-label={`${p.name}${p.character ? `, ${p.character}` : ''}: their movies and shows`}
+                  className="group block rounded-[10px]"
+                >
+                  {body}
+                </Link>
+              ) : (
+                body
+              )}
+            </li>
+          )
+        })}
       </ul>
     </section>
   )

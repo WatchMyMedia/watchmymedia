@@ -25,6 +25,7 @@ package media.watchmy.client.core.api.models
 
 import media.watchmy.client.core.api.models.LiveTVRecording
 import media.watchmy.client.core.api.models.LiveTVRecordingRule
+import media.watchmy.client.core.api.models.LiveTVSectionCounts
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -37,9 +38,12 @@ import kotlinx.serialization.encoding.Encoder
 
 /**
  * @param items
+ * @param counts
  * @param freeBytes
  * @param nextCursor
+ * @param reserveBytes Space the recorder keeps free on the disk: freeBytes less this is the room recordings can use. On the first page, with freeBytes (API level 34).
  * @param rules
+ * @param totalBytes The size of the disk recordings go to. On the first page, with freeBytes (API level 34).
  * @param tuners
  */
 @Serializable
@@ -49,14 +53,25 @@ data class LiveTVRecordings (
     @SerialName(value = "items")
     val items: kotlin.collections.List<LiveTVRecording>,
 
+    @SerialName(value = "counts")
+    val counts: LiveTVSectionCounts? = null,
+
     @SerialName(value = "freeBytes")
     val freeBytes: kotlin.Long? = null,
 
     @SerialName(value = "nextCursor")
     val nextCursor: kotlin.String? = null,
 
+    /* Space the recorder keeps free on the disk: freeBytes less this is the room recordings can use. On the first page, with freeBytes (API level 34). */
+    @SerialName(value = "reserveBytes")
+    val reserveBytes: kotlin.Long? = null,
+
     @SerialName(value = "rules")
     val rules: kotlin.collections.List<LiveTVRecordingRule>? = null,
+
+    /* The size of the disk recordings go to. On the first page, with freeBytes (API level 34). */
+    @SerialName(value = "totalBytes")
+    val totalBytes: kotlin.Long? = null,
 
     @SerialName(value = "tuners")
     val tuners: kotlin.Long? = null

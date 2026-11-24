@@ -311,3 +311,43 @@ export function transferWhy(t: Pick<Transfer, 'mode' | 'quality' | 'deviceName'>
   const q = t.quality && t.quality !== 'original' ? ` (${t.quality}p)` : ''
   return `Making a smaller copy for ${t.deviceName || 'the device'}${q}.`
 }
+
+type Conversions = components['schemas']['ActivityConversions']
+
+const REASONS: Record<string, string> = {
+  'video-format': 'The device can’t play the video’s format',
+  resolution: 'The picture is bigger than the device takes',
+  bitrate: 'More data than the device takes',
+  smaller: 'Sent smaller, chosen or for the connection',
+  'audio-format': 'The device can’t play the sound’s format',
+  'audio-channels': 'More sound channels than the device takes',
+  'audio-track': 'Another sound track was chosen',
+  container: 'The device can’t open the file type',
+  subtitles: 'Subtitles drawn into the picture',
+  other: 'Another reason',
+}
+
+/**
+ * Stats' "Why it was converted" (API level 34): each reason with its share of
+ * the converted plays, most first. A play can have several, so the shares
+ * can add up to more than 100. A reason the server adds later reads as
+ * another reason.
+ */
+export function conversionReasons(c: Conversions | undefined): { key: string; label: string; share: number }[] {
+  if (!c || c.plays <= 0) return []
+  const merged = new Map<string, number>()
+  for (const r of c.reasons) {
+    const key = r.reason in REASONS ? r.reason : 'other'
+    merged.set(key, (merged.get(key) ?? 0) + r.plays)
+  }
+  return [...merged.entries()]
+    .filter(([, plays]) => plays > 0)
+    .map(([key, plays]) => ({ key, label: REASONS[key], share: Math.min(100, Math.max(1, Math.round((plays / c.plays) * 100))) }))
+    .sort((a, b) => b.share - a.share || (a.key === 'other' ? 1 : b.key === 'other' ? -1 : 0))
+}
+
+/** The peak tile's tail: "1 converted", "none converted", or nothing from a server that doesn't say. */
+export function peakConvertedWords(converted: number | undefined): string {
+  if (converted === undefined) return ''
+  return converted === 0 ? 'none converted' : `${converted.toLocaleString()} converted`
+}

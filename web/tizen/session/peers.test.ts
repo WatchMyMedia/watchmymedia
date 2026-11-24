@@ -25,6 +25,8 @@ describe('asking a server other than the current one', () => {
     expect(peer.info).toBeUndefined()
     const results = await peer.search('harbor', never)
     expect(results.movies.map((m) => m.title)).toEqual(['Harbor Nights'])
+    // Its media token is asked for once there is something of it to draw, a moment after the results.
+    await vi.waitFor(() => expect(calls).toHaveLength(3))
     expect(calls.map((r) => `${r.method} ${r.url}`)).toEqual([`GET ${b.origin}/api/server`, `GET ${b.origin}/api/search?q=harbor`, `POST ${b.origin}/api/auth/media-token`])
     expect(calls[0].headers.has('Authorization')).toBe(false)
     expect(calls[1].headers.get('Authorization')).toBe('Bearer token-cabin')
@@ -105,5 +107,37 @@ describe('asking a server other than the current one', () => {
     expect(serversLeftOut(app).map((l) => [l.name, l.reason])).toEqual([['Den server', 'tooOld'], ['Loft server', 'signedOut'], ['Cabin server', 'signedOut']])
     for (const p of peers) p.stop()
     app.shutdown()
+  })
+})
+
+describe('every call to another server', () => {
+  it('waits for the one answer to which server it is, whatever asks, and never signs in before it', async () => {
+    const b = cabin()
+    b.routes = { ...b.routes, 'GET /api/movies': (req) => req.headers.get('Authorization') === 'Bearer token-cabin' ? Response.json({ items: [] }) : undefined }
+    const { calls } = stubServers([b])
+    const peer = new PeerServer(remembered(b))
+    const [one, two] = await Promise.all([
+      peer.api.GET('/api/movies', { params: { query: { tmdbId: 1 } } }),
+      peer.api.GET('/api/movies', { params: { query: { tmdbId: 2 } } }),
+    ])
+    expect(one.response.ok && two.response.ok).toBe(true)
+    expect(calls.filter((r) => r.url.endsWith('/api/server'))).toHaveLength(1)
+    expect(calls[0].url).toBe(`${b.origin}/api/server`)
+    expect(calls.slice(1).every((r) => r.headers.get('Authorization') === 'Bearer token-cabin')).toBe(true)
+  })
+
+  it('sends no sign-in on any call when another server answers at the address', async () => {
+    const b = cabin()
+    b.routes = { 'GET /api/server': () => Response.json({ id: 'someone-else', name: 'Other', version: 'v1.8.0', apiLevel: REQUIRED_API_LEVEL, setupRequired: false, turnstile: false }) }
+    const { calls } = stubServers([b])
+    const peer = new PeerServer(remembered(b))
+    await expect(peer.api.GET('/api/movies/{id}', { params: { path: { id: 3 } } })).rejects.toMatchObject({ reason: 'moved' })
+    expect(calls.every((r) => !r.headers.has('Authorization'))).toBe(true)
+  })
+
+  it('knows a server beyond this network from its address', () => {
+    expect(new PeerServer({ ...remembered(cabin()), baseUrl: 'https://cabin.example.org' }).away).toBe(true)
+    expect(new PeerServer({ ...remembered(cabin()), baseUrl: 'http://192.168.1.31:27587' }).away).toBe(false)
+    expect(new PeerServer({ ...remembered(cabin()), baseUrl: 'http://den.local:27587' }).away).toBe(false)
   })
 })

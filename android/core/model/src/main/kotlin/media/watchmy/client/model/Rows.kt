@@ -137,6 +137,12 @@ val HomeData.continueRow: List<ContinueItem>?
         return rows.firstOrNull { it.style == RowStyle.Continue }?.continueItems
     }
 
+/** Home without [item] in Continue watching, fixed or arranged: taken off the row, its place kept on the server. */
+fun HomeData.withoutContinue(item: ContinueItem): HomeData {
+    fun List<ContinueItem>.without() = filterNot { it.fileId == item.fileId && it.kind == item.kind && it.where.serverId == item.where.serverId }
+    return copy(continueWatching = continueWatching.without(), rows = rows?.map { r -> if (r.style == RowStyle.Continue) r.copy(continueItems = r.continueItems.without()) else r })
+}
+
 /** Every movie and show card on Home, fixed or arranged. */
 internal val HomeData.allItems: List<BrowseItem>
     get() = recentlyAddedShows + recentlyAddedMovies + recentlyReleased + rows.orEmpty().flatMap { it.items }

@@ -10,7 +10,7 @@ import { StackedColumns, type ColumnSeries } from '../../components/charts/Stack
 import { Avatar } from '../../components/activity/StreamDetail'
 import { tile } from '../../components/activity/styles'
 import { Poster } from '../../components/Poster'
-import { perDayWords, playShares, watchedWords } from '../../lib/activityWords'
+import { conversionReasons, peakConvertedWords, perDayWords, playShares, watchedWords } from '../../lib/activityWords'
 import { useActivityAdmin, type StatsSearch } from './shared'
 
 const PERIODS: [number, string][] = [
@@ -59,7 +59,7 @@ export function Stats({ search }: { search: StatsSearch }) {
   const user = admin ? search.user : undefined
   const bucket = days === 0 || days > 90 ? 'month' : 'day'
   const users = useQuery({ ...activityUsersQuery, enabled: admin })
-  const cards = useQuery(cardsQuery({ days, by, user }))
+  const cards = useQuery(cardsQuery({ days, by, user, conversions: true }))
   const types = useQuery(seriesQuery({ days, by, user, split: 'type', bucket }))
   const modes = useQuery(seriesQuery({ days, by, user, split: 'mode', bucket }))
   const heat = useQuery(heatmapQuery({ days, by, user }))
@@ -76,6 +76,7 @@ export function Stats({ search }: { search: StatsSearch }) {
   const heatMax = heat.data?.max ?? 0
   const busiest = busiestWords(heatValues, heatMax)
   const peak = c?.peak
+  const reasons = conversionReasons(c?.conversions)
   const spanDays = days || Math.max(1, (types.data?.buckets.length ?? 1) * (bucket === 'month' ? 30 : 1))
   const people = admin && !user ? (c?.topUsers ?? []) : []
   const devices = c?.topDevices ?? []
@@ -132,7 +133,11 @@ export function Stats({ search }: { search: StatsSearch }) {
           {peak?.all.at && (
             <span className="text-[13px] text-neutral-300">
               {new Date(peak.all.at).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
-              {peak.transcode.count > 0 ? ` · most converted at once: ${peak.transcode.count}` : ''}
+              {peak.all.converted !== undefined
+                ? ` · ${peakConvertedWords(peak.all.converted)}`
+                : peak.transcode.count > 0
+                  ? ` · most converted at once: ${peak.transcode.count}`
+                  : ''}
             </span>
           )}
         </div>
@@ -187,6 +192,26 @@ export function Stats({ search }: { search: StatsSearch }) {
                   </li>
                 ))}
               </ul>
+            </>
+          )}
+          {reasons.length > 0 && (
+            <>
+              <h3 className="mt-[22px] text-[13px] font-semibold text-neutral-400">Why it was converted</h3>
+              {tables ? (
+                <div className="mt-1.5">
+                  <DataTable head={['Reason', 'Share of converted plays']} rows={reasons.map((r) => [r.label, `${r.share}%`])} />
+                </div>
+              ) : (
+                <ul className={`mt-1.5 ${cards.isPlaceholderData ? 'opacity-50' : ''}`} aria-label="Each reason’s share of the converted plays">
+                  {reasons.map((r) => (
+                    <li key={r.key} className="flex items-center gap-3 border-t border-line py-2 text-[13.5px] first:border-t-0">
+                      <span className="min-w-0 flex-[0_1_250px]">{r.label}</span>
+                      <i aria-hidden="true" className="block h-2 rounded-full bg-accent" style={{ width: `${Math.max(2, r.share * 0.4)}%` }} />
+                      <span className="text-[13px] text-neutral-400">{r.share}%</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </>
           )}
         </section>

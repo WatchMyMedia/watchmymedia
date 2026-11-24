@@ -11,10 +11,11 @@ object MobileRoutes {
     /** The Movies tab. */
     @Serializable data object Movies
     /** The show page: up next on top, or [season]'s start, or [episode]. */
-    @Serializable data class Show(val id: Long, val season: Int? = null, val episode: Long? = null)
+    @Serializable data class Show(val id: Long, val season: Int? = null, val episode: Long? = null, val serverId: String? = null)
     /** The show page with this episode on top, from Home, Search and the other pages that link an episode. */
-    @Serializable data class Episode(val showId: Long, val season: Int, val episodeId: Long)
-    @Serializable data class Movie(val id: Long)
+    @Serializable data class Episode(val showId: Long, val season: Int, val episodeId: Long, val serverId: String? = null)
+    /** [serverId] on a title page: the registered server it is on, opened in place without switching; null is the one in use. */
+    @Serializable data class Movie(val id: Long, val serverId: String? = null)
     @Serializable data object Search
     /** Downloads: a tab where the server lets this person download, or downloads are here. */
     @Serializable data object Downloads
@@ -68,7 +69,7 @@ object MobileRoutes {
     @Serializable data class MediaList(val id: Long, val type: String? = null)
     /** The person's watchlists, from Servers and a row's See all. */
     @Serializable data object Watchlists
-    @Serializable data class Player(val fileId: Long, val startMs: Long? = null, val title: String, val subtitle: String? = null, val backdropPath: String? = null, val recordingId: String? = null)
+    @Serializable data class Player(val fileId: Long, val startMs: Long? = null, val title: String, val subtitle: String? = null, val backdropPath: String? = null, val recordingId: String? = null, val serverId: String? = null)
 }
 
 /**

@@ -3,6 +3,8 @@ import {
   channelWords,
   codecName,
   episodeRowFacts,
+  spoilerHidden,
+  hasTrackChoice,
   episodeRowState,
   filesSummary,
   historyWords,
@@ -165,5 +167,27 @@ describe('seasons and episodes', () => {
     expect(initials('Ines Calloway')).toBe('IC')
     expect(initials('Cher')).toBe('C')
     expect(initials('Mary Ann de Vries')).toBe('MV')
+  })
+})
+
+describe('spoilerHidden', () => {
+  const watched = { watch: { completed: true, positionMs: 0, durationMs: 1 } }
+  const started = { watch: { completed: false, positionMs: 60_000, durationMs: 1 } }
+  const fresh = {}
+  it('hides only what the person has not watched or started, and only when asked', () => {
+    expect(spoilerHidden(fresh as never, true)).toBe(true)
+    expect(spoilerHidden(watched as never, true)).toBe(false)
+    expect(spoilerHidden(started as never, true)).toBe(false)
+    expect(spoilerHidden(fresh as never, false)).toBe(false)
+  })
+})
+
+describe('hasTrackChoice', () => {
+  it('is true for two sound tracks or any subtitle, false for one track alone', () => {
+    const a = (index: number) => ({ index, codec: 'aac', channels: 2 })
+    expect(hasTrackChoice({ audio: [a(1), a(2)], subtitles: [] } as never)).toBe(true)
+    expect(hasTrackChoice({ audio: [a(1)], subtitles: [{ index: 3, codec: 'subrip' }] } as never)).toBe(true)
+    expect(hasTrackChoice({ audio: [a(1)], subtitles: [] } as never)).toBe(false)
+    expect(hasTrackChoice(undefined)).toBe(false)
   })
 })

@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import media.watchmy.client.model.AddServerStep
 import media.watchmy.client.model.DeepLink
+import media.watchmy.client.model.liveIsElsewhere
 import media.watchmy.client.model.NOW_ON_MS
 import media.watchmy.client.model.SavedServer
 import media.watchmy.client.model.ServerRepository
@@ -181,6 +182,16 @@ class ServerSwitchViewModel(
         val target = DeepLink.serverFor(link, servers.saved.first()) ?: return true
         val current = servers.current.value?.server
         if (target.server.id == current?.id) return true
+        // Signed in there: the link opens its title in place, from that server, and the app stays where it is.
+        // Live TV and the guide are the server in use's alone: the link says which server it is for.
+        if (target.signedIn) {
+            val page = DeepLink.parse(link)
+            if (page is DeepLink.Live || page == DeepLink.LiveGuide) {
+                say(liveIsElsewhere(target.server.name))
+                return false
+            }
+            return true
+        }
         return when (attempt { servers.switchTo(target.server.id) }.getOrDefault(ServerSwitch.Unreachable)) {
             ServerSwitch.Switched -> true
             ServerSwitch.Unreachable -> {

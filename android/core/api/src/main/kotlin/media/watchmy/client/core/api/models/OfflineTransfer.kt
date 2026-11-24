@@ -52,6 +52,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param startedAt
  * @param user
  * @param encoder A transcode's encoder.
+ * @param ip The address fetching it, for admins only (API level 34).
  * @param speed A transcode's ffmpeg speed, as a multiple of real time.
  */
 @Serializable
@@ -110,6 +111,10 @@ data class OfflineTransfer (
     /* A transcode's encoder. */
     @SerialName(value = "encoder")
     val encoder: kotlin.String? = null,
+
+    /* The address fetching it, for admins only (API level 34). */
+    @SerialName(value = "ip")
+    val ip: kotlin.String? = null,
 
     /* A transcode's ffmpeg speed, as a multiple of real time. */
     @SerialName(value = "speed")

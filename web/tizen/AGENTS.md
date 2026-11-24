@@ -40,7 +40,14 @@ and QN90D steps still to do.
   branches for older servers. A feature from a later level turns on by the
   server's `apiLevel` and asks an older server nothing: watchlists, from 33
   (`useWatchlistsOn()` in `screens/watchlists/`), so the screens that use
-  them call no watchlist query below it.
+  them call no watchlist query below it; and level 34's (`session/features.ts`,
+  `useLevel34()`): a cast member's titles (the `person` route), Remove from
+  Continue watching (a card's Hold OK), the libraries' counts, combined
+  filters and Rated (`gridQuery` sends one filter and no rating below it),
+  and recordings' New, watched and time left. These use the web's own
+  calls (`personQuery` and `itemsQuery` in `../src/api/queries.ts`,
+  `hideFromContinueWatching` in `../src/api/watch.ts`); another server's grid
+  pages go through `fetchItems` with that server's client.
 - **The store identity** in `public/config.xml` is permanent: the widget id,
   package id `cPFf0iV3Li` and application id `cPFf0iV3Li.WatchMyMedia` never
   change, and every update is signed with the same Samsung author certificate.
@@ -182,12 +189,35 @@ together but this list, which stays on the TV.
   the last step of Add a server, and `open` builds the stack a search
   result asked for (Home, Search with the same words, the title). A session
   says it once.
-- **A sign-in only ever goes to its own server.** Search asks every other
-  signed-in server through a `PeerServer` (`session/peers.ts`): a bearer
-  client of its own for that server's address, never the session's `api`,
-  and only after the server has said, without a token, that it is the one
-  remembered. Its pictures use its own media token. Anything new that
-  reaches another server goes through a `PeerServer` too.
+- **A sign-in only ever goes to its own server.** Every call to another
+  signed-in server goes through its `PeerServer` (`session/peers.ts`): a
+  bearer client of its own for that server's address, never the session's
+  `api`, whose every request first waits for the server to say, without a
+  token, that it is the one remembered (`bearerClient`'s `beforeSignIn`).
+  Its pictures use its own media token. The session keeps one `PeerServer`
+  a server (`session/peerRegistry.ts`, `usePeers()`), so each is asked once
+  however many screens use it. Anything new that reaches another server
+  goes through a `PeerServer` too.
+- **One card across servers** (API level 34 on the current server; a
+  server below it takes no part): a title several servers have is one
+  card, matched by TMDB id (an episode by its show's, season and number),
+  and the server is chosen when it plays. Search merges its rows
+  (`mergeResults`); Home's Continue watching and the rows each server
+  builds the same way come from every server, one card a title, rows on
+  screen never moving (`screens/browse/oneCardHome.ts`); Movies and TV
+  Shows merge each server's grid a page at a time
+  (`screens/browse/mergedGrid.ts`, `useMergedGrid.ts`); a title's page asks
+  the other servers for its copies (`screens/details/useCopies.ts`) and the
+  button after Play opens them grouped by server (`copies.ts`,
+  `showCopies.ts`, `CopiesPanel.tsx`), the choice kept per title on the TV
+  (`session/chosenCopies.ts`), Resume from the latest place on any server.
+  A title only another server has opens in place: routes and plays carry
+  `server`, the page reads through `useSource()` and the `SourceContext`
+  (`useMediaUrls`, `routeOn`, `playOn`) and `session/sourceQueries.ts`, and
+  a play uses that server's client so its progress stays there. Every
+  server gets 4 s and one that doesn't answer is left out, said only where
+  the boards draw it. Requests, reports, follows, watchlists and the
+  season and show marks stay the current server's.
 - **Search across servers** is `screens/search/crossSearch.ts`:
   `CrossSearch` asks the others (4 s each, 30 s before one that failed is
   asked again, a keystroke cancels the calls out) and `mergeResults` orders
@@ -199,7 +229,8 @@ together but this list, which stays on the TV.
   again; one this TV is signed out of, or one too old for this app, says so
   and isn't asked (`serversLeftOut`); when none answers it is the plain
   "Search didn't work". Only library titles cross servers; suggestions,
-  Live TV and requests stay the current server's.
+  Live TV and requests stay the current server's. A result from another
+  server opens in place, without switching the app.
 - **Words and rows** for all of it are `screens/servers/serverRows.ts` and
   `screens/search/searchResults.ts`, tested beside them. A server is called
   by its name, never "the server". The Android and Apple apps say the same
@@ -292,7 +323,11 @@ after 8 s, signs in Sam with the password `watching`, and serves every
 screen. `?fakes=away` adds a remembered server away from home over http;
 `?fakes=servers` is a TV with four servers (`fakes/others.ts`): Lakeside,
 signed in and current; Cabin, signed in, with a Home and titles of its own;
-Den, signed in, which never answers; and Attic, signed out here. `old`,
+Den, signed in, which never answers; and Attic, signed out here.
+`?fakes=onecard` (`fakes/onecard.ts`) is one card across servers: Lakeside,
+Cabin away from home sharing some of Lakeside's titles (Dead Reckoning Bay
+further along there, Harbor Lights with two episodes only it has), and Den,
+which takes each request and never answers. `old`,
 `setup` and `expire` give the start problems; the README lists the other
 modes. The first registration of a route answers, so the order in
 `createFakeServer` matters where two areas serve the same route. The TV build leaves the fakes out (`main.tsx` imports
@@ -309,7 +344,13 @@ fictional server). `pnpm build:tizen` builds unsigned app contents for Chromium
 108, as one classic deferred script without `crossorigin`: the package loads
 from `file://`, where module scripts can be refused. Keep it that way, and keep
 code free of `import.meta` beyond `import.meta.env`, which the build replaces.
-`pnpm build:tizen-core` bundles the core separately. `pnpm typecheck`,
+Two real servers in the preview (one card across servers) need a Vite proxy
+each: the server answers CORS only for the packaged app's own origin, so a
+`localhost` page can't reach a second server directly. A scratch config that
+imports `../vite.tizen.config.ts` and overrides `server.port` and
+`server.proxy` puts one in front of each throwaway server, and the second is
+added by its proxy's address. This is how the preview reaches them, not how a
+TV does. `pnpm build:tizen-core` bundles the core separately. `pnpm typecheck`,
 `pnpm lint` and `pnpm test` include this entry. Run both existing web and
 receiver builds when shared code changes.
 

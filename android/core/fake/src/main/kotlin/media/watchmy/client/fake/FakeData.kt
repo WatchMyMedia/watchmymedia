@@ -111,6 +111,11 @@ object FakeData {
             genres = s.genres, rating = 7.0 + (i % 20) / 10.0, posterPath = null, backdropPath = backdropFor(s.title), quality = s.q, hdr = s.hdr,
             isNew = s.isNew, subtitle = "${s.year} · ${s.seasons} season${if (s.seasons > 1) "s" else ""}", watched = s.watched,
             progress = s.pct, episodeCount = s.seasons * 8, runtimeMin = null, releaseDate = null,
+            contentRating = s.cert, seasonCount = s.seasons,
+            unwatchedCount = if (s.watched) 0 else ((1f - (s.pct ?: 0f)) * s.seasons * 8).toInt().coerceAtLeast(1),
+            newEpisodeCount = if (s.isNew) 1 else 0,
+            nextAirDate = if (s.status == "Ended") null else nextThursday(),
+            addedAtMs = System.currentTimeMillis() - (i + 1) * 9 * 3_600_000L,
         )
     }
 
@@ -120,7 +125,45 @@ object FakeData {
             overview = "A salvage crew finds a ship that sank twice, and only one of them remembers the first time.",
             genres = m.genres, rating = 6.5 + (i % 30) / 10.0, posterPath = null, backdropPath = backdropFor(m.title), quality = m.q, hdr = m.q == "4K",
             isNew = m.isNew, subtitle = null, watched = i == 6, progress = if (i == 1) .66f else null, episodeCount = null,
-            runtimeMin = m.runtime, releaseDate = m.released,
+            runtimeMin = m.runtime, releaseDate = m.released, contentRating = m.cert,
+            addedAtMs = System.currentTimeMillis() - (i + 1) * 7 * 3_600_000L,
+        )
+    }
+
+    /** The next Thursday's date, when the fake returning shows air: "New episode Thursday". */
+    private fun nextThursday(now: Long = System.currentTimeMillis()): String {
+        val today = java.time.Instant.ofEpochMilli(now).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+        val ahead = (java.time.DayOfWeek.THURSDAY.value - today.dayOfWeek.value + 7) % 7
+        return today.plusDays(if (ahead == 0) 7L else ahead.toLong()).toString()
+    }
+
+    /** The fake cast's TMDB person ids; Imogen Vale is in Ninety Fathoms alone, the person with one title. */
+    const val INES_VARGA = 7001L
+    const val TOMAS_REYES = 7002L
+    const val ADAEZE_BELL = 7003L
+    const val HOLLIS_KADE = 7101L
+    const val MIRA_OKONJO = 7102L
+    const val IMOGEN_VALE = 7103L
+
+    private val showCast = listOf(Person("Ines Varga", "Maren Holt", null, INES_VARGA), Person("Tomas Reyes", "Harbourmaster", null, TOMAS_REYES), Person("Adaeze Bell", "Wren", null, ADAEZE_BELL))
+
+    private fun movieCast(id: Long): List<Person> = listOf(Person("Hollis Kade", "Captain Ruth Abernathy", null, HOLLIS_KADE), Person("Mira Okonjo", "Dov", null, MIRA_OKONJO)) +
+        listOfNotNull(Person("Imogen Vale", "Tess Arden", null, IMOGEN_VALE).takeIf { id == NINETY_FATHOMS })
+
+    /** Ninety Fathoms, the movie Imogen Vale is in. */
+    const val NINETY_FATHOMS = 502L
+
+    /** A person's titles here, as the server's people call answers: every show for the show cast, every movie for the movie cast. */
+    fun person(personId: Long): media.watchmy.client.model.PersonPage? {
+        val inShows = showCast.firstOrNull { it.personId == personId }
+        val inMovies = movieCast(NINETY_FATHOMS).firstOrNull { it.personId == personId }
+        val who = inShows ?: inMovies ?: return null
+        val movies = if (inMovies == null) emptyList() else movies.filter { personId != IMOGEN_VALE || it.id == NINETY_FATHOMS }
+        val shows = if (inShows == null) emptyList() else shows.take(6)
+        return media.watchmy.client.model.PersonPage(
+            personId, who.name, null,
+            movies = movies.sortedByDescending { it.year }.map { media.watchmy.client.model.PersonTitle(it.copy(tmdbId = tmdbId(it.id)), who.role) },
+            shows = shows.sortedByDescending { it.year }.map { media.watchmy.client.model.PersonTitle(it.copy(tmdbId = tmdbId(it.id)), who.role) },
         )
     }
 
@@ -145,7 +188,16 @@ object FakeData {
         ContinueItem(ContinueItem.Kind.Episode, "Saltmarsh", "S01 E09 · Undertow", null, backdrop("saltmarsh"), null, 9003, null, 102, 3009, 1, 9, 45 * 60_000L, 53 * 60_000L),
         ContinueItem(ContinueItem.Kind.Episode, "Copperline", "S04 E01 · Slag", null, backdrop("copperline"), null, 9004, null, 105, 6401, 4, 1, 6 * 60_000L, 47 * 60_000L),
         ContinueItem(ContinueItem.Kind.Movie, "The Paper Kite", null, null, backdrop("papervkite"), null, 9005, 501, null, null, null, null, 66 * 60_000L, 100 * 60_000L),
-    )
+    ).mapIndexed { i, c ->
+        // What a server at the redesign's level adds: the rating, two lines about it, the TMDB id, and when it was played.
+        val id = c.movieId ?: c.showId ?: 0
+        c.copy(
+            contentRating = if (c.kind == ContinueItem.Kind.Movie) movieRows.getOrNull((id - 500).toInt())?.cert else showRows.getOrNull((id - 100).toInt())?.cert,
+            overview = "The ferry runs late on the last crossing of the night, and one passenger on the car deck was never on the manifest.",
+            tmdbId = tmdbId(id),
+            updatedAtMs = System.currentTimeMillis() - (i + 1) * 3 * 3_600_000L,
+        )
+    }
 
     /** Episode IDs follow [season]'s (show × 1000 + season × 10 + episode), so a card opens its episode. */
     fun recentlyAired(now: Long) = listOf(
@@ -189,7 +241,7 @@ object FakeData {
             seasons = (1..seasonCount).map { n -> SeasonSummary(s.id * 100 + n, n, "Season $n", "", "${s.year!! + n - 1}-09-14", null, 8, 8, if (n < seasonCount) 8 else 4) },
             totalEpisodes = seasonCount * 8, episodesOnDisk = seasonCount * 8, totalSizeBytes = seasonCount * 8 * 2_400_000_000L,
             nextAirDate = if (s.watched) null else "2026-11-05", nextUp = NextUpFor(s, seasonCount),
-            cast = listOf(Person("Ines Varga", "Maren Holt", null), Person("Tomas Reyes", "Harbourmaster", null), Person("Adaeze Bell", "Wren", null)),
+            cast = showCast,
             contentRating = showRows.getOrNull((s.id - 100).toInt())?.cert,
             tmdbId = tmdbId(s.id),
         )
@@ -213,7 +265,7 @@ object FakeData {
             seasons = seasons, totalEpisodes = seasons.sumOf { it.episodeCount }, episodesOnDisk = seasons.sumOf { it.availableCount },
             totalSizeBytes = seasons.sumOf { it.availableCount } * 2_400_000_000L, nextAirDate = day(now, 2),
             nextUp = media.watchmy.client.model.NextUp(s.id * 1000 + 45, 4, 5, "The Long Dark", 9200 + s.id),
-            cast = listOf(Person("Ines Varga", "Maren Holt", null), Person("Tomas Reyes", "Harbourmaster", null)),
+            cast = showCast.take(2),
             contentRating = "TV-14", tmdbId = tmdbId(s.id), managedBy = "Sonarr",
         )
     }
@@ -315,6 +367,7 @@ object FakeData {
                 MediaVersion(
                     9400 + m.id, "${m.title} (${m.year}) - 2160p Remux.mkv", 61_000_000_000L, "MKV", "hevc", 3840, 2160, "Dolby Vision", "TrueHD 7.1 · English", (m.runtimeMin ?: 110) * 60_000L,
                     dvProfile = 8,
+                    addedAtMs = System.currentTimeMillis() - (m.id - 495) * 9 * 86_400_000L,
                     audio = listOf(
                         AudioOption(1, "English · TrueHD 7.1 (Default)", "eng", true),
                         AudioOption(2, "English · AC3 5.1", "eng", false),
@@ -330,12 +383,14 @@ object FakeData {
                 ),
                 MediaVersion(
                     9500 + m.id, "${m.title} (${m.year}) - 1080p.mp4", 9_800_000_000L, "MP4", "h264", 1920, 1080, null, "AAC 5.1 · English", (m.runtimeMin ?: 110) * 60_000L,
+                    addedAtMs = System.currentTimeMillis() - (m.id - 495) * 30 * 86_400_000L,
                     audio = listOf(AudioOption(1, "English · AAC 5.1 (Default)", "eng", true)),
                     subtitles = listOf(SubtitleOption("s2", "English", "eng", forced = false, burnInOnly = false, format = "TX3G")),
                 ),
             ),
-            cast = listOf(Person("Hollis Kade", "Captain Ruth Abernathy", null), Person("Mira Okonjo", "Dov", null)),
-            watch = m.progress?.let { WatchProgress((it * (m.runtimeMin ?: 100) * 60_000L).toLong(), (m.runtimeMin ?: 100) * 60_000L, false) },
+            cast = movieCast(m.id),
+            watch = m.progress?.let { WatchProgress((it * (m.runtimeMin ?: 100) * 60_000L).toLong(), (m.runtimeMin ?: 100) * 60_000L, false, System.currentTimeMillis() - 2 * 86_400_000L) }
+                ?: if (m.watched) WatchProgress(0, (m.runtimeMin ?: 100) * 60_000L, true, System.currentTimeMillis() - 12 * 86_400_000L) else null,
             contentRating = movieRows.getOrNull((m.id - 500).toInt())?.cert,
             tmdbId = tmdbId(m.id),
             trailers = trailers(m.id),

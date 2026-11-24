@@ -1,5 +1,6 @@
 package media.watchmy.client.tv.detail
 
+import media.watchmy.client.model.at
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Box
@@ -66,7 +67,7 @@ import media.watchmy.client.ui.ReportShown
 import media.watchmy.client.ui.components.WmmIcons
 
 /** Which of the show page's panels is open. */
-private enum class ShowPanel { None, More, Details, Tracks, Report, Replace, About }
+private enum class ShowPanel { None, More, Details, Tracks, Report, Replace, About, Copies }
 
 /**
  * One page for a show, its seasons and its episodes on TV.
@@ -92,9 +93,22 @@ fun ShowPageScreen(
     onNavigate: (Any) -> Unit = {},
     onOpenShow: (Long) -> Unit = {},
     onOpenMovie: (Long) -> Unit = {},
+    onOpenPerson: (media.watchmy.client.model.Person, from: String) -> Unit = { _, _ -> },
+    /** The registered server the show is on, opened in place; null is the one in use. */
+    serverId: String? = null,
+    onBack: () -> Unit = {},
 ) {
     val services = LocalAppServices.current
-    val vm = viewModel(key = "show-$showId") { ShowPageViewModel(services.library, showId, arrival, services.requests, follows = services.follows, saved = createSavedStateHandle(), watchlists = services.watchlists) }
+    val library = remember(serverId) { services.library.at(serverId) } ?: return TvScaffold(RailSection.Shows, onNavigate, sectionRoot = false) {
+        ErrorState(SIGNED_OUT_THERE, onBack, title = "Couldn't load this show")
+    }
+    val vm = viewModel(key = "show-$serverId-$showId") {
+        ShowPageViewModel(
+            library, showId, arrival, services.requests, follows = services.follows, saved = createSavedStateHandle(), watchlists = services.watchlists,
+            here = serverId, others = media.watchmy.client.presentation.servers.OtherServers(services.servers, services.library), choices = services.copyChoices,
+            plansOn = services.playback::plansOn,
+        )
+    }
     ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val memory = rememberFocusMemory()
@@ -115,15 +129,17 @@ fun ShowPageScreen(
             show == null || ep == null -> LoadingState()
             else -> {
                 PageContent(
-                    show, ep, state, vm, services.library, memory, play,
+                    show, ep, state, vm, library, memory, play,
                     onMore = {
                         moreFocus = null
                         panel = ShowPanel.More
                     },
                     onAsk = { asking = it },
                     onAboutMore = if (state.aboutFlags().hasMore) ({ panel = ShowPanel.About }) else null,
+                    onOpenPerson = { p -> onOpenPerson(p, show.title) },
+                    onChooser = { panel = ShowPanel.Copies },
                 ) {
-                    RelatedRows(state.related, services.library, memory, onOpenMovie, onOpenShow, Modifier.padding(top = 40.dp))
+                    RelatedRows(state.related, library, memory, onOpenMovie, onOpenShow, Modifier.padding(top = 40.dp))
                 }
                 LaunchedEffect(Unit) {
                     withFrameNanos { }
@@ -145,6 +161,19 @@ fun ShowPageScreen(
     }
     when (panel) {
         ShowPanel.None -> Unit
+        ShowPanel.Copies -> state.copies?.let { copies ->
+            CopiesPanel(
+                context,
+                copies,
+                note = copies.resumeNote(copies.all.firstOrNull()?.registeredId),
+                onChoose = { copy, v ->
+                    vm.choose(copy, v)
+                    panel = ShowPanel.None
+                    memory.focus("play")
+                },
+                onDismiss = { panel = ShowPanel.None },
+            )
+        }
         ShowPanel.More -> TitleMorePanel(
             context = context,
             rows = buildList {
@@ -257,6 +286,8 @@ private fun PageContent(
     onMore: () -> Unit,
     onAsk: (Int) -> Unit,
     onAboutMore: (() -> Unit)?,
+    onOpenPerson: (media.watchmy.client.model.Person) -> Unit,
+    onChooser: () -> Unit,
     related: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -288,7 +319,7 @@ private fun PageContent(
     CompositionLocalProvider(LocalBringIntoViewSpec provides spec) {
         Box(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(bottom = 64.dp)) {
-                Top(show, ep, state, vm, library, memory, { topButton.value = it }, play, onMore, onAsk)
+                Top(show, ep, state, vm, library, memory, { topButton.value = it }, play, onMore, onAsk, onChooser)
                 state.seasonBar()?.let { bar -> SeasonTabs(bar, vm, memory, { topButton.value }, episodeFocus, onAsk, Modifier.onFocusChanged { if (it.hasFocus) toTop() }) }
                 EpisodeRow(show, state, vm, library, memory, onOpen = backToPlay, Modifier.onFocusChanged {
                     rowFocused = it.hasFocus
@@ -296,7 +327,7 @@ private fun PageContent(
                 })
                 AboutPeek(show, rowFocused, Modifier.padding(top = 30.dp))
                 About(show, state.aboutFlags(), vm, library, memory, { aboutButton.value = it }, episodeFocus, onAboutMore, Modifier.padding(top = 140.dp))
-                CastRow(show.cast, library, memory, Modifier.padding(top = 40.dp).upTo(memory) { listOf(aboutButton.value) + AboutButtons })
+                CastRow(show.cast, library, memory, Modifier.padding(top = 40.dp).upTo(memory) { listOf(aboutButton.value) + AboutButtons }, onOpenPerson = onOpenPerson)
                 related()
             }
             ScrolledHeading(scroll, back = show.title) {

@@ -45,6 +45,9 @@ sealed interface DeepLink {
     /** Home, from the notification for the shows past the first five (`home`). */
     data object Home : DeepLink
 
+    /** [page] on the registered server [serverId], which another account here published: opened in place, without switching ([elsewhere]). */
+    data class OnServer(val serverId: String, val page: DeepLink) : DeepLink
+
     companion object {
         const val SCHEME = "watchmymedia"
 
@@ -129,6 +132,19 @@ sealed interface DeepLink {
          * an account that isn't signed in on this device. The app switches
          * to it before opening the link when it isn't the one in use.
          */
+        /**
+         * A link a launcher or notification published for another account
+         * signed in on this device: that server's id and what the link opens
+         * there, in place, without switching the app; a play link plays, as
+         * one published for the account in use does. Null for a link of the
+         * account in use, of no account here, or of one signed out here.
+         */
+        fun elsewhere(link: String?, saved: List<SavedServer>, currentId: String?): Pair<String, DeepLink>? {
+            val target = serverFor(link, saved)?.takeIf { it.signedIn && it.server.id != currentId } ?: return null
+            val page = parse(link) ?: return null
+            return target.server.id to page
+        }
+
         fun serverFor(link: String?, saved: List<SavedServer>): SavedServer? {
             val account = launcherAccount(link)?.takeIf { it.isNotEmpty() } ?: return null
             return saved.firstOrNull { it.linkAccount() == account }

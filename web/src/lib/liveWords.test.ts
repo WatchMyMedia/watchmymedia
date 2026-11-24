@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   behindWords, clashAlert, dayWords, groupRecordings, guideBoxMode, HD_BYTES_PER_HOUR, liveModeWords, livePlaybackWords, parseGuideView, parseVolume, primeTime,
   recordedWords, recordingEpisodeWords, roomWords, ruleWords, scheduleDays,
+  alsoOnWords, groupLine, hasWatchState, inRecordedChip, oneOffWords, recordedChips, recordingLeftWords, recordingPct, storageFacts,
 } from './liveWords'
 import type { components } from '../api/schema'
 
@@ -116,5 +117,65 @@ describe('Recordings', () => {
   it('words a rule, saying you for your own', () => {
     expect(ruleWords({ kind: 'series', newOnly: true, anyChannel: true, number: '9.1', keep: 5, userName: 'Sam' })).toBe('New episodes · any channel · keeps the latest 5 · set by Sam')
     expect(ruleWords({ kind: 'manual', newOnly: false, anyChannel: false, number: '2.1', keep: 0, userName: 'robin' }, 'Weekdays at 6:00 PM', 'robin')).toBe('Weekdays at 6:00 PM · 2.1 · set by you')
+  })
+})
+
+describe('what each person has watched of a recording', () => {
+  it('says where they are', () => {
+    expect(recordingLeftWords({ watched: true })).toBe('Watched')
+    expect(recordingLeftWords({ progress: { positionMs: 12 * 60_000, durationMs: 30 * 60_000 } })).toBe('18 min left')
+    expect(recordingLeftWords({ progress: { positionMs: 1, durationMs: 91 * 60_000 } })).toBe('1 h 31 min left')
+    expect(recordingLeftWords({})).toBe('')
+    expect(recordingPct({ progress: { positionMs: 12, durationMs: 30 } })).toBe(40)
+    expect(recordingPct({ watched: true, progress: { positionMs: 12, durationMs: 30 } })).toBe(0)
+    expect(recordingPct({})).toBe(0)
+  })
+
+  it('counts a group’s unwatched episodes when the server says', () => {
+    expect(groupLine([{ watched: true }, { watched: false }, { watched: false }], true)).toBe('3 episodes · 2 unwatched')
+    expect(groupLine([{ watched: true }], true)).toBe('1 episode · watched')
+    expect(groupLine([{ watched: true }, { watched: true }], true)).toBe('2 episodes · all watched')
+    expect(groupLine([{}, {}], false)).toBe('2 episodes')
+    expect(hasWatchState({ counts: {} })).toBe(true)
+    expect(hasWatchState({})).toBe(false)
+    expect(hasWatchState(undefined)).toBe(false)
+  })
+
+  it('sorts recordings into the chips', () => {
+    const film = rec({ id: 'f', kind: 'movie', year: 1949 })
+    const match = rec({ id: 'm', kind: 'show', categories: ['Sports', 'Football'], watched: true })
+    const episode = rec({ id: 'e', kind: 'episode', season: 2, episode: 7 })
+    expect(inRecordedChip(film, 'movies')).toBe(true)
+    expect(inRecordedChip(match, 'sports')).toBe(true)
+    expect(inRecordedChip(episode, 'shows')).toBe(true)
+    expect(inRecordedChip(film, 'shows')).toBe(false)
+    expect(inRecordedChip(match, 'unwatched')).toBe(false)
+    expect(recordedChips([film, match, episode], true)).toEqual([
+      { value: '', label: 'All' },
+      { value: 'unwatched', label: 'Unwatched', count: 2 },
+      { value: 'shows', label: 'Shows' },
+      { value: 'movies', label: 'Movies' },
+      { value: 'sports', label: 'Sports' },
+    ])
+    expect(recordedChips([rec({ id: 'x' })], false).map((c) => c.value)).toEqual([''])
+    expect(recordedChips([film], false).map((c) => c.value)).toEqual(['', 'movies'])
+  })
+
+  it('words a film and a one-off', () => {
+    expect(oneOffWords({ kind: 'movie', year: 1949, start: at(21, 20), end: at(21, 21, 31) })).toBe('Movie · 1949 · 1 h 31 min')
+    expect(oneOffWords({ kind: 'show', categories: ['Documentary'], start: at(19, 20), end: at(19, 20, 52) })).toBe('Documentary · 52 min')
+  })
+
+  it('says when a repeat is on again', () => {
+    expect(alsoOnWords({ channelId: 'c', channelName: 'Meadow News', number: '7.1', programmeId: 'p', start: new Date(2026, 10, 26, 2).toISOString() }, now, 'en-US')).toBe('Also on Thu 2:00 AM on 7.1')
+    expect(alsoOnWords({ channelId: 'c', channelName: 'Meadow News', number: '7.1', programmeId: 'p', start: new Date(2026, 10, 24, 22).toISOString() }, now, 'en-US')).toBe('Also on tonight 10:00 PM on 7.1')
+    expect(alsoOnWords(undefined, now)).toBe('')
+  })
+
+  it('works out the storage the recorder can use', () => {
+    const counts = { recorded: { items: 46, bytes: 1.1e12 }, now: { items: 1, bytes: 0 }, upcoming: { items: 7, bytes: 0 }, series: { items: 3, bytes: 0 }, conflicts: { items: 0, bytes: 0 } }
+    expect(storageFacts({ freeBytes: 412e9, totalBytes: 1.8e12, reserveBytes: 12e9, counts })).toEqual({ usable: 400e9, usedPct: 77, recordings: { items: 46, bytes: 1.1e12 } })
+    expect(storageFacts({ freeBytes: 5e9, reserveBytes: 10e9 })).toEqual({ usable: 0, usedPct: undefined, recordings: undefined })
+    expect(storageFacts(undefined)).toEqual({})
   })
 })

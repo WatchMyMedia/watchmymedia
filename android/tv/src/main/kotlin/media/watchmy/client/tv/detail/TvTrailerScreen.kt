@@ -489,7 +489,8 @@ private fun TrailerPaused(
                     for (t in others) {
                         MediaCard(
                             title = t.name,
-                            subtitle = null,
+                            // The server says which are teasers; a name that says so already isn't told twice.
+                            subtitle = (if (t.teaser) "Teaser" else null)?.takeUnless { t.name.contains(it, ignoreCase = true) },
                             imageUrl = null,
                             artWidth = WideCardWidth,
                             artHeight = WideCardHeight,

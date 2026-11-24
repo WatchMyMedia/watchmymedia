@@ -40,6 +40,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param lastIp
  * @param lastSeenAt
  * @param plays
+ * @param network The network lastIp is on: local (at home), tailnet or remote. Absent without an address (API level 34).
  */
 @Serializable
 
@@ -58,7 +59,11 @@ data class ActivityDeviceSummary (
     val lastSeenAt: kotlin.String,
 
     @SerialName(value = "plays")
-    val plays: kotlin.Long
+    val plays: kotlin.Long,
+
+    /* The network lastIp is on: local (at home), tailnet or remote. Absent without an address (API level 34). */
+    @SerialName(value = "network")
+    val network: kotlin.String? = null
 
 ) {
 

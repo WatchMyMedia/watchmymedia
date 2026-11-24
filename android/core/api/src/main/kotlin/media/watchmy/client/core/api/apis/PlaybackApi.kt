@@ -36,6 +36,8 @@ import media.watchmy.client.core.api.models.ErrorModel
 import media.watchmy.client.core.api.models.PlanInputBody
 import media.watchmy.client.core.api.models.PlanList
 import media.watchmy.client.core.api.models.Request
+import media.watchmy.client.core.api.models.ShowTracks
+import media.watchmy.client.core.api.models.ShowTracksInputBody
 import media.watchmy.client.core.api.models.SubtitleSearch
 import media.watchmy.client.core.api.models.SubtitleTrack
 import media.watchmy.client.core.api.models.Trickplay
@@ -289,6 +291,77 @@ open class PlaybackApi(basePath: kotlin.String = defaultBasePath, client: Call.F
         return RequestConfig(
             method = RequestMethod.POST,
             path = "/api/files/{id}/subtitles/download".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * DELETE /api/shows/{id}/tracks
+     * Forget the sound and subtitles remembered for a show
+     * Its episodes start on the person&#39;s own languages again. From API level 34.
+     * @param id Show ID.
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    suspend fun forgetShowTracks(id: kotlin.Long) : Unit = withContext(Dispatchers.IO) {
+        val localVarResponse = forgetShowTracksWithHttpInfo(id = id)
+
+        return@withContext when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /api/shows/{id}/tracks
+     * Forget the sound and subtitles remembered for a show
+     * Its episodes start on the person&#39;s own languages again. From API level 34.
+     * @param id Show ID.
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    suspend fun forgetShowTracksWithHttpInfo(id: kotlin.Long) : ApiResponse<Unit?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = forgetShowTracksRequestConfig(id = id)
+
+        return@withContext request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation forgetShowTracks
+     *
+     * @param id Show ID.
+     * @return RequestConfig
+     */
+    fun forgetShowTracksRequestConfig(id: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/problem+json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/api/shows/{id}/tracks".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = false,
@@ -587,6 +660,83 @@ open class PlaybackApi(basePath: kotlin.String = defaultBasePath, client: Call.F
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/api/files/{id}/subtitles/search".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PUT /api/shows/{id}/tracks
+     * Remember the sound and subtitles the signed-in person picked for a show
+     * Apps send it when the person picks a track in the player during one of the show&#39;s episodes, so the next episodes start the same way. Kept by the show&#39;s TMDB id, for every library&#39;s copy. Fields left out keep their values. From API level 34.
+     * @param id Show ID.
+     * @param showTracksInputBody 
+     * @return ShowTracks
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    suspend fun setShowTracks(id: kotlin.Long, showTracksInputBody: ShowTracksInputBody) : ShowTracks = withContext(Dispatchers.IO) {
+        val localVarResponse = setShowTracksWithHttpInfo(id = id, showTracksInputBody = showTracksInputBody)
+
+        return@withContext when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ShowTracks
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /api/shows/{id}/tracks
+     * Remember the sound and subtitles the signed-in person picked for a show
+     * Apps send it when the person picks a track in the player during one of the show&#39;s episodes, so the next episodes start the same way. Kept by the show&#39;s TMDB id, for every library&#39;s copy. Fields left out keep their values. From API level 34.
+     * @param id Show ID.
+     * @param showTracksInputBody 
+     * @return ApiResponse<ShowTracks?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    suspend fun setShowTracksWithHttpInfo(id: kotlin.Long, showTracksInputBody: ShowTracksInputBody) : ApiResponse<ShowTracks?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = setShowTracksRequestConfig(id = id, showTracksInputBody = showTracksInputBody)
+
+        return@withContext request<ShowTracksInputBody, ShowTracks>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation setShowTracks
+     *
+     * @param id Show ID.
+     * @param showTracksInputBody 
+     * @return RequestConfig
+     */
+    fun setShowTracksRequestConfig(id: kotlin.Long, showTracksInputBody: ShowTracksInputBody) : RequestConfig<ShowTracksInputBody> {
+        val localVariableBody = showTracksInputBody
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json, application/problem+json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/api/shows/{id}/tracks".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = false,

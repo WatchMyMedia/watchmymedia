@@ -1,13 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQueries, useQuery } from '@tanstack/react-query'
+import { unwrap } from '../../../src/api/client'
+import { askAt34 } from '../../session/peerRegistry'
+import { chosenCopies, titleKey } from '../../session/chosenCopies'
+import { serverHeading } from '../details/copies'
+import { COPY_MS, useSlow, within } from '../details/useCopies'
+import { MERGED_ROWS, mergeHomeRows, notOnHome, oneCardWords, rowOrder, stillAskingHome, withHere, type PeerHome, type TaggedContinue } from './oneCardHome'
+import { movieCopiesQuery, showCopiesQuery } from '../../../src/api/copies'
+import { bareName } from '../search/crossSearch'
 import type { components } from '../../../src/api/schema'
 import { homeQuery, librariesQuery, liveTVCapabilitiesQuery, liveTVChannelsQuery } from '../../../src/api/queries'
 import type { LiveChannel } from '../../../src/api/liveTV'
 import { showListings } from '../../../src/lib/liveGuide'
 import type { ScreenRow } from '../../../src/lib/screenRows'
 import { scopeName } from '../../app/focus'
-import { useBack, useEntry, useFocus, useKeys, useMediaUrls, useNav, useSession } from '../../app/hooks'
+import { useBack, useEntry, useFocus, useKeys, useLevel34, useMediaFor, useMediaUrls, useNav, usePeers, useSession } from '../../app/hooks'
 import { Button } from '../../ui/Button'
 import { Icon } from '../../ui/Icon'
 import { ProblemScreen, Skeleton, SkeletonRow, SkeletonText } from '../../ui/States'
@@ -21,7 +29,7 @@ import {
   type HomeData, type HomePage,
 } from './homePages'
 import { episodeCode, seeAllRoute, type RowCard, type RowContext } from './rowCards'
-import { toneStyle, useFocusOnArrival, useRowCards } from './browseHooks'
+import { toneStyle, useCardActions, useFocusOnArrival, useRowCards } from './browseHooks'
 import { Glyph, RowView } from './RowView'
 import { useWatchlistsOn } from '../watchlists/useWatchlistsOn'
 import { useApp } from '../../app/hooks'
@@ -103,17 +111,27 @@ function PickHero({ hero, rows }: { hero: Hero; rows: readonly ScreenRow[] }) {
  * how much is left and when it would end, with Resume focused, Start over,
  * and the show's episodes or the movie's page.
  */
-function ResumeHero({ item }: { item: ContinueItem }) {
+function ResumeHero({ item }: { item: TaggedContinue }) {
   const nav = useNav()
-  const media = useMediaUrls()
+  const media = useMediaFor()(item.oneCard?.server.id)
+  const { run } = useCardActions()
+  // Hold OK on Resume opens the card's actions, as it does on the row's cards (API level 34).
+  const menu = useLevel34() ? () => run({ kind: 'continueMenu', item }) : undefined
   const now = useNow()
-  const line = resumeLine(item)
+  // "2026 · from Cabin": the hero says when Resume plays another server's copy, or a title only it has.
+  const line = [resumeLine(item), oneCardWords(item.oneCard, bareName) ?? ''].filter(Boolean).join(' · ')
   const left = Math.max(0, item.durationMs - item.positionMs)
   const fraction = item.durationMs ? Math.min(1, item.positionMs / item.durationMs) : 0
   const picture = item.backdropPath ?? item.stillPath
-  const request = { kind: 'file' as const, fileId: item.fileId, title: item.title, subtitle: line || undefined, backdropPath: picture }
-  const open = item.showId ? { label: 'Episodes', route: { name: 'show' as const, id: item.showId, episodeId: item.episodeId } }
-    : item.movieId ? { label: 'More info', route: { name: 'movie' as const, id: item.movieId } } : undefined
+  // From another server: Resume plays from there, and a title only it has opens in place.
+  const from = item.oneCard ? { server: item.oneCard.server.id } : {}
+  const only = item.oneCard?.where === 'only' ? from : {}
+  const request = { kind: 'file' as const, fileId: item.fileId, title: item.title, subtitle: resumeLine(item) || undefined, backdropPath: picture, ...from }
+  const here = item.oneCard?.here
+  const open = here?.showId ? { label: 'Episodes', route: { name: 'show' as const, id: here.showId } }
+    : here?.movieId ? { label: 'More info', route: { name: 'movie' as const, id: here.movieId } }
+      : item.showId ? { label: 'Episodes', route: { name: 'show' as const, id: item.showId, episodeId: item.episodeId, ...only } }
+        : item.movieId ? { label: 'More info', route: { name: 'movie' as const, id: item.movieId, ...only } } : undefined
   return <>
     <Backdrop url={media.imageUrl(picture, 'w1280')} seed={item.title}/>
     <section className="home-hero" aria-label="Pick up where you left off">
@@ -125,7 +143,7 @@ function ResumeHero({ item }: { item: ContinueItem }) {
         <b>{leftWords(left)}</b><span className="tv-muted">{endsAtWords(now, left)}</span>
       </div>}
       <div className="tv-actions home-hero__actions" data-group="home/hero">
-        <Button id={HERO_PLAY} variant="primary" icon="play" autoFocus onPress={() => nav.play({ ...request, startMs: item.positionMs })}>Resume</Button>
+        <Button id={HERO_PLAY} variant="primary" icon="play" autoFocus onPress={() => nav.play({ ...request, startMs: item.positionMs })} onHold={menu}>Resume</Button>
         <Button id={HERO_RESTART} variant="glass" onPress={() => nav.play({ ...request, startMs: 0 })}>Start over</Button>
         {open && <Button id={HERO_OPEN} variant="glass" onPress={() => nav.push(open.route)}>{open.label}</Button>}
       </div>
@@ -210,7 +228,7 @@ const PAGE_MS = 320
  * only the one showing takes focus. Return from a row page goes to the
  * first page, and from there to the shell's Leave WatchMyMedia?.
  */
-function HomePager({ home, resume, rows, base }: { home: HomeData; resume?: ContinueItem; rows: readonly ScreenRow[]; base: Omit<RowContext, 'now'> }) {
+function HomePager({ home, resume, rows, base, onShown }: { home: HomeData; resume?: ContinueItem; rows: readonly ScreenRow[]; base: Omit<RowContext, 'now'>; onShown?: (row: ScreenRow | undefined) => void }) {
   const entry = useEntry()
   const focus = useFocus()
   const root = useRef<HTMLDivElement>(null)
@@ -273,6 +291,16 @@ function HomePager({ home, resume, rows, base }: { home: HomeData; resume?: Cont
     const timer = setTimeout(() => setJump(false), PAGE_MS)
     return () => clearTimeout(timer)
   }, [jump])
+  // Another server answering late can change Home's pages (its Continue watching brings a row back under the hero):
+  // when the card that had focus went with them, focus goes to the page Home is on.
+  useEffect(() => {
+    if (document.activeElement && document.activeElement !== document.body) return
+    focusPage(index)
+  }, [pages, index, focusPage])
+  // The row on screen keeps its order from now on: another server's late cards join its end.
+  const shown = pages[index]
+  const shownRow = shown && shown.kind !== 'end' ? shown.row : undefined
+  useEffect(() => { onShown?.(shownRow) }, [onShown, shownRow])
 
   const listings = base.listings
   const drawn = pages.map((page, i) => ({ page, i })).filter(({ i }) => Math.abs(i - index) <= 1)
@@ -337,22 +365,98 @@ function EmptyHome({ libraries, liveTV, onRetry }: { libraries: components['sche
  * Edit rows last; Live TV's row where the person put it. Rows refresh as
  * the server's events invalidate Home.
  */
+/**
+ * Every other signed-in server's Home, for one card across servers (API
+ * level 34): asked at once, each through its own client after the identity
+ * check, with search's 4 s; a server below level 34 is left out without a
+ * word. Its states end the merged rows: still asking, or Try again.
+ */
+function usePeerHomes(on: boolean) {
+  const peers = usePeers()
+  const asked = on ? peers : []
+  const results = useQueries({
+    queries: asked.map((peer) => ({
+      queryKey: ['peer', peer.id, 'home', 'arranged'],
+      queryFn: async ({ signal }: { signal: AbortSignal }) =>
+        (await within(COPY_MS, signal, (s) => askAt34(peer, s, async (api, s2) => unwrap(await api.GET('/api/home', { params: { query: { arranged: true } }, signal: s2 }))))) ?? null,
+      retry: false,
+      staleTime: 30_000,
+    })),
+  })
+  const homes: PeerHome[] = asked.flatMap((peer, i) => (results[i]?.data ? [{ server: { id: peer.id, name: peer.name }, home: results[i].data! }] : []))
+  const slow = useSlow(asked.filter((_, i) => results[i]?.isPending).map((p) => serverHeading(p.name)))
+  const failed = asked.flatMap((peer, i) => (results[i]?.isError ? [{ id: peer.id, name: serverHeading(peer.name) }] : []))
+  const retry = (id: string) => {
+    const i = asked.findIndex((p) => p.id === id)
+    if (i < 0) return
+    asked[i].forget()
+    void results[i].refetch()
+  }
+  return { homes, slow, failed, retry }
+}
+
 export function HomeScreen() {
   const home = useQuery(homeQuery)
   const libraries = useQuery(librariesQuery)
   const live = useLive()
+  const session = useSession()
   const libs = libraries.data?.items
   const menu = useWatchlistsOn()
+  const continueMenu = useLevel34()
+  const others = usePeerHomes(continueMenu)
+  const { slow, failed } = others
   const base = useMemo<Omit<RowContext, 'now'>>(() => {
     const refs = libs ?? []
     return {
-      libraries: refs, channels: live.channels, listings: live.listings, menu,
+      libraries: refs, channels: live.channels, listings: live.listings, menu, continueMenu,
       seeAll: (target, row) => { const route = seeAllRoute(target, row, refs); return route && { kind: 'open', route } },
+      // Every row filled from every server ends with who is still being asked, or who didn't answer.
+      tail: (row) => !MERGED_ROWS.has(row.id) ? [] : [
+        ...(slow.length ? [{ key: 'wait', variant: row.style === 'poster' ? 'poster' as const : 'wide' as const, title: '', tile: { kind: 'wait' as const, text: stillAskingHome(slow) } }] : []),
+        ...failed.map((f) => ({ key: `retry-${f.id}`, variant: row.style === 'poster' ? 'poster' as const : 'wide' as const, title: '', label: notOnHome(f.name),
+          tile: { kind: 'retry' as const, text: notOnHome(f.name) }, press: { kind: 'retryServer' as const, id: f.id } })),
+      ],
     }
-  }, [libs, live.channels, live.listings, menu])
-  const rows = useMemo(() => (home.data ? homeScreenRows(home.data, live.channels.length > 0) : []), [home.data, live.channels.length])
+  }, [libs, live.channels, live.listings, menu, continueMenu, slow, failed])
+  const own = useMemo(() => (home.data ? homeScreenRows(home.data, live.channels.length > 0) : []), [home.data, live.channels.length])
+  // Rows on screen keep their order (`frozen`), so a server that answers late adds to their ends.
+  const [frozen, setFrozen] = useState<ReadonlyMap<string, string[]>>(() => new Map())
+  const currentId = session.server.id
+  const merged = useMemo(() => mergeHomeRows(own, currentId, others.homes, frozen, (c) => {
+    if (!c.tmdbId) return undefined
+    return chosenCopies().get(c.kind === 'movie' ? titleKey({ kind: 'movie', tmdbId: c.tmdbId }) : titleKey({ kind: 'episode', showTmdbId: c.tmdbId, season: c.seasonNumber ?? 0, episode: c.episodeNumber ?? 0 }))
+  }), [own, currentId, others.homes, frozen])
+  // A Continue watching title only another server's row has may be in this server's library too: asked by its TMDB id,
+  // it says "from Boathouse" and its page is this server's own.
+  const elsewhere = ((merged.find((r) => r.style === 'continue')?.continue ?? []) as TaggedContinue[]).filter((c) => c.oneCard?.where === 'only' && c.tmdbId)
+  const ownCopies = useQueries({ queries: elsewhere.map((c) => (c.kind === 'movie' ? movieCopiesQuery(c.tmdbId!) : showCopiesQuery(c.tmdbId!))) })
+  const hereKey = ownCopies.map((q) => q.data?.items[0]?.id ?? (q.isPending ? 'p' : '-')).join(',')
+  const rows = useMemo(() => merged.map((r) => (r.style !== 'continue' ? r : {
+    ...r, continue: withHere(r.continue ?? [], (c) => {
+      const at = elsewhere.findIndex((x) => x === c)
+      const id = at >= 0 ? ownCopies[at]?.data?.items[0]?.id : undefined
+      return id === undefined ? undefined : c.kind === 'movie' ? { movieId: id } : { showId: id }
+    }),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  })), [merged, hereKey])
+  const onShown = useCallback((row: ScreenRow | undefined) => {
+    const continued = rows.find((r) => r.style === 'continue')
+    const add = [row, continued].flatMap((r) => {
+      if (!r || frozen.has(r.id)) return []
+      const order = rowOrder(rows.find((x) => x.id === r.id) ?? r, currentId)
+      return order ? [[r.id, order] as const] : []
+    })
+    if (add.length) setFrozen((was) => new Map([...was, ...add]))
+  }, [rows, currentId, frozen])
 
   const resume = useMemo(() => resumeHero(rows), [rows])
+  // Try again leaves the row while the server is asked again: focus goes to the card before it first.
+  const focus = useFocus()
+  const retryServer = (id: string) => {
+    const before = (document.activeElement as HTMLElement | null)?.closest('[data-index]')?.previousElementSibling?.querySelector<HTMLElement>('[data-focus]')
+    if (before) focus.focus(before)
+    others.retry(id)
+  }
   const body = (() => {
     if (home.isPending || libraries.isPending || live.pending) return <HomeSkeleton/>
     if (home.isError) {
@@ -360,7 +464,7 @@ export function HomeScreen() {
       return <ProblemScreen title={`Couldn’t load Home. ${words.title}`} actions={[{ id: 'home/retry', label: 'Try again', onPress: () => void home.refetch() }]}>{words.body}</ProblemScreen>
     }
     if (homeIsEmpty(home.data, rows)) return <EmptyHome libraries={libs} liveTV={live.channels.length > 0} onRetry={() => { void home.refetch(); void libraries.refetch() }}/>
-    return <CardActions><HomePager home={home.data} resume={resume?.item} rows={resume?.rows ?? rows} base={base}/></CardActions>
+    return <CardActions onRetry={retryServer}><HomePager home={home.data} resume={resume?.item} rows={resume?.rows ?? rows} base={base} onShown={onShown}/></CardActions>
   })()
   return <>{body}<Clock/></>
 }

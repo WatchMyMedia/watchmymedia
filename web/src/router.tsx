@@ -1,6 +1,6 @@
 import { createRootRouteWithContext, createRoute, createRouter, lazyRouteComponent, redirect, type RouteComponent } from '@tanstack/react-router'
 import type { QueryClient } from '@tanstack/react-query'
-import { homeQuery, mediaListQuery, movieQuery, seasonQuery, showQuery } from './api/queries'
+import { homeQuery, mediaListQuery, movieQuery, personQuery, seasonQuery, showQuery } from './api/queries'
 import { Layout } from './Layout'
 import { Home } from './pages/Home'
 import { LibraryBrowse } from './pages/LibraryBrowse'
@@ -21,6 +21,7 @@ const LivePlayer = lazyRouteComponent(() => import('./pages/LivePlayer'), 'LiveP
 const LiveTVSettings = lazyRouteComponent(() => import('./pages/settings/LiveTV'), 'LiveTVSettings')
 const Player = lazyRouteComponent(() => import('./pages/Player'), 'Player')
 const TrailerPage = lazyRouteComponent(() => import('./pages/Trailer'), 'TrailerPage')
+const PersonPage = lazyRouteComponent(() => import('./pages/Person'), 'Person')
 const SettingsLayout = lazyRouteComponent(() => import('./pages/settings/SettingsLayout'), 'SettingsLayout')
 const PlaybackSettings = lazyRouteComponent(() => import('./pages/settings/Playback'), 'PlaybackSettings')
 const AccountSettings = lazyRouteComponent(() => import('./pages/settings/Account'), 'AccountSettings')
@@ -227,6 +228,17 @@ const movieRoute = createRoute({
   },
 })
 
+// A person from a title's cast: their movies and shows in the library.
+const personRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/people/$personId',
+  loader: ({ context, params }) => void context.queryClient.prefetchQuery(personQuery(Number(params.personId))),
+  component: rendering(function PersonRoute() {
+    const { personId } = personRoute.useParams()
+    return <PersonPage personId={Number(personId)} />
+  }, PersonPage),
+})
+
 // A movie's YouTube trailer, full screen like the player.
 // A trailer file plays in the player instead.
 const trailerRoute = createRoute({
@@ -421,6 +433,7 @@ const routeTree = rootRoute.addChildren([
   editListRoute,
   libraryFilesRoute,
   movieRoute,
+  personRoute,
   trailerRoute,
   showRoute,
   seasonRoute,

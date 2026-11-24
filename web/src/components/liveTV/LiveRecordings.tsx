@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { liveTVRecordingQuery } from '../../api/queries'
 import { useCanRecord, useRecordingMutation } from './useRecordings'
 import { Link } from '@tanstack/react-router'
+import { alsoOnWords } from '../../lib/liveWords'
+import { useNow } from '../useNow'
 import { Dialog } from '../Dialog'
 import { textInput } from '../SettingsPanel'
 import { primaryAction, secondaryAction } from './LiveReminders'
@@ -58,6 +60,7 @@ export function RecordControls({ programme: p, now }: { programme: LiveProgramme
  */
 export function ClashDialog({ recording, onClose }: { recording: Recording; onClose: () => void }) {
   const [r, setRecording] = useState(recording)
+  const now = useNow()
   const holders = r.conflictsWith ?? []
   const [pick, setPick] = useState(() => firstGivesWay(holders))
   const prefer = useRecordingMutation(preferRecording)
@@ -86,6 +89,7 @@ export function ClashDialog({ recording, onClose }: { recording: Recording; onCl
           <span className="block break-words text-[15px] font-semibold">{h.title}</span>
           <span className="block text-[13px] tabular-nums text-neutral-400">{h.number} {h.channelName} · {timeRange(Date.parse(h.start), Date.parse(h.end))} · Set by {h.userName}</span>
           {h.running && <span className="block text-[13px] font-semibold text-red-300">Recording now</span>}
+          {!h.running && h.repeat && h.nextAiring && <span className="block text-[13px] text-neutral-300">A repeat. {alsoOnWords(h.nextAiring, now)}, so it could record then.</span>}
         </span>
       </label>)}
     </fieldset>

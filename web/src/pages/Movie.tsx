@@ -25,6 +25,8 @@ import { firstTrailer } from '../lib/trailers'
 import { watchlistTitle } from '../lib/watchlists'
 import { planWords, playChoices, sizeAndRate, versionName, yourPlace } from '../lib/titlePage'
 import { scoreWords } from '../lib/cardFacts'
+import { crewLine } from '../lib/personPage'
+import { collectionPartWords } from '../lib/collections'
 import { WatchlistButton } from '../components/watchlists/WatchlistButton'
 
 type MovieDetail = components['schemas']['MovieDetail']
@@ -70,6 +72,7 @@ function MovieView({ m }: { m: MovieDetail }) {
   const left = partway && watch ? leftAndEnds(watch.positionMs, durationMs, now) : undefined
   const pct = partway && watch ? percentWatched(watch.positionMs, durationMs) : 0
   const plan = selected ? planWords(plans.get(selected.id), selected) : undefined
+  const crew = crewLine(m.crew)
   const runtime = formatRuntime(m.runtimeMin ?? 0) || (selected?.durationMs ? formatRuntime(Math.round(selected.durationMs / 60_000)) : '')
 
   const pickVersion = (id: number) => {
@@ -186,8 +189,8 @@ function MovieView({ m }: { m: MovieDetail }) {
 
       <div className="flex flex-wrap items-start gap-x-12 gap-y-2">
         <div className="flex min-w-0 flex-[999_1_620px] flex-col gap-8 pt-7 md:gap-10">
-          <PeopleRow people={m.credits} />
-          <RelatedRows kind="movie" id={m.id} />
+          <PeopleRow people={m.credits} heading={crew ? 'Cast and crew' : 'Cast'} note={crew} />
+          <RelatedRows kind="movie" id={m.id} notes={{ collection: collectionPartWords(m.collection) }} />
         </div>
         <aside className="mt-7 flex min-w-0 flex-[1_1_300px] flex-col gap-4">
           <WatchedHere movie={m.id} you={yourPlace(watch)} />

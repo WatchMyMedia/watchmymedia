@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { components } from '../../../src/api/schema'
-import { ASK_AGAIN_MS, CrossSearch, CURRENT, mergeResults, noneAnswered, resultKey, searchLines, SERVER_MS, SLOW_MS, type Asked, type Part } from './crossSearch'
+import { ASK_AGAIN_MS, bareName, CrossSearch, CURRENT, mergeResults, namesLine, noneAnswered, resultKey, searchLines, SERVER_MS, serversLine, SLOW_MS, type Asked, type Part, type Tagged } from './crossSearch'
 import { askingAgain, didNotAnswer, emptyWords, leftOutLine, noMatchWords, stillAsking } from './searchResults'
 
 type Results = components['schemas']['SearchResults']
@@ -200,5 +200,39 @@ describe('search across servers', () => {
     expect(askingAgain('Den server')).toBe('Asking Den server again…')
     expect(leftOutLine('Den server', 'signedOut')).toBe('You’re signed out of Den server here, so its titles aren’t listed.')
     expect(leftOutLine('Den server', 'tooOld')).toBe('Den server is too old for this app, so its titles aren’t listed.')
+  })
+})
+
+describe('one card across servers in the results (API level 34)', () => {
+  const movie = (id: number, tmdbId: number, title: string) => ({ id, tmdbId, title, libraryId: 1, overview: '', genres: [], fileCount: 1, credits: [] })
+  const show = (id: number, tmdbId: number, title: string) => ({ id, tmdbId, title, libraryId: 2, overview: '', genres: [], episodeCount: 8, credits: [] })
+  const episode = (id: number, showTmdbId: number | undefined, n: number) => ({ id, showId: 1, showTitle: 'Harbor Lights', showTmdbId, seasonNumber: 2, number: n, title: `E${n}`, fileId: id * 10 })
+  const here = { movies: [movie(1, 50, 'Ninety Fathoms')], shows: [show(2, 60, 'Harbor Lights')], episodes: [episode(3, 60, 4)] }
+  const cabin: Part = { id: 'cabin', name: 'Cabin', state: 'done', slow: false, results: {
+    movies: [movie(11, 50, 'Ninety Fathoms'), movie(12, 59, 'The Harbor Choir')], shows: [show(13, 60, 'Harbor Lights')], episodes: [episode(14, 60, 4), episode(15, 60, 5)],
+  } }
+  const den: Part = { id: 'den', name: 'Den server', state: 'done', slow: false, results: { movies: [movie(21, 59, 'The Harbor Choir')], shows: [], episodes: [] } }
+
+  it('lists a title on several servers once, drawn from the first that has it, and names the others', () => {
+    const m = mergeResults(here, true, [cabin, den], true)
+    expect(m.movies.map((t) => [t.item.id, t.server?.id, t.also?.map((s) => s.id)])).toEqual([[1, undefined, ['cabin']], [12, 'cabin', ['den']]])
+    expect(m.shows.map((t) => [t.item.id, t.also?.map((s) => s.id)])).toEqual([[2, ['cabin']]])
+    expect(m.episodes.map((t) => [t.item.id, t.server?.id, t.also?.map((s) => s.id)])).toEqual([[3, undefined, ['cabin']], [15, 'cabin', undefined]])
+    expect(serversLine(m.movies[0], 'Home')).toBe('On Home and Cabin')
+    expect(serversLine(m.movies[1], 'Home')).toBe('On Cabin and Den')
+    expect(serversLine(m.episodes[1], 'Home')).toBe('Cabin')
+    expect(serversLine({ item: 1 } as Tagged<number>, 'Home')).toBeUndefined()
+  })
+
+  it('keeps every server’s titles apart below level 34, as before, and never merges a title without a TMDB id', () => {
+    expect(mergeResults(here, true, [cabin], false).movies).toHaveLength(3)
+    const noId = { ...cabin, results: { movies: [], shows: [], episodes: [episode(16, undefined, 4)] } }
+    expect(mergeResults(here, true, [noId], true).episodes).toHaveLength(2)
+  })
+
+  it('names servers without "server" on a card', () => {
+    expect(bareName('Home server')).toBe('Home')
+    expect(bareName('Cabin')).toBe('Cabin')
+    expect(namesLine(['Home', 'Cabin', 'Den'])).toBe('Home, Cabin and Den')
   })
 })

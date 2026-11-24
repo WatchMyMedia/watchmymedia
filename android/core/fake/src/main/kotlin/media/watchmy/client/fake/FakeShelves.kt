@@ -76,9 +76,10 @@ internal object LivingRoomShelf : FakeShelf {
 /**
  * The Cabin server's library: a few shows and movies of its own (every
  * title is fictional), with ids no other fake server uses (shows from 700,
- * movies from 800, files from 7000). Harbor Nights and Dead Reckoning Bay
- * are also on the Living room server, so a search of both lists a title
- * twice; the rest are only here.
+ * movies from 800, files from 7000). Harbor Lights, Ninety Fathoms and Dead
+ * Reckoning Bay are also on the Living room server, with its TMDB ids
+ * ([tmdbId]), so a device signed in to both shows each as one card; the
+ * rest are only here.
  */
 object FakeCabin {
     private const val DAY = 86_400_000L
@@ -89,6 +90,8 @@ object FakeCabin {
         genres = listOf("Drama"), rating = 7.2 + i / 10.0, posterPath = null, backdropPath = null, quality = quality, hdr = false,
         isNew = isNew, subtitle = "$year · $seasons season${if (seasons > 1) "s" else ""}", watched = false,
         progress = progress, episodeCount = seasons * 6, runtimeMin = null, releaseDate = null,
+        tmdbId = tmdbId(700L + i), contentRating = "TV-PG", seasonCount = seasons, unwatchedCount = seasons * 6 - 2,
+        addedAtMs = System.currentTimeMillis() - (i * 11 + 4) * 3_600_000L,
     )
 
     private fun movie(i: Int, title: String, year: Int, runtime: Int, quality: String = "1080p", progress: Float? = null) = BrowseItem(
@@ -97,7 +100,29 @@ object FakeCabin {
         genres = listOf("Drama"), rating = 6.8 + i / 10.0, posterPath = null, backdropPath = null, quality = quality, hdr = false,
         isNew = i == 0, subtitle = null, watched = false, progress = progress, episodeCount = null,
         runtimeMin = runtime, releaseDate = "$year-0${1 + i % 9}-12",
+        tmdbId = tmdbId(800L + i), contentRating = "PG", addedAtMs = System.currentTimeMillis() - (i * 13 + 2) * 3_600_000L,
     )
+
+    /**
+     * The TMDB ids of this server's titles: Harbor Lights, Ninety Fathoms and
+     * Dead Reckoning Bay are the Living room server's titles too, so they are
+     * one card on a device signed in to both; the rest are this server's alone.
+     */
+    fun tmdbId(id: Long): Long = when (id) {
+        HARBOR_LIGHTS -> FakeData.tmdbId(100)
+        NINETY_FATHOMS -> FakeData.tmdbId(FakeData.NINETY_FATHOMS)
+        DEAD_RECKONING_BAY -> FakeData.tmdbId(500)
+        else -> 70_000 + id
+    }
+
+    /** Harbor Lights on this server, which the Living room server has too. */
+    const val HARBOR_LIGHTS = 706L
+
+    /** Ninety Fathoms on this server, where Sam got further than on the Living room server. */
+    const val NINETY_FATHOMS = 806L
+
+    /** Dead Reckoning Bay on this server. */
+    const val DEAD_RECKONING_BAY = 802L
 
     val shows: List<BrowseItem> = listOf(
         show(0, "Harbour Run", 2019, 2, isNew = true),
@@ -106,6 +131,7 @@ object FakeCabin {
         show(3, "The Woodstove Tapes", 2022, 1, quality = "720p"),
         show(4, "Pine Ledger", 2024, 1, progress = .40f),
         show(5, "Snowline", 2018, 3, progress = .75f),
+        show(6, "Harbor Lights", 2022, 3, quality = "4K"),
     )
 
     val movies: List<BrowseItem> = listOf(
@@ -115,6 +141,7 @@ object FakeCabin {
         movie(3, "Kettle Pond", 2021, 96),
         movie(4, "The Portage Club", 2019, 101),
         movie(5, "Tidewater Road", 2022, 118),
+        movie(6, "Ninety Fathoms", 2026, 112, progress = .75f),
     )
 
     /** Harbour Run, the show Home's hero is of. */
@@ -131,7 +158,10 @@ object FakeCabin {
         ContinueItem(ContinueItem.Kind.Episode, "Pine Ledger", "S01 E02 · Tally", null, null, null, fileId(704, 1, 2), null, 704, episodeId(704, 1, 2), 1, 2, 18 * 60_000L, 49 * 60_000L),
         ContinueItem(ContinueItem.Kind.Movie, "Harbor Nights", null, null, null, null, 7800, HARBOR_NIGHTS, null, null, null, null, 54 * 60_000L, 108 * 60_000L),
         ContinueItem(ContinueItem.Kind.Episode, "Snowline", "S03 E01 · Whiteout", null, null, null, fileId(705, 3, 1), null, 705, episodeId(705, 3, 1), 3, 1, 43 * 60_000L, 55 * 60_000L),
-    )
+    ).mapIndexed { i, c ->
+        // Played before anything on the Living room server, so a Home filled from both keeps that server's cards first.
+        c.copy(tmdbId = tmdbId(c.movieId ?: c.showId ?: 0), updatedAtMs = System.currentTimeMillis() - (i + 1) * 30 * 3_600_000L)
+    }
 
     fun recentlyAired(now: Long) = listOf(
         EpisodeCard(episodeId(HARBOUR_RUN, 2, 3), HARBOUR_RUN, "Harbour Run", 2, 3, "Low Water", "The tide is early and the ferry is aground, and Ines has until morning to float it off the bar before anyone at the yard hears about it.", day(now, -2), null, null, null, true, fileId(HARBOUR_RUN, 2, 3), true),
@@ -168,7 +198,7 @@ object FakeCabin {
             totalEpisodes = seasons * 6, episodesOnDisk = seasons * 6, totalSizeBytes = seasons * 6 * 1_300_000_000L,
             nextAirDate = null, nextUp = NextUp(episodeId(s.id, seasons, 3), seasons, 3, "Low Water", fileId(s.id, seasons, 3)),
             cast = listOf(Person("Ines Varga", "Ines", null), Person("Tomas Reyes", "The yard foreman", null)),
-            contentRating = "TV-PG", tmdbId = 70_000 + s.id,
+            contentRating = "TV-PG", tmdbId = tmdbId(s.id),
         )
     }
 
@@ -197,7 +227,7 @@ object FakeCabin {
             versions = listOf(MediaVersion(7000 + m.id, "${m.title} (${m.year}) - 1080p.mkv", 7_200_000_000L, "MKV", "h264", 1920, 1080, null, "AAC 5.1 · English", (m.runtimeMin ?: 100) * 60_000L)),
             cast = listOf(Person("Hollis Kade", "The coxswain", null), Person("Mira Okonjo", "The volunteer", null)),
             watch = m.progress?.let { WatchProgress((it * (m.runtimeMin ?: 100) * 60_000L).toLong(), (m.runtimeMin ?: 100) * 60_000L, false) },
-            contentRating = "PG", tmdbId = 70_000 + m.id,
+            contentRating = "PG", tmdbId = tmdbId(m.id),
         )
     }
 

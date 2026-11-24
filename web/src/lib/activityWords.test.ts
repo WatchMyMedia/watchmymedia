@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  conversionReasons,
+  peakConvertedWords,
   bandwidthLine,
   byDay,
   clockWords,
@@ -150,5 +152,39 @@ describe('Downloads in words', () => {
     const { downloadsInShort } = await import('./activityWords')
     const d = (user: number, device: string, size: number, state = 'ready') => ({ user: { id: user, name: '' }, deviceName: device, sizeBytes: size, state }) as never
     expect(downloadsInShort([d(1, 'Pixel', 10), d(1, 'Pixel', 5), d(2, 'iPad', 7), d(2, 'iPad', 9, 'revoked')])).toEqual({ titles: 3, bytes: 22, devices: 2, people: 2 })
+  })
+})
+
+describe('why plays were converted', () => {
+  it('words each reason with its share of converted plays, most first', () => {
+    expect(
+      conversionReasons({
+        plays: 20,
+        reasons: [
+          { reason: 'video-format', plays: 6 },
+          { reason: 'smaller', plays: 12 },
+          { reason: 'subtitles', plays: 2 },
+        ],
+      }),
+    ).toEqual([
+      { key: 'smaller', label: 'Sent smaller, chosen or for the connection', share: 60 },
+      { key: 'video-format', label: 'The device can’t play the video’s format', share: 30 },
+      { key: 'subtitles', label: 'Subtitles drawn into the picture', share: 10 },
+    ])
+  })
+  it('folds reasons it doesn’t know into another reason, last among equals', () => {
+    expect(conversionReasons({ plays: 4, reasons: [{ reason: 'teleport', plays: 1 }, { reason: 'other', plays: 1 }, { reason: 'bitrate', plays: 2 }] })).toEqual([
+      { key: 'bitrate', label: 'More data than the device takes', share: 50 },
+      { key: 'other', label: 'Another reason', share: 50 },
+    ])
+  })
+  it('is empty with nothing converted', () => {
+    expect(conversionReasons({ plays: 0, reasons: [] })).toEqual([])
+    expect(conversionReasons(undefined)).toEqual([])
+  })
+  it('says how many of the peak were converted', () => {
+    expect(peakConvertedWords(1)).toBe('1 converted')
+    expect(peakConvertedWords(0)).toBe('none converted')
+    expect(peakConvertedWords(undefined)).toBe('')
   })
 })

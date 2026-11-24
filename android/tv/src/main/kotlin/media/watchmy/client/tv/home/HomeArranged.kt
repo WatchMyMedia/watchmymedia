@@ -1,5 +1,6 @@
 package media.watchmy.client.tv.home
 
+import media.watchmy.client.model.mergedAcrossServers
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -110,6 +111,8 @@ internal fun ArrangedHomeContent(
     onLiveGuide: () -> Unit,
     onEditRows: () -> Unit,
     onOpenLibrary: (LibraryType) -> Unit = {},
+    /** Every merged row's end while another server is out or didn't answer: each row is a screen of its own, so each ends with it. */
+    elsewhere: media.watchmy.client.tv.rows.ElsewhereEnd? = null,
 ) {
     val live = liveChannels.any { it.available }
     val requests = LocalAppServices.current.browseRequests
@@ -204,7 +207,7 @@ internal fun ArrangedHomeContent(
         else {
             // Kept across focus moves, which redraw the page, so the card's click stays the same one.
             val seeAll = remember(row, home, actions, onOpenLibrary) { tvHomeSeeAll(row, home, requests, actions, onOpenLibrary) }
-            TvArrangedRow(row, library, memory, actions, modifier, counter, onFocusItem, seeAll = seeAll, posterLines = false)
+            TvArrangedRow(row, library, memory, actions, modifier, counter, onFocusItem, seeAll = seeAll, posterLines = false, elsewhere = elsewhere?.takeIf { row.mergedAcrossServers })
         }
     }
 

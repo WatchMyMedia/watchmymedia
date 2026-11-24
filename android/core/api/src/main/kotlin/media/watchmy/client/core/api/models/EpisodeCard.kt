@@ -46,8 +46,10 @@ import kotlinx.serialization.encoding.Encoder
  * @param addedAt
  * @param airDate
  * @param fileId
+ * @param runtimeMin The episode's length in minutes, as TMDB lists it.
  * @param showBackdropPath
  * @param showPosterPath
+ * @param showTmdbId The show's TMDB id, so an app signed in to several servers shows one card for an episode on more than one.
  * @param stillPath
  * @param watched The signed-in user has watched it.
  */
@@ -92,11 +94,19 @@ data class EpisodeCard (
     @SerialName(value = "fileId")
     val fileId: kotlin.Long? = null,
 
+    /* The episode's length in minutes, as TMDB lists it. */
+    @SerialName(value = "runtimeMin")
+    val runtimeMin: kotlin.Long? = null,
+
     @SerialName(value = "showBackdropPath")
     val showBackdropPath: kotlin.String? = null,
 
     @SerialName(value = "showPosterPath")
     val showPosterPath: kotlin.String? = null,
+
+    /* The show's TMDB id, so an app signed in to several servers shows one card for an episode on more than one. */
+    @SerialName(value = "showTmdbId")
+    val showTmdbId: kotlin.Long? = null,
 
     @SerialName(value = "stillPath")
     val stillPath: kotlin.String? = null,

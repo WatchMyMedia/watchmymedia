@@ -1,7 +1,7 @@
 import type { FocusEvent } from 'react'
 import { timeOfDay } from '../../../src/lib/liveGuide'
 import type { ScreenRow } from '../../../src/lib/screenRows'
-import { useMediaUrls } from '../../app/hooks'
+import { useMediaFor } from '../../app/hooks'
 import { Card } from '../../ui/Card'
 import { Row } from '../../ui/Row'
 import { useCardActions, useNow } from './browseHooks'
@@ -37,10 +37,27 @@ function MoreCard({ id, card, onPress }: { id: string; card: RowCard; onPress?: 
   </button>
 }
 
+/**
+ * The end of a row filled from every server: a server still being asked,
+ * which takes no focus, or one that didn't answer, with Try again.
+ */
+function TileCard({ id, card, onPress }: { id: string; card: RowCard; onPress?: () => void }) {
+  const tile = card.tile!
+  if (tile.kind === 'wait') {
+    return <span className={`tv-card tv-card--${card.variant} browse-tile`} role="status">
+      <span className="tv-card__art browse-tile__art"><span className="tv-spinner" aria-hidden="true"/><span className="browse-tile__text">{tile.text}</span></span>
+    </span>
+  }
+  return <button type="button" data-focus={id} className={`tv-card tv-card--${card.variant} browse-tile browse-tile--retry`} aria-label={`${tile.text} Try again`} onClick={onPress}>
+    <span className="tv-card__art browse-tile__art"><span className="browse-tile__text">{tile.text}</span><span className="tv-btn browse-tile__btn">Try again</span></span>
+  </button>
+}
+
 /** One card of a row, with what OK and Hold OK do. */
 export function RowCardView({ card, id, imageUrl }: { card: RowCard; id: string; imageUrl?: string }) {
   const { run } = useCardActions()
   const press = card.press && (() => run(card.press))
+  if (card.tile) return <span className="browse-card"><TileCard id={id} card={card} onPress={press}/></span>
   return <span className="browse-card" data-hint={okWords(card.press)} data-hold={holdHint(card.hold)}>
     {card.more ? <MoreCard id={id} card={card} onPress={press}/>
       : <Card id={id} variant={card.variant} title={card.title} subtitle={card.subtitle} image={imageUrl} progress={card.progress} badges={card.badges} done={card.done} live={card.live}
@@ -58,7 +75,7 @@ export function RowView({ row, cards, counter, listings, onFocusIndex, dimPast }
   /** Dims the cards before the focused one (Home's row screens). */
   dimPast?: boolean
 }) {
-  const media = useMediaUrls()
+  const mediaFor = useMediaFor()
   const now = useNow(row.style === 'live' && listings)
   const [title, small] = rowHeading(row, listings, row.style === 'live' ? timeOfDay(now) : undefined)
   const onFocus = onFocusIndex && ((e: FocusEvent) => {
@@ -67,6 +84,6 @@ export function RowView({ row, cards, counter, listings, onFocusIndex, dimPast }
   })
   return <div className="browse-row" data-home-row onFocus={onFocus}>
     <Row id={rowGroup(row)} title={title} subtitle={small} counter={counter} variant={rowVariant(row)} items={cards} itemKey={(c) => c.key} dimPast={dimPast}
-      renderItem={(c, id) => <RowCardView card={c} id={id} imageUrl={c.image && media.imageUrl(c.image.path, c.image.size)}/>}/>
+      renderItem={(c, id) => <RowCardView card={c} id={id} imageUrl={c.image && mediaFor(c.server).imageUrl(c.image.path, c.image.size)}/>}/>
   </div>
 }

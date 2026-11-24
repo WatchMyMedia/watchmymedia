@@ -26,6 +26,13 @@ import media.watchmy.client.model.RequestRepository
 import media.watchmy.client.model.Requestable
 import media.watchmy.client.model.SavedServer
 import media.watchmy.client.model.SearchResults
+import media.watchmy.client.model.ServerTag
+import media.watchmy.client.model.Where
+import media.watchmy.client.model.cardKey
+import media.watchmy.client.model.on
+import media.watchmy.client.model.plus
+import media.watchmy.client.model.serverHeading
+import media.watchmy.client.model.serverList
 import media.watchmy.client.model.ServerRepository
 import media.watchmy.client.model.WatchTarget
 import media.watchmy.client.model.attempt
@@ -87,9 +94,24 @@ class SearchViewModel(
     /** A registered server whose titles aren't in the results, in a line; [retry] when asking again may help. */
     data class Unlisted(val serverId: String, val line: String, val retry: Boolean)
 
-    /** One result: [serverId] and [serverName] are null for the server in use, whose results carry no name. */
-    data class Hit<T>(val item: T, val serverId: String? = null, val serverName: String? = null) {
+    /**
+     * One result: [serverId] and [serverName] are null for the server in use,
+     * whose results carry no name. A title several servers have is one hit,
+     * drawn from its first copy (the server in use's, when it has one), with
+     * the others in its item's `where`; [alsoOn] names them.
+     */
+    data class Hit<T>(val item: T, val serverId: String? = null, val serverName: String? = null, val alsoOn: List<String> = emptyList()) {
         val elsewhere: Boolean get() = serverId != null
+
+        /** On more than one server: the result says where ("On Home and Cabin"). */
+        val several: Boolean get() = alsoOn.isNotEmpty()
+
+        /** "On Home and Cabin" for a title on several servers, "Cabin server" for one only another has, null for the server in use's. */
+        fun serversLine(inUse: String?): String? = when {
+            several -> "On " + serverList(listOf(serverName ?: inUse ?: "this server") + alsoOn)
+            serverName != null -> serverHeading(serverName)
+            else -> null
+        }
     }
 
     data class State(
@@ -115,17 +137,45 @@ class SearchViewModel(
         /** The servers still out a moment after the search began, by name. */
         val stillAsking: List<String> = emptyList(),
         val unlisted: List<Unlisted> = emptyList(),
+        /** The server in use's name, for "On Home and Cabin". */
+        val inUseName: String? = null,
     ) {
         /** Search looks in more than the server in use. */
         val several: Boolean get() = searched > 1
 
-        /** Each group as it is drawn: the server in use's first, then each other server's, named. */
-        val shows: List<Hit<BrowseItem>> get() = group({ it.shows })
-        val movies: List<Hit<BrowseItem>> get() = group({ it.movies })
-        val episodes: List<Hit<EpisodeCard>> get() = group({ it.episodes })
+        /**
+         * Each group as it is drawn: the server in use's first, then each
+         * other server's, named. A title on several servers is one hit, where
+         * its first copy is: a later server's copy joins it and moves nothing.
+         */
+        val shows: List<Hit<BrowseItem>> get() = group({ it.shows }, BrowseItem::cardKey, BrowseItem::id, { i, s -> i.on(s) }) { a, c, b -> a.plus(c, b) }
+        val movies: List<Hit<BrowseItem>> get() = group({ it.movies }, BrowseItem::cardKey, BrowseItem::id, { i, s -> i.on(s) }) { a, c, b -> a.plus(c, b) }
+        val episodes: List<Hit<EpisodeCard>> get() = group({ it.episodes }, EpisodeCard::cardKey, EpisodeCard::episodeId, { i, s -> i.on(s) }) { a, c, b -> a.plus(c, b) }
 
-        private fun <T> group(of: (SearchResults) -> List<T>): List<Hit<T>> =
-            results?.let(of).orEmpty().map { Hit(it) } + elsewhere.flatMap { r -> of(r.results).map { Hit(it, r.serverId, r.serverName) } }
+        private fun <T> group(
+            of: (SearchResults) -> List<T>,
+            key: (T) -> String?,
+            id: (T) -> Long,
+            own: (T, ServerTag) -> T,
+            merge: (T, Where.Copy, T) -> T,
+        ): List<Hit<T>> {
+            val out = ArrayList<Hit<T>>()
+            val at = HashMap<String, Int>()
+            fun add(item: T, serverId: String?, serverName: String?) {
+                val k = key(item)
+                val i = k?.let { at[it] }
+                if (i != null) {
+                    val h = out[i]
+                    out[i] = h.copy(item = merge(h.item, Where.Copy(serverId, serverName, id(item)), item), alsoOn = h.alsoOn + (serverName ?: inUseName ?: "this server"))
+                    return
+                }
+                if (k != null) at[k] = out.size
+                out += Hit(own(item, ServerTag(serverId, serverName.orEmpty())), serverId, serverName)
+            }
+            results?.let(of).orEmpty().forEach { add(it, null, null) }
+            elsewhere.forEach { r -> of(r.results).forEach { add(it, r.serverId, r.serverName) } }
+            return out
+        }
 
         /** Nothing found anywhere; with several servers, once every one asked has answered or failed. */
         val noResults: Boolean
@@ -164,8 +214,8 @@ class SearchViewModel(
         }
         if (servers != null) {
             viewModelScope.launch {
-                combine(servers.saved, servers.current) { all, current -> all.registered(current?.server?.id).count { it.searched() } }
-                    .collect { count -> _state.update { it.copy(searched = count.coerceAtLeast(1)) } }
+                combine(servers.saved, servers.current) { all, current -> all.registered(current?.server?.id).count { it.searched() } to current?.server?.name }
+                    .collect { (count, name) -> _state.update { it.copy(searched = count.coerceAtLeast(1), inUseName = name) } }
             }
         }
         val accountAtLaunch = accountRevision

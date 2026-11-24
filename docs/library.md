@@ -29,8 +29,9 @@ the UI.
 ## The web app
 
 `/` home (hero, recently added and aired rows), `/tv` and `/movies` (rows plus a filterable,
-sortable grid), `/search`, `/shows/:id` with season pages, `/movies/:id`, and `/play/:fileId`
-for the player. `/activity` is Now playing, with History, Stats and Users tabs (see
+sortable grid, and for a movie library its collections), `/search`, `/shows/:id` with season
+pages, `/movies/:id`, `/people/:personId` (a cast member's movies and shows in the library),
+and `/play/:fileId` for the player. `/activity` is Now playing, with History, Stats and Users tabs (see
 Activity below). `/settings` is Settings, a tab per page: Playback and Account & devices for
 everyone, then General, Libraries, Users, Watch history, Transcoding, Security and
 Backups for admins (`/admin` redirects there), and

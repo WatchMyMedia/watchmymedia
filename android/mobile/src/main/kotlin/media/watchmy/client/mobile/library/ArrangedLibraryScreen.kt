@@ -1,5 +1,6 @@
 package media.watchmy.client.mobile.library
 
+import media.watchmy.client.ui.imageFor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -216,10 +217,11 @@ private fun LazyGridScope.gridItems(
             }) {}
         }
         else -> {
-            items(state.items, key = { it.id }, contentType = { "poster" }) { item ->
+            if (state.merged && state.notes.isNotEmpty()) item(key = "servers", span = full) { ServersNote(state.notes, if (state.retryServers) vm::retryServers else null) }
+            items(state.items, key = { "${it.where.serverId}:${it.kind}:${it.id}" }, contentType = { "poster" }) { item ->
                 PosterCard(
                     item = item,
-                    imageUrl = library.imageUrl(item.posterPath, ImageSize.W342),
+                    imageUrl = library.imageFor(item.where, item.posterPath, ImageSize.W342),
                     subtitle = item.gridSubtitle(),
                     onClick = { item.open(onOpenShow, onOpenMovie, onPlay, onNotMatched) },
                     onSetWatched = { vm.setWatched(item, it) },

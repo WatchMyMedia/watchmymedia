@@ -5,6 +5,7 @@ import {
 } from '../../../src/lib/liveRecordings'
 import type { PlayRequest } from '../../app/routes'
 import type { MenuItem } from './guideModel'
+import { leftWords } from '../../ui/timeWords'
 import { seriesWords } from './recordModel'
 
 // Recordings: the focused card's details
@@ -234,11 +235,23 @@ function seasonEpisode(r: Pick<Recording, 'season' | 'episode'>): string {
   return r.season >= 1000 ? `${r.season} · Episode ${r.episode}` : `Season ${r.season} · Episode ${r.episode}`
 }
 
-/** What recorded, in a few words: its length, or why it isn't whole. */
+/**
+ * What recorded, in a few words: its length, or why it isn't whole. From API
+ * level 34 a recording says where the person is in it: "watched", "22 min
+ * left".
+ */
 function recordedState(r: Recording): string {
   if (r.state === 'failed') return recordingWords(r.state, r.reason)
+  if (r.watched) return 'watched'
+  const p = r.progress
+  if (p && p.positionMs > 0 && p.durationMs > p.positionMs) return leftWords(p.durationMs - p.positionMs)
   if (r.state === 'partial') return 'Part recorded'
   return lengthWords(ms(r.end) - ms(r.start))
+}
+
+/** The listing called it new and the person hasn't watched it (API level 34): a New badge. */
+export function isNewRecording(r: Pick<Recording, 'new' | 'watched'>): boolean {
+  return !!r.new && !r.watched
 }
 
 /** One show's recordings, on one card: what OK opens. */
@@ -252,6 +265,8 @@ export type ShowGroup = {
   line: string
   /** Something in it plays. */
   playable: boolean
+  /** How many of its recordings are new and not watched yet (API level 34): a New badge on its card. */
+  fresh: number
 }
 
 /**
@@ -269,10 +284,12 @@ export function recordedShows(items: readonly Recording[], now: number, locale?:
   return [...groups.entries()].map(([key, list]) => {
     const sorted = [...list].sort((a, b) => ms(b.start) - ms(a.start))
     const latest = sorted[0]
+    const fresh = sorted.filter(isNewRecording).length
+    // "3 episodes · 1 new" when some are new and unwatched; else when the newest recorded.
     const line = sorted.length > 1
-      ? `${sorted.length} ${sorted[0].series || sorted.some((r) => r.season != null) ? 'episodes' : 'recordings'} · newest ${recordedDay(ms(latest.start), now, locale).replace(/^(Today|Yesterday|Last)\b/, (w) => w.toLowerCase())}`
+      ? `${sorted.length} ${sorted[0].series || sorted.some((r) => r.season != null) ? 'episodes' : 'recordings'} · ${fresh ? `${fresh} new` : `newest ${recordedDay(ms(latest.start), now, locale).replace(/^(Today|Yesterday|Last)\b/, (w) => w.toLowerCase())}`}`
       : [seasonEpisode(latest) || latest.episodeTitle, recordedState(latest)].filter(Boolean).join(' · ')
-    return { key: `show:${key}`, title: latest.title, items: sorted, latest, line, playable: sorted.some((r) => r.state === 'done' || r.state === 'partial') }
+    return { key: `show:${key}`, title: latest.title, items: sorted, latest, line, playable: sorted.some((r) => r.state === 'done' || r.state === 'partial'), fresh }
   }).sort((a, b) => ms(b.latest.start) - ms(a.latest.start))
 }
 

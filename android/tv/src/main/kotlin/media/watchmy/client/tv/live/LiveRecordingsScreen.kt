@@ -64,6 +64,8 @@ import media.watchmy.client.model.LiveRecordingRule
 import media.watchmy.client.model.PlayRequest
 import media.watchmy.client.model.RECORDING_CLASH_RUNNING
 import media.watchmy.client.model.RECORDING_PADDING
+import media.watchmy.client.tv.components.ArtProgress
+import media.watchmy.client.tv.components.ArtWatched
 import media.watchmy.client.model.RecordingOptions
 import media.watchmy.client.model.RecordingSection
 import media.watchmy.client.model.clashInsteadOf
@@ -270,6 +272,14 @@ fun LiveRecordingsScreenTv(onNavigate: (Any) -> Unit, onPlay: (PlayRequest) -> U
                         modifier = Modifier.focusRequester(subTabs.getValue(t)),
                         first = index == 0,
                     )
+                }
+                // How much more fits, past the space the recorder keeps free: from servers that say what it keeps.
+                val room = state.page(RecordingSection.Recorded).let { recorded ->
+                    media.watchmy.client.model.recordingRoomLine(recorded.copy(freeBytes = recorded.freeBytes ?: state.page(RecordingSection.Now).freeBytes))
+                }
+                if (room != null) {
+                    androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                    Text(room, style = TvType.Second, color = TvPalette.Muted, maxLines = 1)
                 }
             }
             clash?.let { c ->
@@ -527,8 +537,15 @@ private fun ReadyGrid(groups: List<RecordingGroup>, now: Long, format: LiveClock
                 modifier = Modifier.onFocusChanged { if (it.isFocused) onFocus(group) }.then(if (i == 0) Modifier.focusRequester(first) else Modifier).then(if (i < 4) Modifier.upTo(onTopUp) else Modifier),
             ) {
                 if (r.active) PictureFlag("REC", Modifier.align(Alignment.TopStart).padding(10.dp), rec = true, spoken = "Recording")
+                // A first airing nobody here has watched yet, from servers that keep the listing's New flag.
+                else if (group.items.any { it.isNew && !it.watched && it.watchedProgress == null }) NewFlag(Modifier.align(Alignment.TopStart).padding(10.dp))
                 if (group.items.size > 1) PictureFlag("${group.items.size} recordings", Modifier.align(Alignment.BottomEnd).padding(end = 10.dp, bottom = 16.dp))
                 if (r.active) media.watchmy.client.ui.components.LiveProgress(r.progressAt(now), Modifier.align(Alignment.BottomStart).fillMaxWidth(), height = 8.dp, track = WmmColors.Ground.copy(alpha = .62f))
+                else if (group.items.size == 1) {
+                    // How far the person has watched it, as any title's card shows; a tick once watched to the end.
+                    ArtProgress(r.watchedProgress?.takeIf { !r.watched })
+                    ArtWatched(r.watched)
+                }
             }
         }
     }

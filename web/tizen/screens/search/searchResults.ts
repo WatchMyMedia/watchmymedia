@@ -37,9 +37,9 @@ export function noMatchWords(q: string, answered: number, liveTV: boolean): { ti
 }
 
 /** The library's best match for what was typed: the same title, then one starting with it, then one with a word starting with it, then the first found; shows before movies on a tie. Only this server's titles are a best match. */
-export function bestMatch<S extends { id: number; title: string }, M extends { id: number; title: string }>(
-  shows: readonly { item: S; server?: unknown }[], movies: readonly { item: M; server?: unknown }[], q: string,
-): { kind: 'show'; item: S } | { kind: 'movie'; item: M } | undefined {
+export function bestMatch<S extends { id: number; title: string }, M extends { id: number; title: string }, X = unknown>(
+  shows: readonly { item: S; server?: unknown; also?: X }[], movies: readonly { item: M; server?: unknown; also?: X }[], q: string,
+): { kind: 'show'; item: S; also?: X } | { kind: 'movie'; item: M; also?: X } | undefined {
   const typed = q.trim().toLowerCase()
   const rank = (title: string) => {
     const t = title.toLowerCase()
@@ -48,10 +48,12 @@ export function bestMatch<S extends { id: number; title: string }, M extends { i
     if (t.split(/[^\p{L}\p{N}]+/u).some((w) => w.startsWith(typed))) return 2
     return 3
   }
-  let best: { kind: 'show'; item: S } | { kind: 'movie'; item: M } | undefined
+  let best: { kind: 'show'; item: S; also?: X } | { kind: 'movie'; item: M; also?: X } | undefined
   let score = Infinity
-  for (const t of shows) if (!t.server && rank(t.item.title) < score) { best = { kind: 'show', item: t.item }; score = rank(t.item.title) }
-  for (const t of movies) if (!t.server && rank(t.item.title) < score) { best = { kind: 'movie', item: t.item }; score = rank(t.item.title) }
+  // The servers that have the same title too (one card across servers) come with it.
+  const also = (t: { also?: X }) => (t.also ? { also: t.also } : {})
+  for (const t of shows) if (!t.server && rank(t.item.title) < score) { best = { kind: 'show', item: t.item, ...also(t) }; score = rank(t.item.title) }
+  for (const t of movies) if (!t.server && rank(t.item.title) < score) { best = { kind: 'movie', item: t.item, ...also(t) }; score = rank(t.item.title) }
   return best
 }
 

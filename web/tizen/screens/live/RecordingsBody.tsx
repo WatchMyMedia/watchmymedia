@@ -23,7 +23,7 @@ import { useStartFocus, useTabKeys } from './tabFocus'
 import { OptionsPage, RecordPanel } from './RecordPanel'
 import { ruleBody, ruleOptions, seriesWords, type RecordOptions } from './recordModel'
 import {
-  actions, cardLine, clashAlert, clashCount, episodeWords, playRequest, recordedShows, recordingNowWords, roomWords, scheduledDays,
+  actions, cardLine, clashAlert, clashCount, episodeWords, isNewRecording, playRequest, recordedShows, recordingNowWords, roomWords, scheduledDays,
   type Entry, type RecordingAction, type RecordingsTab, type ShowGroup,
 } from './recordingsModel'
 
@@ -77,9 +77,10 @@ function ShowPanel({ show, rule, onPlay, onDelete, onRule, onClose }: {
           const plays = r.state === 'done' || r.state === 'partial'
           return <div key={r.id} className="live-show__row" data-row>
             <button type="button" className="tv-option live-row live-show__ep" data-focus={`ep/${r.id}`} data-autofocus={i === 0 || undefined} aria-disabled={!plays || undefined}
-              aria-label={plays ? `Play ${w.title}, ${w.line}` : `${w.title}, ${w.line}`} onClick={plays ? () => onPlay(r) : undefined}>
+              aria-label={`${plays ? 'Play ' : ''}${w.title}, ${w.line}${isNewRecording(r) ? ', new' : ''}`} onClick={plays ? () => onPlay(r) : undefined}>
               <span className="live-row__mark">{plays ? <LiveIcon name="play" className="live-row__icon"/> : <LiveIcon name="warn" className="live-row__icon"/>}</span>
               <span className="tv-option__text"><span className="tv-option__label">{w.title}</span><span className="tv-option__detail">{w.line}</span></span>
+              {isNewRecording(r) && <span className="tv-option__end"><span className="tv-badge tv-badge--gold">New</span></span>}
             </button>
             {r.canDelete && <Button id={`ep/${r.id}/delete`} label={`Delete ${w.title}`} icon="trash" onPress={() => onDelete(r)}/>}
           </div>
@@ -216,7 +217,7 @@ export function RecordingsBody({ tabs }: { tabs: TabsProps }) {
             onPress={() => play(r)}/></Start>}/>}
         {shows.length > 0 && <Row id="rec-done" title="Recorded" variant="wide" items={shows} itemKey={(s) => s.key}
           renderItem={(s, focusId, i) => <Start on={!nowItems.length && i === 0}><span className={s.playable ? 'live-card' : 'live-card live-card--off'}>
-            <Card id={focusId} variant="wide" title={s.title} subtitle={s.line} image={media.mediaUrl(s.latest.pictureUrl)}
+            <Card id={focusId} variant="wide" title={s.title} subtitle={s.line} image={media.mediaUrl(s.latest.pictureUrl)} badges={s.fresh ? [{ label: 'New', tone: 'gold' }] : undefined}
               label={`${s.title}, ${s.line}`} onPress={() => s.items.length === 1 && s.playable ? play(s.items[0]) : setShow(s.key)}/></span></Start>}/>}
       </div>
     }

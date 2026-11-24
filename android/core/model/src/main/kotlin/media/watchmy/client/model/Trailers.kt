@@ -20,7 +20,12 @@ sealed interface Trailer {
      * tablets and Android TV) or by the YouTube app (an Android TV without a
      * usable WebView). [key] is its video id.
      */
-    data class YouTube(override val name: String, val key: String) : Trailer {
+    data class YouTube(
+        override val name: String,
+        val key: String,
+        /** The server calls it a teaser rather than a trailer (from [REDESIGN_API_LEVEL]); the trailer screen's More trailers says so. */
+        val teaser: Boolean = false,
+    ) : Trailer {
         /** The watch link, which the YouTube app opens where it is installed. */
         val watchUrl: String get() = "https://www.youtube.com/watch?v=$key"
     }

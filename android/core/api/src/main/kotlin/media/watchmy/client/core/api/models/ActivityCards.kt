@@ -23,6 +23,7 @@
 
 package media.watchmy.client.core.api.models
 
+import media.watchmy.client.core.api.models.ActivityConversions
 import media.watchmy.client.core.api.models.ActivityHistoryRow
 import media.watchmy.client.core.api.models.ActivityPeaks
 import media.watchmy.client.core.api.models.ActivityStatItem
@@ -47,6 +48,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param topMovies
  * @param topShows
  * @param topUsers
+ * @param conversions
  */
 @Serializable
 
@@ -80,7 +82,10 @@ data class ActivityCards (
     val topShows: kotlin.collections.List<ActivityStatItem>,
 
     @SerialName(value = "topUsers")
-    val topUsers: kotlin.collections.List<ActivityStatItem>
+    val topUsers: kotlin.collections.List<ActivityStatItem>,
+
+    @SerialName(value = "conversions")
+    val conversions: ActivityConversions? = null
 
 ) {
 

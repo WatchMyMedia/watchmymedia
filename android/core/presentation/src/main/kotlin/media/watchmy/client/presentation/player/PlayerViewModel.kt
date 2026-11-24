@@ -61,7 +61,7 @@ class PlayerViewModel(
     private var started: Pair<PlaybackController, Long>? = null
 
     /** The controller playing on this device, made at first use and kept until the play moves to a TV or the entry goes. */
-    fun controller(): PlaybackController = local ?: playback.create().also {
+    fun controller(): PlaybackController = local ?: playback.createOn(_selection.value.request.serverId).also {
         local = it
         follow(it)
     }

@@ -14,6 +14,16 @@ const val AUTO_RECOVERY_API_LEVEL = 24
 const val DECISION_TOKEN_API_LEVEL = 28
 
 /**
+ * The level that brought what the redesigned screens read: TMDB's person ids
+ * on credits and a person's titles, hiding a title from Continue watching,
+ * the cards' facts (episodes left, seasons, a content rating and overview on
+ * Continue watching), the rating filter, recordings' New flag and progress,
+ * and a title's copies found by its TMDB id, with that id on every kind of
+ * card, which one card for a title on several servers needs.
+ */
+const val REDESIGN_API_LEVEL = 34
+
+/**
  * What a server at API [level] offers, by name, so a check says what it gates
  * rather than a number. The levels are the
  * server's (`APILevel` in server/internal/api/system.go, whose comment says
@@ -100,4 +110,16 @@ value class ServerFeatures(val level: Int) {
 
     /** 33: watchlists, and the TMDB id and watchlist mark on cards. */
     val watchlists: Boolean get() = level >= WATCHLISTS_API_LEVEL
+
+    /** 34: credits' person ids and a person's titles (`GET /api/people/{id}`). */
+    val people: Boolean get() = level >= REDESIGN_API_LEVEL
+
+    /** 34: hiding a title from Continue watching, keeping its place. */
+    val hideFromContinue: Boolean get() = level >= REDESIGN_API_LEVEL
+
+    /** 34: the rating filter in the libraries (`contentRating`, its facets and counts). */
+    val ratingFilter: Boolean get() = level >= REDESIGN_API_LEVEL
+
+    /** 34: a title's copies by TMDB id, and the TMDB id on Continue watching's and episode cards. */
+    val copies: Boolean get() = level >= REDESIGN_API_LEVEL
 }

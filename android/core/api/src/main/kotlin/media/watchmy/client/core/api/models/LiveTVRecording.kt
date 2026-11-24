@@ -23,8 +23,10 @@
 
 package media.watchmy.client.core.api.models
 
+import media.watchmy.client.core.api.models.LiveTVAiring
 import media.watchmy.client.core.api.models.LiveTVConflictRef
 import media.watchmy.client.core.api.models.LiveTVGap
+import media.watchmy.client.core.api.models.LiveTVViewerProgress
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -53,18 +55,26 @@ import kotlinx.serialization.encoding.Encoder
  * @param title
  * @param userName
  * @param canDelete The current delete policy permits removing this finished recording's owned file.
+ * @param categories The listing's categories, such as Documentary or Sports (API level 34).
  * @param conflictsWith For a recording that won't record (state conflict): the recordings holding the tuners while it would run. Choosing one with PATCH {prefer, over} makes that one give way.
  * @param endedAt
  * @param episode
  * @param episodeTitle
+ * @param kind What was recorded, from its listing: episode, show (a programme without episodes, such as news) or movie; absent for a recording made by time. Other values may follow (API level 34).
  * @param mediaFileId
+ * @param new The listing called it new. From API level 34; absent for a recording scheduled before, whose listing was gone.
+ * @param nextAiring
  * @param pictureUrl
  * @param programmeId
+ * @param progress
  * @param reason
+ * @param repeat The listing called it a repeat (API level 34).
  * @param ruleId
  * @param season
  * @param startedAt
  * @param userId
+ * @param watched The signed-in person finished the movie or episode it became (API level 34).
+ * @param year A movie's year, or the year an episode first aired, from the listing (API level 34).
  */
 @Serializable
 
@@ -122,6 +132,10 @@ data class LiveTVRecording (
     @SerialName(value = "canDelete")
     val canDelete: kotlin.Boolean? = null,
 
+    /* The listing's categories, such as Documentary or Sports (API level 34). */
+    @SerialName(value = "categories")
+    val categories: kotlin.collections.List<kotlin.String>? = null,
+
     /* For a recording that won't record (state conflict): the recordings holding the tuners while it would run. Choosing one with PATCH {prefer, over} makes that one give way. */
     @SerialName(value = "conflictsWith")
     val conflictsWith: kotlin.collections.List<LiveTVConflictRef>? = null,
@@ -135,8 +149,19 @@ data class LiveTVRecording (
     @SerialName(value = "episodeTitle")
     val episodeTitle: kotlin.String? = null,
 
+    /* What was recorded, from its listing: episode, show (a programme without episodes, such as news) or movie; absent for a recording made by time. Other values may follow (API level 34). */
+    @SerialName(value = "kind")
+    val kind: kotlin.String? = null,
+
     @SerialName(value = "mediaFileId")
     val mediaFileId: kotlin.Long? = null,
+
+    /* The listing called it new. From API level 34; absent for a recording scheduled before, whose listing was gone. */
+    @SerialName(value = "new")
+    val new: kotlin.Boolean? = null,
+
+    @SerialName(value = "nextAiring")
+    val nextAiring: LiveTVAiring? = null,
 
     @SerialName(value = "pictureUrl")
     val pictureUrl: kotlin.String? = null,
@@ -144,8 +169,15 @@ data class LiveTVRecording (
     @SerialName(value = "programmeId")
     val programmeId: kotlin.String? = null,
 
+    @SerialName(value = "progress")
+    val progress: LiveTVViewerProgress? = null,
+
     @SerialName(value = "reason")
     val reason: kotlin.String? = null,
+
+    /* The listing called it a repeat (API level 34). */
+    @SerialName(value = "repeat")
+    val repeat: kotlin.Boolean? = null,
 
     @SerialName(value = "ruleId")
     val ruleId: kotlin.String? = null,
@@ -157,7 +189,15 @@ data class LiveTVRecording (
     val startedAt: kotlin.String? = null,
 
     @SerialName(value = "userId")
-    val userId: kotlin.Long? = null
+    val userId: kotlin.Long? = null,
+
+    /* The signed-in person finished the movie or episode it became (API level 34). */
+    @SerialName(value = "watched")
+    val watched: kotlin.Boolean? = null,
+
+    /* A movie's year, or the year an episode first aired, from the listing (API level 34). */
+    @SerialName(value = "year")
+    val year: kotlin.Long? = null
 
 ) {
 

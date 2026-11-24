@@ -5,6 +5,8 @@ import { duration, nowAndNext, timeRange } from '../../../src/lib/liveGuide'
 import { isListRow, titleParts, type ScreenRow } from '../../../src/lib/screenRows'
 import { episodeCode, holdWords, isWatchlistRow, timeLeft, type RowCard } from './rowCards'
 import { resumeLine } from './homePages'
+import { bareName } from '../search/crossSearch'
+import { oneCardWords, type OneCardTag } from './oneCardHome'
 
 // What the panel over a Home row screen says about its focused card
 // (Android's CardPanel): a kicker, the title, facts,
@@ -47,10 +49,12 @@ function itemPanel(row: ScreenRow, item: BrowseItem, index: number, card: RowCar
   const facts = item.kind === 'movie' ? [year, formatRuntime(item.runtimeMin ?? 0), genres]
     : item.kind === 'show' ? [year, item.episodeCount ? plural(item.episodeCount, 'episode') : '', genres]
       : [item.fileCount ? plural(item.fileCount, 'file') : '']
+  // A title only another server has says so at the end of its facts: "… · On Cabin".
+  const on = oneCardWords((item as { oneCard?: OneCardTag }).oneCard, bareName)
   return {
     kicker,
     title: item.title,
-    facts: facts.filter(Boolean),
+    facts: [...facts, on ?? ''].filter(Boolean),
     tags: [item.quality || '', item.hdr ? 'HDR' : ''].filter(Boolean),
     rating: item.rating ? `★ ${item.rating.toFixed(1)}` : undefined,
     overview: item.overview,
@@ -81,7 +85,7 @@ function episodePanel(row: ScreenRow, e: EpisodeCard): CardPanel {
   return {
     kicker: [e.isNew ? 'New episode' : heading, e.airDate ? `aired ${airedDay(e.airDate)}` : ''].filter(Boolean).join(' · '),
     title: e.title || e.showTitle,
-    facts: [e.showTitle, episodeCode(e.seasonNumber, e.episodeNumber), e.hasFile ? '' : 'Not in library'].filter(Boolean),
+    facts: [e.showTitle, episodeCode(e.seasonNumber, e.episodeNumber), e.hasFile ? '' : 'Not in library', oneCardWords((e as { oneCard?: OneCardTag }).oneCard, bareName) ?? ''].filter(Boolean),
     tags: [],
     overview: e.overview,
     target: 'episode',
@@ -127,6 +131,8 @@ function channelPanel(channel: LiveChannel, listings: boolean, now: number): Car
 export function cardPanel(row: ScreenRow, cards: readonly RowCard[], index: number, ctx: { channels: readonly LiveChannel[]; listings: boolean; now: number }): CardPanel | undefined {
   const card = cards[index]
   if (!card) return undefined
+  // A server still being asked, or Try again: the row's own name above it, and its words.
+  if (card.tile) return { kicker: titleParts(row)[0], title: card.tile.kind === 'retry' ? 'Try again' : 'Still asking', facts: [card.tile.text], tags: [], overview: '', target: 'library', seed: row.title }
   if (card.more) {
     const target: PanelTarget = card.more.glyph === 'guide' ? 'guide' : card.more.glyph === 'list' ? 'list' : 'library'
     const kicker = row.style === 'live' ? 'Live TV' : titleParts(row)[0]

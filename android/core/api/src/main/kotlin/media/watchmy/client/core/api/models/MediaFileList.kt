@@ -39,6 +39,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param limit
  * @param offset
  * @param total Total files matching the filter.
+ * @param unreadable Present files in the library ffprobe could not read, whatever the filter (API level 34).
  */
 @Serializable
 
@@ -55,7 +56,11 @@ data class MediaFileList (
 
     /* Total files matching the filter. */
     @SerialName(value = "total")
-    val total: kotlin.Long
+    val total: kotlin.Long,
+
+    /* Present files in the library ffprobe could not read, whatever the filter (API level 34). */
+    @SerialName(value = "unreadable")
+    val unreadable: kotlin.Long? = null
 
 ) {
 

@@ -7,7 +7,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import media.watchmy.client.model.CopyChoices
 import media.watchmy.client.model.DownloadRepository
+import media.watchmy.client.model.at
+import media.watchmy.client.presentation.servers.OtherServers
 import media.watchmy.client.model.LibraryRepository
 import media.watchmy.client.model.MediaVersion
 import media.watchmy.client.model.MovieDetail
@@ -60,6 +63,14 @@ class MovieViewModel(
     /** The person's watchlists, from [media.watchmy.client.model.WATCHLISTS_API_LEVEL]: where the page reads the movie is. */
     private val watchlists: WatchlistRepository = WatchlistRepository.Unavailable,
     private val plans: suspend (List<Long>) -> Map<Long, PlaybackPlan> = { emptyMap() },
+    /** The registered server the page is on, opened in place from another server's card or link; null is the one in use. */
+    private val here: String? = null,
+    /** The other servers to ask for their copies of the movie by its TMDB id; null asks none. */
+    private val others: OtherServers? = null,
+    /** Which copy Play uses for each title, on this device. */
+    private val choices: CopyChoices = CopyChoices.None,
+    /** How another server's files would play here. */
+    private val plansOn: suspend (serverId: String?, fileIds: List<Long>) -> Map<Long, PlaybackPlan> = { _, _ -> emptyMap() },
 ) : ViewModel(), ShownPage {
     data class State(
         val movie: Load<MovieDetail> = Load.Loading,
@@ -81,8 +92,19 @@ class MovieViewModel(
          * on servers without them or when they couldn't be had.
          */
         val related: List<ScreenRow> = emptyList(),
+        /** Every server's copy, this page's first, once more than one server has it ([Copies.several]). */
+        val copies: Copies = Copies(),
+        /** The page's own server: its name, and whether it is reached away from home; null names for the server in use. */
+        val hereName: String? = null,
+        val hereAway: Boolean = false,
     ) {
         val watched: Boolean get() = movie.value?.watch?.completed == true
+
+        /** Opened in place from another server: the page says so ("On Cabin server · away from home"). */
+        val elsewhere: Boolean get() = hereName != null
+
+        /** Another server's copy has a later place than this page's: Resume says where it starts. */
+        val furtherElsewhere: ServerCopy? get() = copies.latest?.takeIf { copies.several && it.serverId != copies.all.firstOrNull()?.serverId }
 
         /** Partway through: Resume, with Play from start beside it. */
         val resumable: Boolean get() = movie.value?.watch?.let { !it.completed && it.positionMs > 0 && it.durationMs > 0 } ?: false
@@ -106,6 +128,9 @@ class MovieViewModel(
     private val freshness = Freshness(viewModelScope) { load(quiet = true) }
 
     override fun setShown(shown: Boolean) = freshness.setShown(shown)
+
+    // Declared before init, which starts the first load: a field set there would be set back by its initializer.
+    private var copiesJob: kotlinx.coroutines.Job? = null
 
     init {
         load()
@@ -142,7 +167,13 @@ class MovieViewModel(
             s.copy(movie = shown ?: s.movie, busy = true)
         }
         viewModelScope.launch {
-            attempt { library.markWatched(WatchTarget.Movie(movieId), watched) }
+            attempt {
+                library.markWatched(WatchTarget.Movie(movieId), watched)
+                // Watched on any server is watched: every other copy is marked too, where it can be.
+                _state.value.copies.all.filter { it.serverId != here }.forEach { c ->
+                    attempt { others?.server(c.serverId)?.library?.markWatched(WatchTarget.Movie(c.titleId), watched) }
+                }
+            }
                 .onSuccess {
                     _state.update { it.copy(busy = false, message = markedMessage(watched)) }
                     load(quiet = true)
@@ -181,8 +212,82 @@ class MovieViewModel(
      */
     fun playRequest(version: MediaVersion? = null, fromStart: Boolean = false): PlayRequest? {
         val movie = _state.value.movie.value ?: return null
-        return movie.playRequest(startMs = if (fromStart) 0 else null, version = version ?: movie.versions.firstOrNull())
+        val copies = _state.value.copies
+        // With several servers, Play's copy (the one chosen, or the latest place's) and the latest place on any of them.
+        if (version == null && copies.several) {
+            val play = copies.play ?: return null
+            return playCopy(play.copy, play.version, fromStart)
+        }
+        return movie.playRequest(startMs = if (fromStart) 0 else null, version = version ?: movie.versions.firstOrNull())?.copy(serverId = here)
     }
+
+    /** Plays [version] of [copy], from the latest place on any copy unless [fromStart]. */
+    fun playCopy(copy: ServerCopy, version: MediaVersion, fromStart: Boolean = false): PlayRequest? {
+        val movie = _state.value.movie.value ?: return null
+        val start = if (fromStart) 0 else _state.value.copies.startFor(copy)
+        return movie.playRequest(startMs = start, version = version)?.copy(serverId = copy.serverId)
+    }
+
+    /**
+     * Chooses [version] of [copy] for Play: the page's Resume or Play plays it
+     * from now on, here and on later visits, on this device. Nothing plays.
+     */
+    fun choose(copy: ServerCopy, version: MediaVersion) {
+        val key = _state.value.movie.value?.copyKey() ?: return
+        val chosen = CopyChoices.Chosen(copy.registeredId, version.fileId)
+        choices.choose(key, chosen)
+        _state.update { it.copy(copies = it.copies.copy(chosen = chosen)) }
+    }
+
+    private fun MovieDetail.copyKey(): String? = tmdbId?.takeIf { it > 0 }?.let { "Movie:$it" }
+
+    /**
+     * The movie's copies on the other servers, by its TMDB id, as soon as the
+     * page has it: each server asked at once with [OtherServers]' time, one
+     * that doesn't answer left out. Each copy's page is read there for its
+     * versions and the person's place.
+     */
+    private fun findCopies(movie: MovieDetail) {
+        val all = others ?: return
+        val key = movie.copyKey() ?: return
+        copiesJob?.cancel()
+        copiesJob = viewModelScope.launch {
+            val own = all.server(here) ?: return@launch
+            _state.update { it.copy(hereName = own.name.takeIf { here != null }, hereAway = own.away) }
+            val asked = all.others(except = here)
+            val ownCopy = ServerCopy(here, own.registeredId, own.name, own.away, movie.versions, movie.watch, movie.id, _state.value.plans)
+            val found = arrayOfNulls<ServerCopy>(asked.size)
+            val done = BooleanArray(asked.size)
+            var late = false
+            fun publish() {
+                val list = listOf(ownCopy) + found.filterNotNull()
+                val pending = asked.filterIndexed { i, _ -> !done[i] }.map { it.name }
+                _state.update { it.copy(copies = Copies(list, if (late) pending else emptyList(), choices.chosen(key))) }
+            }
+            publish()
+            if (asked.isEmpty()) return@launch
+            val stillAsking = launch {
+                kotlinx.coroutines.delay(OtherServers.STILL_ASKING_MS)
+                late = true
+                publish()
+            }
+            all.ask(asked) { lib ->
+                val copy = lib.copies(media.watchmy.client.model.ItemKind.Movie, movie.tmdbId ?: 0).firstOrNull() ?: return@ask null
+                lib.movie(copy.id)
+            }.collect { (other, answer) ->
+                val i = asked.indexOf(other)
+                done[i] = true
+                answer.getOrNull()?.let { m ->
+                    val plans = attempt { plansOn(other.id, m.versions.map { v -> v.fileId }) }.getOrDefault(emptyMap())
+                    found[i] = ServerCopy(other.id, other.registeredId, other.name, other.away, m.versions, m.watch, m.id, plans)
+                }
+                if (done.all { it }) stillAsking.cancel()
+                publish()
+            }
+        }
+    }
+
+
 
     /** What Trailer does: plays the trailer file, or opens the YouTube trailers from the first. */
     fun trailerPlay(): TrailerPlay? {
@@ -208,7 +313,9 @@ class MovieViewModel(
                     _state.update { it.copy(movie = Load.Ready(movie), offline = false) }
                     loadRelated()
                     // A version list without the play mode is still right; a failure here is not shown.
-                    attempt { plans(movie.versions.map { v -> v.fileId }) }.onSuccess { p -> _state.update { it.copy(plans = p) } }
+                    attempt { if (here == null) plans(movie.versions.map { v -> v.fileId }) else plansOn(here, movie.versions.map { v -> v.fileId }) }
+                        .onSuccess { p -> _state.update { it.copy(plans = p) } }
+                    findCopies(movie)
                 }
                 .onFailure { e ->
                     val offline = held()?.takeIf { e.isUnreachable() }?.toMovieDetail()

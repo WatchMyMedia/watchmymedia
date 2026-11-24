@@ -1,6 +1,8 @@
 import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type FocusEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { fileQuery, liveTVRecordingQuery, movieQuery, preferencesQuery, seasonQuery } from '../../../src/api/queries'
+import { liveTVRecordingQuery, preferencesQuery } from '../../../src/api/queries'
+import { fileOn, movieOn, seasonOn } from '../../session/sourceQueries'
+import type { Source } from '../../session/peerRegistry'
 import { AUTO } from '../../../src/lib/quality'
 import type { components } from '../../../src/api/schema'
 import { useFocus, useKeys, useNav, useSession } from '../../app/hooks'
@@ -58,11 +60,12 @@ const keyTime = () => performance.now()
  * screen opens and stops when it goes, and the page is see-through over the
  * video while it shows.
  */
-export function FilePlayer({ play, request, player }: { play: PlayRequest; request: FileRequest; player: Player }) {
+export function FilePlayer({ play, request, player, source }: { play: PlayRequest; request: FileRequest; player: Player; source: Source }) {
   const session = useSession()
   const nav = useNav()
   const focus = useFocus()
-  const [ps] = useState(() => new PlayerSession(session, player))
+  // Another server's copy plays from that server, through its own client: its progress is kept there.
+  const [ps] = useState(() => new PlayerSession(session, player, source))
   const [hold] = useState(() => new SeekHold())
   const playback = ps.controller
   const m = useSelect(playback, modelOf)
@@ -109,14 +112,14 @@ export function FilePlayer({ play, request, player }: { play: PlayRequest; reque
 
   // What the file is: an episode's show and season (the Episodes panel, Previous), a trailer's movie, a recording's channel.
   const fileId = m.request?.kind === 'file' ? m.request.fileId : undefined
-  const file = useQuery({ ...fileQuery(fileId ?? 0), enabled: fileId !== undefined })
+  const file = useQuery({ ...fileOn(source, fileId ?? 0), enabled: fileId !== undefined })
   const context = fileId !== undefined ? episodeContext(file.data) : undefined
-  const season = useQuery({ ...seasonQuery(context?.showId ?? 0, context?.season ?? 0), enabled: !!context })
+  const season = useQuery({ ...seasonOn(source, context?.showId ?? 0, context?.season ?? 0), enabled: !!context })
   const episodes = playableEpisodes(season.data?.episodes)
   const previous = previousEpisode(episodes, fileId)
-  const movie = useQuery({ ...movieQuery(play.kind === 'trailer' ? play.movieId : 0), enabled: play.kind === 'trailer' })
+  const movie = useQuery({ ...movieOn(source, play.kind === 'trailer' ? play.movieId : 0), enabled: play.kind === 'trailer' })
   // When a file can't play: its movie's other versions, to offer one that may.
-  const failedMovie = useQuery({ ...movieQuery(file.data?.movieId ?? 0), enabled: !!file.data?.movieId && m.phase === 'error' })
+  const failedMovie = useQuery({ ...movieOn(source, file.data?.movieId ?? 0), enabled: !!file.data?.movieId && m.phase === 'error' })
   const recording = useQuery({ ...liveTVRecordingQuery(play.kind === 'recording' ? play.id : ''), enabled: play.kind === 'recording' })
 
   const kind: PlayerKind = m.request?.kind === 'recording' ? 'recording' : m.request?.kind === 'trailer' ? 'trailer' : context ? 'episode' : 'file'

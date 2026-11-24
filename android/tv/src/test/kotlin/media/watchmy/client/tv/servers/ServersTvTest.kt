@@ -110,9 +110,8 @@ class ServersTvTest {
         assertEquals(Cabin.id, current)
         compose.onNodeWithText("Manage servers").assertDoesNotExist()
         compose.onNodeWithText("Now on Cabin server").assertExists()
-        // Its own library, and focus where Home opens: the banner takes none.
-        // The Cabin server's Home: its Continue watching opens it.
-        assertTrue(compose.onAllNodesWithText("Pine Ledger").fetchSemanticsNodes().isNotEmpty())
+        // Its Home, and focus where Home opens: the banner takes none. Home fills from every server, so what is on it
+        // is checked in the ViewModel's tests; here, that it opened on a card.
         assertHomeOpened()
         // It goes by itself.
         ShadowLooper.idleMainLooper(5, TimeUnit.SECONDS)
@@ -218,7 +217,7 @@ class ServersTvTest {
         assertEquals("Servers", focused())
     }
 
-    @Test fun `a search card from another server carries its name, and OK on it switches and lands on its title`() {
+    @Test fun `a search card from another server carries its name, and OK on it opens its title in place`() {
         start()
         press(Key.DirectionLeft)
         repeat(6) { if (focused() != "Search") press(Key.DirectionUp) }
@@ -247,16 +246,13 @@ class ServersTvTest {
         ShadowLooper.idleMainLooper(1, TimeUnit.SECONDS)
         compose.waitForIdle()
 
-        assertEquals("the TV is on the server that has it", Cabin.id, current)
-        compose.onNodeWithText("Now on Cabin server").assertExists()
-        // Back from its page is Search with the same words, on the Cabin server; Back again is its Home.
+        assertEquals("the TV stays on the server it was on", LivingRoom.id, current)
+        compose.onNodeWithText("On Cabin server", substring = true).assertExists()
+        // Back from its page is Search as it was.
         back()
         ShadowLooper.idleMainLooper(2, TimeUnit.SECONDS)
         compose.waitForIdle()
-        compose.onNode(hasText("Harbor Lights") and hasText("Living room server")).assertExists()
-        back()
-        // The Cabin server's Home: its Continue watching opens it.
-        assertTrue(compose.onAllNodesWithText("Pine Ledger").fetchSemanticsNodes().isNotEmpty())
+        compose.onNode(hasText("Harborside") and hasText("Cabin server")).assertExists()
     }
 
     /**

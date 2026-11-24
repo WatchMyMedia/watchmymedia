@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import media.watchmy.client.model.BrowseItem
+import media.watchmy.client.model.DeepLink
 import media.watchmy.client.model.ItemKind
 import media.watchmy.client.model.PlayRequest
 
@@ -25,6 +26,15 @@ fun BrowseItem.open(
 ) {
     val episode = episodeId
     val season = episodeSeason
+    // A card whose copy is on another server opens there, in place.
+    where.serverId?.let { server ->
+        val page = when (kind) {
+            ItemKind.Movie -> DeepLink.Movie(id)
+            ItemKind.Show -> if (onOpenEpisode != null && episode != null && season != null) DeepLink.Show(id, season, episode) else DeepLink.Show(id)
+            ItemKind.Unmatched -> null
+        }
+        if (page != null && InPlace.open(server, page)) return
+    }
     when (kind) {
         ItemKind.Movie -> onOpenMovie(id)
         ItemKind.Show -> if (onOpenEpisode != null && episode != null && season != null) onOpenEpisode(id, season, episode) else onOpenShow(id)

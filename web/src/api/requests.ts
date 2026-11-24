@@ -55,6 +55,8 @@ function useInvalidateRequests() {
     void qc.invalidateQueries({ queryKey: ['requests'] })
     void qc.invalidateQueries({ queryKey: ['show'] })
     void qc.invalidateQueries({ queryKey: ['movie'] })
+    // A collection's films the library lacks carry their request state.
+    void qc.invalidateQueries({ queryKey: ['collection'] })
   }
 }
 
