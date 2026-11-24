@@ -28,6 +28,10 @@ public final class MovieModel {
     public var trailerCode: YouTubeTrailer?
     /// The rows at the end of the page: the collection, then More like this.
     public let related: RelatedRows
+    /// The movie's copies on every server signed in to, once it has loaded
+    /// with a TMDB id; nil with one server (``OneCardContext``).
+    public private(set) var copies: TitleCopiesModel?
+    @ObservationIgnored private let oneCard: OneCardContext?
 
     @ObservationIgnored private let library: any LibraryRepository
     @ObservationIgnored private let playback: any PlaybackControllerFactory
@@ -39,8 +43,10 @@ public final class MovieModel {
 
     /// `device` names this device in how a version would play: "this phone", "this TV".
     /// With `downloads`, a downloaded movie's page opens with no server, and its marks wait for one.
+    /// With `oneCard`, the page offers the movie's copies on other servers too.
     public init(library: any LibraryRepository, playback: any PlaybackControllerFactory, navigator: Navigator, movieID: Int, device: String = "this phone",
-                downloads: (any DownloadRepository)? = nil, now: @escaping @MainActor () -> Date = { Date() }) {
+                downloads: (any DownloadRepository)? = nil, oneCard: OneCardContext? = nil, now: @escaping @MainActor () -> Date = { Date() }) {
+        self.oneCard = oneCard
         changes = ScreenChanges(now: now)
         self.library = library
         self.playback = playback
@@ -68,10 +74,18 @@ public final class MovieModel {
 
     public var watched: Bool { movie?.watched ?? false }
 
-    public var resumable: Bool { movie?.resumable ?? false }
+    /// Resume rather than Play: a place here, or on another server's copy.
+    public var resumable: Bool { (movie?.resumable ?? false) || copies?.resumeMs != nil }
 
-    /// "Resume · 1 h 12 min left" or "Play".
-    public var playLabel: String { WMMFeatures.playLabel(movie?.watch) }
+    /// "Resume · 1 h 12 min left" or "Play"; "Resume from 1:06:12, from
+    /// Cabin" when the place is on another server's copy, which plays.
+    public var playLabel: String {
+        if let copies, let from = copies.resumeFrom, let ms = copies.resumeMs { return "Resume from \(formatClock(ms: ms)), \(from)" }
+        return WMMFeatures.playLabel(movie?.watch)
+    }
+
+    /// Several servers have it: Play plays the chosen copy, and the chooser shows.
+    public var offersCopies: Bool { copies?.onSeveralServers == true }
 
     public var watchToggleLabel: String { WMMFeatures.watchToggleLabel(watched: watched) }
 
@@ -157,7 +171,7 @@ public final class MovieModel {
 
     /// A related title's card: its page, over this one, so Back comes back here.
     public func open(_ item: BrowseItem) {
-        _ = navigator.open(item)
+        _ = navigator.open(item, on: library)
     }
 
     /// A related title's long press: Mark watched or unwatched, with its note.
@@ -169,6 +183,24 @@ public final class MovieModel {
     public func select(_ version: MediaVersion) {
         if version.id != selectedVersion?.id { tracks = TrackChoice() }
         selectedVersionID = version.id
+        if let copy = copies?.here.first(where: { $0.version.fileID == version.fileID }) { copies?.choose(copy) }
+    }
+
+    /// Chooses another server's copy, or one of the page's, for Play: kept
+    /// for this title on this device.
+    public func choose(_ copy: TitleCopy) {
+        guard let copies else { return }
+        if copies.here.contains(copy) {
+            if copy.version.id != selectedVersion?.id { tracks = TrackChoice() }
+            selectedVersionID = copy.version.id
+        }
+        copies.choose(copy)
+    }
+
+    /// Plays a copy at once (Versions' Play this), resuming at the latest place on any server.
+    public func play(_ copy: TitleCopy) {
+        guard let base = movie?.playRequest(version: selectedVersion), let request = copies?.request(base, copy: copy) else { return }
+        navigator.play(request)
     }
 
     /// The sound Play starts with, of the selected version; nil is the file's default.
@@ -184,13 +216,19 @@ public final class MovieModel {
     /// Plays the selected version, with the sound and subtitles chosen: resumes, or plays from 0:00 with `fromStart`.
     public func play(fromStart: Bool = false) {
         guard let request = movie?.playRequest(version: selectedVersion, fromStart: fromStart) else { return }
-        navigator.play(tracks.applied(to: request))
+        if let copies, let chosen = copies.chosen, let other = copies.request(request, copy: chosen, fromStart: fromStart) {
+            // The tracks chosen are the page's version's: they go with it alone.
+            navigator.play(copies.here.contains(chosen) && chosen.version.id == selectedVersion?.id ? tracks.applied(to: other) : other)
+            return
+        }
+        navigator.play(tracks.applied(to: request.on(library.serverScope)))
     }
 
     /// A version's Play this: that file, resuming.
     public func play(_ version: MediaVersion) {
+        if let copy = copies?.here.first(where: { $0.version.fileID == version.fileID }) { return play(copy) }
         guard let request = movie?.playRequest(version: version) else { return }
-        navigator.play(request)
+        navigator.play(request.on(library.serverScope))
     }
 
     /// Trailer. A trailer file plays in our player
@@ -202,7 +240,7 @@ public final class MovieModel {
         guard let movie, let trailer = chosen ?? movie.trailer else { return }
         switch trailer.source {
         case .file(let fileID):
-            navigator.play(movie.trailerRequest(fileID: fileID, name: trailer.name))
+            navigator.play(movie.trailerRequest(fileID: fileID, name: trailer.name).on(library.serverScope))
         case .youTube(let youTube):
             if let openApp {
                 if !openApp(youTube.appURL) { trailerCode = youTube }
@@ -235,6 +273,16 @@ public final class MovieModel {
 
     // MARK: Internals
 
+    /// The page's copies, and the other servers asked once for theirs.
+    private func updateCopies(_ movie: MovieDetail) {
+        guard let oneCard, oneCard.applies, let tmdb = movie.tmdbID else { return }
+        let copies = self.copies ?? TitleCopiesModel(services: oneCard.services, subject: .movie(tmdbID: tmdb), choices: oneCard.choices)
+        self.copies = copies
+        if let server = copies.pageServer { copies.setHere(TitleCopiesModel.copies(of: movie, on: server)) }
+        if selectedVersionID == nil, let chosen = copies.chosen, copies.here.contains(chosen) { selectedVersionID = chosen.version.id }
+        Task { await copies.load() }
+    }
+
     /// A load still running when another starts is cancelled.
     func load(quiet: Bool) async {
         await loads.run { [weak self] load in await self?.fetch(load, quiet: quiet) }
@@ -262,6 +310,7 @@ public final class MovieModel {
         state = result
         guard let movie = result.value else { return }
         if let selectedVersionID, !movie.versions.contains(where: { $0.id == selectedVersionID }) { self.selectedVersionID = nil }
+        updateCopies(movie)
         // Asked beside the plans, with the page already drawn; neither can fail the page.
         async let rows: Void = related.load()
         // A version list without the play mode is still right, so this cannot fail the page.

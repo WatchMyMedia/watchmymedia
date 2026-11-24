@@ -66,6 +66,11 @@ public final class ShowPageModel {
     public private(set) var plans: [Int: PlaybackPlan] = [:]
     /// Asks the server how a file would play; nil where the page shows no File details (iPhone, iPad).
     @ObservationIgnored public var playback: (any PlaybackControllerFactory)?
+    /// The show on the other servers signed in to, once it has loaded with a TMDB id; nil with one server.
+    public private(set) var elsewhere: ShowElsewhere?
+    /// The episode on top's copies on every server, while the show is on two or more.
+    public private(set) var episodeCopies: TitleCopiesModel?
+    @ObservationIgnored private let oneCard: OneCardContext?
 
     @ObservationIgnored private let library: any LibraryRepository
     @ObservationIgnored private let requests: (any RequestsRepository)?
@@ -83,7 +88,8 @@ public final class ShowPageModel {
     @ObservationIgnored private var placed = false
 
     public init(library: any LibraryRepository, navigator: Navigator, showID: Int, arrival: ShowArrival = .show, requests: (any RequestsRepository)? = nil, preferences: (any PreferencesRepository)? = nil, downloads: (any DownloadRepository)? = nil, downloadSession: (@MainActor () -> String?)? = nil,
-                now: @escaping @MainActor () -> Date = { Date() }) {
+                oneCard: OneCardContext? = nil, now: @escaping @MainActor () -> Date = { Date() }) {
+        self.oneCard = oneCard
         changes = ScreenChanges(now: now)
         self.library = library
         self.navigator = navigator
@@ -142,8 +148,22 @@ public final class ShowPageModel {
     /// the one on top; every episode with Show missing on.
     public var seasonEpisodes: [EpisodeDetail] {
         let all = loadedSeason?.value?.episodes ?? []
-        return missingShown ? all : all.filter { $0.hasFile || !$0.aired || $0.id == episodeID }
+        return missingShown ? all : all.filter { $0.hasFile || !$0.aired || $0.id == episodeID || onlyOn($0) != nil }
     }
+
+    /// The server an episode without a file here is on: listed in its
+    /// season, in its place, with "On Cabin", and played from there.
+    public func onlyOn(_ episode: EpisodeDetail) -> CardServer? {
+        guard !episode.hasFile, let elsewhere else { return nil }
+        return elsewhere.onlyOn(season: episode.season, number: episode.number)
+    }
+
+    /// An episode plays: from here, or from the server that has it.
+    public func canPlay(_ episode: EpisodeDetail) -> Bool { episode.playable || onlyOn(episode) != nil }
+
+    /// The show is on two servers or more: Apple TV's button after Play
+    /// stays for every episode, so the row doesn't move as focus does.
+    public var showOnSeveralServers: Bool { !(elsewhere?.servers.isEmpty ?? true) }
 
     /// The row's state: loading or failed while the chosen season comes in.
     public var rowState: Loadable<[EpisodeDetail]> {
@@ -223,7 +243,7 @@ public final class ShowPageModel {
 
     /// A related show's card: its page, over this one, so Back comes back here.
     public func open(_ item: BrowseItem) {
-        _ = navigator.open(item)
+        _ = navigator.open(item, on: library)
     }
 
     /// A related show's long press: Mark watched or unwatched, with its note.
@@ -252,6 +272,7 @@ public final class ShowPageModel {
         reason = nil
         note = nil
         dialog = nil
+        updateEpisodeCopies()
     }
 
     /// Refreshes queued marks, local progress and removed downloads without a network request.
@@ -284,8 +305,9 @@ public final class ShowPageModel {
         case .loaded(let full):
             loadedShow = result
             offline = false
-            // Asked beside the season, with nothing waiting on it.
+            // Asked beside the season, with nothing waiting on it; the other servers too.
             async let rows: Void = related.load()
+            Task { await askElsewhere(full) }
             await placeSeason(full, load: load, quiet: quiet)
             await rows
         }
@@ -336,6 +358,13 @@ public final class ShowPageModel {
         }
         loadedSeason = result
         placeTop(in: season, by: place)
+        updateEpisodeCopies()
+        if let elsewhere {
+            Task {
+                await elsewhere.loadSeason(number)
+                updateEpisodeCopies()
+            }
+        }
     }
 
     private func placeTop(in season: SeasonDetail, by place: Placing?) {
@@ -439,8 +468,66 @@ public final class ShowPageModel {
     /// The episode on top: resumes where the viewer left off, or plays from 0:00 with `fromStart`.
     public func play(fromStart: Bool = false) {
         guard let episode, let request = playRequest(episode, fromStart: fromStart) else { return }
+        if let copies = copies(for: episode), let chosen = copies.chosen, let other = copies.request(request, copy: chosen, fromStart: fromStart) {
+            // The tracks chosen are the page's first version's: they go with it alone.
+            navigator.play(chosen.version.id == episode.versions.first?.id && copies.here.contains(chosen) ? tracks.applied(to: other) : other)
+            return
+        }
         // The tracks chosen are the first version's, which Play plays.
         navigator.play(tracks.applied(to: request))
+    }
+
+    /// The copies of `episode` across servers: the one on top's, kept as
+    /// the person chooses, or for another a fresh look from what was asked.
+    private func copies(for episode: EpisodeDetail) -> TitleCopiesModel? {
+        if episode.id == episodeID { return episodeCopies }
+        return makeCopies(episode)
+    }
+
+    private func makeCopies(_ episode: EpisodeDetail) -> TitleCopiesModel? {
+        guard let oneCard, let elsewhere, !elsewhere.servers.isEmpty, let tmdb = loadedShow.value?.tmdbID else { return nil }
+        let copies = TitleCopiesModel(services: oneCard.services, subject: .episode(showTMDBID: tmdb, season: episode.season, number: episode.number), choices: oneCard.choices)
+        if let server = copies.pageServer { copies.setHere(TitleCopiesModel.copies(of: episode, on: server)) }
+        copies.setFound(elsewhere.copies(season: episode.season, number: episode.number), out: elsewhere.out, slow: elsewhere.slow)
+        return copies
+    }
+
+    /// The episode on top's copies again: it changed, or what was asked came in.
+    private func updateEpisodeCopies() {
+        guard let episode else {
+            episodeCopies = nil
+            return
+        }
+        if let current = episodeCopies, case .episode(_, let season, let number) = current.subject, season == episode.season, number == episode.number {
+            if let server = current.pageServer { current.setHere(TitleCopiesModel.copies(of: episode, on: server)) }
+            if let elsewhere { current.setFound(elsewhere.copies(season: episode.season, number: episode.number), out: elsewhere.out, slow: elsewhere.slow) }
+            return
+        }
+        episodeCopies = makeCopies(episode)
+    }
+
+    /// Asks the other servers for the show once it is in, then for the season showing.
+    private func askElsewhere(_ show: ShowDetail) async {
+        guard let oneCard, oneCard.applies, let tmdb = show.tmdbID else { return }
+        let elsewhere = self.elsewhere ?? ShowElsewhere(services: oneCard.services, showTMDBID: tmdb)
+        self.elsewhere = elsewhere
+        let page = oneCard.services.scope ?? oneCard.services.servers.current?.server.id
+        var others = oneCard.services.servers.otherCardServers
+        if let current = oneCard.services.servers.currentCardServer { others.insert(current, at: 0) }
+        await elsewhere.load(asking: others.filter { $0.id != page })
+        if let season = selectedSeason { await elsewhere.loadSeason(season) }
+        updateEpisodeCopies()
+    }
+
+    /// Chooses a copy of the episode on top for Play: kept for it on this device.
+    public func choose(_ copy: TitleCopy) {
+        episodeCopies?.choose(copy)
+    }
+
+    /// Plays a copy of the episode on top at once (Versions' Play this), resuming at the latest place.
+    public func play(_ copy: TitleCopy) {
+        guard let episode, let base = playRequest(episode), let request = episodeCopies?.request(base, copy: copy) else { return }
+        navigator.play(request)
     }
 
     /// The sound and subtitles chosen for the episode on top (Apple TV's
@@ -486,13 +573,20 @@ public final class ShowPageModel {
     /// (``CardPlayPause``): plays it, resuming, when it is on disk; else the
     /// card's Select, which puts it on top.
     public func cardPlayPause(_ episode: EpisodeDetail) -> CardPlayPause {
-        guard episode.playable, let request = playRequest(episode) else { return .select }
+        guard canPlay(episode), let request = playRequest(episode) else { return .select }
+        if let copies = copies(for: episode), let chosen = copies.chosen, let other = copies.request(request, copy: chosen) { return .play(other) }
         return .play(request)
     }
 
     private func playRequest(_ episode: EpisodeDetail, fromStart: Bool = false) -> PlayRequest? {
         let show = loadedShow.value
-        return episode.playRequest(showTitle: showTitle, backdropPath: show?.backdropPath, posterPath: show?.posterPath, fromStart: fromStart, showID: offline ? nil : showID)
+        // An episode only another server has: its copy there stands in until the chosen one replaces it.
+        var episode = episode
+        if episode.versions.isEmpty, let server = onlyOn(episode), let copy = elsewhere?.copies(season: episode.season, number: episode.number)[server.id]?.first {
+            episode.versions = [copy.version]
+        }
+        return episode.playRequest(showTitle: showTitle, backdropPath: show?.backdropPath, posterPath: show?.posterPath, fromStart: fromStart, showID: offline ? nil : showID)?
+            .on(library.serverScope)
     }
 
     /// Mark watched, or Mark unwatched (which takes it back to not started).

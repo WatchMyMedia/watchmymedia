@@ -35,7 +35,8 @@ struct ShowScreen: View {
         ShowPageView(model: {
             let model = ShowPageModel(
                 library: services.library, navigator: navigator, showID: id, arrival: ShowArrival(season: season, episode: episode),
-                requests: services.requests, preferences: services.preferences
+                requests: services.requests, preferences: services.preferences,
+                oneCard: OneCardContext(services: services, choices: CopyChoices())
             )
             model.playback = services.playback
             return model
@@ -48,6 +49,8 @@ private enum PageFocus: Hashable {
     case play
     /// The episode's More.
     case more
+    /// The button after Play naming the copy it uses, while the show is on two servers or more.
+    case chooser
     case tab(Int)
     case markSeason
     case card(Int)
@@ -69,6 +72,8 @@ private struct ShowPageView: View {
     @State var model: ShowPageModel
     /// Focus went to the top once; after that, it stays where the person puts it.
     @State private var focusedTop = false
+    /// A copy was chosen in the panel: focus goes back to Play, which now plays it.
+    @State private var chose = false
     @FocusState private var focus: PageFocus?
     /// The episode row's cards and its bumps at the first episode (``RowStartScrolling``).
     @State private var rowCards = RowStartCards<EpisodeDetail.ID>()
@@ -85,7 +90,10 @@ private struct ShowPageView: View {
                     // While a panel is up, the page under it takes no focus.
                     .disabled(panel != nil)
                 if let panel {
-                    ShowPanels(panel: panel, model: model, show: show) { self.panel = $0 }
+                    ShowPanels(panel: panel, model: model, show: show, go: { self.panel = $0 }, chose: {
+                        chose = true
+                        self.panel = nil
+                    })
                         .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
@@ -118,10 +126,12 @@ private struct ShowPageView: View {
             // The panel closed: focus goes back to the More that opened it, once the page takes focus again.
             let back: PageFocus
             switch (old, new) {
+            case (.episode(.copies)?, nil): back = chose ? .play : .chooser
             case (.episode?, nil): back = .more
             case (.show?, nil): back = .aboutMore
             default: return
             }
+            chose = false
             Task { @MainActor in
                 for _ in 0..<6 where focus != back {
                     focus = back
@@ -267,6 +277,11 @@ private struct ShowPageView: View {
                 if let line = show.tvLine {
                     Text(line).font(.tv(.caption1)).foregroundStyle(Palette.muted).lineLimit(1)
                 }
+                // Where else the show is; nothing more about other servers until the chooser opens.
+                if let elsewhere = model.elsewhere, !elsewhere.servers.isEmpty {
+                    Text("Also on \(liveListed(elsewhere.servers.map(\.shortName)))").font(.tv(.caption1)).foregroundStyle(Palette.muted).lineLimit(1)
+                        .accessibilityIdentifier("show-also-on")
+                }
             }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
@@ -279,7 +294,7 @@ private struct ShowPageView: View {
                 .minimumScaleFactor(0.7)
                 .frame(maxWidth: 1100, alignment: .leading)
                 .accessibilityAddTraits(.isHeader)
-            FactsLine(lead: episode.watched ? "Watched" : nil, parts: episode.tvFacts(), rating: show.contentRating)
+            FactsLine(lead: episode.watched ? "Watched" : nil, parts: episode.tvFacts() + [model.onlyOn(episode).map { OneCardWords.on($0.shortName) }].compactMap { $0 }, rating: show.contentRating)
             if !episode.overview.isEmpty {
                 Text(episode.overview)
                     .font(.tv(.body))
@@ -293,7 +308,7 @@ private struct ShowPageView: View {
             if model.reason == .watchedItAll {
                 Text(watchedItAllLine).font(.tv(.caption1)).foregroundStyle(Palette.textSecondary)
             }
-            if !episode.hasFile && episode.aired {
+            if !episode.hasFile && episode.aired && model.onlyOn(episode) == nil {
                 StatusLineView(episode.missingLine(), fontSize: TVText.caption1.rawValue, barWidth: 360)
             }
             if episode.playable, let ends = WhenItEnds.line(watch: episode.watch, durationMs: nil), ends.left != nil {
@@ -308,24 +323,36 @@ private struct ShowPageView: View {
     private func buttons(_ episode: EpisodeDetail) -> some View {
         let actions = episode.actions()
         let request = model.canRequest(episode), search = model.canSearchNow(episode), monitor = model.canMonitor(episode)
+        let copies = model.episodeCopies
+        let resumes = episode.resumable || copies?.resumeMs != nil
         return HStack(spacing: 20) {
-            if episode.playable {
+            if model.canPlay(episode) {
                 Button { model.play() } label: {
-                    Text("\(Image(systemName: "play.fill")) \(episode.resumable ? "Resume" : "Play")")
+                    Text("\(Image(systemName: "play.fill")) \(resumes ? "Resume" : "Play")\(copies?.resumeFrom.map { " · \($0)" } ?? "")")
                 }
                 .buttonStyle(TVButtonStyle(kind: .primary))
                 .focused($focus, equals: .play)
                 // "Play · 52 min", "Resume from 23:10": what the button does, in full.
                 .accessibilityLabel(episode.pagePlayLabel ?? "Play")
-                if actions.fromStart {
+                // While the show is on two servers, the copy Play uses, for every episode, so the row doesn't move.
+                if model.showOnSeveralServers, let chosen = copies?.chosen {
+                    Button { panel = .episode(.copies) } label: { Text("\(chosen.label) \(Image(systemName: "chevron.down"))") }
+                        .buttonStyle(TVButtonStyle())
+                        .focused($focus, equals: .chooser)
+                        .accessibilityLabel("Plays \(chosen.label). Choose a version")
+                        .accessibilityIdentifier("episode-copies")
+                }
+                if actions.fromStart || (copies?.resumeMs != nil && !episode.resumable) {
                     Button("From the start") { model.play(fromStart: true) }
                         .buttonStyle(TVButtonStyle())
                 }
-                Button("More") { panel = .episode(.more) }
-                    .buttonStyle(TVButtonStyle())
-                    .focused($focus, equals: .more)
-                    .disabled(model.busy)
-                    .accessibilityIdentifier("episode-more")
+                if episode.playable {
+                    Button("More") { panel = .episode(.more) }
+                        .buttonStyle(TVButtonStyle())
+                        .focused($focus, equals: .more)
+                        .disabled(model.busy)
+                        .accessibilityIdentifier("episode-more")
+                }
             } else if episode.aired {
                 if request {
                     Button(model.seasonRequestLabel) { model.requestSeason() }
@@ -442,7 +469,9 @@ private struct ShowPageView: View {
             if hasTopButton(episode) { focus = .play }
         }
         return Button(action: select) {
-            EpisodeCardFace(episode: episode, line: line, imageURL: episode.hasFile ? url(episode.stillPath, .w780) : nil, seed: seed(episode), onTop: onTop)
+            EpisodeCardFace(episode: episode, line: model.onlyOn(episode).map { OneCardWords.on($0.shortName) } ?? line,
+                            imageURL: episode.hasFile ? url(episode.stillPath, .w780) : nil, seed: seed(episode), onTop: onTop,
+                            elsewhere: model.onlyOn(episode) != nil)
         }
         .buttonStyle(.borderless)
         .focused($focus, equals: .card(episode.id))
@@ -463,6 +492,8 @@ private struct EpisodeCardFace: View {
     let imageURL: URL?
     let seed: String
     let onTop: Bool
+    /// Only another server has it: drawn as one that plays, from there.
+    var elsewhere = false
     @Environment(\.isFocused) private var focused
     @Environment(\.displayScale) private var scale
 
@@ -470,7 +501,7 @@ private struct EpisodeCardFace: View {
         let width = TVCardWidth.wide, height = (TVCardWidth.wide * 9 / 16).rounded()
         VStack(alignment: .leading, spacing: 0) {
             Group {
-                if episode.hasFile {
+                if episode.hasFile || elsewhere {
                     Artwork(url: imageURL, seed: seed, maxPixel: cardPixels(width: width, height: height, scale: scale))
                 } else {
                     RoundedRectangle(cornerRadius: 14)
@@ -689,6 +720,8 @@ private struct ShowPanels: View {
     let model: ShowPageModel
     let show: ShowDetail
     let go: (ShowPanel?) -> Void
+    /// A copy was chosen: the panel closes onto Play.
+    let chose: () -> Void
     @FocusState private var firstFocused: Bool
 
     var body: some View {
@@ -828,6 +861,14 @@ private struct ShowPanels: View {
                 facts: episode.versions.prefix(3).map { $0.fileFacts(plan: model.plans[$0.fileID], isDefault: $0.id == first?.id, several: episode.versions.count > 1) }
             ) { go(.episode(.more)) }
             .task { await model.loadPlans() }
+        case .copies:
+            if let copies = model.episodeCopies {
+                CopiesPanel(title: episode.displayTitle, copies: copies, firstFocused: $firstFocused) { copy in
+                    model.choose(copy)
+                    chose()
+                }
+                .onExitCommand { go(nil) }
+            }
         case .version, .trailers:
             EmptyView()
         }

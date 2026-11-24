@@ -26,7 +26,8 @@ struct MovieScreen: View {
 
     var body: some View {
         MovieView(
-            model: MovieModel(library: services.library, playback: services.playback, navigator: navigator, movieID: id, device: "Apple TV"),
+            model: MovieModel(library: services.library, playback: services.playback, navigator: navigator, movieID: id, device: "Apple TV",
+                              oneCard: OneCardContext(services: services, choices: CopyChoices())),
             tab: tab
         )
     }
@@ -34,12 +35,14 @@ struct MovieScreen: View {
 
 /// What the buttons' row holds focus on, by button.
 private enum MovieFocus: Hashable {
-    case play, fromStart, trailer, watchlist, more
+    case play, chooser, fromStart, trailer, watchlist, more
 }
 
 /// More's panels: More itself, and what its rows open.
 enum TitlePanel: Hashable {
     case more, files, version, sound, subtitles, trailers
+    /// The copies on every server, grouped by server (one card).
+    case copies
 }
 
 private struct MovieView: View {
@@ -52,6 +55,8 @@ private struct MovieView: View {
     @State private var panel: TitlePanel?
     /// Focus went to the main button once; after that, it stays where the person puts it.
     @State private var focusedPlay = false
+    /// A copy was chosen in the panel: focus goes back to Play, which now plays it.
+    @State private var chose = false
     @Environment(AppServices.self) private var services
     @Environment(WatchlistStore.self) private var watchlists
 
@@ -64,6 +69,9 @@ private struct MovieView: View {
                 if let panel {
                     MoviePanels(panel: panel, model: model, movie: movie, canReport: services.requests.options.problems, openApp: openYouTubeApp) { next in
                         self.panel = next
+                    } chose: {
+                        chose = true
+                        self.panel = nil
                     } report: {
                         self.panel = nil
                         report = ReportProblemModel(requests: services.requests, target: .movie(movie))
@@ -91,7 +99,9 @@ private struct MovieView: View {
         .onChange(of: panel) { old, new in
             // The panel closed: focus goes back to the button that opened it (More, or Trailers), once the page takes focus again.
             guard let old, new == nil else { return }
-            let back: MovieFocus = old == .trailers ? .trailer : .more
+            // A copy chosen: back on Play, which plays it. Back from the panel: on the button that opened it.
+            let back: MovieFocus = old == .trailers ? .trailer : old == .copies ? (chose ? .play : .chooser) : .more
+            chose = false
             Task { @MainActor in
                 for _ in 0..<6 where focus != back {
                     focus = back
@@ -160,6 +170,10 @@ private struct MovieView: View {
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("title-page-title")
             FactsLine(parts: facts.before, rating: movie.contentRating, after: facts.after)
+            // Where else it is, and nothing more about other servers until the chooser opens.
+            if let also = model.copies?.alsoLine {
+                Text(also).font(.tv(.caption1)).foregroundStyle(Palette.muted).accessibilityIdentifier("title-also-on")
+            }
             if let recording = model.selectedVersion?.recording ?? movie.versions.first?.recording {
                 Text("\(Image(systemName: "record.circle")) \(recording.line())").font(.tv(.caption1)).foregroundStyle(Palette.liveText)
             }
@@ -199,11 +213,19 @@ private struct MovieView: View {
         return HStack(spacing: 20) {
             if !movie.versions.isEmpty {
                 Button { model.play() } label: {
-                    Text("\(Image(systemName: "play.fill")) \(model.resumable ? "Resume" : "Play")")
+                    Text("\(Image(systemName: "play.fill")) \(model.resumable ? "Resume" : "Play")\(model.copies?.resumeFrom.map { " · \($0)" } ?? "")")
                 }
                 .buttonStyle(TVButtonStyle(kind: .primary))
                 .focused($focus, equals: .play)
                 .accessibilityLabel(model.playLabel)
+                // On two servers or more: the copy Play uses, which opens the versions grouped by server.
+                if model.offersCopies, let chosen = model.copies?.chosen {
+                    Button { panel = .copies } label: { Text("\(chosen.label) \(Image(systemName: "chevron.down"))") }
+                        .buttonStyle(TVButtonStyle())
+                        .focused($focus, equals: .chooser)
+                        .accessibilityLabel("Plays \(chosen.label). Choose a version")
+                        .accessibilityIdentifier("title-copies")
+                }
                 if model.resumable {
                     Button("From the start") { model.play(fromStart: true) }
                         .buttonStyle(TVButtonStyle())
@@ -221,7 +243,8 @@ private struct MovieView: View {
                     .accessibilityIdentifier("movie-trailer")
                     .accessibilityHint(trailerHint ?? "")
             }
-            if let watchlist {
+            // Watchlists are the server in use's: a title opened from another server has none.
+            if let watchlist, services.scope == nil {
                 TVWatchlistButton(title: watchlist, said: movie.watchlists)
                     .focused($focus, equals: .watchlist)
             }
@@ -362,6 +385,8 @@ private struct MoviePanels: View {
     /// Opens a YouTube trailer in the YouTube app; false without it.
     let openApp: (URL) -> Bool
     let go: (TitlePanel?) -> Void
+    /// A copy was chosen: the panel closes onto Play.
+    let chose: () -> Void
     let report: () -> Void
     @FocusState private var firstFocused: Bool
 
@@ -369,6 +394,14 @@ private struct MoviePanels: View {
         let version = model.selectedVersion
         TVSidePanel {
             switch panel {
+            case .copies:
+                if let copies = model.copies {
+                    CopiesPanel(title: movie.title, copies: copies, firstFocused: $firstFocused) { copy in
+                        model.choose(copy)
+                        chose()
+                    }
+                    .onExitCommand { go(nil) }
+                }
             case .trailers:
                 PanelRows(title: "Trailers") {
                     ForEach(Array(movie.trailers.enumerated()), id: \.element.choiceID) { index, trailer in
@@ -464,7 +497,7 @@ private extension MoviePanels {
     /// Sound with two tracks or more, Subtitles with any.
     func moreRows(_ version: MediaVersion?) -> [MoreRow] {
         var rows: [MoreRow] = []
-        if movie.versions.count > 1 { rows.append(.version) }
+        if movie.versions.count > 1 || model.offersCopies { rows.append(.version) }
         if let version, version.audio.count > 1 { rows.append(.sound) }
         if let version, !version.subtitles.isEmpty { rows.append(.subtitles) }
         rows.append(.watched)
@@ -476,7 +509,8 @@ private extension MoviePanels {
     @ViewBuilder func moreRow(_ row: MoreRow, version: MediaVersion?) -> some View {
         switch row {
         case .version:
-            Button { go(.version) } label: { TVRowLabel(title: "Version", value: version?.choiceLabel) }
+            // On two servers or more, Version opens the same versions grouped by server.
+            Button { go(model.offersCopies ? .copies : .version) } label: { TVRowLabel(title: "Version", value: model.offersCopies ? model.copies?.chosen?.label : version?.choiceLabel) }
                 .buttonStyle(TVListRowStyle())
                 .accessibilityIdentifier("title-version")
         case .sound:
@@ -588,5 +622,44 @@ struct FileDetails: View {
                 doneFocused = true
             }
         }
+    }
+}
+
+/// The versions on every server, grouped by server: the server in use
+/// first, a server away from home last with its note. The copy Play uses is
+/// ticked and has focus as the panel opens; Select chooses one and closes the
+/// panel. Where the person got further on another server, the first line
+/// says Resume starts there whichever is chosen; a server still being asked
+/// ends the list.
+struct CopiesPanel: View {
+    let title: String
+    let copies: TitleCopiesModel
+    var firstFocused: FocusState<Bool>.Binding
+    let choose: (TitleCopy) -> Void
+
+    var body: some View {
+        let chosen = copies.chosen
+        PanelRows(title: title) {
+            if let note = copies.resumeNote {
+                Text(note).font(.tv(.body)).foregroundStyle(Palette.textSecondary).fixedSize(horizontal: false, vertical: true)
+            }
+            ForEach(copies.groups) { group in
+                TVGroupLabel(group.heading)
+                if let note = group.note {
+                    Text(note).font(.tv(.caption1)).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+                }
+                ForEach(group.copies) { copy in
+                    Button { choose(copy) } label: { TVRowLabel(title: copy.quality, value: copy.placeLine) }
+                        .buttonStyle(TVListRowStyle(checked: copy.id == chosen?.id))
+                        .panelFirst(copy.id == chosen?.id, firstFocused)
+                        .accessibilityLabel(copy.accessibilityLabel + (copy.id == chosen?.id ? ", chosen" : ""))
+                        .accessibilityIdentifier("copy-\(copy.id)")
+                }
+            }
+            if let asking = copies.stillAsking {
+                Text(asking).font(.tv(.caption1)).foregroundStyle(Palette.muted).accessibilityIdentifier("copies-still-asking")
+            }
+        }
+        .accessibilityIdentifier("title-copies-panel")
     }
 }
