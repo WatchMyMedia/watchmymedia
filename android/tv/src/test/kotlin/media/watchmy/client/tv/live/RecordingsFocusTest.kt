@@ -97,8 +97,13 @@ class RecordingsFocusTest {
         compose.onNodeWithText("Delete recording…").assertExists()
         repeat(3) { press(Key.DirectionDown) }
         compose.onNode(isFocused() and hasText("Delete recording…")).assertExists()
+        // Delete is the last of the recording's choices.
+        press(Key.DirectionDown)
+        compose.onNode(isFocused() and hasText("Delete recording…")).assertExists()
         press(Key.DirectionCenter)
         compose.onNode(isFocused() and hasText("Keep it")).assertExists()
+        // It asks first, naming which recording goes.
+        compose.onNodeWithText("Delete the recorded file? This can’t be undone.", substring = true).assertExists()
         press(Key.DirectionCenter)
         compose.onNodeWithText("Delete recording").assertDoesNotExist()
         // Kept, and focus back on the card that opened it.
