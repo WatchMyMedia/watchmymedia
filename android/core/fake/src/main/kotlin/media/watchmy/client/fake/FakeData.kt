@@ -367,6 +367,7 @@ object FakeData {
                 MediaVersion(
                     9400 + m.id, "${m.title} (${m.year}) - 2160p Remux.mkv", 61_000_000_000L, "MKV", "hevc", 3840, 2160, "Dolby Vision", "TrueHD 7.1 · English", (m.runtimeMin ?: 110) * 60_000L,
                     dvProfile = 8,
+                    addedAtMs = System.currentTimeMillis() - (m.id - 495) * 9 * 86_400_000L,
                     audio = listOf(
                         AudioOption(1, "English · TrueHD 7.1 (Default)", "eng", true),
                         AudioOption(2, "English · AC3 5.1", "eng", false),
@@ -382,6 +383,7 @@ object FakeData {
                 ),
                 MediaVersion(
                     9500 + m.id, "${m.title} (${m.year}) - 1080p.mp4", 9_800_000_000L, "MP4", "h264", 1920, 1080, null, "AAC 5.1 · English", (m.runtimeMin ?: 110) * 60_000L,
+                    addedAtMs = System.currentTimeMillis() - (m.id - 495) * 30 * 86_400_000L,
                     audio = listOf(AudioOption(1, "English · AAC 5.1 (Default)", "eng", true)),
                     subtitles = listOf(SubtitleOption("s2", "English", "eng", forced = false, burnInOnly = false, format = "TX3G")),
                 ),
