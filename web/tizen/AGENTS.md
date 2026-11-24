@@ -343,7 +343,13 @@ fictional server). `pnpm build:tizen` builds unsigned app contents for Chromium
 108, as one classic deferred script without `crossorigin`: the package loads
 from `file://`, where module scripts can be refused. Keep it that way, and keep
 code free of `import.meta` beyond `import.meta.env`, which the build replaces.
-`pnpm build:tizen-core` bundles the core separately. `pnpm typecheck`,
+Two real servers in the preview (one card across servers) need a Vite proxy
+each: the server answers CORS only for the packaged app's own origin, so a
+`localhost` page can't reach a second server directly. A scratch config that
+imports `../vite.tizen.config.ts` and overrides `server.port` and
+`server.proxy` puts one in front of each throwaway server, and the second is
+added by its proxy's address. This is how the preview reaches them, not how a
+TV does. `pnpm build:tizen-core` bundles the core separately. `pnpm typecheck`,
 `pnpm lint` and `pnpm test` include this entry. Run both existing web and
 receiver builds when shared code changes.
 
