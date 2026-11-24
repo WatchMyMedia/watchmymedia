@@ -27,6 +27,10 @@ internal fun LiveTVRecording.toModel(): LiveRecording? {
             val to = epochMs(holder.end)?.takeIf { it > from } ?: return@mapNotNull null
             RecordingConflict(holder.id, holder.title, holder.number, holder.channelName, from, to, holder.userName, holder.running)
         },
+        isNew = new == true,
+        repeat = repeat == true,
+        watchedProgress = progress?.takeIf { it.durationMs > 0 && it.positionMs > 0 }?.let { (it.positionMs.toDouble() / it.durationMs).coerceIn(0.0, 1.0).toFloat() },
+        watched = watched == true,
     )
 }
 
@@ -40,4 +44,5 @@ internal fun LiveTVRecordingRule.toModel() = LiveRecordingRule(
 internal fun LiveTVRecordings.toModel() = RecordingPage(
     items = items.mapNotNull { it.toModel() }, rules = rules.orEmpty().map { it.toModel() },
     nextCursor = nextCursor?.takeIf { it.isNotBlank() }, tuners = tuners?.coerceIn(0, 128)?.toInt(), freeBytes = freeBytes?.coerceAtLeast(0),
+    reserveBytes = reserveBytes?.coerceAtLeast(0),
 )

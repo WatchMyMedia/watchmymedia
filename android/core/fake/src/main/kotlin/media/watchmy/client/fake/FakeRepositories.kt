@@ -27,7 +27,9 @@ import media.watchmy.client.model.MediaType
 import media.watchmy.client.model.WatchlistKey
 import media.watchmy.client.model.AudioPassthrough
 import media.watchmy.client.model.AuthRepository
+import media.watchmy.client.model.BrowseItem
 import media.watchmy.client.model.ContinueItem
+import media.watchmy.client.model.ItemKind
 import media.watchmy.client.model.DeepLink
 import media.watchmy.client.model.DevicePlayback
 import media.watchmy.client.model.DeviceSession
@@ -74,7 +76,7 @@ private suspend fun latency() {
  * feature. A fake server at a lower level hides what its level lacks, as a
  * real one does.
  */
-const val FAKE_SERVER_API_LEVEL = 33
+const val FAKE_SERVER_API_LEVEL = 34
 
 /** The asset URL of one of the fakes' fictional backdrops ([FakeData.backdrop]); null for any other path. */
 fun fakeArtUrl(path: String?): String? =
@@ -306,20 +308,80 @@ class FakeLibraryRepository(
     /** The fake servers, each with a library of its own; null serves the Living room server's alone. */
     private val servers: FakeServerRepository? = null,
     private val user: () -> String? = { "Sam" },
+    /** The server this repository talks to whichever is in use ([on]); null is the one in use. */
+    private val pinned: String? = null,
+    /** What every server's repository shares: the titles taken off Continue watching, and the other servers' repositories. */
+    private val shared: Shared = Shared(),
 ) : LibraryRepository {
+    class Shared {
+        /** Taken off Continue watching: the server (null for the Living room's, unpinned), the kind and the id. */
+        val hidden: MutableSet<Triple<String?, ContinueItem.Kind, Long>> = java.util.Collections.synchronizedSet(mutableSetOf())
+        val bound = java.util.concurrent.ConcurrentHashMap<String, FakeLibraryRepository>()
+    }
+
     /** The server can't be reached: Home and the pages fail as with no connection, for the offline Home (-PfakesOffline=true). */
     var offline: Boolean = false
 
     private fun shelfOf(serverId: String?): FakeShelf = if (serverId == Cabin.id) FakeCabin.shelf else LivingRoomShelf
 
-    /** The library of the server in use. */
-    private fun shelf(): FakeShelf = shelfOf(servers?.current?.value?.server?.id)
+    /** The id of the server this repository talks to. */
+    private fun serverId(): String? = pinned ?: servers?.current?.value?.server?.id
+
+    /** The library of the server this talks to. */
+    private fun shelf(): FakeShelf = shelfOf(serverId())
 
     private fun unreachable() {
         // A server that doesn't answer, in use all the same (its downloads are watched): as with no connection.
-        val away = servers?.let { s -> s.current.value?.server?.id in s.unreachable } == true
+        val away = servers?.let { s -> serverId() in s.unreachable } == true
         if (offline || away) throw ApiException(null, "Couldn't reach the server. Check the connection and try again.", java.io.IOException("offline"))
+        if (pinned != null && servers?.account(pinned) == null) throw media.watchmy.client.model.SignedOutException()
     }
+
+    /** The key [Shared.hidden] keeps a hidden title under on this server. */
+    private fun hiddenKey(kind: ContinueItem.Kind, id: Long) = Triple(serverId()?.takeIf { it != LivingRoom.id }, kind, id)
+
+    private fun ContinueItem.hidden(): Boolean = hiddenKey(kind, (if (kind == ContinueItem.Kind.Movie) movieId else episodeId) ?: -1) in shared.hidden
+
+    override fun features(): media.watchmy.client.model.ServerFeatures = media.watchmy.client.model.ServerFeatures(level())
+
+    override fun on(serverId: String?): LibraryRepository? {
+        if (pinned != null) return if (serverId == pinned) this else null
+        val all = servers ?: return if (serverId == null) this else null
+        if (serverId == null || serverId == all.current.value?.server?.id) return this
+        if (all.account(serverId) == null) return null
+        return shared.bound.getOrPut(serverId) { FakeLibraryRepository(arr, level, rows, following, servers, user, pinned = serverId, shared = shared) }
+    }
+
+    override suspend fun person(personId: Long): media.watchmy.client.model.PersonPage {
+        latency()
+        unreachable()
+        if (level() < media.watchmy.client.model.REDESIGN_API_LEVEL) throw ApiException(404, "Not found.")
+        return FakeData.person(personId) ?: throw ApiException(404, "Not found.")
+    }
+
+    override suspend fun hideFromContinue(kind: ContinueItem.Kind, id: Long) {
+        latency()
+        unreachable()
+        shared.hidden += hiddenKey(kind, id)
+    }
+
+    override suspend fun showInContinue(kind: ContinueItem.Kind, id: Long) {
+        latency()
+        unreachable()
+        shared.hidden -= hiddenKey(kind, id)
+    }
+
+    override suspend fun copies(kind: ItemKind, tmdbId: Long): List<BrowseItem> {
+        latency()
+        unreachable()
+        if (level() < media.watchmy.client.model.REDESIGN_API_LEVEL) return emptyList()
+        val shelf = shelf()
+        val all = if (kind == ItemKind.Movie) shelf.movies else shelf.shows
+        return all.map(::withTmdb).filter { it.tmdbId == tmdbId }
+    }
+
+    /** A card with this server's TMDB id for it, as a server at the watchlists' level sends it. */
+    private fun withTmdb(item: BrowseItem): BrowseItem = if (shelf() === FakeCabin.shelf) item else rows.marked(item)
 
     private fun titleKey(title: String): String {
         val lower = title.lowercase(java.util.Locale.ROOT)
@@ -330,17 +392,18 @@ class FakeLibraryRepository(
     override suspend fun home(): HomeData {
         latency()
         unreachable()
-        return marked(shelf().home(System.currentTimeMillis()))
+        val home = marked(shelf().home(System.currentTimeMillis()))
+        return home.copy(continueWatching = home.continueWatching.filterNot { it.hidden() })
     }
 
     /** Home's cards with their TMDB ids and watchlist marks, as a server with watchlists sends them. */
     private fun marked(home: HomeData) = home.copy(
-        recentlyAddedShows = home.recentlyAddedShows.map(rows::marked),
-        recentlyAddedMovies = home.recentlyAddedMovies.map(rows::marked),
-        recentlyReleased = home.recentlyReleased.map(rows::marked),
+        recentlyAddedShows = home.recentlyAddedShows.map(::withTmdb),
+        recentlyAddedMovies = home.recentlyAddedMovies.map(::withTmdb),
+        recentlyReleased = home.recentlyReleased.map(::withTmdb),
     )
 
-    private fun List<ScreenRow>.marked() = map { r -> r.copy(items = r.items.map(rows::marked)) }
+    private fun List<ScreenRow>.marked() = map { r -> r.copy(items = r.items.map(::withTmdb)) }
 
     /** Home in the person's order from [ROWS_API_LEVEL], with the fixed arrays empty, as the server sends it. */
     override suspend fun arrangedHome(): HomeData {
@@ -360,7 +423,7 @@ class FakeLibraryRepository(
         return rows.rows(RowScreens.library(libraryId), marked(shelf().home(System.currentTimeMillis())))
     }
 
-    override suspend fun continueWatching(): List<ContinueItem> = shelf().continueWatching.also { latency(); unreachable() }
+    override suspend fun continueWatching(): List<ContinueItem> = shelf().continueWatching.filterNot { it.hidden() }.also { latency(); unreachable() }
 
     override suspend fun libraries(): List<Library> = listOf(
         Library(FakeData.MOVIE_LIBRARY, "Movies", LibraryType.Movie),
@@ -369,6 +432,7 @@ class FakeLibraryRepository(
 
     override suspend fun items(query: ItemQuery): ItemPage {
         latency()
+        unreachable()
         val shelf = shelf()
         val all = if (query.libraryId == FakeData.MOVIE_LIBRARY) shelf.movies else shelf.shows
         var list = all.filter { item ->
@@ -386,6 +450,11 @@ class FakeLibraryRepository(
         val genres = all.flatMap { it.genres }.distinct().sorted()
         val genreCounts = genres.associateWith { genre -> list.count { genre in it.genres } }
         query.genre?.let { g -> list = list.filter { g in it.genres } }
+        // The rating filter, from the redesign's level: certifications in the US order, unrated last.
+        val ratingsHere = level() >= media.watchmy.client.model.REDESIGN_API_LEVEL
+        val ratingOf = { item: BrowseItem -> item.contentRating ?: media.watchmy.client.model.UNRATED }
+        val ratingCounts = list.groupingBy(ratingOf).eachCount()
+        if (ratingsHere && query.contentRatings.isNotEmpty()) list = list.filter { ratingOf(it) in query.contentRatings }
         list = when (query.sort) {
             ItemSort.Title -> list.sortedBy { titleKey(it.title) }
             ItemSort.Added -> list
@@ -394,10 +463,12 @@ class FakeLibraryRepository(
             ItemSort.Runtime -> list.sortedByDescending { it.runtimeMin }
         }
         return ItemPage(
-            items = list.drop(query.offset).take(query.limit).map(rows::marked), total = list.size, offset = query.offset,
+            items = list.drop(query.offset).take(query.limit).map(::withTmdb), total = list.size, offset = query.offset,
             genres = genres, decades = all.mapNotNull { it.year?.div(10)?.times(10) }.distinct().sortedDescending(),
             summary = shelf.summary(query.libraryId),
             genreCounts = genreCounts,
+            contentRatings = if (ratingsHere) all.map(ratingOf).distinct().sortedBy { RATING_ORDER.indexOf(it).let { i -> if (i < 0) RATING_ORDER.size else i } } else null,
+            contentRatingCounts = if (ratingsHere) ratingCounts else null,
             letters = if (query.sort == ItemSort.Title) list.mapIndexed { index, item ->
                 val initial = titleKey(item.title).firstOrNull()?.uppercaseChar()
                 media.watchmy.client.model.LetterOffset(initial?.takeIf { it in 'A'..'Z' }?.toString() ?: "#", index)
@@ -440,6 +511,10 @@ class FakeLibraryRepository(
      * that doesn't answer fails after a moment, and one no one is signed in
      * to refuses.
      */
+    private companion object {
+        val RATING_ORDER = listOf("G", "PG", "PG-13", "R", "NC-17", "TV-Y", "TV-Y7", "TV-G", "TV-PG", "TV-14", "TV-MA", media.watchmy.client.model.UNRATED)
+    }
+
     override suspend fun searchOn(serverId: String, text: String): SearchResults {
         val all = servers ?: return search(text)
         latency()

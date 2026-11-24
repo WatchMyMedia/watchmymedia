@@ -52,7 +52,10 @@ import kotlinx.serialization.encoding.Encoder
  * @param posterPath
  * @param posterSource Set when an admin chose the poster; absent for the match's own.
  * @param rating
+ * @param seasonCount Search results and findShowsByTMDB: seasons with a present episode, specials left out, as on cards.
  * @param status
+ * @param unwatchedCount Search results and findShowsByTMDB: episodes with a present file they haven't finished, as on cards.
+ * @param watched Search results and findShowsByTMDB: the signed-in person has watched every episode with a present file.
  * @param year
  */
 @Serializable
@@ -113,8 +116,20 @@ data class Show (
     @SerialName(value = "rating")
     val rating: kotlin.Double? = null,
 
+    /* Search results and findShowsByTMDB: seasons with a present episode, specials left out, as on cards. */
+    @SerialName(value = "seasonCount")
+    val seasonCount: kotlin.Long? = null,
+
     @SerialName(value = "status")
     val status: kotlin.String? = null,
+
+    /* Search results and findShowsByTMDB: episodes with a present file they haven't finished, as on cards. */
+    @SerialName(value = "unwatchedCount")
+    val unwatchedCount: kotlin.Long? = null,
+
+    /* Search results and findShowsByTMDB: the signed-in person has watched every episode with a present file. */
+    @SerialName(value = "watched")
+    val watched: kotlin.Boolean? = null,
 
     @SerialName(value = "year")
     val year: kotlin.Long? = null

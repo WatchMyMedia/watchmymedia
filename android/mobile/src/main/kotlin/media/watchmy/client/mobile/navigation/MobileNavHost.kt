@@ -1,5 +1,7 @@
 package media.watchmy.client.mobile.navigation
 
+import media.watchmy.client.model.attempt
+import media.watchmy.client.model.at
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.only
@@ -119,7 +121,17 @@ import media.watchmy.client.ui.rememberTabletLayout
 import media.watchmy.client.ui.LocalLiveChannelsShown
 
 fun NavHostController.play(request: PlayRequest) =
-    navigate(MobileRoutes.Player(request.fileId, request.startMs, request.title, request.subtitle, request.backdropPath, request.recordingId))
+    navigate(MobileRoutes.Player(request.fileId, request.startMs, request.title, request.subtitle, request.backdropPath, request.recordingId, request.serverId))
+
+/** Another server's title, opened in place without switching: Back returns to where the person was. */
+fun NavHostController.openInPlace(serverId: String, page: DeepLink) {
+    when (page) {
+        is DeepLink.Movie -> navigate(MobileRoutes.Movie(page.id, serverId))
+        is DeepLink.Show -> navigate(MobileRoutes.Show(page.id, page.season, page.episode, serverId))
+        is DeepLink.Play -> navigate(MobileRoutes.Player(fileId = page.fileId, startMs = page.startMs, title = page.title.orEmpty(), subtitle = page.subtitle, serverId = serverId))
+        else -> Unit
+    }
+}
 
 /** The route behind each bottom-bar tab. */
 private fun MobileTab.route(): Any = when (this) {
@@ -302,6 +314,8 @@ fun MobileNavHost(
     }
     val badge by rememberRequestBadge(services.requests)
 
+    // A card, result or link from another server opens its title in place, from that server, without switching.
+    media.watchmy.client.ui.ProvideInPlace { serverId, page -> nav.openInPlace(serverId, page) }
     LaunchedEffect(deepLink) {
         fun page(link: DeepLink?) = when (link) {
             is DeepLink.Show -> nav.navigate(MobileRoutes.Show(link.id, link.season, link.episode))
@@ -329,6 +343,12 @@ fun MobileNavHost(
             DeepLink.Downloads -> nav.openTabRoot(MobileTab.Downloads)
             // The new-episode notification for the shows past the first five.
             DeepLink.Home -> nav.openTabRoot(MobileTab.Home)
+            // Another account here published it: its title opens in place, from that server.
+            is DeepLink.OnServer -> when (val p = deepLink.page) {
+                is DeepLink.Details -> services.library.at(deepLink.serverId)?.let { attempt { it.filePage(p.fileId) }.getOrNull() }?.let { nav.openInPlace(deepLink.serverId, it) }
+                is DeepLink.Play, is DeepLink.Movie, is DeepLink.Show -> nav.openInPlace(deepLink.serverId, p)
+                else -> nav.openTabRoot(MobileTab.Home)
+            }
         }
         onDeepLinkHandled()
     }
@@ -466,15 +486,17 @@ fun MobileNavHost(
                                 route.season != null -> ShowArrival.Season(route.season)
                                 else -> ShowArrival.Show
                             }
-                            ShowPage(nav, route.id, arrival)
+                            ShowPage(nav, route.id, arrival, route.serverId)
                         }
                         composable<MobileRoutes.Episode> {
                             val route = it.toRoute<MobileRoutes.Episode>()
-                            ShowPage(nav, route.showId, ShowArrival.Episode(route.episodeId, route.season))
+                            ShowPage(nav, route.showId, ShowArrival.Episode(route.episodeId, route.season), route.serverId)
                         }
                         composable<MobileRoutes.Movie> {
+                            val route = it.toRoute<MobileRoutes.Movie>()
                             MovieScreen(
-                                movieId = it.toRoute<MobileRoutes.Movie>().id,
+                                movieId = route.id,
+                                serverId = route.serverId,
                                 onPlay = nav::play,
                                 onBack = { nav.popBackStack() },
                                 onOpenSettings = { go(MobileRoutes.Settings) },
@@ -492,7 +514,8 @@ fun MobileNavHost(
                         composable<MobileRoutes.Search> {
                             SearchScreen(
                                 onOpenShow = openShow, onOpenMovie = openMovie, onPlay = nav::play, onNavigate = go, onOpenSeason = openSeason, onOpenEpisode = openEpisode,
-                                words = searchWords, onWordsTaken = { searchWords = null }, onOpenElsewhere = onOpenElsewhere,
+                                // Another server's result opens in place, from that server; Back returns to Search as it was.
+                                words = searchWords, onWordsTaken = { searchWords = null }, onOpenElsewhere = { serverId, _, page -> nav.openInPlace(serverId, page) },
                             )
                         }
                         composable<MobileRoutes.LiveTV> {
@@ -605,7 +628,7 @@ fun MobileNavHost(
                         }
                         composable<MobileRoutes.Player> {
                             val r = it.toRoute<MobileRoutes.Player>()
-                            PlayerScreen(request = PlayRequest(r.fileId, r.startMs, r.title, r.subtitle, r.backdropPath, recordingId = r.recordingId), onExit = { nav.popBackStack() })
+                            PlayerScreen(request = PlayRequest(r.fileId, r.startMs, r.title, r.subtitle, r.backdropPath, recordingId = r.recordingId, serverId = r.serverId), onExit = { nav.popBackStack() })
                         }
                         composable<MobileRoutes.Watchlists> {
                             WatchlistsScreen(onBack = { nav.popBackStack() }, onOpenList = { id -> nav.navigate(MobileRoutes.MediaList(id)) })
@@ -711,15 +734,16 @@ private fun ChangePasswordRoute(nav: NavHostController, entry: NavBackStackEntry
 
 /** The one page for a show, a season or an episode: what goes on top first is [arrival]'s. */
 @Composable
-private fun ShowPage(nav: NavHostController, showId: Long, arrival: ShowArrival) {
+private fun ShowPage(nav: NavHostController, showId: Long, arrival: ShowArrival, serverId: String? = null) {
     ShowPageScreen(
         showId = showId,
         arrival = arrival,
+        serverId = serverId,
         onPlay = nav::play,
         onBack = { nav.popBackStack() },
         onOpenSettings = { nav.go(MobileRoutes.Settings) },
         onOpenDownloads = { nav.go(MobileRoutes.Downloads) },
-        onOpenShow = { id -> nav.navigate(MobileRoutes.Show(id)) },
-        onOpenMovie = { id -> nav.navigate(MobileRoutes.Movie(id)) },
+        onOpenShow = { id -> nav.navigate(MobileRoutes.Show(id, serverId = serverId)) },
+        onOpenMovie = { id -> nav.navigate(MobileRoutes.Movie(id, serverId)) },
     )
 }

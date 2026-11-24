@@ -24,6 +24,12 @@ data class PlayRequest(
     val episodeContext: EpisodeContext? = null,
     val subtitleMode: SubtitleRequestMode = SubtitleRequestMode.Auto,
     val recordingId: String? = null,
+    /**
+     * The registered server [fileId] is on, when it isn't the one in use: a
+     * copy of a title on another server, played without switching the app,
+     * as the person signed in there. Its progress stays on that server.
+     */
+    val serverId: String? = null,
 )
 
 /**
@@ -347,6 +353,17 @@ interface PlaybackController {
 
 fun interface PlaybackControllerFactory {
     fun create(): PlaybackController
+
+    /**
+     * A player for [PlayRequest.serverId]'s files: its calls go to that
+     * server, as the person signed in there, after asking its address which
+     * server it is, and its progress is kept there. Null is the server in use
+     * ([create]). One that no one is signed in to here fails as it plays.
+     */
+    fun createOn(serverId: String?): PlaybackController = if (serverId == null) create() else create()
+
+    /** [plans] for the files of the registered server [serverId]; null is the server in use. */
+    suspend fun plansOn(serverId: String?, fileIds: List<Long>): Map<Long, PlaybackPlan> = if (serverId == null) plans(fileIds) else emptyMap()
 
     /**
      * How each file would play on this device at the default quality, for

@@ -1,5 +1,9 @@
 package media.watchmy.client.tv.rows
 
+import androidx.compose.foundation.layout.Box
+import media.watchmy.client.model.cardLine
+import media.watchmy.client.ui.imageFor
+import androidx.compose.foundation.layout.size
 import media.watchmy.client.tv.components.PosterHeight
 import media.watchmy.client.tv.components.PosterWidth
 import media.watchmy.client.tv.components.TvPalette
@@ -16,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -78,6 +83,8 @@ internal class TvRowActions(
     val onNotMatched: () -> Unit,
     val onToggleWatched: ((BrowseItem) -> Unit)?,
     val onOpenList: (Long) -> Unit,
+    /** Hold OK on a Continue watching card offers Remove from Continue watching, where the server can ([media.watchmy.client.model.ServerFeatures.hideFromContinue]). */
+    val onHideContinue: ((ContinueItem) -> Unit)? = null,
 )
 
 /**
@@ -130,9 +137,9 @@ internal fun tvLibrarySeeAll(row: ScreenRow, type: LibraryType, libraryId: Long?
  * watching's are those Home always used; the others are the row's.
  */
 internal fun ScreenRow.cardKey(index: Int = 0): String? = when (style) {
-    RowStyle.Continue -> continueItems.getOrNull(index)?.let { "cw:${it.fileId}" }
-    RowStyle.Episode -> episodes.getOrNull(index)?.let { "$id:e${it.episodeId}" }
-    RowStyle.Poster, RowStyle.Wide -> items.getOrNull(index)?.let { "$id:${it.kind}${it.id}" }
+    RowStyle.Continue -> continueItems.getOrNull(index)?.let { if (it.where.serverId == null) "cw:${it.fileId}" else "cw:${it.where.serverId}:${it.fileId}" }
+    RowStyle.Episode -> episodes.getOrNull(index)?.let { "$id:e${it.where.serverId.orEmpty()}${it.episodeId}" }
+    RowStyle.Poster, RowStyle.Wide -> items.getOrNull(index)?.let { "$id:${it.where.serverId.orEmpty()}${it.kind}${it.id}" }
     RowStyle.Live -> null
 }
 
@@ -168,38 +175,40 @@ internal fun TvArrangedRow(
     named: Boolean = false,
     /** False on Home, whose row screen says the rest above the row: a poster then carries its title alone. */
     posterLines: Boolean = true,
+    /** A merged row's end while another server is still out, or didn't answer ([ElsewhereEnd]). */
+    elsewhere: ElsewhereEnd? = null,
 ) {
     val (title, small) = row.heading()
     Column(modifier) {
         SectionHeader(title, small = small, trailing = counter, modifier = if (named) Modifier.semantics(mergeDescendants = true) { heading() } else Modifier)
         CardRow(Modifier.then(if (named) Modifier.semantics { contentDescription = title } else Modifier), enter = enter) {
             when (row.style) {
-                RowStyle.Continue -> itemsIndexed(row.continueItems, key = { _, it -> it.fileId }) { i, c ->
+                RowStyle.Continue -> itemsIndexed(row.continueItems, key = { _, it -> "${it.where.serverId}:${it.fileId}" }) { i, c ->
                     MediaCard(
                         title = c.title,
-                        subtitle = c.remainingLine,
-                        imageUrl = library.imageUrl(c.stillPath ?: c.backdropPath, ImageSize.W780),
+                        subtitle = listOfNotNull(c.remainingLine, c.where.cardLine(resumes = true)).joinToString(" · "),
+                        imageUrl = library.imageFor(c.where, c.stillPath ?: c.backdropPath, ImageSize.W780),
                         artWidth = WideCardWidth,
                         artHeight = WideCardHeight,
                         onClick = { actions.onPlay(c.playRequest()) },
-                        onLongClick = { c.openPage(actions) },
-                        modifier = Modifier.rowCard(memory, "cw:${c.fileId}", i, onFocusItem),
+                        onLongClick = continueHold(c, actions),
+                        modifier = Modifier.rowCard(memory, if (c.where.serverId == null) "cw:${c.fileId}" else "cw:${c.where.serverId}:${c.fileId}", i, onFocusItem),
                     ) {
                         ArtProgress(c.progress)
                     }
                 }
-                RowStyle.Episode -> itemsIndexed(row.episodes, key = { _, it -> it.episodeId }) { i, e ->
+                RowStyle.Episode -> itemsIndexed(row.episodes, key = { _, it -> "${it.where.serverId}:${it.episodeId}" }) { i, e ->
                     MediaCard(
                         title = e.showTitle,
                         subtitle = e.airedLine(),
-                        imageUrl = library.imageUrl(e.stillPath ?: e.showBackdropPath, ImageSize.W780),
+                        imageUrl = library.imageFor(e.where, e.stillPath ?: e.showBackdropPath, ImageSize.W780),
                         artWidth = WideCardWidth,
                         artHeight = WideCardHeight,
                         seed = e.showTitle,
-                        // Select opens the episode on its show, focused on Play; holding it plays at once.
-                        onClick = { actions.onOpenEpisode(e.showId, e.season, e.episodeId) },
-                        onLongClick = { e.playRequest()?.let(actions.onPlay) ?: actions.onOpenEpisode(e.showId, e.season, e.episodeId) },
-                        modifier = Modifier.rowCard(memory, "${row.id}:e${e.episodeId}", i, onFocusItem),
+                        // Select opens the episode on its show, focused on Play; holding it plays at once. Another server's opens there, in place.
+                        onClick = { e.openEpisode(actions) },
+                        onLongClick = { e.playRequest()?.let(actions.onPlay) ?: e.openEpisode(actions) },
+                        modifier = Modifier.rowCard(memory, "${row.id}:e${e.where.serverId.orEmpty()}${e.episodeId}", i, onFocusItem),
                     ) {
                         if (e.isNew) ArtBadge("New", Modifier.align(Alignment.TopStart).padding(10.dp), BadgeStyle.Gold)
                         if (!e.hasFile) ArtBadge("Not in library", Modifier.align(Alignment.TopEnd).padding(10.dp), BadgeStyle.Warn)
@@ -207,16 +216,16 @@ internal fun TvArrangedRow(
                         ArtWatched(e.watched)
                     }
                 }
-                RowStyle.Poster -> itemsIndexed(row.items, key = { _, it -> "${it.kind}${it.id}" }) { i, item ->
+                RowStyle.Poster -> itemsIndexed(row.items, key = { _, it -> "${it.where.serverId}${it.kind}${it.id}" }) { i, item ->
                     MediaCard(
                         title = item.title,
                         subtitle = if (posterLines) item.subtitle ?: item.year?.toString() else null,
-                        imageUrl = library.imageUrl(item.posterPath, ImageSize.W342),
+                        imageUrl = library.imageFor(item.where, item.posterPath, ImageSize.W342),
                         artWidth = PosterWidth,
                         artHeight = PosterHeight,
                         onClick = { item.open(actions.onOpenShow, actions.onOpenMovie, actions.onPlay, actions.onNotMatched, actions.onOpenEpisode) },
                         onLongClick = holdFor(item, actions.onToggleWatched),
-                        modifier = Modifier.rowCard(memory, "${row.id}:${item.kind}${item.id}", i, onFocusItem),
+                        modifier = Modifier.rowCard(memory, "${row.id}:${item.where.serverId.orEmpty()}${item.kind}${item.id}", i, onFocusItem),
                         subtitleLine = posterLines,
                     ) {
                         if (item.isNew) ArtBadge("New", Modifier.align(Alignment.TopStart).padding(8.dp), BadgeStyle.Gold)
@@ -224,16 +233,16 @@ internal fun TvArrangedRow(
                         ArtProgress(item.progress)
                     }
                 }
-                RowStyle.Wide -> itemsIndexed(row.items, key = { _, it -> "${it.kind}${it.id}" }) { i, m ->
+                RowStyle.Wide -> itemsIndexed(row.items, key = { _, it -> "${it.where.serverId}${it.kind}${it.id}" }) { i, m ->
                     MediaCard(
                         title = m.title,
                         subtitle = null,
-                        imageUrl = library.imageUrl(m.backdropPath, ImageSize.W780),
+                        imageUrl = library.imageFor(m.where, m.backdropPath, ImageSize.W780),
                         artWidth = WideCardWidth,
                         artHeight = WideCardHeight,
-                        onClick = { if (m.kind == ItemKind.Movie) actions.onOpenMovie(m.id) else m.open(actions.onOpenShow, actions.onOpenMovie, actions.onPlay, actions.onNotMatched) },
+                        onClick = { if (m.kind == ItemKind.Movie && m.where.serverId == null) actions.onOpenMovie(m.id) else m.open(actions.onOpenShow, actions.onOpenMovie, actions.onPlay, actions.onNotMatched) },
                         onLongClick = holdFor(m, actions.onToggleWatched),
-                        modifier = Modifier.rowCard(memory, "${row.id}:${m.kind}${m.id}", i, onFocusItem),
+                        modifier = Modifier.rowCard(memory, "${row.id}:${m.where.serverId.orEmpty()}${m.kind}${m.id}", i, onFocusItem),
                     ) {
                         formatDate(m.releaseDate)?.let { ArtBadge(it, Modifier.align(Alignment.BottomStart).padding(10.dp)) }
                         ArtWatched(m.watched)
@@ -241,6 +250,7 @@ internal fun TvArrangedRow(
                 }
                 RowStyle.Live -> Unit
             }
+            if (elsewhere != null) item("elsewhere") { ElsewhereTile(elsewhere, wide = row.style != RowStyle.Poster, modifier = Modifier.rowCard(memory, "${row.id}:elsewhere", row.cardCount, onFocusItem)) }
             if (seeAll != null) {
                 item("see-all") { SeeAllCard(seeAll, wide = row.style != RowStyle.Poster, modifier = Modifier.rowCard(memory, "${row.id}:all", row.cardCount, onFocusItem)) }
             }
@@ -248,7 +258,42 @@ internal fun TvArrangedRow(
     }
 }
 
+/**
+ * Hold OK on a Continue watching card: a menu with the title's page and
+ * Remove from Continue watching, which keeps the place; with no way to
+ * remove it (an older server), the page, as before.
+ */
+@Composable
+private fun continueHold(c: ContinueItem, actions: TvRowActions): () -> Unit {
+    val host = media.watchmy.client.tv.watchlists.LocalCardMenu.current
+    val hide = actions.onHideContinue
+    return remember(c, host, hide, actions) {
+        if (host == null || hide == null) {
+            { c.openPage(actions) }
+        } else {
+            {
+                host.open = media.watchmy.client.tv.watchlists.CardMenu(
+                    c.title,
+                    c.remainingLine,
+                    listOf(
+                        media.watchmy.client.tv.watchlists.CardMenuEntry(if (c.showId != null) "Go to the show" else "Go to the movie", WmmIcons.Info) { c.openPage(actions) },
+                        media.watchmy.client.tv.watchlists.CardMenuEntry(media.watchmy.client.model.REMOVE_FROM_CONTINUE, WmmIcons.Close) { hide(c) },
+                    ),
+                )
+            }
+        }
+    }
+}
+
+/** An episode card's page: its show with it on top, from the server it is on. */
+private fun media.watchmy.client.model.EpisodeCard.openEpisode(actions: TvRowActions) {
+    if (media.watchmy.client.ui.InPlace.open(where.serverId, media.watchmy.client.model.DeepLink.Show(showId, season, episodeId))) return
+    actions.onOpenEpisode(showId, season, episodeId)
+}
+
 private fun ContinueItem.openPage(actions: TvRowActions) {
+    val page = showId?.let { media.watchmy.client.model.DeepLink.Show(it) } ?: movieId?.let { media.watchmy.client.model.DeepLink.Movie(it) }
+    if (page != null && media.watchmy.client.ui.InPlace.open(where.serverId, page)) return
     when {
         showId != null -> actions.onOpenShow(showId!!)
         movieId != null -> actions.onOpenMovie(movieId!!)
@@ -292,4 +337,38 @@ internal fun Modifier.bleed(start: Dp, end: Dp): Modifier = layout { measurable,
     val extra = (start + end).roundToPx()
     val placeable = measurable.measure(constraints.copy(minWidth = constraints.minWidth + extra, maxWidth = constraints.maxWidth + extra))
     layout(constraints.maxWidth, placeable.height) { placeable.place(-start.roundToPx(), 0) }
+}
+
+
+/**
+ * The end of a row filled from every server: [stillAsking] names a server
+ * still out (a placeholder that takes no focus, so focus stops at the last
+ * card), [notAnswered] one that didn't answer, with Try again ([onRetry]).
+ */
+@androidx.compose.runtime.Immutable
+internal class ElsewhereEnd(val stillAsking: List<String>, val notAnswered: List<String>, val onRetry: () -> Unit)
+
+@Composable
+private fun ElsewhereTile(end: ElsewhereEnd, wide: Boolean, modifier: Modifier = Modifier) {
+    val width = if (wide) WideCardWidth else PosterWidth
+    val height = if (wide) WideCardHeight else PosterHeight
+    if (end.notAnswered.isEmpty()) {
+        Box(
+            Modifier.size(width, height).background(WmmColors.Surface, RoundedCornerShape(14.dp)).padding(horizontal = 18.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(media.watchmy.client.model.stillAsking(end.stillAsking.map { media.watchmy.client.model.serverHeading(it) }), style = TvType.Second, color = TvPalette.Muted, textAlign = TextAlign.Center, maxLines = 3)
+        }
+        return
+    }
+    RowArtCard(width = width, height = height, onClick = end.onRetry, modifier = modifier) { focused ->
+        Column(
+            Modifier.fillMaxSize().background(if (focused) TvPalette.Lift else WmmColors.Surface2, RoundedCornerShape(14.dp)).padding(horizontal = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(media.watchmy.client.model.notOnHome(end.notAnswered.first()), style = TvType.Caption, color = WmmColors.TextSoft, textAlign = TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            Text("Try again", style = TvType.Body.copy(fontWeight = FontWeight.SemiBold), color = WmmColors.Text, maxLines = 1)
+        }
+    }
 }

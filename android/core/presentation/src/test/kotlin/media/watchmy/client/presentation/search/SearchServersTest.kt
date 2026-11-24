@@ -39,7 +39,8 @@ class SearchServersTest {
     /** The fake libraries, with each server's calls noted, slowed or failed on demand. */
     private class ServersLibrary(
         private val servers: FakeServerRepository,
-        private val fake: FakeLibraryRepository = FakeLibraryRepository(servers = servers),
+        // With watchlists' TMDB ids on the server in use's results, as a server from that level sends them.
+        private val fake: FakeLibraryRepository = FakeLibraryRepository(servers = servers, rows = media.watchmy.client.fake.FakeRowsData(watchlistsOn = { true })),
     ) : LibraryRepository by fake {
         /** How long each server takes to answer, by id. */
         val delays = HashMap<String, Long>()
@@ -112,13 +113,30 @@ class SearchServersTest {
         assertEquals(listOf("harbor"), s.recentQueries)
     }
 
-    @Test fun `the same title on two servers is listed twice, the second with its server`() = runTest {
+    @Test fun `the same title on two servers is one result, drawn from the server in use's copy, that names both`() = runTest {
         vm.setQuery("dead reckoning")
         advanceUntilIdle()
         val movies = vm.state.value.movies
-        assertEquals(listOf("Dead Reckoning Bay" to null, "Dead Reckoning Bay" to "Cabin server"), movies.named { it.title })
-        assertEquals("each carries its own server's id for it", listOf(500L, 802L), movies.map { it.item.id })
-        assertEquals(listOf(null, Cabin.id), movies.map { it.serverId })
+        assertEquals(listOf("Dead Reckoning Bay" to null), movies.named { it.title })
+        val hit = movies.single()
+        assertEquals("the server in use's id for it", 500L, hit.item.id)
+        assertEquals(listOf("Cabin server"), hit.alsoOn)
+        assertEquals("the other copy carries that server's own id", listOf(media.watchmy.client.model.Where.Copy(Cabin.id, "Cabin server", 802L)), hit.item.where.copies)
+        assertEquals("On Living room and Cabin", hit.serversLine(vm.state.value.inUseName))
+    }
+
+    @Test fun `a title only another server has names that server, and one without a TMDB id is never merged`() = runTest {
+        vm.setQuery("harbor")
+        advanceUntilIdle()
+        val choir = vm.state.value.movies.first { it.item.title == "The Harbor Choir" }
+        assertEquals("Cabin server", choir.serversLine(vm.state.value.inUseName))
+        assertTrue(choir.item.where.onlyElsewhere)
+        // The Den server's Harbor Lights carries no TMDB id here, so it stays its own result.
+        servers.unreachable = emptySet()
+        vm.retry()
+        advanceUntilIdle()
+        assertEquals(listOf("Harbor Lights" to null, "Harborside" to "Cabin server", "Harbor Lights" to "Den server"), vm.state.value.shows.named { it.title })
+        assertEquals(listOf("Cabin server"), vm.state.value.shows.first().alsoOn)
     }
 
     @Test fun `a server that fails, and one signed out here, each get one line`() = runTest {
@@ -163,7 +181,8 @@ class SearchServersTest {
         advanceTimeBy(1_000)
         runCurrent()
         s = vm.state.value
-        assertEquals("what was drawn is where it was", drawn, s.shows.take(drawn.size))
+        assertEquals("what was drawn is where it was", drawn.map { it.item.id to it.serverId }, s.shows.take(drawn.size).map { it.item.id to it.serverId })
+        assertEquals("the late copy joins the row already drawn", listOf("Cabin server"), s.shows.first().alsoOn)
         assertEquals(listOf("Harbor Lights" to null, "Harborside" to "Cabin server"), s.shows.named { it.title })
         assertTrue(s.stillAsking.isEmpty())
         assertFalse(s.loading)
@@ -244,7 +263,7 @@ class SearchServersTest {
         advanceUntilIdle()
         val s = vm.state.value
         assertNull("something was found, so it is not the failed state", s.error)
-        assertEquals(listOf("Harborside" to "Cabin server"), s.shows.named { it.title })
+        assertEquals(listOf("Harborside" to "Cabin server", "Harbor Lights" to "Cabin server"), s.shows.named { it.title })
         assertEquals("Living room server didn’t answer, so its titles aren’t listed.", s.unlisted.first().line)
         assertTrue("a failed search is not a recent search", s.recentQueries.isEmpty())
     }

@@ -57,7 +57,16 @@ class PlaybackEngine(
      * the players share ([mediaHttpClient]); asked for with the first player.
      */
     httpClient: () -> OkHttpClient = ::OkHttpClient,
+    /**
+     * The player's calls for another registered server's files, as the
+     * person signed in there (`DataServices.playbackGatewayOn`); null where
+     * no one is signed in there.
+     */
+    private val gatewayOn: (serverId: String) -> PlaybackGateway? = { null },
+    /** The server in use's id, whose files [create] plays. */
+    private val inUse: () -> String? = { null },
 ) : PlaybackControllerFactory {
+    private val library = library
     private val app = context.applicationContext
     /** What the players and the downloader say they are, as the API's requests do. */
     val userAgent = userAgent(client, Build.VERSION.RELEASE)
@@ -81,6 +90,25 @@ class PlaybackEngine(
     private val playerHttp: OkHttpClient by lazy { mediaHttpClient(httpClient()) }
 
     override fun create(): PlaybackController = build(gateway, preferences, watchNext.bind(), lookups)
+
+    /**
+     * A copy on another server, played without switching: that server's
+     * calls and its library's lookups (the next episode is its own), and
+     * nothing on this TV's Watch Next row, which is the server in use's.
+     * Where no one is signed in there, the play fails with a sentence.
+     */
+    override fun createOn(serverId: String?): PlaybackController {
+        if (serverId == null || serverId == inUse()) return create()
+        val other = gatewayOn(serverId) ?: return build(SignedOutGateway, preferences, WatchNext.None, PlaybackLookups.None)
+        val lookupsThere = library?.on(serverId)?.let(::LibraryLookups) ?: PlaybackLookups.None
+        return build(other, preferences, WatchNext.None, lookupsThere)
+    }
+
+    override suspend fun plansOn(serverId: String?, fileIds: List<Long>): Map<Long, PlaybackPlan> {
+        if (serverId == null || serverId == inUse()) return plans(fileIds)
+        val other = gatewayOn(serverId) ?: return emptyMap()
+        return other.plans(profiles.current(), preferences.qualityOn(network), fileIds).associateBy { it.fileId }
+    }
 
     /** Live streams use their own controller and direct HTTP sources, never the offline file cache. */
     fun live(gateway: LivePlaybackGateway): LivePlaybackControllerFactory = live(gateway, preferences)
@@ -149,4 +177,13 @@ class PlaybackEngine(
     /** Plans for this device's profile at the default quality for the network in use. */
     override suspend fun plans(fileIds: List<Long>): Map<Long, PlaybackPlan> =
         gateway.plans(profiles.current(), preferences.qualityOn(network), fileIds).associateBy { it.fileId }
+}
+
+/** A play on a server no one is signed in to here any more: it fails at once, saying so, and sends nothing. */
+private object SignedOutGateway : PlaybackGateway {
+    private fun refuse(): Nothing = throw media.watchmy.client.model.SignedOutException()
+    override suspend fun decide(request: media.watchmy.client.model.DecisionRequest): media.watchmy.client.model.PlaybackDecision = refuse()
+    override suspend fun reportProgress(report: media.watchmy.client.model.ProgressReport): media.watchmy.client.model.ProgressReply = refuse()
+    override suspend fun mediaToken(): media.watchmy.client.model.MediaToken = refuse()
+    override suspend fun stopSession(sessionId: String) = Unit
 }

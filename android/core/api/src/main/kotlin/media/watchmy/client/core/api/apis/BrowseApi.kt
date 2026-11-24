@@ -30,13 +30,18 @@ import okhttp3.HttpUrl
 import media.watchmy.client.core.api.models.ErrorModel
 import media.watchmy.client.core.api.models.HomeData
 import media.watchmy.client.core.api.models.ItemList
+import media.watchmy.client.core.api.models.LibraryCollectionDetail
+import media.watchmy.client.core.api.models.LibraryCollections
 import media.watchmy.client.core.api.models.LibraryRows
+import media.watchmy.client.core.api.models.MovieCopies
 import media.watchmy.client.core.api.models.MovieDetail
 import media.watchmy.client.core.api.models.MovieList
+import media.watchmy.client.core.api.models.PersonDetail
 import media.watchmy.client.core.api.models.RelatedRows
 import media.watchmy.client.core.api.models.RowLayout
 import media.watchmy.client.core.api.models.SearchResults
 import media.watchmy.client.core.api.models.SeasonDetail
+import media.watchmy.client.core.api.models.ShowCopies
 import media.watchmy.client.core.api.models.ShowDetail
 import media.watchmy.client.core.api.models.ShowList
 import media.watchmy.client.core.api.models.UpdateRowLayoutInputBody
@@ -67,6 +72,158 @@ open class BrowseApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         val defaultBasePath: String by lazy {
             System.getProperties().getProperty(ApiClient.BASE_URL_KEY, "http://localhost")
         }
+    }
+
+    /**
+     * GET /api/movies
+     * The library&#39;s copies of a movie, by its TMDB id
+     * For an app signed in to several servers, which shows a title on more than one as one card and offers each server&#39;s copy when it plays. Answers with an empty list, never an error, when the library doesn&#39;t have it. From API level 34.
+     * @param tmdbId The movie&#39;s or show&#39;s TMDB id, as cards and search carry it (tmdbId, showTmdbId).
+     * @return MovieCopies
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    suspend fun findMoviesByTMDB(tmdbId: kotlin.Long) : MovieCopies = withContext(Dispatchers.IO) {
+        val localVarResponse = findMoviesByTMDBWithHttpInfo(tmdbId = tmdbId)
+
+        return@withContext when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as MovieCopies
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /api/movies
+     * The library&#39;s copies of a movie, by its TMDB id
+     * For an app signed in to several servers, which shows a title on more than one as one card and offers each server&#39;s copy when it plays. Answers with an empty list, never an error, when the library doesn&#39;t have it. From API level 34.
+     * @param tmdbId The movie&#39;s or show&#39;s TMDB id, as cards and search carry it (tmdbId, showTmdbId).
+     * @return ApiResponse<MovieCopies?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    suspend fun findMoviesByTMDBWithHttpInfo(tmdbId: kotlin.Long) : ApiResponse<MovieCopies?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = findMoviesByTMDBRequestConfig(tmdbId = tmdbId)
+
+        return@withContext request<Unit, MovieCopies>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation findMoviesByTMDB
+     *
+     * @param tmdbId The movie&#39;s or show&#39;s TMDB id, as cards and search carry it (tmdbId, showTmdbId).
+     * @return RequestConfig
+     */
+    fun findMoviesByTMDBRequestConfig(tmdbId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                put("tmdbId", listOf(tmdbId.toString()))
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json, application/problem+json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/api/movies",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /api/shows
+     * The library&#39;s copies of a show, by its TMDB id
+     * For an app signed in to several servers, which shows a title on more than one as one card and offers each server&#39;s copy when it plays. Answers with an empty list, never an error, when the library doesn&#39;t have it. From API level 34.
+     * @param tmdbId The movie&#39;s or show&#39;s TMDB id, as cards and search carry it (tmdbId, showTmdbId).
+     * @return ShowCopies
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    suspend fun findShowsByTMDB(tmdbId: kotlin.Long) : ShowCopies = withContext(Dispatchers.IO) {
+        val localVarResponse = findShowsByTMDBWithHttpInfo(tmdbId = tmdbId)
+
+        return@withContext when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as ShowCopies
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /api/shows
+     * The library&#39;s copies of a show, by its TMDB id
+     * For an app signed in to several servers, which shows a title on more than one as one card and offers each server&#39;s copy when it plays. Answers with an empty list, never an error, when the library doesn&#39;t have it. From API level 34.
+     * @param tmdbId The movie&#39;s or show&#39;s TMDB id, as cards and search carry it (tmdbId, showTmdbId).
+     * @return ApiResponse<ShowCopies?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    suspend fun findShowsByTMDBWithHttpInfo(tmdbId: kotlin.Long) : ApiResponse<ShowCopies?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = findShowsByTMDBRequestConfig(tmdbId = tmdbId)
+
+        return@withContext request<Unit, ShowCopies>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation findShowsByTMDB
+     *
+     * @param tmdbId The movie&#39;s or show&#39;s TMDB id, as cards and search carry it (tmdbId, showTmdbId).
+     * @return RequestConfig
+     */
+    fun findShowsByTMDBRequestConfig(tmdbId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
+            .apply {
+                put("tmdbId", listOf(tmdbId.toString()))
+            }
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json, application/problem+json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/api/shows",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
     }
 
     /**
@@ -213,6 +370,82 @@ open class BrowseApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/api/home",
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /api/libraries/{id}/collections/{collectionId}
+     * A collection&#39;s films: the library&#39;s, and the ones it lacks to request
+     * 404 when the library has fewer than two of its films. The reply never waits on TMDB. From API level 34.
+     * @param id Library ID.
+     * @param collectionId TMDB collection ID.
+     * @return LibraryCollectionDetail
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    suspend fun getLibraryCollection(id: kotlin.Long, collectionId: kotlin.Long) : LibraryCollectionDetail = withContext(Dispatchers.IO) {
+        val localVarResponse = getLibraryCollectionWithHttpInfo(id = id, collectionId = collectionId)
+
+        return@withContext when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as LibraryCollectionDetail
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /api/libraries/{id}/collections/{collectionId}
+     * A collection&#39;s films: the library&#39;s, and the ones it lacks to request
+     * 404 when the library has fewer than two of its films. The reply never waits on TMDB. From API level 34.
+     * @param id Library ID.
+     * @param collectionId TMDB collection ID.
+     * @return ApiResponse<LibraryCollectionDetail?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    suspend fun getLibraryCollectionWithHttpInfo(id: kotlin.Long, collectionId: kotlin.Long) : ApiResponse<LibraryCollectionDetail?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = getLibraryCollectionRequestConfig(id = id, collectionId = collectionId)
+
+        return@withContext request<Unit, LibraryCollectionDetail>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getLibraryCollection
+     *
+     * @param id Library ID.
+     * @param collectionId TMDB collection ID.
+     * @return RequestConfig
+     */
+    fun getLibraryCollectionRequestConfig(id: kotlin.Long, collectionId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json, application/problem+json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/api/libraries/{id}/collections/{collectionId}".replace("{"+"id"+"}", encodeURIComponent(id.toString())).replace("{"+"collectionId"+"}", encodeURIComponent(collectionId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = false,
@@ -440,6 +673,79 @@ open class BrowseApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
         return RequestConfig(
             method = RequestMethod.GET,
             path = "/api/movies/{id}/related".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * GET /api/people/{personId}
+     * A cast member&#39;s movies and shows in the library
+     * The titles in every library with the person in their billed cast, matched by TMDB person ID, never by name, with the part played. Titles matched before the server kept person IDs count once their credits are fetched again in the background. 404 when no title in the library has the person. From API level 34.
+     * @param personId TMDB person ID, from a credit&#39;s personId.
+     * @return PersonDetail
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    suspend fun getPerson(personId: kotlin.Long) : PersonDetail = withContext(Dispatchers.IO) {
+        val localVarResponse = getPersonWithHttpInfo(personId = personId)
+
+        return@withContext when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as PersonDetail
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /api/people/{personId}
+     * A cast member&#39;s movies and shows in the library
+     * The titles in every library with the person in their billed cast, matched by TMDB person ID, never by name, with the part played. Titles matched before the server kept person IDs count once their credits are fetched again in the background. 404 when no title in the library has the person. From API level 34.
+     * @param personId TMDB person ID, from a credit&#39;s personId.
+     * @return ApiResponse<PersonDetail?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    suspend fun getPersonWithHttpInfo(personId: kotlin.Long) : ApiResponse<PersonDetail?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = getPersonRequestConfig(personId = personId)
+
+        return@withContext request<Unit, PersonDetail>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation getPerson
+     *
+     * @param personId TMDB person ID, from a credit&#39;s personId.
+     * @return RequestConfig
+     */
+    fun getPersonRequestConfig(personId: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json, application/problem+json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/api/people/{personId}".replace("{"+"personId"+"}", encodeURIComponent(personId.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = false,
@@ -743,6 +1049,79 @@ open class BrowseApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
     }
 
     /**
+     * GET /api/libraries/{id}/collections
+     * A movie library&#39;s TMDB collections
+     * The collections the library has two films of or more. Empty for a TV library. From API level 34.
+     * @param id Library ID.
+     * @return LibraryCollections
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    suspend fun listLibraryCollections(id: kotlin.Long) : LibraryCollections = withContext(Dispatchers.IO) {
+        val localVarResponse = listLibraryCollectionsWithHttpInfo(id = id)
+
+        return@withContext when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as LibraryCollections
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * GET /api/libraries/{id}/collections
+     * A movie library&#39;s TMDB collections
+     * The collections the library has two films of or more. Empty for a TV library. From API level 34.
+     * @param id Library ID.
+     * @return ApiResponse<LibraryCollections?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    suspend fun listLibraryCollectionsWithHttpInfo(id: kotlin.Long) : ApiResponse<LibraryCollections?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = listLibraryCollectionsRequestConfig(id = id)
+
+        return@withContext request<Unit, LibraryCollections>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation listLibraryCollections
+     *
+     * @param id Library ID.
+     * @return RequestConfig
+     */
+    fun listLibraryCollectionsRequestConfig(id: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json, application/problem+json"
+
+        return RequestConfig(
+            method = RequestMethod.GET,
+            path = "/api/libraries/{id}/collections".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * enum for parameter sort
      */
      enum class SortListLibraryItems(val value: kotlin.String) {
@@ -766,6 +1145,25 @@ open class BrowseApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      }
 
     /**
+     * enum for parameter order
+     */
+     enum class OrderListLibraryItems(val value: kotlin.String) {
+         @SerialName(value = "") none(""),
+         @SerialName(value = "asc") asc("asc"),
+         @SerialName(value = "desc") desc("desc"),
+         @SerialName(value = "unknown_default_open_api") unknown_default_open_api("unknown_default_open_api");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
      * enum for parameter filter
      */
      enum class FilterListLibraryItems(val value: kotlin.String) {
@@ -775,6 +1173,31 @@ open class BrowseApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
          @SerialName(value = "4k") _4k("4k"),
          @SerialName(value = "hdr") hdr("hdr"),
          @SerialName(value = "unwatched") unwatched("unwatched"),
+         @SerialName(value = "inProgress") inProgress("inProgress"),
+         @SerialName(value = "following") following("following"),
+         @SerialName(value = "unknown_default_open_api") unknown_default_open_api("unknown_default_open_api");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
+     * enum for parameter filters
+     */
+     enum class FiltersListLibraryItems(val value: kotlin.String) {
+         @SerialName(value = "continuing") continuing("continuing"),
+         @SerialName(value = "ended") ended("ended"),
+         @SerialName(value = "4k") _4k("4k"),
+         @SerialName(value = "hdr") hdr("hdr"),
+         @SerialName(value = "unwatched") unwatched("unwatched"),
+         @SerialName(value = "inProgress") inProgress("inProgress"),
+         @SerialName(value = "following") following("following"),
          @SerialName(value = "unknown_default_open_api") unknown_default_open_api("unknown_default_open_api");
 
         /**
@@ -793,7 +1216,11 @@ open class BrowseApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * 
      * @param id Library ID.
      * @param sort  (optional, default to Sort.title)
-     * @param filter  (optional)
+     * @param order Ascending or descending; absent for the sort&#39;s own direction: A to Z for title, the most or newest first for the rest. \&quot;Shortest first\&quot; is sort&#x3D;runtime&amp;order&#x3D;asc. From API level 34. (optional)
+     * @param filter inProgress (movies part watched, shows started and not finished) and following (TV: shows the person follows) are from API level 34. (optional)
+     * @param filters More filters, comma separated, all of which an item must meet, with filter as one more. From API level 34. (optional)
+     * @param contentRating Ratings to keep, comma separated, as facets.contentRatings lists them: TMDB&#39;s US certification, or unrated. From API level 34. (optional)
+     * @param collection Movies: only those of this TMDB collection, as listLibraryCollections lists them. From API level 34. (optional)
      * @param genre  (optional)
      * @param decade e.g. 1990 (optional)
      * @param q Title contains. (optional)
@@ -808,8 +1235,8 @@ open class BrowseApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    suspend fun listLibraryItems(id: kotlin.Long, sort: SortListLibraryItems? = SortListLibraryItems.title, filter: FilterListLibraryItems? = null, genre: kotlin.String? = null, decade: kotlin.Long? = null, q: kotlin.String? = null, limit: kotlin.Long? = 100L, offset: kotlin.Long? = 0L) : ItemList = withContext(Dispatchers.IO) {
-        val localVarResponse = listLibraryItemsWithHttpInfo(id = id, sort = sort, filter = filter, genre = genre, decade = decade, q = q, limit = limit, offset = offset)
+    suspend fun listLibraryItems(id: kotlin.Long, sort: SortListLibraryItems? = SortListLibraryItems.title, order: OrderListLibraryItems? = null, filter: FilterListLibraryItems? = null, filters: kotlin.collections.List<FiltersListLibraryItems>? = null, contentRating: kotlin.collections.List<kotlin.String>? = null, collection: kotlin.Long? = null, genre: kotlin.String? = null, decade: kotlin.Long? = null, q: kotlin.String? = null, limit: kotlin.Long? = 100L, offset: kotlin.Long? = 0L) : ItemList = withContext(Dispatchers.IO) {
+        val localVarResponse = listLibraryItemsWithHttpInfo(id = id, sort = sort, order = order, filter = filter, filters = filters, contentRating = contentRating, collection = collection, genre = genre, decade = decade, q = q, limit = limit, offset = offset)
 
         return@withContext when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as ItemList
@@ -832,7 +1259,11 @@ open class BrowseApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * 
      * @param id Library ID.
      * @param sort  (optional, default to Sort.title)
-     * @param filter  (optional)
+     * @param order Ascending or descending; absent for the sort&#39;s own direction: A to Z for title, the most or newest first for the rest. \&quot;Shortest first\&quot; is sort&#x3D;runtime&amp;order&#x3D;asc. From API level 34. (optional)
+     * @param filter inProgress (movies part watched, shows started and not finished) and following (TV: shows the person follows) are from API level 34. (optional)
+     * @param filters More filters, comma separated, all of which an item must meet, with filter as one more. From API level 34. (optional)
+     * @param contentRating Ratings to keep, comma separated, as facets.contentRatings lists them: TMDB&#39;s US certification, or unrated. From API level 34. (optional)
+     * @param collection Movies: only those of this TMDB collection, as listLibraryCollections lists them. From API level 34. (optional)
      * @param genre  (optional)
      * @param decade e.g. 1990 (optional)
      * @param q Title contains. (optional)
@@ -844,8 +1275,8 @@ open class BrowseApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    suspend fun listLibraryItemsWithHttpInfo(id: kotlin.Long, sort: SortListLibraryItems?, filter: FilterListLibraryItems?, genre: kotlin.String?, decade: kotlin.Long?, q: kotlin.String?, limit: kotlin.Long?, offset: kotlin.Long?) : ApiResponse<ItemList?> = withContext(Dispatchers.IO) {
-        val localVariableConfig = listLibraryItemsRequestConfig(id = id, sort = sort, filter = filter, genre = genre, decade = decade, q = q, limit = limit, offset = offset)
+    suspend fun listLibraryItemsWithHttpInfo(id: kotlin.Long, sort: SortListLibraryItems?, order: OrderListLibraryItems?, filter: FilterListLibraryItems?, filters: kotlin.collections.List<FiltersListLibraryItems>?, contentRating: kotlin.collections.List<kotlin.String>?, collection: kotlin.Long?, genre: kotlin.String?, decade: kotlin.Long?, q: kotlin.String?, limit: kotlin.Long?, offset: kotlin.Long?) : ApiResponse<ItemList?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = listLibraryItemsRequestConfig(id = id, sort = sort, order = order, filter = filter, filters = filters, contentRating = contentRating, collection = collection, genre = genre, decade = decade, q = q, limit = limit, offset = offset)
 
         return@withContext request<Unit, ItemList>(
             localVariableConfig
@@ -857,7 +1288,11 @@ open class BrowseApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      *
      * @param id Library ID.
      * @param sort  (optional, default to Sort.title)
-     * @param filter  (optional)
+     * @param order Ascending or descending; absent for the sort&#39;s own direction: A to Z for title, the most or newest first for the rest. \&quot;Shortest first\&quot; is sort&#x3D;runtime&amp;order&#x3D;asc. From API level 34. (optional)
+     * @param filter inProgress (movies part watched, shows started and not finished) and following (TV: shows the person follows) are from API level 34. (optional)
+     * @param filters More filters, comma separated, all of which an item must meet, with filter as one more. From API level 34. (optional)
+     * @param contentRating Ratings to keep, comma separated, as facets.contentRatings lists them: TMDB&#39;s US certification, or unrated. From API level 34. (optional)
+     * @param collection Movies: only those of this TMDB collection, as listLibraryCollections lists them. From API level 34. (optional)
      * @param genre  (optional)
      * @param decade e.g. 1990 (optional)
      * @param q Title contains. (optional)
@@ -865,15 +1300,27 @@ open class BrowseApi(basePath: kotlin.String = defaultBasePath, client: Call.Fac
      * @param offset  (optional, default to 0L)
      * @return RequestConfig
      */
-    fun listLibraryItemsRequestConfig(id: kotlin.Long, sort: SortListLibraryItems?, filter: FilterListLibraryItems?, genre: kotlin.String?, decade: kotlin.Long?, q: kotlin.String?, limit: kotlin.Long?, offset: kotlin.Long?) : RequestConfig<Unit> {
+    fun listLibraryItemsRequestConfig(id: kotlin.Long, sort: SortListLibraryItems?, order: OrderListLibraryItems?, filter: FilterListLibraryItems?, filters: kotlin.collections.List<FiltersListLibraryItems>?, contentRating: kotlin.collections.List<kotlin.String>?, collection: kotlin.Long?, genre: kotlin.String?, decade: kotlin.Long?, q: kotlin.String?, limit: kotlin.Long?, offset: kotlin.Long?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
                 if (sort != null) {
                     put("sort", listOf(sort.value))
                 }
+                if (order != null) {
+                    put("order", listOf(order.value))
+                }
                 if (filter != null) {
                     put("filter", listOf(filter.value))
+                }
+                if (filters != null) {
+                    put("filters", toMultiValue(filters.toList(), "csv"))
+                }
+                if (contentRating != null) {
+                    put("contentRating", toMultiValue(contentRating.toList(), "csv"))
+                }
+                if (collection != null) {
+                    put("collection", listOf(collection.toString()))
                 }
                 if (genre != null) {
                     put("genre", listOf(genre.toString()))

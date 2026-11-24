@@ -482,6 +482,7 @@ private fun Results(
                                     if (e.isNew) ArtBadge("New", Modifier.align(Alignment.TopStart).padding(10.dp), BadgeStyle.Gold)
                                     if (!e.hasFile) ArtBadge("Not in library", Modifier.align(Alignment.TopEnd).padding(10.dp), BadgeStyle.Warn)
                                     ArtBadge(e.codeBadge, Modifier.align(Alignment.BottomStart).padding(10.dp))
+                                    if (hit.several) ServersFlag(hit, Modifier.align(Alignment.TopEnd).padding(10.dp))
                                     ArtWatched(e.watched)
                                 }
                             }
@@ -625,12 +626,21 @@ private fun PosterSection(
                     subtitleLine = several,
                 ) {
                     if (item.isNew) ArtBadge("New", Modifier.align(Alignment.TopStart).padding(8.dp), BadgeStyle.Gold)
+                    // A title on several servers is one result: a flag on the poster says where, as the line under 200 px can't hold it.
+                    if (hit.several) ServersFlag(hit, Modifier.align(Alignment.BottomStart).padding(start = 8.dp, bottom = 14.dp))
                     ArtWatched(item.watched)
                     ArtProgress(item.progress)
                 }
             }
         }
     }
+}
+
+/** "Home and Cabin" on a result's picture: every server that has the title. */
+@Composable
+private fun ServersFlag(hit: SearchViewModel.Hit<*>, modifier: Modifier = Modifier) {
+    val inUse by LocalAppServices.current.servers.current.collectAsStateWithLifecycle()
+    ArtBadge(media.watchmy.client.model.serverList(listOf(hit.serverName ?: inUse?.server?.name ?: "This server") + hit.alsoOn), modifier)
 }
 
 /**

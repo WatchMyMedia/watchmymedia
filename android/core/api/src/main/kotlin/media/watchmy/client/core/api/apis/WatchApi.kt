@@ -61,6 +61,98 @@ open class WatchApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
     }
 
     /**
+     * enum for parameter type
+     */
+     enum class TypeHideFromContinueWatching(val value: kotlin.String) {
+         @SerialName(value = "movie") movie("movie"),
+         @SerialName(value = "episode") episode("episode"),
+         @SerialName(value = "unknown_default_open_api") unknown_default_open_api("unknown_default_open_api");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
+     * PUT /api/watch/{type}/{id}/hidden
+     * Take a movie or episode off Continue watching, keeping its place
+     * The position and watched mark stay. Playing the item again brings it back. Nothing happens when the signed-in person has no progress on it. From API level 34.
+     * @param type 
+     * @param id 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    suspend fun hideFromContinueWatching(type: TypeHideFromContinueWatching, id: kotlin.Long) : Unit = withContext(Dispatchers.IO) {
+        val localVarResponse = hideFromContinueWatchingWithHttpInfo(type = type, id = id)
+
+        return@withContext when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /api/watch/{type}/{id}/hidden
+     * Take a movie or episode off Continue watching, keeping its place
+     * The position and watched mark stay. Playing the item again brings it back. Nothing happens when the signed-in person has no progress on it. From API level 34.
+     * @param type 
+     * @param id 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    suspend fun hideFromContinueWatchingWithHttpInfo(type: TypeHideFromContinueWatching, id: kotlin.Long) : ApiResponse<Unit?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = hideFromContinueWatchingRequestConfig(type = type, id = id)
+
+        return@withContext request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation hideFromContinueWatching
+     *
+     * @param type 
+     * @param id 
+     * @return RequestConfig
+     */
+    fun hideFromContinueWatchingRequestConfig(type: TypeHideFromContinueWatching, id: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/problem+json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/api/watch/{type}/{id}/hidden".replace("{"+"type"+"}", encodeURIComponent(type.value.toString())).replace("{"+"id"+"}", encodeURIComponent(id.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
      * GET /api/watch/continue
      * Items the user is partway through, newest first
      * 
@@ -674,6 +766,98 @@ open class WatchApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
         return RequestConfig(
             method = RequestMethod.PUT,
             path = "/api/files/{id}/progress".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * enum for parameter type
+     */
+     enum class TypeShowInContinueWatching(val value: kotlin.String) {
+         @SerialName(value = "movie") movie("movie"),
+         @SerialName(value = "episode") episode("episode"),
+         @SerialName(value = "unknown_default_open_api") unknown_default_open_api("unknown_default_open_api");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
+     * DELETE /api/watch/{type}/{id}/hidden
+     * Put a movie or episode taken off Continue watching back on it
+     * Undoes hideFromContinueWatching. From API level 34.
+     * @param type 
+     * @param id 
+     * @return void
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    suspend fun showInContinueWatching(type: TypeShowInContinueWatching, id: kotlin.Long) : Unit = withContext(Dispatchers.IO) {
+        val localVarResponse = showInContinueWatchingWithHttpInfo(type = type, id = id)
+
+        return@withContext when (localVarResponse.responseType) {
+            ResponseType.Success -> Unit
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /api/watch/{type}/{id}/hidden
+     * Put a movie or episode taken off Continue watching back on it
+     * Undoes hideFromContinueWatching. From API level 34.
+     * @param type 
+     * @param id 
+     * @return ApiResponse<Unit?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Throws(IllegalStateException::class, IOException::class)
+    suspend fun showInContinueWatchingWithHttpInfo(type: TypeShowInContinueWatching, id: kotlin.Long) : ApiResponse<Unit?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = showInContinueWatchingRequestConfig(type = type, id = id)
+
+        return@withContext request<Unit, Unit>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation showInContinueWatching
+     *
+     * @param type 
+     * @param id 
+     * @return RequestConfig
+     */
+    fun showInContinueWatchingRequestConfig(type: TypeShowInContinueWatching, id: kotlin.Long) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/problem+json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/api/watch/{type}/{id}/hidden".replace("{"+"type"+"}", encodeURIComponent(type.value.toString())).replace("{"+"id"+"}", encodeURIComponent(id.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = false,

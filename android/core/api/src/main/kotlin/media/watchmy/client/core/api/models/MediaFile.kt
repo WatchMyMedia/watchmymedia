@@ -26,6 +26,7 @@ package media.watchmy.client.core.api.models
 import media.watchmy.client.core.api.models.Candidate
 import media.watchmy.client.core.api.models.Guess
 import media.watchmy.client.core.api.models.LiveTVProvenance
+import media.watchmy.client.core.api.models.MediaFileEpisode
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -56,14 +57,17 @@ import kotlinx.serialization.encoding.Encoder
  * @param container
  * @param durationMs
  * @param dvProfile Dolby Vision profile (5, 7, 8…); omitted for other files, and for Dolby Vision files the scanner has not probed again since profiles were kept.
+ * @param episode
  * @param hdr HDR kind of the main video stream.
  * @param height
  * @param matchError Why the file could not be matched.
  * @param movieId
  * @param probeError Set when ffprobe could not read the file.
  * @param recording
+ * @param title The files list only: the movie's or show's title the file was matched to (API level 34).
  * @param videoCodec
  * @param width
+ * @param year The files list only: the matched movie's year (API level 34).
  */
 @Serializable
 
@@ -134,6 +138,9 @@ data class MediaFile (
     @SerialName(value = "dvProfile")
     val dvProfile: kotlin.Long? = null,
 
+    @SerialName(value = "episode")
+    val episode: MediaFileEpisode? = null,
+
     /* HDR kind of the main video stream. */
     @SerialName(value = "hdr")
     val hdr: MediaFile.Hdr? = null,
@@ -155,11 +162,19 @@ data class MediaFile (
     @SerialName(value = "recording")
     val recording: LiveTVProvenance? = null,
 
+    /* The files list only: the movie's or show's title the file was matched to (API level 34). */
+    @SerialName(value = "title")
+    val title: kotlin.String? = null,
+
     @SerialName(value = "videoCodec")
     val videoCodec: kotlin.String? = null,
 
     @SerialName(value = "width")
-    val width: kotlin.Long? = null
+    val width: kotlin.Long? = null,
+
+    /* The files list only: the matched movie's year (API level 34). */
+    @SerialName(value = "year")
+    val year: kotlin.Long? = null
 
 ) {
 

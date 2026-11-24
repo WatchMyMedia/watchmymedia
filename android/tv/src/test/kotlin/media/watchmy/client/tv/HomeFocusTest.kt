@@ -47,7 +47,8 @@ class HomeFocusTest {
     @Before
     fun start() {
         fakeLatencyMs = 0
-        val services = quietTvFakes()
+        // One server: these rows and grids are the Living room server's own, as another server's titles would join them.
+        val services = quietTvFakes(several = false)
         compose.setContent {
             CompositionLocalProvider(LocalAppServices provides services) { TvApp() }
         }

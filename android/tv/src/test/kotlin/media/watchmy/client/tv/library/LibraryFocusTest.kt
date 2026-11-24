@@ -51,7 +51,8 @@ class LibraryFocusTest {
     fun start() {
         fakeLatencyMs = 0
         // Without tonight's reminders, whose banner would take Back first (QuietFakes.kt).
-        val services = quietTvFakes()
+        // One server: these rows and grids are the Living room server's own, as another server's titles would join them.
+        val services = quietTvFakes(several = false)
         compose.setContent {
             CompositionLocalProvider(LocalAppServices provides services) { TvApp() }
         }

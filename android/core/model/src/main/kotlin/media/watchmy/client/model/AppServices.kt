@@ -49,6 +49,9 @@ interface AppServices {
      * their own, so tests don't hand requests to each other.
      */
     val browseRequests: BrowseRequests get() = AppBrowseRequests
+
+    /** Which server's copy Play uses for each title on several servers, kept on this device. */
+    val copyChoices: CopyChoices get() = CopyChoices.None
 }
 
 private val AppBrowseRequests = BrowseRequests()

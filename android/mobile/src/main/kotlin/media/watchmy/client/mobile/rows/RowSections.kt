@@ -1,5 +1,9 @@
 package media.watchmy.client.mobile.rows
 
+import media.watchmy.client.ui.InPlace
+import media.watchmy.client.model.DeepLink
+import media.watchmy.client.model.cardLine
+import media.watchmy.client.ui.imageFor
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -140,22 +144,25 @@ internal fun ArrangedRow(
         ArrangedRowHeading(row, tablet, seeAll, edge, counter)
         LazyRow(state = state, flingBehavior = flingBehavior, contentPadding = PaddingValues(horizontal = edge), horizontalArrangement = Arrangement.spacedBy(spacing)) {
             when (row.style) {
-                RowStyle.Poster -> itemsIndexed(row.items, key = { _, it -> "${it.kind}${it.id}" }) { i, item -> PosterRowCard(item, library, tablet, actions, outlined = i == lead) }
-                RowStyle.Wide -> itemsIndexed(row.items, key = { _, it -> "${it.kind}${it.id}" }) { i, item -> WideRowCard(item, library, tablet, actions, outlined = i == lead) }
-                RowStyle.Episode -> itemsIndexed(row.episodes, key = { _, it -> it.episodeId }) { i, ep -> EpisodeRowCard(ep, library, actions, outlined = i == lead) }
-                RowStyle.Continue -> itemsIndexed(row.continueItems, key = { _, it -> it.fileId }) { i, item ->
+                // Keys carry the card's server: two servers' ids can be the same.
+                RowStyle.Poster -> itemsIndexed(row.items, key = { _, it -> "${it.where.serverId}${it.kind}${it.id}" }) { i, item -> PosterRowCard(item, library, tablet, actions, outlined = i == lead) }
+                RowStyle.Wide -> itemsIndexed(row.items, key = { _, it -> "${it.where.serverId}${it.kind}${it.id}" }) { i, item -> WideRowCard(item, library, tablet, actions, outlined = i == lead) }
+                RowStyle.Episode -> itemsIndexed(row.episodes, key = { _, it -> "${it.where.serverId}:${it.episodeId}" }) { i, ep -> EpisodeRowCard(ep, library, actions, outlined = i == lead) }
+                RowStyle.Continue -> itemsIndexed(row.continueItems, key = { _, it -> "${it.where.serverId}:${it.fileId}" }) { i, item ->
+                    val here = item.where.serverId == null
                     WideCard(
                         title = item.title,
-                        subtitle = item.remainingLine,
-                        imageUrl = library.imageUrl(item.stillPath ?: item.backdropPath, ImageSize.W780),
+                        subtitle = listOfNotNull(item.remainingLine, item.where.cardLine(resumes = true)).joinToString(" · "),
+                        imageUrl = library.imageFor(item.where, item.stillPath ?: item.backdropPath, ImageSize.W780),
                         seed = item.title,
                         width = 232.dp,
                         outlined = i == lead,
                         onClick = { actions.onPlay(item.playRequest()) },
+                        // Another server's card opens its page there, in place; it is marked on its own page.
                         actions = listOfNotNull(
-                            item.watchTarget()?.let { t -> CardAction("Mark as watched") { actions.onSetWatched(t, true) } },
-                            item.movieId?.let { id -> CardAction("Go to movie") { actions.onOpenMovie(id) } },
-                            item.showId?.let { id -> CardAction("Go to show") { actions.onOpenShow(id) } },
+                            item.watchTarget()?.takeIf { here }?.let { t -> CardAction("Mark as watched") { actions.onSetWatched(t, true) } },
+                            item.movieId?.let { id -> CardAction("Go to movie") { if (!InPlace.open(item.where.serverId, DeepLink.Movie(id))) actions.onOpenMovie(id) } },
+                            item.showId?.let { id -> CardAction("Go to show") { if (!InPlace.open(item.where.serverId, DeepLink.Show(id))) actions.onOpenShow(id) } },
                         ),
                     ) {
                         PlayGlyph()
@@ -179,10 +186,10 @@ internal const val SEE_ALL_KEY = "see-all"
 private fun PosterRowCard(item: BrowseItem, library: LibraryRepository, tablet: Boolean, actions: RowActions, outlined: Boolean = false) {
     PosterCard(
         item,
-        library.imageUrl(item.posterPath, ImageSize.W342),
-        item.subtitle ?: item.year?.toString(),
+        library.imageFor(item.where, item.posterPath, ImageSize.W342),
+        listOfNotNull(item.subtitle ?: item.year?.toString(), item.where.cardLine()).joinToString(" · ").ifEmpty { null },
         { item.open(actions.onOpenShow, actions.onOpenMovie, actions.onPlay, actions.onNotMatched, actions.onOpenEpisode) },
-        item.watchTarget()?.let { t -> { w: Boolean -> actions.onSetWatched(t, w) } },
+        item.watchTarget()?.takeIf { item.where.serverId == null }?.let { t -> { w: Boolean -> actions.onSetWatched(t, w) } },
         width = if (tablet) 150.dp else 116.dp,
         outlined = outlined,
     )
@@ -193,12 +200,12 @@ private fun WideRowCard(item: BrowseItem, library: LibraryRepository, tablet: Bo
     WideCard(
         title = item.title,
         subtitle = null,
-        imageUrl = library.imageUrl(item.backdropPath, ImageSize.W780),
+        imageUrl = library.imageFor(item.where, item.backdropPath, ImageSize.W780),
         seed = item.title,
         width = if (tablet) 240.dp else 160.dp,
         outlined = outlined,
-        onClick = { if (item.kind == ItemKind.Movie) actions.onOpenMovie(item.id) else item.open(actions.onOpenShow, actions.onOpenMovie, actions.onPlay, actions.onNotMatched) },
-        actions = listOfNotNull(item.watchTarget()?.let { t -> watchToggle(item.watched) { actions.onSetWatched(t, it) } }).withWatchlist(item),
+        onClick = { if (item.kind == ItemKind.Movie && item.where.serverId == null) actions.onOpenMovie(item.id) else item.open(actions.onOpenShow, actions.onOpenMovie, actions.onPlay, actions.onNotMatched) },
+        actions = listOfNotNull(item.watchTarget()?.takeIf { item.where.serverId == null }?.let { t -> watchToggle(item.watched) { actions.onSetWatched(t, it) } }).withWatchlist(item),
     ) {
         formatDate(item.releaseDate)?.let { Badge(it, Modifier.align(Alignment.BottomStart).padding(6.dp)) }
         if (item.watched) Badge("Watched", Modifier.align(Alignment.TopEnd).padding(6.dp), style = BadgeStyle.Gold)
@@ -212,14 +219,14 @@ private fun EpisodeRowCard(ep: EpisodeCard, library: LibraryRepository, actions:
     WideCard(
         title = ep.showTitle,
         subtitle = ep.airedLine(),
-        imageUrl = library.imageUrl(ep.stillPath ?: ep.showBackdropPath, ImageSize.W780),
+        imageUrl = library.imageFor(ep.where, ep.stillPath ?: ep.showBackdropPath, ImageSize.W780),
         seed = ep.showTitle,
         width = 232.dp,
         outlined = outlined,
-        onClick = { actions.onOpenEpisode(ep.showId, ep.season, ep.episodeId) },
+        onClick = { if (!InPlace.open(ep.where.serverId, DeepLink.Show(ep.showId, ep.season, ep.episodeId))) actions.onOpenEpisode(ep.showId, ep.season, ep.episodeId) },
         actions = listOfNotNull(
             request?.let { r -> CardAction("Play") { actions.onPlay(r) } },
-            watchToggle(ep.watched) { actions.onSetWatched(WatchTarget.Episode(ep.episodeId), it) },
+            watchToggle(ep.watched) { actions.onSetWatched(WatchTarget.Episode(ep.episodeId), it) }.takeIf { ep.where.serverId == null },
         ),
     ) {
         if (ep.isNew) Badge("New", Modifier.align(Alignment.TopStart).padding(8.dp), style = BadgeStyle.Gold)

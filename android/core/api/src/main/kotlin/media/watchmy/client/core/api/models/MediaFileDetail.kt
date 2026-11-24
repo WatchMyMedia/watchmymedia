@@ -26,6 +26,7 @@ package media.watchmy.client.core.api.models
 import media.watchmy.client.core.api.models.Candidate
 import media.watchmy.client.core.api.models.Guess
 import media.watchmy.client.core.api.models.LiveTVProvenance
+import media.watchmy.client.core.api.models.MediaFileEpisode
 import media.watchmy.client.core.api.models.MediaInfo
 
 import kotlinx.serialization.Serializable
@@ -57,6 +58,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param container
  * @param durationMs
  * @param dvProfile Dolby Vision profile (5, 7, 8…); omitted for other files, and for Dolby Vision files the scanner has not probed again since profiles were kept.
+ * @param episode
  * @param episodeId
  * @param episodeNumber
  * @param hdr HDR kind of the main video stream.
@@ -68,8 +70,10 @@ import kotlinx.serialization.encoding.Encoder
  * @param recording
  * @param seasonNumber
  * @param showId
+ * @param title The files list only: the movie's or show's title the file was matched to (API level 34).
  * @param videoCodec
  * @param width
+ * @param year The files list only: the matched movie's year (API level 34).
  */
 @Serializable
 
@@ -140,6 +144,9 @@ data class MediaFileDetail (
     @SerialName(value = "dvProfile")
     val dvProfile: kotlin.Long? = null,
 
+    @SerialName(value = "episode")
+    val episode: MediaFileEpisode? = null,
+
     @SerialName(value = "episodeId")
     val episodeId: kotlin.Long? = null,
 
@@ -176,11 +183,19 @@ data class MediaFileDetail (
     @SerialName(value = "showId")
     val showId: kotlin.Long? = null,
 
+    /* The files list only: the movie's or show's title the file was matched to (API level 34). */
+    @SerialName(value = "title")
+    val title: kotlin.String? = null,
+
     @SerialName(value = "videoCodec")
     val videoCodec: kotlin.String? = null,
 
     @SerialName(value = "width")
-    val width: kotlin.Long? = null
+    val width: kotlin.Long? = null,
+
+    /* The files list only: the matched movie's year (API level 34). */
+    @SerialName(value = "year")
+    val year: kotlin.Long? = null
 
 ) {
 

@@ -1,5 +1,6 @@
 package media.watchmy.client.tv.home
 
+import media.watchmy.client.model.cardLine
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -43,6 +44,8 @@ import media.watchmy.client.model.heading
 import media.watchmy.client.model.nextAt
 import media.watchmy.client.model.onAt
 import media.watchmy.client.model.plural
+import media.watchmy.client.model.episodesLeftLine
+import media.watchmy.client.model.nextEpisodeLine
 import media.watchmy.client.model.seeAllWords
 import media.watchmy.client.tv.components.Kicker
 import media.watchmy.client.tv.components.TvPalette
@@ -77,6 +80,8 @@ internal data class HomeFocus(
     val live: Boolean = false,
     /** The card's 16:9 picture in the library, or a programme's picture. */
     val picturePath: String? = null,
+    /** The server the card's picture is on. */
+    val where: media.watchmy.client.model.Where = media.watchmy.client.model.Where.Here,
     val livePicture: String? = null,
     val seed: String = title,
 )
@@ -114,10 +119,18 @@ private fun continueFocus(c: ContinueItem, now: Long, format: LiveClockFormat): 
         kicker = "Continue watching",
         title = c.title,
         episode = if (code != null) listOfNotNull(code, c.subtitle?.takeIf { it.isNotBlank() && !it.startsWith(code) }).joinToString(" · ") else null,
-        facts = listOf(HomeFact(timeLeft(c.remainingMs), HomeFact.Kind.Strong), HomeFact(endsAt(c.remainingMs, now, format))),
+        facts = listOfNotNull(
+            HomeFact(timeLeft(c.remainingMs), HomeFact.Kind.Strong),
+            HomeFact(endsAt(c.remainingMs, now, format)),
+            c.contentRating?.let { HomeFact(it, HomeFact.Kind.Tag) },
+            // Resume plays another server's copy: the card says so.
+            c.where.cardLine(resumes = true)?.let { HomeFact(it) },
+        ),
         progress = c.progress.takeIf { c.durationMs > 0 },
         progressLabel = if (totalMin > 0) "$watchedMin of $totalMin minutes watched" else null,
+        overview = c.overview.orEmpty(),
         picturePath = c.stillPath ?: c.backdropPath,
+        where = c.where,
     )
 }
 
@@ -139,6 +152,7 @@ private fun ScreenRow.itemFocus(item: BrowseItem, index: Int, headingTitle: Stri
     when (item.kind) {
         ItemKind.Movie -> {
             item.year?.let { facts += HomeFact(it.toString()) }
+            item.contentRating?.let { facts += HomeFact(it, HomeFact.Kind.Tag) }
             if (partway != null && runtimeMs != null) {
                 val left = (runtimeMs * (1f - partway)).toLong()
                 facts += HomeFact(timeLeft(left), HomeFact.Kind.Strong)
@@ -150,15 +164,23 @@ private fun ScreenRow.itemFocus(item: BrowseItem, index: Int, headingTitle: Stri
             genre?.let { facts += HomeFact(it) }
         }
         ItemKind.Show -> {
-            item.year?.let { facts += HomeFact(it.toString()) }
-            item.episodeCount?.let { facts += HomeFact(plural(it, "episode"), HomeFact.Kind.Strong) }
+            item.seasonCount?.let { facts += HomeFact(plural(it, "season")) } ?: item.year?.let { facts += HomeFact(it.toString()) }
+            item.contentRating?.let { facts += HomeFact(it, HomeFact.Kind.Tag) }
+            val left = item.episodesLeftLine()
+            when {
+                left != null -> facts += HomeFact(left, HomeFact.Kind.Strong)
+                else -> item.episodeCount?.let { facts += HomeFact(plural(it, "episode"), HomeFact.Kind.Strong) }
+            }
             genre?.let { facts += HomeFact(it) }
+            note = nextEpisodeLine(item.nextAirDate)
         }
         ItemKind.Unmatched -> {
             item.fileName?.let { facts += HomeFact(it) }
             item.fileCount?.let { facts += HomeFact(plural(it, "file")) }
         }
     }
+    // A title only another server has names it; one the server in use has too names nothing.
+    item.where.cardLine()?.let { facts += HomeFact(it) }
     return HomeFocus(
         kicker = ScreenRowItemKicker(item, index, headingTitle, listId, style),
         title = item.title,
@@ -167,6 +189,7 @@ private fun ScreenRow.itemFocus(item: BrowseItem, index: Int, headingTitle: Stri
         note = note,
         overview = item.overview,
         picturePath = item.backdropPath,
+        where = item.where,
     )
 }
 
@@ -177,6 +200,7 @@ private fun episodeFocus(e: EpisodeCard, headingTitle: String): HomeFocus = Home
     facts = listOfNotNull(HomeFact("Not in your library").takeIf { !e.hasFile }),
     overview = e.overview,
     picturePath = e.stillPath ?: e.showBackdropPath,
+    where = e.where,
     seed = e.showTitle,
 )
 

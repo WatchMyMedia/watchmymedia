@@ -129,21 +129,32 @@ internal fun ApiBrowseItem.toModel(): BrowseItem? = BrowseItem(
     episodeSeason = seasonNumber?.toInt()?.takeIf { episodeId != null },
     tmdbId = tmdbId?.takeIf { it > 0 && kind != ApiBrowseItem.Kind.unmatched },
     watchlisted = watchlisted == true,
+    contentRating = contentRating.orNullIfBlank(),
+    unwatchedCount = unwatchedCount?.toInt()?.coerceAtLeast(0),
+    newEpisodeCount = newEpisodeCount?.toInt()?.coerceAtLeast(0),
+    seasonCount = seasonCount?.toInt()?.takeIf { it > 0 },
+    nextAirDate = nextAirDate.orNullIfBlank(),
+    addedAtMs = epochMs(addedAt),
 )
 
+/** Search's and the copies' movies; their marks and TMDB id are sent from [media.watchmy.client.model.REDESIGN_API_LEVEL]. */
 internal fun ApiMovie.toBrowseItem() = BrowseItem(
     kind = ItemKind.Movie, id = id, libraryId = libraryId, title = title, year = year?.toInt()?.takeIf { it > 0 },
     overview = overview, genres = genres, rating = rating?.takeIf { it > 0 }, posterPath = posterPath.orNullIfBlank(),
     backdropPath = backdropPath.orNullIfBlank(), quality = null, hdr = false, isNew = false, subtitle = null,
-    watched = false, progress = null, episodeCount = null, runtimeMin = runtimeMin?.toInt()?.takeIf { it > 0 },
-    releaseDate = releaseDate.orNullIfBlank(),
+    watched = watched == true, progress = progress?.toFloat()?.takeIf { it > 0f && watched != true }, episodeCount = null,
+    runtimeMin = runtimeMin?.toInt()?.takeIf { it > 0 }, releaseDate = releaseDate.orNullIfBlank(),
+    tmdbId = tmdbId.takeIf { it > 0 }, contentRating = contentRating.orNullIfBlank(),
 )
 
 internal fun ApiShow.toBrowseItem() = BrowseItem(
     kind = ItemKind.Show, id = id, libraryId = libraryId, title = title, year = year?.toInt()?.takeIf { it > 0 },
     overview = overview, genres = genres, rating = rating?.takeIf { it > 0 }, posterPath = posterPath.orNullIfBlank(),
     backdropPath = backdropPath.orNullIfBlank(), quality = null, hdr = false, isNew = false, subtitle = null,
-    watched = false, progress = null, episodeCount = episodeCount.toInt(), runtimeMin = null, releaseDate = null,
+    watched = watched == true, progress = null, episodeCount = episodeCount.toInt(), runtimeMin = null, releaseDate = null,
+    tmdbId = tmdbId.takeIf { it > 0 }, contentRating = contentRating.orNullIfBlank(),
+    unwatchedCount = unwatchedCount?.toInt()?.coerceAtLeast(0), seasonCount = seasonCount?.toInt()?.takeIf { it > 0 },
+    nextAirDate = nextAirDate.orNullIfBlank(),
 )
 
 internal fun ApiEpisodeCard.toModel() = EpisodeCard(
@@ -162,6 +173,8 @@ internal fun ApiEpisodeCard.toModel() = EpisodeCard(
     fileId = fileId,
     isNew = isNew,
     watched = watched == true,
+    runtimeMin = runtimeMin?.toInt()?.takeIf { it > 0 },
+    showTmdbId = showTmdbId?.takeIf { it > 0 },
 )
 
 internal fun ApiSearchEpisode.toCard() = EpisodeCard(
@@ -169,6 +182,8 @@ internal fun ApiSearchEpisode.toCard() = EpisodeCard(
     title = title, overview = "", airDate = airDate.orNullIfBlank(), stillPath = stillPath.orNullIfBlank(),
     showPosterPath = showPosterPath.orNullIfBlank(), showBackdropPath = null, hasFile = true, fileId = fileId, isNew = false,
     watched = watched == true,
+    runtimeMin = runtimeMin?.toInt()?.takeIf { it > 0 },
+    showTmdbId = showTmdbId?.takeIf { it > 0 },
 )
 
 internal fun ApiContinueItem.toModel(): ContinueItem? = ContinueItem(
@@ -190,6 +205,10 @@ internal fun ApiContinueItem.toModel(): ContinueItem? = ContinueItem(
     episode = episodeNumber?.toInt(),
     positionMs = positionMs,
     durationMs = durationMs,
+    contentRating = contentRating.orNullIfBlank(),
+    overview = overview.orNullIfBlank(),
+    tmdbId = tmdbId?.takeIf { it > 0 },
+    updatedAtMs = epochMs(updatedAt),
 )
 
 internal fun ApiHomeHero.toModel(): Hero? = Hero(
@@ -229,11 +248,14 @@ internal fun ApiHomeData.toModel(arranged: Boolean = false) = HomeData(
     rows = if (arranged) rows.toRows() else null,
 )
 
-internal fun ApiItemTotals.toModel() = LibrarySummary(items.toInt(), episodes.toInt(), continuing.toInt(), unmatched.toInt(), totalSize)
+internal fun ApiItemTotals.toModel() = LibrarySummary(
+    items.toInt(), episodes.toInt(), continuing.toInt(), unmatched.toInt(), totalSize,
+    unwatched = unwatched?.toInt()?.coerceAtLeast(0), newEpisodes = newEpisodes?.toInt()?.coerceAtLeast(0),
+)
 
-internal fun ApiCredit.toModel() = Person(name, character.orNullIfBlank(), profilePath.orNullIfBlank())
+internal fun ApiCredit.toModel() = Person(name, character.orNullIfBlank(), profilePath.orNullIfBlank(), personId?.takeIf { it > 0 })
 
-internal fun ApiWatchState.toModel() = WatchProgress(positionMs, durationMs, completed)
+internal fun ApiWatchState.toModel() = WatchProgress(positionMs, durationMs, completed, epochMs(updatedAt))
 
 internal fun ApiSeason.toModel() = SeasonSummary(
     id = id,
@@ -351,7 +373,7 @@ internal fun ApiMovieTrailer.toModel(): Trailer? {
     val name = name.ifBlank { TrailerText.BUTTON }
     return when (source) {
         "file" -> fileId?.takeIf { it > 0 }?.let { Trailer.File(name, it, durationMs?.takeIf { d -> d > 0 }) }
-        "youtube" -> key?.takeIf(::isYouTubeKey)?.let { Trailer.YouTube(name, it) }
+        "youtube" -> key?.takeIf(::isYouTubeKey)?.let { Trailer.YouTube(name, it, teaser = kind == "teaser") }
         else -> null
     }
 }
@@ -372,6 +394,7 @@ internal fun ApiMediaFile.toVersion() = MediaVersion(
     durationMs = durationMs,
     dvProfile = dvProfile?.toInt()?.takeIf { it > 0 },
     recording = recording?.let { source -> epochMs(source.startedAt)?.let { RecordingProvenance(source.channel, source.number, it, source.gaps.size, source.adBreaks) } },
+    addedAtMs = epochMs(addedAt),
 )
 
 internal fun ApiMediaFileDetail.toVersion(): MediaVersion {
@@ -392,6 +415,7 @@ internal fun ApiMediaFileDetail.toVersion(): MediaVersion {
         subtitles = probe?.subtitles.orEmpty().map { it.toOption() },
         dvProfile = (dvProfile ?: video?.dvProfile)?.toInt()?.takeIf { it > 0 },
         recording = recording?.let { source -> epochMs(source.startedAt)?.let { RecordingProvenance(source.channel, source.number, it, source.gaps.size, source.adBreaks) } },
+        addedAtMs = epochMs(addedAt),
     )
 }
 
@@ -599,3 +623,23 @@ internal val SkipMode.apiValue: String
         SkipMode.AutoDelay -> "auto-delay"
     }
 
+
+/** One of a person's titles: a card as a browse item is, and the part they play; null for a kind this app doesn't know. */
+internal fun media.watchmy.client.core.api.models.PersonTitle.toTitle(): media.watchmy.client.model.PersonTitle? {
+    val kind = when (kind) {
+        media.watchmy.client.core.api.models.PersonTitle.Kind.movie -> ItemKind.Movie
+        media.watchmy.client.core.api.models.PersonTitle.Kind.show -> ItemKind.Show
+        else -> return null
+    }
+    val item = BrowseItem(
+        kind = kind, id = id, libraryId = libraryId, title = title, year = year?.toInt()?.takeIf { it > 0 }, overview = overview,
+        genres = genres, rating = rating?.takeIf { it > 0 }, posterPath = posterPath.orNullIfBlank(), backdropPath = backdropPath.orNullIfBlank(),
+        quality = qualityLabel(quality?.value), hdr = hdr, isNew = isNew, subtitle = subtitle.orNullIfBlank(), watched = watched,
+        progress = progress?.toFloat()?.takeIf { it > 0f }, episodeCount = episodeCount?.toInt(), runtimeMin = runtimeMin?.toInt()?.takeIf { it > 0 },
+        releaseDate = releaseDate.orNullIfBlank(), tmdbId = tmdbId?.takeIf { it > 0 }, watchlisted = watchlisted == true,
+        contentRating = contentRating.orNullIfBlank(), unwatchedCount = unwatchedCount?.toInt()?.coerceAtLeast(0),
+        newEpisodeCount = newEpisodeCount?.toInt()?.coerceAtLeast(0), seasonCount = seasonCount?.toInt()?.takeIf { it > 0 },
+        nextAirDate = nextAirDate.orNullIfBlank(), addedAtMs = epochMs(addedAt),
+    )
+    return media.watchmy.client.model.PersonTitle(item, character.orNullIfBlank())
+}

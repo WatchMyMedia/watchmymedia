@@ -39,6 +39,11 @@ import kotlinx.serialization.encoding.Encoder
  * @param items Matched movies or shows with a present file.
  * @param totalSize Bytes across every item's present files.
  * @param unmatched Items for files not matched yet: one per file, or per show folder.
+ * @param addedThisMonth Items whose newest present file arrived this calendar month, in the server's time zone.
+ * @param following TV: shows the signed-in person follows, as filter following lists them.
+ * @param inProgress Movies part watched, or shows started and not finished, as filter inProgress lists them.
+ * @param newEpisodes TV: shows with a new episode the signed-in person hasn't finished (isNew).
+ * @param unwatched Movies the signed-in person hasn't finished, or shows with an episode they haven't seen (\"58 you haven't watched\").
  */
 @Serializable
 
@@ -62,7 +67,27 @@ data class ItemTotals (
 
     /* Items for files not matched yet: one per file, or per show folder. */
     @SerialName(value = "unmatched")
-    val unmatched: kotlin.Long
+    val unmatched: kotlin.Long,
+
+    /* Items whose newest present file arrived this calendar month, in the server's time zone. */
+    @SerialName(value = "addedThisMonth")
+    val addedThisMonth: kotlin.Long? = null,
+
+    /* TV: shows the signed-in person follows, as filter following lists them. */
+    @SerialName(value = "following")
+    val following: kotlin.Long? = null,
+
+    /* Movies part watched, or shows started and not finished, as filter inProgress lists them. */
+    @SerialName(value = "inProgress")
+    val inProgress: kotlin.Long? = null,
+
+    /* TV: shows with a new episode the signed-in person hasn't finished (isNew). */
+    @SerialName(value = "newEpisodes")
+    val newEpisodes: kotlin.Long? = null,
+
+    /* Movies the signed-in person hasn't finished, or shows with an episode they haven't seen (\"58 you haven't watched\"). */
+    @SerialName(value = "unwatched")
+    val unwatched: kotlin.Long? = null
 
 ) {
 

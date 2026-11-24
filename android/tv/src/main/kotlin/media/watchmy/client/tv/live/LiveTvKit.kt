@@ -281,3 +281,9 @@ internal fun LiveProgramme.cellLine(nowMs: Long, format: LiveClockFormat): Strin
     }
     return parts.joinToString(" · ")
 }
+
+/** "New" on a recording's picture, gold as every New flag is on the TV. */
+@Composable
+internal fun NewFlag(modifier: Modifier = Modifier) {
+    media.watchmy.client.tv.components.ArtBadge("New", modifier, media.watchmy.client.ui.components.BadgeStyle.Gold)
+}

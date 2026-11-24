@@ -175,9 +175,9 @@ internal fun PageBackdrop(url: String?, seed: String, modifier: Modifier = Modif
  * A cast member (`.who`): a round picture 150 across, the name and the part
  * they play. It takes focus with the picture growing in the gold ring, and
  * TalkBack reads the name and the part as one (the clickable merges them;
- * clearing its semantics would clear its focused state with them). [onClick] is for opening the
- * person's titles; until the server can say which titles a person is in, a
- * press only shows that it was taken.
+ * clearing its semantics would clear its focused state with them). [onClick] opens the
+ * person's titles; on a credit the server sent without a person id, a press
+ * only shows that it was taken.
  */
 @Composable
 internal fun PersonCard(person: Person, imageUrl: String?, modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
@@ -219,6 +219,8 @@ internal fun CastRow(
     modifier: Modifier = Modifier,
     enter: FocusRequester = FocusRequester.Default,
     onFocusPerson: (Int) -> Unit = {},
+    /** OK on a person: their titles. A credit without TMDB's person id (an older server, a title not fetched again since) only shows the press was taken. */
+    onOpenPerson: (Person) -> Unit = {},
 ) {
     if (cast.isEmpty()) return
     Column(modifier) {
@@ -230,6 +232,7 @@ internal fun CastRow(
                     p,
                     library.imageUrl(p.profilePath, ImageSize.W185),
                     Modifier.focusMemory(memory, "cast:$i").onFocused { onFocusPerson(i) },
+                    onClick = { if (p.personId != null) onOpenPerson(p) },
                 )
             }
         }

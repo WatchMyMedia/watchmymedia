@@ -173,7 +173,7 @@ internal class RealPlaybackGateway(
             return signedInMediaToken(SignedInAccess(http))
         }
 
-        private suspend fun signedInMediaToken(access: ServerAccess): MediaToken {
+        internal suspend fun signedInMediaToken(access: ServerAccess): MediaToken {
             val (base, t) = access.call { base, client -> base to AuthApi(base, client).createMediaToken() }
             return t.toModel(base)
         }

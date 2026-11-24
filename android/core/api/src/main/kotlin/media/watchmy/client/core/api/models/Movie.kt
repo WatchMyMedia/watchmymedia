@@ -49,10 +49,12 @@ import kotlinx.serialization.encoding.Encoder
  * @param originalTitle
  * @param posterPath Image path; fetch via /api/images/{size}{posterPath}. TMDB's, or a picture an admin chose.
  * @param posterSource Set when an admin chose the poster: another of TMDB's, an upload or a link. Absent for the match's own poster.
+ * @param progress Search results and findMoviesByTMDB: the fraction watched (0-1) when partway through.
  * @param rating TMDB vote average, 0-10.
  * @param releaseDate
  * @param runtimeMin
  * @param tagline
+ * @param watched Search results and findMoviesByTMDB: the signed-in person finished it. Absent elsewhere; a movie's page has watch.
  * @param year
  */
 @Serializable
@@ -104,6 +106,10 @@ data class Movie (
     @SerialName(value = "posterSource")
     val posterSource: Movie.PosterSource? = null,
 
+    /* Search results and findMoviesByTMDB: the fraction watched (0-1) when partway through. */
+    @SerialName(value = "progress")
+    val progress: kotlin.Double? = null,
+
     /* TMDB vote average, 0-10. */
     @SerialName(value = "rating")
     val rating: kotlin.Double? = null,
@@ -116,6 +122,10 @@ data class Movie (
 
     @SerialName(value = "tagline")
     val tagline: kotlin.String? = null,
+
+    /* Search results and findMoviesByTMDB: the signed-in person finished it. Absent elsewhere; a movie's page has watch. */
+    @SerialName(value = "watched")
+    val watched: kotlin.Boolean? = null,
 
     @SerialName(value = "year")
     val year: kotlin.Long? = null

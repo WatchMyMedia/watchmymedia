@@ -1,5 +1,6 @@
 package media.watchmy.client.mobile.detail
 
+import media.watchmy.client.mobile.components.GoldTextButton
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -209,6 +210,15 @@ internal fun Actions(show: ShowDetail, ep: EpisodeDetail, state: ShowPageViewMod
         )
     }
     Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Where it is, when it matters: opened in place from another server, an episode only another has, or on others too.
+        val copies = state.copies
+        val where = when {
+            state.hereName != null -> listOfNotNull("On ${media.watchmy.client.model.serverHeading(state.hereName!!)}", "away from home".takeIf { state.hereAway }).joinToString(" · ")
+            ep.where.serverName != null -> "On ${media.watchmy.client.model.serverHeading(ep.where.serverName!!)}"
+            copies != null && copies.several -> "Also on " + media.watchmy.client.model.serverList(copies.all.drop(1).map { it.serverName })
+            else -> null
+        }
+        if (where != null) Text(where, style = TextStyle(fontFamily = Inter, fontSize = 13.sp, color = WmmColors.TextSoft))
         when {
             play != null -> FilledButton(play, { vm.playRequest()?.let(page.onPlay) }, Modifier.fillMaxWidth().testTag(TestTags.PLAY), large = true, icon = WmmIcons.Play)
             missing != null && missing.actions -> {
@@ -242,7 +252,10 @@ internal fun Actions(show: ShowDetail, ep: EpisodeDetail, state: ShowPageViewMod
                 if (state.hasMore) menu() else if (!fromStart && !ep.aired) Spacer(Modifier.weight(1f))
             }
         }
-        if (ep.playable) {
+        // Every server's copies of the episode, when it is on two servers or more: Play this plays it and keeps it for Play.
+        state.copies?.takeIf { it.several }?.let { copies -> EpisodeVersions(copies, vm, page) }
+        // Only the server in use's copy downloads: an episode only another server has is downloaded by switching to it.
+        if (ep.playable && ep.where.serverId == null) {
             val version = ep.versions.firstOrNull()
             ItemDownload(
                 fileId = version?.fileId,
@@ -366,3 +379,38 @@ private val MenuGround = Color(0xFF1C1C1F)
 private val DangerText = Color(0xFFFCA5A5)
 internal val Danger = Color(0xFFB42318)
 internal val DangerRim = Color(0xFFE5484D)
+
+
+/** The episode's copies under their servers, those away from home last with their note, each with where the person is there. */
+@Composable
+private fun EpisodeVersions(copies: media.watchmy.client.presentation.detail.Copies, vm: ShowPageActions, page: PageActions) {
+    val play = copies.play
+    Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Versions", style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = WmmColors.Text))
+        copies.all.sortedBy { it.away }.forEach { copy ->
+            Text(copy.heading, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = WmmColors.TextSoft))
+            if (copy.away) Text(media.watchmy.client.model.AWAY_FROM_HOME_NOTE, style = TextStyle(fontFamily = Inter, fontSize = 12.sp, color = WmmColors.TextMuted))
+            copy.versions.forEach { v ->
+                val chosen = play?.copy?.registeredId == copy.registeredId && play.version.fileId == v.fileId
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(WmmColors.Surface).padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(media.watchmy.client.model.versionTitle(v) + if (chosen) " · Play uses this" else "", style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = if (chosen) WmmColors.Accent else WmmColors.Text))
+                        val place = when {
+                            copy.watch?.completed == true -> "Watched"
+                            copy.place != null -> media.watchmy.client.model.formatRemaining(copy.place!!.durationMs - copy.place!!.positionMs)
+                            else -> "Not started"
+                        }
+                        Text(place, style = TextStyle(fontFamily = Inter, fontSize = 12.sp, color = WmmColors.TextMuted))
+                    }
+                    GoldTextButton("Play this", {
+                        vm.choose(copy, v)
+                        vm.playCopy(copy, v)?.let(page.onPlay)
+                    })
+                }
+            }
+        }
+    }
+}

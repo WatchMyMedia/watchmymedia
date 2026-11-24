@@ -1,5 +1,6 @@
 package media.watchmy.client.tv.home
 
+import media.watchmy.client.ui.imageFor
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
@@ -130,7 +131,7 @@ internal fun PeekLine(text: String, up: Boolean, modifier: Modifier = Modifier) 
 
 /** The picture a row screen shows behind its focused card. */
 internal fun HomeFocus.pictureUrl(library: LibraryRepository, live: LiveRepository, size: ImageSize): String? =
-    livePicture?.let(live::artUrl) ?: picturePath?.let { library.imageUrl(it, size) }
+    livePicture?.let(live::artUrl) ?: picturePath?.let { library.imageFor(where, it, size) }
 
 /**
  * ▲ and ▼ page instead of moving focus: [up] and [down] run once per press

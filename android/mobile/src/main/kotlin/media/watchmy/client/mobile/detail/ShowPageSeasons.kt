@@ -1,5 +1,6 @@
 package media.watchmy.client.mobile.detail
 
+import media.watchmy.client.model.cardLine
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.selection.toggleable
@@ -236,6 +237,8 @@ private fun SeasonCard(ep: EpisodeDetail, url: String?, seed: String, current: B
             when {
                 // What a missing one waits for, shortly: "Missing", "Downloading 45%", "Requested".
                 missing != null -> missing.label.substringBefore(" · ")
+                // Only another server has it so far: it plays from there.
+                ep.where.serverName != null -> listOfNotNull(ep.runtimeMin?.let { "$it min" }, ep.where.cardLine()).joinToString(" · ")
                 ep.aired -> ep.runtimeMin?.let { "$it min" }.orEmpty()
                 else -> episodeMeta(ep)
             },

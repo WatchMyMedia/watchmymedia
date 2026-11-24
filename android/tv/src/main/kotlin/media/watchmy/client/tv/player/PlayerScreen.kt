@@ -1,5 +1,6 @@
 package media.watchmy.client.tv.player
 
+import media.watchmy.client.model.at
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -122,7 +123,9 @@ private fun CastPlayer(request: PlayRequest, controller: PlaybackController, onE
 private fun PlayerFrame(controller: PlaybackController, request: PlayRequest, onPlay: (PlayRequest) -> Unit, onLeave: (reportStop: Boolean) -> Unit) {
     val services = LocalAppServices.current
     // The episode list beside the video (the Episodes panel); a recording, or a film, has none.
-    val episodes = viewModel(key = "tv-player-episodes") { PlayerEpisodesViewModel(services.library) }
+    // Another server's copy: its episodes and pictures are that server's.
+    val there = remember(request.serverId) { services.library.at(request.serverId) ?: services.library }
+    val episodes = viewModel(key = "tv-player-episodes-${request.serverId}") { PlayerEpisodesViewModel(there) }
     LaunchedEffect(episodes, request) { if (request.recordingId == null) episodes.load(request) }
     val server by services.servers.current.collectAsStateWithLifecycle()
     val leave by rememberUpdatedState(onLeave)
@@ -132,7 +135,7 @@ private fun PlayerFrame(controller: PlaybackController, request: PlayRequest, on
         PlayerContent(
             controller = controller,
             request = request,
-            imageUrl = { path, size -> services.library.imageUrl(path, size) },
+            imageUrl = { path, size -> there.imageUrl(path, size) },
             serverName = server?.server?.name,
             episodes = episodes,
             onPlay = onPlay,

@@ -39,16 +39,20 @@ import kotlinx.serialization.encoding.Encoder
  * @param kind
  * @param overview
  * @param title
+ * @param airDate Episodes: when it aired, YYYY-MM-DD.
  * @param backdropPath
  * @param contentRating
  * @param episodeId
+ * @param episodeNumber Episodes: its number in seasonNumber.
  * @param fileId
  * @param hdr
  * @param movieId
  * @param posterPath
  * @param quality The episode's best file, or the movie's or show's best.
+ * @param runtimeMin The episode's or movie's length in minutes.
  * @param seasonNumber
  * @param showId
+ * @param showTitle Episodes and shows: the show's title.
  */
 @Serializable
 
@@ -69,6 +73,10 @@ data class HomeHero (
     @SerialName(value = "title")
     val title: kotlin.String,
 
+    /* Episodes: when it aired, YYYY-MM-DD. */
+    @SerialName(value = "airDate")
+    val airDate: kotlin.String? = null,
+
     @SerialName(value = "backdropPath")
     val backdropPath: kotlin.String? = null,
 
@@ -77,6 +85,10 @@ data class HomeHero (
 
     @SerialName(value = "episodeId")
     val episodeId: kotlin.Long? = null,
+
+    /* Episodes: its number in seasonNumber. */
+    @SerialName(value = "episodeNumber")
+    val episodeNumber: kotlin.Long? = null,
 
     @SerialName(value = "fileId")
     val fileId: kotlin.Long? = null,
@@ -94,11 +106,19 @@ data class HomeHero (
     @SerialName(value = "quality")
     val quality: HomeHero.Quality? = null,
 
+    /* The episode's or movie's length in minutes. */
+    @SerialName(value = "runtimeMin")
+    val runtimeMin: kotlin.Long? = null,
+
     @SerialName(value = "seasonNumber")
     val seasonNumber: kotlin.Long? = null,
 
     @SerialName(value = "showId")
-    val showId: kotlin.Long? = null
+    val showId: kotlin.Long? = null,
+
+    /* Episodes and shows: the show's title. */
+    @SerialName(value = "showTitle")
+    val showTitle: kotlin.String? = null
 
 ) {
 

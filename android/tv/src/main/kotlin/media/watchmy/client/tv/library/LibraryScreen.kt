@@ -1,5 +1,6 @@
 package media.watchmy.client.tv.library
 
+import media.watchmy.client.ui.imageFor
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.graphics.Brush
@@ -115,7 +116,10 @@ fun LibraryScreen(
     val services = LocalAppServices.current
     val notMatched = rememberNotMatchedNotice()
     val vm = viewModel(key = "library-$type") {
-        LibraryViewModel(services.library, type, createSavedStateHandle(), pageSize = PAGE_SIZE, columns = COLUMNS, countsLine = true, requests = services.browseRequests)
+        LibraryViewModel(
+            services.library, type, createSavedStateHandle(), pageSize = PAGE_SIZE, columns = COLUMNS, countsLine = true, requests = services.browseRequests,
+            others = media.watchmy.client.presentation.servers.OtherServers(services.servers, services.library),
+        )
     }
     ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
@@ -146,7 +150,7 @@ fun LibraryScreen(
 
     TvScaffold(if (type == LibraryType.Tv) RailSection.Shows else RailSection.Movies, onNavigate) {
         if (rowsVm.arranges && state.libraryId != null) {
-            val actions = TvRowActions(onPlay, onOpenShow, onOpenMovie, { show, season, episode -> onNavigate(TvRoutes.Episode(show, season, episode)) }, notMatched, { vm.setWatched(it, !it.watched) }) { id -> onNavigate(TvRoutes.MediaList(id, type = if (type == LibraryType.Movie) "movie" else "tv")) }
+            val actions = TvRowActions(onPlay, onOpenShow, onOpenMovie, { show, season, episode -> onNavigate(TvRoutes.Episode(show, season, episode)) }, notMatched, { vm.setWatched(it, !it.watched) }, { id -> onNavigate(TvRoutes.MediaList(id, type = if (type == LibraryType.Movie) "movie" else "tv")) })
             ArrangedLibrary(
                 type, title, state, rows, actions, memory, gridState, jumps, byTitle,
                 controls = { m -> LibraryControls(state.choices, memory, vm::clearFilters, { vm.setFilter(ItemFilter.Unwatched) }, { openPanel(null) }, { openPanel(FilterList.Sort) }, m) },
@@ -167,6 +171,8 @@ fun LibraryScreen(
                 LibraryTitle(title, state.countsLine, Modifier.weight(1f))
                 LibraryControls(state.choices, memory, vm::clearFilters, { vm.setFilter(ItemFilter.Unwatched) }, { openPanel(null) }, { openPanel(FilterList.Sort) })
             }
+            // A grid from every server: a line under the header for one still out, one that didn't answer (with Try again), or one that can't filter so.
+            if (state.merged) ServersLine(state.notes, if (state.retryServers) vm::retryServers else null, Modifier.padding(start = ContentStart, end = ContentEnd, top = 8.dp))
             FocusedFacts(state.items.firstOrNull { it.id == focusedId }, Modifier.padding(start = ContentStart, end = ContentEnd, top = 26.dp))
             Box(Modifier.fillMaxWidth().weight(1f)) {
                 when {
@@ -193,10 +199,10 @@ fun LibraryScreen(
                                 horizontalArrangement = Arrangement.spacedBy(GridGapX),
                                 verticalArrangement = Arrangement.spacedBy(GridGapY),
                             ) {
-                                itemsIndexed(state.items, key = { _, it -> it.id }) { i, item ->
+                                itemsIndexed(state.items, key = { _, it -> it.gridKey() }) { i, item ->
                                     GridCard(
                                         item = item,
-                                        imageUrl = services.library.imageUrl(item.posterPath, ImageSize.W342),
+                                        imageUrl = services.library.imageFor(item.where, item.posterPath, ImageSize.W342),
                                         onClick = { item.open(onOpenShow, onOpenMovie, onPlay, notMatched) },
                                         onLongClick = holdFor(item) { vm.setWatched(it, !it.watched) },
                                         modifier = Modifier
@@ -263,6 +269,7 @@ fun LibraryScreen(
             onSort = vm::setSort,
             onClear = vm::clearFilters,
             onDismiss = { panelOpen = false },
+            onRating = vm::setRating,
         )
     }
 }
@@ -352,10 +359,10 @@ private fun ArrangedLibrary(
                     Text(if (state.choices.narrowed) "No ${title.lowercase()} match these filters." else "No ${title.lowercase()} yet.", style = inter(22.sp), color = WmmColors.TextMuted)
                 }
                 else -> {
-                    itemsIndexed(state.items, key = { _, it -> it.id }) { i, item ->
+                    itemsIndexed(state.items, key = { _, it -> it.gridKey() }) { i, item ->
                         GridCard(
                             item = item,
-                            imageUrl = services.library.imageUrl(item.posterPath, ImageSize.W342),
+                            imageUrl = services.library.imageFor(item.where, item.posterPath, ImageSize.W342),
                             onClick = { onOpen(item) },
                             onLongClick = holdFor(item, actions.onToggleWatched),
                             modifier = Modifier.focusMemory(memory, "item:${item.id}").toStrip(jumps, byTitle && i % COLUMNS == COLUMNS - 1).onFocusChanged {
@@ -457,6 +464,9 @@ private fun GridCard(item: BrowseItem, imageUrl: String?, onClick: () -> Unit, o
         subtitleLine = false,
     ) {
         if (item.isNew) ArtBadge("New", Modifier.align(Alignment.TopStart).padding(10.dp), BadgeStyle.Gold)
+        // A show partway through says how many episodes are left ("4 left"), where the server counts them.
+        val left = item.unwatchedCount?.takeIf { item.kind == media.watchmy.client.model.ItemKind.Show && it > 0 && !item.watched }
+        if (left != null) ArtBadge("$left left", Modifier.align(Alignment.TopEnd).padding(10.dp))
         ArtWatched(item.watched)
         ArtProgress(item.progress)
     }
@@ -499,3 +509,22 @@ private fun Strip(state: LibraryViewModel.State, type: LibraryType, jumps: GridJ
 /** ▶ from a poster in the grid's last column goes to the A–Z strip ([on]), not wherever is nearest. */
 private fun Modifier.toStrip(jumps: GridJumps, on: Boolean): Modifier =
     if (on) focusProperties { right = jumps.strip } else this
+
+
+/** A grid card's key: its server's, as two servers' ids can be the same. */
+private fun BrowseItem.gridKey(): String = "${where.serverId}:${kind}:${id}"
+
+/**
+ * The header's second line on a grid from every server: what a server
+ * still out, one that didn't answer or one too old for a filter means for
+ * the grid, with Try again for the one that didn't answer. Its height is
+ * kept when there is nothing to say, so the grid doesn't jump.
+ */
+@Composable
+private fun ServersLine(notes: List<String>, onRetry: (() -> Unit)?, modifier: Modifier = Modifier) {
+    Row(modifier.heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+        val line = notes.firstOrNull { !it.startsWith("Still asking") } ?: notes.firstOrNull()
+        if (line != null) Text(line, style = TvType.Second, color = WmmColors.TextSoft, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+        if (onRetry != null) TvButton("Try again", onRetry, size = media.watchmy.client.tv.components.TvButtonSize.Small)
+    }
+}

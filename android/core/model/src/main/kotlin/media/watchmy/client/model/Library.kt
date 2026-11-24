@@ -56,7 +56,51 @@ data class BrowseItem(
     val tmdbId: Long? = null,
     /** On one of the person's watchlists, as the server read it ([WatchlistRepository.held] has what changed since). */
     val watchlisted: Boolean = false,
+    /** Its certification ("PG-13", "TV-14"); null when it has none. */
+    val contentRating: String? = null,
+    /** Shows: episodes on disk not watched yet ("4 episodes left"); null from servers below [REDESIGN_API_LEVEL]. */
+    val unwatchedCount: Int? = null,
+    /** Shows: episodes new since the person last watched ("2 new"); null as [unwatchedCount]. */
+    val newEpisodeCount: Int? = null,
+    /** Shows: seasons with an episode on disk, specials left out; null as [unwatchedCount]. */
+    val seasonCount: Int? = null,
+    /** Shows: when the next episode airs, an ISO date; null when none is known. */
+    val nextAirDate: String? = null,
+    /** When it came into the library, in epoch milliseconds; what a row filled from several servers is ordered by. */
+    val addedAtMs: Long? = null,
+    /** Which servers the title is on, when the device is signed in to several ([Where]). */
+    val where: Where = Where.Here,
 )
+
+/**
+ * Where a card's title is, for one card a title across the servers this
+ * device is signed in to. [serverId] is the registered server the card's ids
+ * are for, which it opens and plays from: null is the server in use, as every
+ * card was before. [serverName] names it when it isn't. [copies] are the same
+ * title on other servers, merged into this card, each with its own id there.
+ */
+data class Where(
+    val serverId: String? = null,
+    val serverName: String? = null,
+    val copies: List<Copy> = emptyList(),
+) {
+    /** The title on another server: [id] is its movie, show or episode id there; [serverId] null is the server in use. */
+    data class Copy(val serverId: String?, val serverName: String?, val id: Long)
+
+    /** The server in use has no copy: the card names where it is ("On Cabin"). */
+    val onlyElsewhere: Boolean get() = serverId != null && copies.none { it.serverId == null }
+
+    /** On more than one server. */
+    val several: Boolean get() = copies.isNotEmpty()
+
+    /** Every server that has the title, its own first: (server id or null, name or null). */
+    val all: List<Copy> get() = listOf(Copy(serverId, serverName, -1)) + copies
+
+    companion object {
+        /** On the server in use alone. */
+        val Here = Where()
+    }
+}
 
 /** An episode card (Recently aired, search results). */
 data class EpisodeCard(
@@ -78,6 +122,12 @@ data class EpisodeCard(
     val isNew: Boolean,
     /** The signed-in user has watched it; false on servers that do not say. */
     val watched: Boolean = false,
+    /** Its length in minutes; null when unknown, or from servers below [REDESIGN_API_LEVEL]. */
+    val runtimeMin: Int? = null,
+    /** The show's TMDB id, which matches the episode on other servers with its season and number; null as [runtimeMin]. */
+    val showTmdbId: Long? = null,
+    /** Which servers the episode is on ([Where]); a copy's id is the episode's there. */
+    val where: Where = Where.Here,
 )
 
 /** An item partway through, for Continue watching. */
@@ -96,6 +146,16 @@ data class ContinueItem(
     val episode: Int?,
     val positionMs: Long,
     val durationMs: Long,
+    /** The movie's or show's certification; null when it has none, or from servers below [REDESIGN_API_LEVEL]. */
+    val contentRating: String? = null,
+    /** The movie's or the episode's overview; null as [contentRating]. */
+    val overview: String? = null,
+    /** The movie's TMDB id, or for an episode its show's; null as [contentRating]. */
+    val tmdbId: Long? = null,
+    /** When it was last played, in epoch milliseconds: the order of Continue watching filled from several servers. */
+    val updatedAtMs: Long? = null,
+    /** Which servers the title is on ([Where]): the card is the copy played last, and a copy's id is its movie's or episode's there. */
+    val where: Where = Where.Here,
 ) {
     enum class Kind { Movie, Episode }
 
@@ -152,6 +212,9 @@ enum class ItemSort { Title, Added, Year, Rating, Released, Runtime, Aired }
 
 enum class ItemFilter { All, Continuing, Ended, FourK, Hdr, Unwatched }
 
+/** [ItemQuery.contentRatings]'s value for titles with no certification. */
+const val UNRATED = "unrated"
+
 data class ItemQuery(
     val libraryId: Long,
     val sort: ItemSort = ItemSort.Title,
@@ -163,6 +226,8 @@ data class ItemQuery(
     val text: String? = null,
     val offset: Int = 0,
     val limit: Int = 100,
+    /** Certifications to keep ("PG-13", [UNRATED] for none); empty keeps every one. Sent from [REDESIGN_API_LEVEL] only. */
+    val contentRatings: Set<String> = emptySet(),
 )
 
 /** A title initial and its first offset across the whole filtered result. */
@@ -183,6 +248,10 @@ data class ItemPage(
     /** Genre totals with the active status/quality, title and decade filters, excluding selected genre.
      * Null on older servers; an empty map is an authoritative empty result. */
     val genreCounts: Map<String, Int>? = null,
+    /** The certifications in the library, in the US order with [UNRATED] last; null below [REDESIGN_API_LEVEL], where there is no rating filter. */
+    val contentRatings: List<String>? = null,
+    /** Titles of each certification with the other filters on; null as [contentRatings]. */
+    val contentRatingCounts: Map<String, Int>? = null,
 )
 
 /** A library's counts for its header ("142 shows · 3,418 episodes · 12 continuing"). */
@@ -196,9 +265,28 @@ data class LibrarySummary(
     /** Files (or show folders) not matched yet. */
     val unmatched: Int,
     val totalSizeBytes: Long,
+    /** Titles the person hasn't watched; null from servers below [REDESIGN_API_LEVEL]. */
+    val unwatched: Int? = null,
+    /** TV: shows with new episodes for the person; null as [unwatched]. */
+    val newEpisodes: Int? = null,
 )
 
-data class Person(val name: String, val role: String?, val profilePath: String?)
+/** A cast member. [personId] is TMDB's, which opens their titles; null from servers below [REDESIGN_API_LEVEL] and on titles not fetched again since. */
+data class Person(val name: String, val role: String?, val profilePath: String?, val personId: Long? = null)
+
+/** A person's titles in the library, newest first ([LibraryRepository.person]). */
+data class PersonPage(
+    val personId: Long,
+    val name: String,
+    val profilePath: String?,
+    val movies: List<PersonTitle>,
+    val shows: List<PersonTitle>,
+) {
+    val count: Int get() = movies.size + shows.size
+}
+
+/** One of a person's titles, and the part they play in it ("Tess Arden"; two joined with " / "). */
+data class PersonTitle(val item: BrowseItem, val character: String?)
 
 data class SeasonSummary(
     val id: Long,
@@ -273,6 +361,8 @@ data class MediaVersion(
     /** The Dolby Vision profile (5, 7, 8); null for other files, or when the server has not read it. */
     val dvProfile: Int? = null,
     val recording: RecordingProvenance? = null,
+    /** When the file came into the library, in epoch milliseconds; null when the server doesn't say. */
+    val addedAtMs: Long? = null,
 ) {
     /** [hdr] as a tag: "DV P8" when the profile is known, else "DV", "HDR10", "HLG"; null for SDR. */
     val hdrTag: String? get() = hdrLabel(hdr)?.let { if (it == DOLBY_VISION) "DV" + profileSuffix(" ") else it }
@@ -287,7 +377,13 @@ data class MediaVersion(
 const val DOLBY_VISION = "Dolby Vision"
 
 /** Where the signed-in user is in a movie or episode. */
-data class WatchProgress(val positionMs: Long, val durationMs: Long, val completed: Boolean)
+data class WatchProgress(
+    val positionMs: Long,
+    val durationMs: Long,
+    val completed: Boolean,
+    /** When it was last played or marked, in epoch milliseconds: when it was watched, once [completed]. */
+    val updatedAtMs: Long? = null,
+)
 
 data class EpisodeDetail(
     val id: Long,
@@ -311,6 +407,12 @@ data class EpisodeDetail(
     val download: Download? = null,
     /** The season's open request covering this episode. */
     val request: RequestState? = null,
+    /**
+     * An episode only another server has, listed in its place on a show on
+     * several servers: [Where.serverId] is that server, and [id] stands for
+     * it on this page alone (its own id there is in the page's copies).
+     */
+    val where: Where = Where.Here,
 )
 
 /** The show with only the seasons that have episodes on disk, and [keep] (the one asked for). */
@@ -403,6 +505,46 @@ interface LibraryRepository {
     /** The row at the end of a show's page: More like this; empty as [movieRelated]'s. */
     suspend fun showRelated(id: Long): List<ScreenRow> = emptyList()
 
+    /**
+     * A cast member's titles in the library, newest first, from
+     * [REDESIGN_API_LEVEL]. Throws [ApiException] with 404 when no title here
+     * has them, and on older servers, which have no such call.
+     */
+    suspend fun person(personId: Long): PersonPage = throw ApiException(404, "Not found.")
+
+    /**
+     * Takes the movie or episode off Continue watching, keeping its place, from
+     * [REDESIGN_API_LEVEL] ([ServerFeatures.hideFromContinue]); playing it
+     * again brings it back. [showInContinue] undoes it.
+     */
+    suspend fun hideFromContinue(kind: ContinueItem.Kind, id: Long): Unit = throw ApiException(404, "This server can't do that.")
+
+    suspend fun showInContinue(kind: ContinueItem.Kind, id: Long): Unit = throw ApiException(404, "This server can't do that.")
+
+    /**
+     * This server's copies of the movie or show with TMDB id [tmdbId], every
+     * library's with a file, marked for the person as search's results are;
+     * empty when it has none, and below [REDESIGN_API_LEVEL], which is not asked.
+     */
+    suspend fun copies(kind: ItemKind, tmdbId: Long): List<BrowseItem> = emptyList()
+
+    /** What the server this repository talks to offers, by its level as last read. */
+    fun features(): ServerFeatures = ServerFeatures(0)
+
+    /**
+     * This library on the registered server [serverId], as the person signed
+     * in there, whichever server is in use: every call goes to that server's
+     * own address with its own sign-in, and every id is that server's. Null
+     * for a server no one is signed in to here. With null, or the server in
+     * use, this repository itself.
+     *
+     * A server that isn't in use is asked which server it is first, with no
+     * sign-in, and gets its sign-in only when it is the one remembered; its
+     * pictures ([imageUrl]) are signed while that answer stands, and a call
+     * that fails forgets it, so the next asks again.
+     */
+    fun on(serverId: String?): LibraryRepository? = if (serverId == null) this else null
+
     suspend fun search(text: String): SearchResults
 
     /**
@@ -484,3 +626,10 @@ interface LibraryRepository {
      */
     val libraryChanges: Flow<LibraryChange> get() = changes.map { LibraryChange.Everything }
 }
+
+/**
+ * This library on [serverId] ([LibraryRepository.on]), and this very one for
+ * the server in use (null): a wrapper's own calls (Watch Next's, a test's)
+ * stay in the way for the server in use.
+ */
+fun LibraryRepository.at(serverId: String?): LibraryRepository? = if (serverId == null) this else on(serverId)

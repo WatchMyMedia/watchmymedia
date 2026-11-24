@@ -59,6 +59,8 @@ class FakeAppServices(
         override fun create(): PlaybackController = FakePlaybackController(trickplay = FakeData.trickplay.takeIf { level() >= TRICKPLAY_API_LEVEL })
 
         override suspend fun plans(fileIds: List<Long>): Map<Long, PlaybackPlan> = fileIds.mapNotNull(FakeData::plan).associateBy { it.fileId }
+
+        override suspend fun plansOn(serverId: String?, fileIds: List<Long>): Map<Long, PlaybackPlan> = plans(fileIds)
     }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -72,6 +74,7 @@ class FakeAppServices(
 
     /** Each fake's own, so one test's See all doesn't reach another's grid. */
     override val browseRequests = BrowseRequests()
+    override val copyChoices = media.watchmy.client.model.CopyChoices.InMemory()
     override val cast: CastService = if (cast && !tv) FakeCastService("Living Room TV", connected = true) else CastService.None
     override val client = ClientInfo(
         deviceId = "fake-device",

@@ -34,7 +34,7 @@ class ShowPageViewModelTest {
 
     private val arr = FakeArr()
     private var user = User(1, "Sam", isAdmin = true)
-    private val library = TestLibrary(FakeLibraryRepository(arr) { user.name })
+    private val library = TestLibrary(FakeLibraryRepository(arr, user = { user.name }))
     private val requests = FakeRequestRepository({ user }, arr)
 
     /** Copperline's S04E05, on disk and Sonarr's. */

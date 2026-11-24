@@ -128,7 +128,7 @@ fun HomeScreen(
     liveListings: Boolean = false,
 ) {
     val services = LocalAppServices.current
-    val vm = viewModel { HomeViewModel(services.library, services.auth, services.rows) }
+    val vm = viewModel { HomeViewModel(services.library, services.auth, services.rows, others = media.watchmy.client.presentation.servers.OtherServers(services.servers, services.library)) }
     ReportShown(vm::setShown)
     val state by vm.state.collectAsStateWithLifecycle()
     val user by vm.user.collectAsStateWithLifecycle()
@@ -158,13 +158,15 @@ fun HomeScreen(
                             home = home,
                             library = services.library,
                             memory = memory,
-                            actions = TvRowActions(onPlay, onOpenShow, onOpenMovie, onOpenEpisode, rememberNotMatchedNotice(), vm::toggleMovieWatched) { id -> onNavigate(TvRoutes.MediaList(id)) },
+                            actions = TvRowActions(onPlay, onOpenShow, onOpenMovie, onOpenEpisode, rememberNotMatchedNotice(), vm::toggleMovieWatched, { id -> onNavigate(TvRoutes.MediaList(id)) }, vm::hideFromContinue.takeIf { state.canHideContinue }),
                             liveChannels = liveChannels,
                             onWatchLive = onWatchLive,
                             liveListings = liveListings,
                             onLiveGuide = { onNavigate(RailSection.LiveTV.route) },
                             onEditRows = { onNavigate(TvRoutes.RowSettings(RowScreens.HOME)) },
                             onOpenLibrary = { type -> onNavigate(if (type == LibraryType.Tv) RailSection.Shows.route else RailSection.Movies.route) },
+                            elsewhere = media.watchmy.client.tv.rows.ElsewhereEnd(state.stillAsking, state.notAnswered, vm::retryElsewhere)
+                                .takeIf { state.stillAsking.isNotEmpty() || state.notAnswered.isNotEmpty() },
                         )
                     } else HomeContent(
                         home = home,

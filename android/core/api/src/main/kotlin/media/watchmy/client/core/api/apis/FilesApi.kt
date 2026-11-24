@@ -577,12 +577,31 @@ open class FilesApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      }
 
     /**
+     * enum for parameter probe
+     */
+     enum class ProbeListLibraryFiles(val value: kotlin.String) {
+         @SerialName(value = "failed") failed("failed"),
+         @SerialName(value = "unknown_default_open_api") unknown_default_open_api("unknown_default_open_api");
+
+        /**
+         * Override [toString()] to avoid using the enum variable name as the value, and instead use
+         * the actual value defined in the API spec file.
+         *
+         * This solves a problem when the variable name and its value are different, and ensures that
+         * the client sends the correct enum values to the server always.
+         */
+        override fun toString(): kotlin.String = "$value"
+     }
+
+    /**
      * GET /api/libraries/{id}/files
      * List the video files in a library
      * 
      * @param id Library ID.
      * @param status Filter by status; omit for all. (optional)
      * @param match Filter by metadata match status; omit for all. (optional)
+     * @param probe failed: only the files ffprobe could not read (API level 34). (optional)
+     * @param q Words in the file&#39;s path, in order, any case (API level 34). (optional)
      * @param limit  (optional, default to 100L)
      * @param offset  (optional, default to 0L)
      * @return MediaFileList
@@ -594,8 +613,8 @@ open class FilesApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    suspend fun listLibraryFiles(id: kotlin.Long, status: StatusListLibraryFiles? = null, match: MatchListLibraryFiles? = null, limit: kotlin.Long? = 100L, offset: kotlin.Long? = 0L) : MediaFileList = withContext(Dispatchers.IO) {
-        val localVarResponse = listLibraryFilesWithHttpInfo(id = id, status = status, match = match, limit = limit, offset = offset)
+    suspend fun listLibraryFiles(id: kotlin.Long, status: StatusListLibraryFiles? = null, match: MatchListLibraryFiles? = null, probe: ProbeListLibraryFiles? = null, q: kotlin.String? = null, limit: kotlin.Long? = 100L, offset: kotlin.Long? = 0L) : MediaFileList = withContext(Dispatchers.IO) {
+        val localVarResponse = listLibraryFilesWithHttpInfo(id = id, status = status, match = match, probe = probe, q = q, limit = limit, offset = offset)
 
         return@withContext when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as MediaFileList
@@ -619,6 +638,8 @@ open class FilesApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @param id Library ID.
      * @param status Filter by status; omit for all. (optional)
      * @param match Filter by metadata match status; omit for all. (optional)
+     * @param probe failed: only the files ffprobe could not read (API level 34). (optional)
+     * @param q Words in the file&#39;s path, in order, any case (API level 34). (optional)
      * @param limit  (optional, default to 100L)
      * @param offset  (optional, default to 0L)
      * @return ApiResponse<MediaFileList?>
@@ -627,8 +648,8 @@ open class FilesApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    suspend fun listLibraryFilesWithHttpInfo(id: kotlin.Long, status: StatusListLibraryFiles?, match: MatchListLibraryFiles?, limit: kotlin.Long?, offset: kotlin.Long?) : ApiResponse<MediaFileList?> = withContext(Dispatchers.IO) {
-        val localVariableConfig = listLibraryFilesRequestConfig(id = id, status = status, match = match, limit = limit, offset = offset)
+    suspend fun listLibraryFilesWithHttpInfo(id: kotlin.Long, status: StatusListLibraryFiles?, match: MatchListLibraryFiles?, probe: ProbeListLibraryFiles?, q: kotlin.String?, limit: kotlin.Long?, offset: kotlin.Long?) : ApiResponse<MediaFileList?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = listLibraryFilesRequestConfig(id = id, status = status, match = match, probe = probe, q = q, limit = limit, offset = offset)
 
         return@withContext request<Unit, MediaFileList>(
             localVariableConfig
@@ -641,11 +662,13 @@ open class FilesApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
      * @param id Library ID.
      * @param status Filter by status; omit for all. (optional)
      * @param match Filter by metadata match status; omit for all. (optional)
+     * @param probe failed: only the files ffprobe could not read (API level 34). (optional)
+     * @param q Words in the file&#39;s path, in order, any case (API level 34). (optional)
      * @param limit  (optional, default to 100L)
      * @param offset  (optional, default to 0L)
      * @return RequestConfig
      */
-    fun listLibraryFilesRequestConfig(id: kotlin.Long, status: StatusListLibraryFiles?, match: MatchListLibraryFiles?, limit: kotlin.Long?, offset: kotlin.Long?) : RequestConfig<Unit> {
+    fun listLibraryFilesRequestConfig(id: kotlin.Long, status: StatusListLibraryFiles?, match: MatchListLibraryFiles?, probe: ProbeListLibraryFiles?, q: kotlin.String?, limit: kotlin.Long?, offset: kotlin.Long?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
@@ -654,6 +677,12 @@ open class FilesApi(basePath: kotlin.String = defaultBasePath, client: Call.Fact
                 }
                 if (match != null) {
                     put("match", listOf(match.value))
+                }
+                if (probe != null) {
+                    put("probe", listOf(probe.value))
+                }
+                if (q != null) {
+                    put("q", listOf(q.toString()))
                 }
                 if (limit != null) {
                     put("limit", listOf(limit.toString()))

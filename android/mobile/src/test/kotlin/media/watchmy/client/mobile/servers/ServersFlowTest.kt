@@ -118,7 +118,8 @@ class ServersFlowTest {
         assertEquals(LivingRoom.id, current)
         compose.onNodeWithText("Couldn’t reach Den server").assertIsDisplayed()
         compose.onNodeWithText("It may be off, or only reachable on its own network. You’re still on Living room server.").assertIsDisplayed()
-        compose.onNodeWithText("Try again").assertIsDisplayed()
+        // Home under the sheet says the same server didn't answer, with a Try again of its own.
+        compose.onAllNodesWithText("Try again").onLast().assertIsDisplayed()
         // The phone holds downloads from it, so it can be switched to all the same.
         compose.onNodeWithText("Watch its 3 downloads").performClick()
         compose.waitForIdle()
@@ -200,7 +201,7 @@ class ServersFlowTest {
         compose.onNode(hasText("Servers") and hasText("Living room and 2 more")).assertExists()
     }
 
-    @Test fun `search looks in every server, and a result on another opens there and comes back to the words`() {
+    @Test fun `search looks in every server, and a result on another opens in place and comes back to the words`() {
         start()
         compose.onNode(hasContentDescription("Search") and hasClickAction()).performClick()
         compose.waitForIdle()
@@ -215,31 +216,25 @@ class ServersFlowTest {
         compose.onAllNodesWithText("Cabin server").onFirst().assertIsDisplayed()
 
         compose.onNodeWithText("Harborside").performClick()
-        // The switch is the app's own work, not the screen's: let it run.
-        compose.waitUntil(5_000) {
-            compose.waitForIdle()
-            current == Cabin.id
-        }
-        assertEquals("the phone is on the server that has it", Cabin.id, current)
-        waitFor("Now on Cabin server")
-        // The title's page, on the Cabin server.
-        waitFor("Harborside")
+        // The title's page, from the Cabin server, in place: the phone stays on the server it was on.
+        waitFor("On Cabin server")
         compose.onAllNodesWithText("Harborside").onFirst().assertIsDisplayed()
+        assertEquals("the phone doesn't switch", LivingRoom.id, current)
 
-        // Back is Search with the same words, asked again: the rows name the server that is no longer in use.
+        // Back is Search as it was.
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
-        waitFor("Living room server")
+        waitFor("harbor")
         compose.onNode(hasSetTextAction() and hasText("harbor")).assertIsDisplayed()
-        compose.onAllNodesWithText("Living room server").onFirst().assertIsDisplayed()
+        compose.onAllNodesWithText("Cabin server").onFirst().assertIsDisplayed()
         // At the end of the results: the server that didn't answer, and the one signed out here.
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Den server didn’t answer, so its titles aren’t listed."))
         compose.onNodeWithText("Den server didn’t answer, so its titles aren’t listed.").assertIsDisplayed()
         compose.onNodeWithText("You’re signed out of home.watchmy.media here, so its titles aren’t listed.").assertExists()
 
-        // Back again is the Cabin server's Home.
+        // Back again is Home, on the server it was on.
         compose.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
         compose.waitForIdle()
-        compose.onNodeWithContentDescription("On Cabin server. Open Servers").assertIsDisplayed()
+        compose.onNodeWithContentDescription("On Living room server. Open Servers").assertIsDisplayed()
     }
 
     @Test

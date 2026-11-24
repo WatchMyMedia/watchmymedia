@@ -1,5 +1,6 @@
 package media.watchmy.client.mobile.player
 
+import media.watchmy.client.model.at
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
@@ -101,7 +102,8 @@ import media.watchmy.client.ui.rememberTabletLayout
 fun PlayerScreen(request: PlayRequest, onExit: () -> Unit) {
     val services = LocalAppServices.current
     val castState by services.cast.state.collectAsStateWithLifecycle()
-    val castDevice = (castState as? CastState.Connected)?.deviceName.takeIf { request.recordingId == null }
+    // Another server's copy plays here: a cast goes as the server in use, which doesn't have this file.
+    val castDevice = (castState as? CastState.Connected)?.deviceName.takeIf { request.recordingId == null && request.serverId == null }
     // The play, on this screen's nav entry: where it is now (here or on a TV) and what it is, through a
     // recreated activity or process death (a handover carries the position and tracks).
     val model = viewModel { PlayerViewModel(services.playback, createSavedStateHandle(), request, onTv = castDevice != null) }
@@ -162,7 +164,7 @@ private fun RemotePlayer(selection: PlayerSelection, start: (PlaybackController)
 private fun PlayerContent(controller: PlaybackController, selection: PlayerSelection, onExit: () -> Unit, onPlay: (PlayRequest) -> Unit, remoteDevice: String?) {
     val request = selection.request
     val local = remoteDevice == null
-    val library = LocalAppServices.current.library
+    val library = LocalAppServices.current.library.let { root -> remember(selection.request.serverId) { root.at(selection.request.serverId) ?: root } }
     val state by controller.state.collectAsStateWithLifecycle()
     // Read only by the scrubber and the clocks, through the lambda, so its ticks recompose only them.
     val progress = controller.progress.collectAsStateWithLifecycle()

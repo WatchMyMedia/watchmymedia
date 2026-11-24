@@ -65,6 +65,16 @@ class WatchNextLibrary(
         row.removeMarked(WatchTarget.Season(showId, season))
     }
 
+    /** Off Continue watching is off the launcher's row too. */
+    override suspend fun hideFromContinue(kind: ContinueItem.Kind, id: Long) {
+        val row = watchNext.bind()
+        library.hideFromContinue(kind, id)
+        row.removeMarked(if (kind == ContinueItem.Kind.Movie) WatchTarget.Movie(id) else WatchTarget.Episode(id))
+    }
+
+    /** The server in use is this library, so its marks keep the row in step; another server's is its own. */
+    override fun on(serverId: String?): LibraryRepository? = library.on(serverId)?.let { if (it === library) this else it }
+
     override suspend fun setShowWatched(showId: Long, watched: Boolean) {
         val row = watchNext.bind()
         library.setShowWatched(showId, watched)

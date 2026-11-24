@@ -1,5 +1,6 @@
 package media.watchmy.client.core.data
 
+import kotlinx.serialization.builtins.serializer
 import media.watchmy.client.model.ServerFeatures
 import android.util.Log
 import androidx.datastore.core.DataStore
@@ -97,6 +98,8 @@ internal data class Stored(
     val passthrough: String? = null,
     /** [SubtitleSize] by name; null for Normal. */
     val subtitleSize: String? = null,
+    /** For each title on several servers, the copy Play uses: its card key, then "server id/file id"; the newest last. */
+    val chosenCopies: Map<String, String> = emptyMap(),
 ) {
     val current: StoredServer? get() = servers.firstOrNull { it.id == currentId }
 
@@ -411,6 +414,8 @@ internal class LocalStore(
         private val MATCH_FRAME_RATE = booleanPreferencesKey("match_frame_rate")
         private val PASSTHROUGH = stringPreferencesKey("audio_passthrough")
         private val SUBTITLE_SIZE = stringPreferencesKey("subtitle_size")
+        private val CHOSEN_COPIES = stringPreferencesKey("chosen_copies")
+        private val copiesSerializer = kotlinx.serialization.builtins.MapSerializer(String.serializer(), String.serializer())
         private val json = Json { ignoreUnknownKeys = true }
         private val serversSerializer = ListSerializer(StoredServer.serializer())
 
@@ -424,6 +429,7 @@ internal class LocalStore(
             matchFrameRate = prefs[MATCH_FRAME_RATE] ?: false,
             passthrough = prefs[PASSTHROUGH],
             subtitleSize = prefs[SUBTITLE_SIZE],
+            chosenCopies = prefs[CHOSEN_COPIES]?.let { runCatching { json.decodeFromString(copiesSerializer, it) }.getOrNull() }.orEmpty(),
         )
 
         fun encode(s: Stored, prefs: androidx.datastore.preferences.core.MutablePreferences) {
@@ -438,6 +444,7 @@ internal class LocalStore(
             put(MOBILE_QUALITY, s.mobileQuality)
             put(PASSTHROUGH, s.passthrough)
             put(SUBTITLE_SIZE, s.subtitleSize)
+            put(CHOSEN_COPIES, s.chosenCopies.takeIf { it.isNotEmpty() }?.let { json.encodeToString(copiesSerializer, it) })
             // Left out while off, as the other settings are while at their defaults.
             if (s.matchFrameRate) prefs[MATCH_FRAME_RATE] = true else prefs.remove(MATCH_FRAME_RATE)
         }

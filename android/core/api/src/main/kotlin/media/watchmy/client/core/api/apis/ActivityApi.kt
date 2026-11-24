@@ -630,6 +630,7 @@ open class ActivityApi(basePath: kotlin.String = defaultBasePath, client: Call.F
      * @param by  (optional, default to By.plays)
      * @param user Admins only; others always see their own. (optional)
      * @param library  (optional)
+     * @param conversions Also count why the period&#39;s plays were converted (conversions). From API level 34. (optional)
      * @return ActivityCards
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
@@ -639,8 +640,8 @@ open class ActivityApi(basePath: kotlin.String = defaultBasePath, client: Call.F
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
-    suspend fun getStatsCards(days: kotlin.Long? = 30L, by: ByGetStatsCards? = ByGetStatsCards.plays, user: kotlin.Long? = null, library: kotlin.Long? = null) : ActivityCards = withContext(Dispatchers.IO) {
-        val localVarResponse = getStatsCardsWithHttpInfo(days = days, by = by, user = user, library = library)
+    suspend fun getStatsCards(days: kotlin.Long? = 30L, by: ByGetStatsCards? = ByGetStatsCards.plays, user: kotlin.Long? = null, library: kotlin.Long? = null, conversions: kotlin.Boolean? = null) : ActivityCards = withContext(Dispatchers.IO) {
+        val localVarResponse = getStatsCardsWithHttpInfo(days = days, by = by, user = user, library = library, conversions = conversions)
 
         return@withContext when (localVarResponse.responseType) {
             ResponseType.Success -> (localVarResponse as Success<*>).data as ActivityCards
@@ -665,14 +666,15 @@ open class ActivityApi(basePath: kotlin.String = defaultBasePath, client: Call.F
      * @param by  (optional, default to By.plays)
      * @param user Admins only; others always see their own. (optional)
      * @param library  (optional)
+     * @param conversions Also count why the period&#39;s plays were converted (conversions). From API level 34. (optional)
      * @return ApiResponse<ActivityCards?>
      * @throws IllegalStateException If the request is not correctly configured
      * @throws IOException Rethrows the OkHttp execute method exception
      */
     @Suppress("UNCHECKED_CAST")
     @Throws(IllegalStateException::class, IOException::class)
-    suspend fun getStatsCardsWithHttpInfo(days: kotlin.Long?, by: ByGetStatsCards?, user: kotlin.Long?, library: kotlin.Long?) : ApiResponse<ActivityCards?> = withContext(Dispatchers.IO) {
-        val localVariableConfig = getStatsCardsRequestConfig(days = days, by = by, user = user, library = library)
+    suspend fun getStatsCardsWithHttpInfo(days: kotlin.Long?, by: ByGetStatsCards?, user: kotlin.Long?, library: kotlin.Long?, conversions: kotlin.Boolean?) : ApiResponse<ActivityCards?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = getStatsCardsRequestConfig(days = days, by = by, user = user, library = library, conversions = conversions)
 
         return@withContext request<Unit, ActivityCards>(
             localVariableConfig
@@ -686,9 +688,10 @@ open class ActivityApi(basePath: kotlin.String = defaultBasePath, client: Call.F
      * @param by  (optional, default to By.plays)
      * @param user Admins only; others always see their own. (optional)
      * @param library  (optional)
+     * @param conversions Also count why the period&#39;s plays were converted (conversions). From API level 34. (optional)
      * @return RequestConfig
      */
-    fun getStatsCardsRequestConfig(days: kotlin.Long?, by: ByGetStatsCards?, user: kotlin.Long?, library: kotlin.Long?) : RequestConfig<Unit> {
+    fun getStatsCardsRequestConfig(days: kotlin.Long?, by: ByGetStatsCards?, user: kotlin.Long?, library: kotlin.Long?, conversions: kotlin.Boolean?) : RequestConfig<Unit> {
         val localVariableBody = null
         val localVariableQuery: MultiValueMap = mutableMapOf<kotlin.String, kotlin.collections.List<kotlin.String>>()
             .apply {
@@ -703,6 +706,9 @@ open class ActivityApi(basePath: kotlin.String = defaultBasePath, client: Call.F
                 }
                 if (library != null) {
                     put("library", listOf(library.toString()))
+                }
+                if (conversions != null) {
+                    put("conversions", listOf(conversions.toString()))
                 }
             }
         val localVariableHeaders: MutableMap<String, String> = mutableMapOf()

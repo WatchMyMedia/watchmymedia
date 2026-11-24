@@ -36,6 +36,7 @@ import kotlinx.serialization.encoding.Encoder
 /**
  * @param name
  * @param character
+ * @param personId TMDB's person ID: getPerson lists the person's titles in the library. Absent for a credit stored before person IDs were kept, until the server fetches the title's credits again, and on servers below API level 34; such a card opens nothing.
  * @param profilePath
  */
 @Serializable
@@ -47,6 +48,10 @@ data class Credit (
 
     @SerialName(value = "character")
     val character: kotlin.String? = null,
+
+    /* TMDB's person ID: getPerson lists the person's titles in the library. Absent for a credit stored before person IDs were kept, until the server fetches the title's credits again, and on servers below API level 34; such a card opens nothing. */
+    @SerialName(value = "personId")
+    val personId: kotlin.Long? = null,
 
     @SerialName(value = "profilePath")
     val profilePath: kotlin.String? = null

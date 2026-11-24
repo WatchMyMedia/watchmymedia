@@ -159,6 +159,7 @@ class WatchMyMediaApp : Application(), SingletonImageLoader.Factory, OfflineDown
                 this, downloads?.playbackGateway(data.playbackGateway) ?: data.playbackGateway, data.preferences, data.client, isTv = isTv,
                 library = library, watchNextAccount = account(), playerSources = downloads?.playerSources ?: { it },
                 artwork = ArtworkLoader(this), httpClient = { data.mediaHttpClient },
+                gatewayOn = data::playbackGatewayOn, inUse = { data.servers.current.value?.server?.id },
             )
         }.also { engine = it }
         data.onSessionChange { playback.setWatchNextAccount(account()) }
@@ -303,4 +304,5 @@ private class RealAppServices(
     override val rows: RowsRepository get() = data.rows
     override val follows: FollowsRepository get() = data.follows
     override val watchlists: WatchlistRepository get() = data.watchlists
+    override val copyChoices: media.watchmy.client.model.CopyChoices get() = data.copyChoices
 }
