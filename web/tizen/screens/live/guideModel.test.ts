@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { LiveChannel, LiveProgramme } from '../../../src/api/liveTV'
-import { HALF_HOUR, HOUR } from '../../../src/lib/liveGuide'
-import { cellAt, cellLine, dayHeading, firstRow, guideBounds, guideStep, laterWords, nowFraction, pageStep, parseTarget, programmePanel, slotLabels, stripFor, targetId, type GuideRowData, type GuideTarget } from './guideModel'
+import { FAVOURITES, HALF_HOUR, HOUR } from '../../../src/lib/liveGuide'
+import { cellAt, cellLine, dayHeading, firstRow, guideBounds, guideStep, laterWords, nowFraction, openingFilter, pageStep, parseTarget, programmePanel, slotLabels, stripFor, targetId, type GuideRowData, type GuideTarget } from './guideModel'
 
 // Monday 8:12 PM local, as on the boards.
 const at = (h: number, m = 0, day = 0) => new Date(2026, 10, 16 + day, h, m).getTime()
@@ -149,5 +149,20 @@ describe('a programme’s panel', () => {
     const view = programmePanel({ ...channel, available: false }, on, { now: NOW, favourite: false, lead: 5, canRecord: true })
     expect(view.rows.map((r) => r.label)).toEqual(['Record the rest', 'More ways to record', 'Watch 4.1', 'Add to favourites'])
     expect(view.rows[2]).toMatchObject({ disabled: true, detail: 'Not available right now' })
+  })
+})
+
+describe('where the guide opens', () => {
+  const ch = (id: string, favourite = false) => ({ id, favourite })
+  it('opens on Favourites when there are some, otherwise on All channels', () => {
+    expect(openingFilter([ch('2.1'), ch('4.1', true)])).toBe(FAVOURITES)
+    expect(openingFilter([ch('2.1'), ch('4.1')])).toBe('all')
+    expect(openingFilter([])).toBe('all')
+  })
+
+  it('shows them all when opened at a channel that isn’t a favourite', () => {
+    expect(openingFilter([ch('2.1'), ch('4.1', true)], '4.1')).toBe(FAVOURITES)
+    expect(openingFilter([ch('2.1'), ch('4.1', true)], '2.1')).toBe('all')
+    expect(openingFilter([ch('2.1'), ch('4.1', true)], 'gone')).toBe('all')
   })
 })

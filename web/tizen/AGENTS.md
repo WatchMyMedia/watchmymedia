@@ -283,8 +283,15 @@ nothing under 22px; one focus treatment, a 5px gold ring 5px off the item
 with growth (`--grow-card` 1.08, `--grow-button` 1.05, `--grow-row` 1.025;
 guide cells don't grow) and a shadow; selected is never a ring. Burgundy
 fills the main button and the avatar, gold is focus, progress, selection
-and badges, orange a warning; the recording marks stay red. A title's page
+and badges, orange a warning; the Recording and Live marks stay red. A title's page
 and the players use the full width without the rail (`chrome: 'full'`).
+
+What every app does the same way: a movie's first screen says its picture
+and sound in one line in words (`titleQuality`, from the web's `qualityLine`),
+never as tags, and no card or row panel names 4K or HDR; Delete is last in
+More, in plain text, and only its dialog's own button is marked; the guide
+opens on Favourites when there are some, otherwise All channels
+(`openingFilter` in `screens/live/guideModel.ts`).
 
 Sizes are rem at 16px for a 1920px-wide screen (`1rem = 100vw / 120`), so a
 board's pixels divide by 16. Keep pictures cheap: `Card` decodes
