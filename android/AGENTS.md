@@ -147,6 +147,12 @@ Lint warnings that were already on `main` are not yours to fix in passing.
   reminders they seed for tonight, come from the time the test runs. While
   a reminder is due, the TV's banner takes Back first, so a test that runs
   the whole TV app and presses Back uses `quietTvFakes()` (tv tests).
+  The schedule is anchored on the hour, so what is on next starts at the
+  next hour: in each hour's last five minutes, inside the reminder's lead,
+  it offers no Remind me. A test that needs a programme far enough ahead
+  finds it by its start time, not by a fixed number of presses
+  (`focusRemindable` in `LiveTVScreenTest`); two presses failed on CI at
+  04:56 UTC.
 - **Build conventions.** The settings modules share (SDK levels, Java and
   Kotlin targets, test options, Compose) are set by the plugins in
   `build-logic/` (README, "Build conventions"); a module's build file holds
