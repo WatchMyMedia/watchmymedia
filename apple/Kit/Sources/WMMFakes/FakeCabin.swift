@@ -114,9 +114,27 @@ public enum FakeCabin {
             nextUp: next.flatMap { episode in
                 episode.fileID.map { NextUp(episodeID: episode.id, season: episode.season, episode: episode.number, title: episode.title, fileID: $0) }
             },
-            cast: [Person(name: "Odile Marsh", role: "Inés"), Person(name: "Corin Vale", role: "Tam Marsh")],
+            cast: [Person(name: "Odile Marsh", role: "Inés", personID: odileMarsh), Person(name: "Corin Vale", role: "Tam Marsh", personID: corinVale)],
             contentRating: "TV-14", tmdbID: s.tmdbID
         )
+    }
+
+    /// Cabin server's two players, by TMDB person ID: in every one of its titles.
+    public static let odileMarsh = 9_031
+    public static let corinVale = 9_032
+
+    /// Odile Marsh's or Corin Vale's titles on Cabin server, newest first; nil for anyone else.
+    public static func person(id: Int) -> PersonDetail? {
+        let parts: (name: String, movie: String, show: String)
+        switch id {
+        case odileMarsh: parts = ("Odile Marsh", "The harbourmaster", "Inés")
+        case corinVale: parts = ("Corin Vale", "Lew", "Tam Marsh")
+        default: return nil
+        }
+        let newest: (BrowseItem, BrowseItem) -> Bool = { ($0.year ?? 0) > ($1.year ?? 0) }
+        return PersonDetail(personID: id, name: parts.name,
+                            movies: movies.sorted(by: newest).map { PersonTitle(item: $0, character: parts.movie) },
+                            shows: shows.sorted(by: newest).map { PersonTitle(item: $0, character: parts.show) })
     }
 
     public static func season(showID: Int, number: Int) -> SeasonDetail {
@@ -141,7 +159,7 @@ public enum FakeCabin {
                     subtitles: [SubtitleOption(id: "s2", label: "English", language: "eng", format: "TX3G")]
                 ),
             ],
-            cast: [Person(name: "Odile Marsh", role: "The harbourmaster"), Person(name: "Corin Vale", role: "Lew")],
+            cast: [Person(name: "Odile Marsh", role: "The harbourmaster", personID: odileMarsh), Person(name: "Corin Vale", role: "Lew", personID: corinVale)],
             watch: m.progress.map { WatchProgress(positionMs: Int($0 * Double(runtime * 60_000)), durationMs: runtime * 60_000, completed: false) }
                 ?? (m.watched ? WatchProgress(positionMs: 0, durationMs: runtime * 60_000, completed: true) : nil),
             contentRating: "PG-13", tmdbID: m.tmdbID

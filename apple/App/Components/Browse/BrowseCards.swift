@@ -17,6 +17,9 @@ struct PosterCard: View {
     var leading = false
     /// A card from another server, which says so before its line: "On Cabin".
     var server: String?
+    /// The line under the title in place of the card's own (a person's
+    /// page: "2026 · as Io Vance").
+    var line: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -31,7 +34,7 @@ struct PosterCard: View {
                 .foregroundStyle(Palette.text)
                 .lineLimit(1)
                 .padding(.top, compact ? 5 : 6)
-            if let line = [server, item.gridSubtitle].compactMap({ $0 }).joined(separator: " · ").nonEmptyLine {
+            if let line = [server, line ?? item.gridSubtitle].compactMap({ $0 }).joined(separator: " · ").nonEmptyLine {
                 Text(line)
                     .scaledFont(compact ? 11 : 13)
                     .foregroundStyle(Palette.muted)
@@ -56,7 +59,7 @@ struct PosterCard: View {
 
     private var accessibilityText: String {
         [
-            item.title, item.gridSubtitle, item.isNew ? "New" : nil,
+            item.title, line ?? item.gridSubtitle, item.isNew ? "New" : nil,
             item.watched ? "Watched" : item.progress.map { "\(Int(($0 * 100).rounded()))% watched" },
         ].compactMap { $0 }.joined(separator: ", ")
     }
