@@ -38,13 +38,17 @@ public final class HomeModel {
     /// within ``cardStillAskingAfter`` of it are merged in order; a slower
     /// one's cards join the ends of rows already on screen, which don't move.
     @ObservationIgnored private var ownArrived: ContinuousClock.Instant?
+    /// The clock that times ``ownArrived``; tests hold it still.
+    @ObservationIgnored private let clock: @MainActor () -> ContinuousClock.Instant
 
     /// `rows` brings the person's other devices' changes to the layout and lists (rows.changed, lists.changed).
     /// `servers` says what the server in use offers (Remove from Continue watching).
     /// With `oneCard`, Home's rows built the same way on every server are filled from all of them.
     public init(library: any LibraryRepository, auth: any AuthRepository, navigator: Navigator, rows: (any RowsRepository)? = nil,
-                servers: (any ServerRepository)? = nil, oneCard: OneCardContext? = nil, now: @escaping @MainActor () -> Date = { Date() }) {
+                servers: (any ServerRepository)? = nil, oneCard: OneCardContext? = nil, now: @escaping @MainActor () -> Date = { Date() },
+                clock: @escaping @MainActor () -> ContinuousClock.Instant = { ContinuousClock.now }) {
         self.oneCard = oneCard
+        self.clock = clock
         self.library = library
         self.auth = auth
         self.navigator = navigator
@@ -215,7 +219,7 @@ public final class HomeModel {
     private func remerge() {
         guard let ownHome, case .loaded(let shown) = state else { return }
         let answered = others.arrived.compactMap { id in others.answers[id].map { (server: id, home: $0) } }
-        let settled = ownArrived.map { ContinuousClock.now - $0 > cardStillAskingAfter } ?? true
+        let settled = ownArrived.map { clock() - $0 > cardStillAskingAfter } ?? true
         state = .loaded(HomeMerge.merge(ownHome, others: answered, shown: settled ? HomeMerge.shownKeys(shown) : [:]))
     }
 
@@ -360,7 +364,7 @@ public final class HomeModel {
             message = reason
         } else {
             ownHome = result.value
-            ownArrived = .now
+            ownArrived = clock()
             state = result
             emptyState = empty
             if result.value != nil {

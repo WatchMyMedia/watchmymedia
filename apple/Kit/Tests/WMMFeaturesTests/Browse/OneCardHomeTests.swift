@@ -18,8 +18,12 @@ import WMMModel
 
     init() { FakeLatency.duration = .zero }
 
+    /// Held still, so every server answers "within a second" of the server
+    /// in use's Home however busy the runner is, and is merged in order.
+    private let clock: @MainActor () -> ContinuousClock.Instant = { [start = ContinuousClock.now] in start }
+
     private func home() async -> HomeModel {
-        let model = HomeModel(library: services.library, auth: services.auth, navigator: navigator, rows: services.rows, servers: services.servers, oneCard: oneCard)
+        let model = HomeModel(library: services.library, auth: services.auth, navigator: navigator, rows: services.rows, servers: services.servers, oneCard: oneCard, clock: clock)
         await model.retry()
         return model
     }
@@ -34,7 +38,7 @@ import WMMModel
         let library = TestLibrary()
         let (gate, open) = AsyncStream.makeStream(of: Void.self)
         library.tmdbGate = { for await _ in gate { return } }
-        let model = HomeModel(library: library, auth: services.auth, navigator: navigator, rows: services.rows, servers: services.servers, oneCard: oneCard)
+        let model = HomeModel(library: library, auth: services.auth, navigator: navigator, rows: services.rows, servers: services.servers, oneCard: oneCard, clock: clock)
         let loading = Task { await model.retry() }
         #expect(await eventually { row(model, "continue")?.continueItems.contains { $0.title == "Ninety Fathoms" && $0.server == cabin } == true })
         let fathoms = try #require(row(model, "continue")?.continueItems.first { $0.title == "Ninety Fathoms" })
@@ -102,6 +106,23 @@ import WMMModel
         #expect(model.message == "Marked as watched")
         let fake = try #require(services.library as? FakeLibraryRepository)
         #expect(fake.marks[.movie(id: 502)] == true, "Living room server's copy too")
+    }
+
+    @Test func cardsAlreadyShownKeepTheirPlacesAndALateServersJoinTheEnd() {
+        func item(_ id: Int, _ minutesAgo: Double) -> ContinueItem {
+            ContinueItem(kind: .movie, title: "T\(id)", fileID: id, movieID: id, positionMs: 1, durationMs: 10,
+                         tmdbID: 10 + id, updatedAt: Date(timeIntervalSince1970: 1_000_000 - minutesAgo * 60))
+        }
+        func home(_ items: [ContinueItem]) -> HomeData {
+            HomeData(hero: nil, continueWatching: items, recentlyAddedShows: [], recentlyAired: [], recentlyAddedMovies: [], recentlyReleased: [],
+                     totals: LibraryTotals(movies: 0, shows: 0, episodes: 0, files: 0, totalSizeBytes: 0), lastScannedAt: nil, movieLibraryID: nil, tvLibraryID: nil)
+        }
+        let mine = home([item(1, 10), item(2, 20)])
+        let theirs = home([item(7, 1)])
+        let inOrder = HomeMerge.merge(mine, others: [(server: cabin, home: theirs)])
+        #expect(inOrder.continueWatching.map(\.title) == ["T7", "T1", "T2"], "within a second: by when each was last played")
+        let late = HomeMerge.merge(mine, others: [(server: cabin, home: theirs)], shown: HomeMerge.shownKeys(mine))
+        #expect(late.continueWatching.map(\.title) == ["T1", "T2", "T7"], "later: the cards on screen stay put, the new one at the end")
     }
 
     @Test func theTopShelfsContinueWatchingLinksNameTheirServer() {
