@@ -52,21 +52,21 @@ who work on the code.
 | Path | What |
 |---|---|
 | `server/` | Go module: chi + huma API, SQLite (modernc) through sqlc and goose, ffmpeg orchestration, embedded web UI |
-| `web/` | React + Vite web app (`src/`), Cast receiver (`receiver/`) and the TV app (`tv/`, built for Samsung TVs; signed and run on a QN90D, not yet submitted) |
+| `web/` | React + Vite web app (`src/`), Cast receiver (`receiver/`) and the TV app (`tv/`, built for Samsung TVs, signed and run on a QN90D, and for LG webOS TVs, packaged but not yet run on one; neither submitted) |
 | `api/` | The OpenAPI documents the native apps generate their clients from. Generated |
 | `android/` | Android app; modules and conventions in [android/README.md](android/README.md) |
 | `apple/` | iPhone, iPad and Apple TV apps and the `Kit` package; layout and conventions in [apple/README.md](apple/README.md) |
 | `windows/` | Native Go/Win32 tray app; built by `make windows-app` (development installer; signing pending) |
 | `macos/` | The menu bar app (SwiftPM, Sparkle); built by `macos/build-app.sh` |
 | `deploy/` | Dockerfile and compose files, the Unraid template, the Debian, Ubuntu and Fedora packages (`deploy/linux/`), the fixture library, CI support |
-| `brand/export/` | The icons and logos the Mac, Windows and Samsung builds read. Generated; don't edit |
+| `brand/export/` | The icons and logos the Mac, Windows, Samsung and LG builds read. Generated; don't edit |
 | `docs/` | The reference for people: install, the library, the apps, playback, Live TV, integrations, remote access, accounts and security, development and releasing. Step-by-step setup is on watchmy.media's guide, which the root README and these pages link to |
 | `Makefile` | `make help` lists every target |
 
 Not source, never commit: `data/` (databases, the fixture library), `bin/`,
 `build/`, `dist/` (kept release DMGs and signed Android bundles),
 `server/internal/webui/dist/*`, `web/dist/`, `web/dist-receiver/`,
-`web/dist-tizen/`, `android/secrets/`,
+`web/dist-tizen/`, `web/dist-webos/`, `android/secrets/`,
 `android/local.properties`, `.claude/worktrees/`, `server.log`.
 
 ## Sources of truth and generated files
@@ -194,8 +194,8 @@ here, and no workflow may name a self-hosted runner or pick one at run time
 Each job runs only when what it builds or tests changed.
 `deploy/ci/changes.py` holds the rules, and the `changes` job runs it: the
 server jobs for `server/`, the web's for `web/` except the TV app,
-the `samsung` job's for that app (`web/tv/`, its Vite configs and
-`deploy/samsung/`) and what it shares with the web app (`web/src/lib/`,
+the `samsung` and `lg` jobs' for that app (`web/tv/`, its Vite configs,
+`deploy/samsung/` and `deploy/lg/`) and what it shares with the web app (`web/src/lib/`,
 `web/src/api/`, the dependencies and configs), Android's for `android/` and
 `api/`, each Apple app's for its own folders and the Kit, the Linux package
 jobs for `deploy/linux/` and the server's start-up and configuration. Four
@@ -257,7 +257,7 @@ is encrypted with `GRADLE_ENCRYPTION_KEY`, the only secret `ci.yml` may read
 | History, statistics, home, browse, search or recording-list queries | `make bench` |
 | API types | `make gen-api`, `make apple-api`, `make apple-test`, `cd web && pnpm typecheck`; Android's client if used |
 | Web app | `cd web && pnpm lint && pnpm typecheck && pnpm test && pnpm build` (these cover the Samsung TV app too; CI's `web` job runs the `:web` scripts, which leave it out) |
-| TV app (`web/tv/`, `deploy/samsung/`), or the `web/src/lib/` and `web/src/api/` code it imports | `cd web && pnpm lint:tv && pnpm test:tv && pnpm build:tizen && pnpm check:tizen` (`build:tizen` checks the types first), and `python3 -I -m unittest discover -s deploy/samsung -p '*_test.py'` |
+| TV app (`web/tv/`, `deploy/samsung/`, `deploy/lg/`), or the `web/src/lib/` and `web/src/api/` code it imports | `cd web && pnpm lint:tv && pnpm test:tv && pnpm build:tizen && pnpm check:tizen && pnpm build:webos && pnpm check:webos` (each build checks the types first), `pnpm package:webos` with LG's `ares-package` installed, and `python3 -I -m unittest discover -s deploy/samsung -p '*_test.py'` and the same for `deploy/lg` |
 | Cast receiver | the web checks plus `cd web && pnpm build:receiver` |
 | Android | `cd android && ./gradlew testDebugUnitTest lintDebug` (CI adds `coverageReport`, `assembleDebug` and an unsigned `:app:assembleRelease` without `lintVitalRelease`) |
 | Apple Kit | `make apple-test` |

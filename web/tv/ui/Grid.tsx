@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties, type FocusEvent, type ReactNode } from 'react'
 import { useGroupMemory } from '../app/hooks'
 import { gridWindow } from '../app/focusRules'
+import { pointerShown } from '../app/pointer'
 
 export type GridProps<T> = {
   /** The grid's group id; its cards' ids are `<id>/<itemKey>`. */
@@ -49,14 +50,16 @@ export function Grid<T>({ id, items, itemKey, variant, columns = variant === 'po
     setRevealed(reveal)
     if (reveal) setFocus(reveal.index)
   }
-  const { first, from, to, loadMore } = gridWindow(focus, items.length, columns, visibleRows)
+  // Where the grid was when the pointer moved focus: it holds still there while the row is in view.
+  const [kept, setKept] = useState<number>()
+  const { first, from, to, loadMore } = gridWindow(focus, items.length, columns, visibleRows, 2, 2, kept)
   const wantMore = loadMore && !!hasMore
   useEffect(() => { if (wantMore) onLoadMore?.() }, [wantMore, items.length, onLoadMore])
 
   const onFocus = (e: FocusEvent) => {
     const cell = (e.target as HTMLElement).closest?.('[data-index]')
     const i = cell ? Number(cell.getAttribute('data-index')) : -1
-    if (i >= 0 && i !== focus) setFocus(i)
+    if (i >= 0 && i !== focus) { setKept(pointerShown() ? first : undefined); setFocus(i) }
   }
   const rowH = `(var(--grid-cell-h) + var(--grid-row-gap))`
   const style = { ...SIZES[variant], '--columns': columns, '--grid-row-gap': '2.5rem', transform: `translateY(calc(${-first} * ${rowH}))` } as CSSProperties

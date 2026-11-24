@@ -2,8 +2,8 @@
 
 The TV app, one app for each make of TV that runs web apps: what every make
 shares is here, and what one make gives the app is its platform, under
-`platform/` (`platform/samsung/` for Samsung). Each make has its own build,
-package and store listing.
+`platform/` (`platform/samsung/` for Samsung, `platform/lg/` for LG). Each
+make has its own build, package and store listing.
 
 ## Samsung
 
@@ -86,6 +86,56 @@ on 2026-11-20 and never to change: package id `cPFf0iV3Li`, application id
 `cPFf0iV3Li.WatchMyMedia`, signed with the maintainers' Samsung author
 certificate.
 
+## LG
+
+The LG TV app: a packaged webOS web app for 2024 and later LG TVs (webOS 24,
+whose web engine is Chromium 108), the same app as Samsung's with LG's
+half. It needs the same servers. Its store identity is `appinfo.json`'s id,
+`media.watchmy.client` (`platform/lg/public/appinfo.json`), at 2.2.0 with
+the Samsung app.
+
+### Where it stands
+
+Built on 2026-11-24 and checked in the browser preview; **not yet run on an
+LG TV**, so everything below that a TV decides is a claim to check there.
+
+- **Playing**: the TV's one video element. HLS goes through hls.js on Media
+  Source Extensions rather than webOS's own HLS, which LG documents without
+  the tags the server's playlists use; a resume starts loading where it
+  resumes; the buffer is bounded at 60 MB. Files go to the video directly.
+  Audio track changes are the server's, as a new stream. The profile claims
+  MP4 and MKV, H.264 and HEVC (8 and 10 bits) to 4K, AAC, AC-3 and E-AC-3 to
+  5.1, HDR10 only where the TV says it shows it, and no DTS, Dolby Vision or
+  HDR10+ (`platform/lg/profile.ts`).
+- **The remote**: Back is key 461 (`disableBackHistoryAPI`), the arrows, OK
+  and the media keys of LG's conventional remotes; held keys are acted on
+  every 100 ms. With nothing left to go back to, Back hands over to webOS
+  (`platformBack`), which asks and goes to the TV's Home. LG gives apps no
+  channel or number keys: Up and Down change channel in the live player, and
+  Go to channel is a button there and in the guide, its pad taking focus.
+- **The Magic Remote's pointer**: pointing focuses, a click presses, the
+  wheel steps through a row or down a page, and while the pointer shows,
+  rows have arrows at their ends, a focused card has a More button (its
+  Hold OK actions), the player has a Back button and the live player CH ▲▼
+  at the right edge.
+- **The TV's own calls** (`platform/lg/webos.ts`), made through the system
+  objects webOSTV.js wraps rather than a copy of LG's library: the model and
+  webOS version for Settings › About and the devices list, whether it shows
+  HDR10, coming forward when opened again (`handlesRelaunch`), and asking
+  the TV not to start its screensaver while something plays, which LG
+  doesn't document for web apps: where the TV refuses, full-screen video
+  keeps it away by itself and a paused screen may dim.
+- Words: "LG TV" and "Back" wherever Samsung's say "Samsung TV" and
+  "Return". Storage is its own (`watchmymedia.webos.*`).
+
+To check on the TV: which headers its requests send (Samsung's sent no
+`Origin`), HLS through hls.js at 4K and with 5.1 sound, HDR10, seeking,
+Home and back mid-play, the pointer and a held arrow's pace, Back at Home,
+the screensaver call, a YouTube trailer (YouTube refused another LG app's
+framed trailers for three months in 2025), launch time and memory. Its `requiredACG` (the
+Luna access groups its calls need, which LG's store requires from webOS 27)
+is to be set from what the TV allows.
+
 ## Run the browser preview
 
 On the fictional server, from `web/`:
@@ -95,7 +145,8 @@ pnpm install --frozen-lockfile
 pnpm dev:tizen
 ```
 
-Open <http://127.0.0.1:5186/?fakes>. Its server, Lakeside, is at the
+`pnpm dev:webos` previews the LG build the same way, where the mouse stands
+in for the Magic Remote's pointer. Open <http://127.0.0.1:5186/?fakes>. Its server, Lakeside, is at the
 prefilled address; its code signs in by itself after a few seconds, and the
 password form takes Sam and `watching`. `?fakes=away` adds a remembered
 server away from home over http; `?fakes=servers` opens signed in to
@@ -222,6 +273,39 @@ it (in that server's Activity only), searching again with one server
 stopped, the lines for a server signed out here and for the current server
 answering late, and Try again. Not on a TV: a real remote, the
 packaged app reaching two servers, and AVPlay after a switch.
+
+## Packaging and testing on an LG TV
+
+From `web/`, with LG's CLI (`npm install -g @webos-tools/cli`, 3.2.6 or
+later, Node 20 or later):
+
+```sh
+pnpm build:webos
+pnpm check:webos
+pnpm package:webos
+```
+
+`build:webos` writes the app (`index.html`, the one classic script and
+stylesheet, `appinfo.json`, `icon.png` at 80 px and `largeIcon.png` at
+130 px) to ignored `web/dist-webos/`. `check:webos`
+([deploy/lg/bundle.py](../../deploy/lg/bundle.py)) runs Samsung's Chromium
+108 checks on it and then LG's own. `package:webos`
+([deploy/lg/package.py](../../deploy/lg/package.py)) has `ares-package`
+check the app, writes `build/lg/media.watchmy.client_<version>_all.ipk` and
+reads it back. The `.ipk` is unsigned: Developer Mode installs it as it is,
+and LG signs what its store accepts. CI's `lg` job does the same and keeps
+the `.ipk` as an artifact.
+
+On a TV, each step with the maintainers' go-ahead: install LG's Developer
+Mode app from the TV's store and sign in with the LG developer account; in
+it, switch Developer Mode on and the key server on, and note the TV's
+address and passphrase. Then `ares-setup-device` adds the TV (port 9922,
+user `prisoner`), `ares-novacom --device <name> --getkey` fetches its key
+with the passphrase, `ares-install --device <name> build/lg/<the .ipk>`
+installs it, `ares-launch --device <name> media.watchmy.client` opens it and
+`ares-inspect --device <name> --app media.watchmy.client --open` opens
+Chrome's inspector on it. A Developer Mode session lasts up to 1000 hours;
+when it runs out, apps installed in it are removed.
 
 ## Signing and testing on a Samsung TV
 

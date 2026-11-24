@@ -1,4 +1,5 @@
 import { actionFor, HoldDetector, type KeyInput } from './keys'
+import { platform } from '../platform/current'
 import { KeyRouter, type KeyHandler } from './router'
 import { FocusEngine, type FocusHooks } from './focus'
 
@@ -14,6 +15,24 @@ function editing(el: Element | null) {
 }
 
 /**
+ * Passes on a held key's repeats at most once every `ms` (0: every one). A
+ * TV that repeats far faster than the remote the app was tuned for would
+ * otherwise race through rows and seeks; the first press always counts.
+ */
+export class RepeatPace {
+  private last = -Infinity
+
+  constructor(private ms: number) {}
+
+  take(input: KeyInput, at: number): boolean {
+    if (!input.repeat) { this.last = at; return true }
+    if (this.ms > 0 && at - this.last < this.ms) return false
+    this.last = at
+    return true
+  }
+}
+
+/**
  * The app's one keyboard: the router that hands keys to screens, the focus
  * engine that moves focus, and the app's own handler for what nobody took
  * (Return through the stack, the leave dialog). OK counts on keyup, so Hold
@@ -25,6 +44,7 @@ export class Input {
   private appHandler?: KeyHandler
   private hold: HoldDetector
   private pressed?: Element
+  private repeats = new RepeatPace(platform.repeatMs)
 
   constructor(private root: HTMLElement = document.body, hooks: FocusHooks = {}) {
     this.focus = new FocusEngine(root, hooks)
@@ -70,6 +90,7 @@ export class Input {
     const input = actionFor(event)
     if (!input) return
     event.preventDefault()
+    if (!this.repeats.take(input, event.timeStamp)) return
     if (input.action === 'left') this.focus.run.press(event.timeStamp, event.repeat)
     else this.focus.run.reset()
     if (input.action === 'ok') { this.press(); this.hold.keydown(); return }

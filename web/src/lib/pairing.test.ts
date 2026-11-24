@@ -11,6 +11,7 @@ describe('pairingKind', () => {
     expect(pairingKind('androidtv')).toBe('tv')
     expect(pairingKind('tvos')).toBe('tv')
     expect(pairingKind('tizen')).toBe('tv')
+    expect(pairingKind('webos')).toBe('tv')
     expect(pairingKind('android')).toBe('app')
     expect(pairingKind('ios')).toBe('app')
     expect(pairingKind(undefined)).toBe('device')

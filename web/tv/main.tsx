@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client'
 import { App } from './app/App'
 import { Input } from './app/input'
+import { PointerInput } from './app/pointer'
 import { platform } from './platform/current'
 import { AppSession } from './session/session'
 import type { Player } from './player'
@@ -74,6 +75,8 @@ async function start() {
   const app = new AppSession(appStorage(), { model: platform.model(), initialAddress })
   const player = await makePlayer(fakes !== undefined)
   const input = new Input(document.body)
+  // A remote that points (LG's Magic Remote): pointing focuses, a click presses, the wheel steps.
+  const pointer = platform.pointer ? new PointerInput(input) : undefined
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) app.suspend()
     else app.resume()
@@ -86,6 +89,7 @@ async function start() {
     platform.refreshScreenSaver()
     if (platform.exit()) return
     root.unmount()
+    pointer?.dispose()
     input.dispose()
     closed('Preview closed', 'Reload this page to open WatchMyMedia again.')
   }

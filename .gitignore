@@ -6,6 +6,7 @@
 /web/dist/
 /web/dist-receiver/
 /web/dist-tizen/
+/web/dist-webos/
 *.wgt
 /server/tmp/
 /server/internal/webui/dist/*

@@ -4,6 +4,9 @@ import { rowWindow } from '../app/focusRules'
 import { ROW_STOP_EVENT } from '../app/input'
 import { CARDS_IN_VIEW } from './tones'
 import type { CardVariant } from './Card'
+import { pointerShown } from '../app/pointer'
+import { platform } from '../platform/current'
+import { Icon } from './Icon'
 
 export type RowProps<T> = {
   /** The row's group id; its cards' ids are `<id>/<itemKey>`. */
@@ -37,8 +40,11 @@ function indexOf(target: EventTarget) {
 export function Row<T>({ id, title, subtitle, counter, items, itemKey, variant, renderItem, dimPast }: RowProps<T>) {
   const remembered = useGroupMemory(id)
   const [focus, setFocus] = useState(() => Math.max(0, items.findIndex((item, i) => `${id}/${itemKey(item, i)}` === remembered)))
+  // Where the row was when the pointer moved focus: it holds still there while the card is in view.
+  const [kept, setKept] = useState<number>()
   const ref = useRef<HTMLElement>(null)
-  const { start, from, to } = rowWindow(Math.min(focus, items.length - 1), items.length, CARDS_IN_VIEW[variant])
+  const visible = CARDS_IN_VIEW[variant]
+  const { start, from, to } = rowWindow(Math.min(focus, items.length - 1), items.length, visible, 3, kept)
 
   useEffect(() => {
     const el = ref.current
@@ -56,7 +62,12 @@ export function Row<T>({ id, title, subtitle, counter, items, itemKey, variant, 
 
   const onFocus = (e: FocusEvent) => {
     const i = indexOf(e.target)
-    if (i >= 0 && i !== focus) setFocus(i)
+    if (i >= 0 && i !== focus) { setKept(pointerShown() ? start : undefined); setFocus(i) }
+  }
+  /** The pointer's arrows: the card before or after the focused one. */
+  const stepBy = (by: number) => {
+    const i = Math.max(0, Math.min(items.length - 1, focus + by))
+    ref.current?.querySelector<HTMLElement>(`[data-index="${i}"] [data-focus]`)?.focus({ preventScroll: true })
   }
   const cell = variant === 'poster' ? 'var(--poster-w)' : 'var(--wide-w)'
   const step = `(var(--cell-w) + var(--card-gap))`
@@ -74,6 +85,16 @@ export function Row<T>({ id, title, subtitle, counter, items, itemKey, variant, 
           return <div key={key} className={`tv-row__cell${dimPast && i < focus ? ' tv-row__cell--past' : ''}`} data-index={i}>{renderItem(item, `${id}/${key}`, i)}</div>
         })}
       </div>
+      {platform.pointer && <>
+        <RowArrow label="Earlier in this row" icon="left" off={focus <= 0} onPress={() => stepBy(-1)}/>
+        <RowArrow label="Later in this row" icon="right" off={focus >= items.length - 1} onPress={() => stepBy(1)}/>
+      </>}
     </div>
   </section>
+}
+
+/** A row's end, for the pointer only: the arrows never take focus, so the remote's place stays on the card. */
+function RowArrow({ label, icon, off, onPress }: { label: string; icon: 'left' | 'right'; off: boolean; onPress(): void }) {
+  return <button type="button" className={`tv-row__arrow tv-row__arrow--${icon} tv-pointer-only`} aria-label={label} aria-disabled={off || undefined} tabIndex={-1}
+    onMouseDown={(e) => e.preventDefault()} onClick={off ? undefined : onPress}><Icon name={icon}/></button>
 }

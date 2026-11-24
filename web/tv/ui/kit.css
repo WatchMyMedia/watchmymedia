@@ -289,3 +289,21 @@ button { border: 0; background: none; padding: 0; text-align: inherit; cursor: p
 .tv-rail:focus-within:not([data-parked]) .tv-rail__badge { position: static; margin-left: auto; }
 /* A list scrolling inside a panel: room above and below for the focused row's ring. */
 .tv-panel .tv-vscroll { margin-top: -1rem; margin-bottom: -1rem; padding-top: 1rem; padding-bottom: 1rem; }
+
+/* The remote's pointer (LG's Magic Remote). html.tv-pointer while it shows
+   (app/pointer.ts): the controls only a pointer needs draw, and what it is
+   over gets the same gold ring as focus. None of them takes focus from the
+   arrows. */
+.tv-pointer-only { display: none; }
+.tv-pointer .tv-pointer-only:hover { outline: var(--focus-width) solid var(--accent); outline-offset: var(--focus-offset); box-shadow: var(--focus-shadow); }
+.tv-pointer-only[aria-disabled="true"] { opacity: var(--off-opacity); }
+.tv-pointer .tv-row__arrow { display: flex; }
+.tv-row__arrow { position: absolute; top: 50%; z-index: 2; width: 4rem; height: 4rem; margin-top: -2rem; align-items: center; justify-content: center;
+  border-radius: 50%; border: 0.125rem solid var(--line-2); background: var(--raised); color: var(--text); }
+.tv-row__arrow--left { left: 0.25rem; }
+.tv-row__arrow--right { right: 1rem; }
+.tv-row__arrow svg { width: 1.875rem; height: 1.875rem; }
+.tv-card__more { position: absolute; top: 0.625rem; right: 0.625rem; z-index: 2; width: 4rem; height: 4rem; align-items: center; justify-content: center;
+  border-radius: 50%; background: var(--raised); color: var(--text); }
+.tv-pointer .tv-card:focus .tv-card__more { display: flex; }
+.tv-card__more svg { width: 1.875rem; height: 1.875rem; }

@@ -89,6 +89,8 @@ export type ControlsProps = {
   onToggle(): void
   onLive(): void
   onRecord(): void
+  /** Go to channel's pad, on a remote without number keys. */
+  onGoTo?(): void
   onCancelTakeover(): void
   onOnNow(): void
   onGuide(): void
@@ -128,6 +130,7 @@ export function Controls(p: ControlsProps) {
         {p.canRecord && <button type="button" className="lp-btn" data-focus="live/record" onClick={p.onRecord}><span className="lp-dot"/>Record</button>}
         {p.takeoverCancel && <button type="button" className="lp-btn" data-focus="live/cancel" onClick={p.onCancelTakeover}>Don’t record it</button>}
         <span className="lp-row__fill"/>
+        {p.onGoTo && <button type="button" className="lp-btn" data-focus="live/goto" onClick={p.onGoTo}>Go to channel</button>}
         <button type="button" className="lp-btn" data-focus="live/onnow" onClick={p.onOnNow}>On now</button>
         <button type="button" className="lp-btn" data-focus="live/guide" onClick={p.onGuide}>Guide</button>
         <button type="button" className="lp-btn" data-focus="live/quality" onClick={p.onQuality}>Quality<small>{p.quality}</small></button>
@@ -135,6 +138,14 @@ export function Controls(p: ControlsProps) {
       <p className="lp-note">{CONTROLS_NOTE}</p>
     </section>
   </>
+}
+
+/** CH ▲▼ for the pointer, at the right edge while the controls show: a remote that points sends no channel keys. */
+export function ChannelArrows({ onUp, onDown }: { onUp(): void; onDown(): void }) {
+  return <div className="lp-chan-arrows tv-pointer-only">
+    <button type="button" className="lp-btn lp-btn--round" aria-label="Channel up" tabIndex={-1} onClick={onUp}><LiveIcon name="up"/></button>
+    <button type="button" className="lp-btn lp-btn--round" aria-label="Channel down" tabIndex={-1} onClick={onDown}><LiveIcon name="down"/></button>
+  </div>
 }
 
 /** On now, from the left: every channel with what is on, favourites first; OK watches, ▶ or Return closes. */

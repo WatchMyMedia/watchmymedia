@@ -10,7 +10,7 @@ import type { DeviceProfiles, Player } from '../player'
  */
 export type TvPlatform = {
   /** What sign-in and plays report as this TV's platform. */
-  id: 'tizen'
+  id: 'tizen' | 'webos'
   words: TvWords
   /**
    * The names this app keeps in the TV's storage. Samsung's never change:
@@ -21,10 +21,27 @@ export type TvPlatform = {
   keyCodes: Readonly<Record<number, Action>>
   /** Key codes that end typing in a field, as Enter and Escape do: the TV keyboard's Done and Cancel, and the remote's back key. */
   typing: { done: readonly number[]; cancel: readonly number[] }
+  /**
+   * The shortest time between two repeats of a held key that the app acts
+   * on, in ms; 0 takes every one. A TV that repeats much faster than the
+   * remote was tuned for would race through rows and seeks.
+   */
+  repeatMs: number
+  /** Whether the remote sends number keys to apps. Without them, Go to channel is a button and its pad. */
+  numberKeys: boolean
+  /** Whether the remote points (LG's Magic Remote): pointing focuses, a click presses, the wheel moves. */
+  pointer: boolean
   /** Loads the TV's own APIs and asks for the remote's keys. Resolves in the preview too, and never rejects. */
   start(): Promise<void>
   /** Leaves the app. False where there is nowhere to go, as in the preview. */
   exit(): boolean
+  /**
+   * Back with nothing left to go back to, on Home or the first start
+   * screen: true when the TV took it (LG hands it to webOS, which asks and
+   * leaves), false for the app to ask "Leave WatchMyMedia?" itself, as
+   * Samsung's certification asks.
+   */
+  backAtHome(): boolean
   /** Keeps the TV's screensaver away while something plays; call the returned function when it stops. */
   holdScreenSaver(): () => void
   /** Applies the screensaver state again, as the app comes and goes. */

@@ -94,3 +94,8 @@
 .lp-problem--others .lp-problem__body { top: 40%; }
 .lp-problem__actions { margin-top: 1.375rem; }
 .lp-problem__others { position: absolute; left: var(--page-left); right: 0; bottom: var(--safe-y); }
+
+/* CH ▲▼ for the pointer, at the right edge while the controls show (LG): its remote sends apps no channel keys. */
+.tv-pointer .lp-chan-arrows { display: flex; }
+.lp-chan-arrows { position: absolute; right: var(--safe-x); top: 23.75rem; z-index: 2; flex-direction: column; gap: 2.75rem; }
+.lp-btn--round { width: 4.75rem; height: 4.75rem; padding: 0; border-radius: 50%; }

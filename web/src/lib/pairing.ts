@@ -2,7 +2,7 @@
 export type PairingKind = 'tv' | 'app' | 'device'
 
 export function pairingKind(platform?: string): PairingKind {
-  if (platform === 'androidtv' || platform === 'tvos' || platform === 'tizen') return 'tv'
+  if (platform === 'androidtv' || platform === 'tvos' || platform === 'tizen' || platform === 'webos') return 'tv'
   if (platform === 'android' || platform === 'ios') return 'app'
   return 'device'
 }

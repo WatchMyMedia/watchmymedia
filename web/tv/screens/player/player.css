@@ -140,3 +140,10 @@
 .pl-ep__title { font-size: var(--t-label); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pl-ep__now { padding: .1875rem .625rem; border-radius: .4375rem; background: var(--accent); color: var(--on-accent); font-size: var(--t-small); font-weight: 700; flex: none; }
 .pl-ep__line { font-size: var(--t-small); color: var(--muted); }
+
+/* The pointer's Back, before the title (LG): the Magic Remote's own Back works as ever. */
+.tv-pointer .pl-back { display: flex; }
+.pl-back { position: absolute; left: var(--safe-x); top: var(--safe-y); z-index: 2; width: 4.75rem; height: 4.75rem; align-items: center; justify-content: center;
+  border-radius: 50%; border: 0.125rem solid var(--line-2); background: var(--raised); color: var(--text); }
+.pl-back svg { width: 2.125rem; height: 2.125rem; }
+.tv-pointer .pl-title { left: calc(var(--safe-x) + 6.25rem); }

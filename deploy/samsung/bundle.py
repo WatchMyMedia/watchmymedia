@@ -102,9 +102,9 @@ def style_problems(style):
     return sorted(set(found))
 
 
-def problems(app):
-    """What keeps the app in this folder from loading on the TV."""
-    found = [f'{name} is missing' for name in ('index.html', 'config.xml', 'icon.png') if not (app / name).is_file()]
+def problems(app, package=('config.xml', 'icon.png')):
+    """What keeps the app in this folder from loading on the TV; `package` is the make's own files (LG's are in deploy/lg/bundle.py)."""
+    found = [f'{name} is missing' for name in ('index.html', *package) if not (app / name).is_file()]
     scripts, styles = sorted(app.rglob('*.js')), sorted(app.rglob('*.css'))
     for kind, files in (('script', scripts), ('stylesheet', styles)):
         if len(files) != 1:

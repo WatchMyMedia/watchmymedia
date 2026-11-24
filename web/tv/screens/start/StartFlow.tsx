@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useState } from 'r
 import { useApp, useInput } from '../../app/hooks'
 import { emptyMemory } from '../../app/focusRules'
 import { LeaveDialog } from '../../app/LeaveDialog'
+import { platform } from '../../platform/current'
 import type { StartState } from '../../session/session'
 import { ServerScreen } from './ServerScreen'
 import { SignInScreen } from './SignInScreen'
@@ -38,7 +39,7 @@ export function StartFlow({ state, exit }: { state: Start; exit(): void }) {
   }, [input, memory, key, failed])
 
   const onBack = useEffectEvent(() => {
-    if (state.screen === 'servers' && !state.busy && !state.adding) setLeaving(true)
+    if (state.screen === 'servers' && !state.busy && !state.adding && !platform.backAtHome()) setLeaving(true)
     else app.cancel()
     return true
   })

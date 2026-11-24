@@ -2,6 +2,7 @@ import { useRef, useState, type CSSProperties } from 'react'
 import { useHold } from '../app/hooks'
 import { Icon } from './Icon'
 import { placeholderTone } from './tones'
+import { platform } from '../platform/current'
 
 export type CardVariant = 'poster' | 'wide' | 'episode' | 'continue' | 'live'
 
@@ -67,5 +68,8 @@ export function Card({ id, variant, title, subtitle, server, image, progress, ba
     <span className="tv-card__title">{live ? live.now ?? title : title}</span>
     {!live && server && <span className="tv-card__server"><Icon name="server"/><span>{server}</span></span>}
     {subtitle && <span className="tv-card__sub">{subtitle}</span>}
+    {/* Hold OK's actions for the pointer, on the card under it: a held wheel may not repeat. */}
+    {onHold && platform.pointer && <span className="tv-card__more tv-pointer-only" role="button" aria-label={`More for ${title}`}
+      onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); onHold() }}><Icon name="more"/></span>}
   </button>
 }

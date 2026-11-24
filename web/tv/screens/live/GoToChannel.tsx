@@ -7,6 +7,7 @@ import { Modal } from '../../ui/Overlays'
 import { numberKey } from './liveRemote'
 import { leftWords, matchWords, onNow } from './liveWords'
 import { BACK } from '../../app/keys'
+import { platform } from '../../platform/current'
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '\b']
 
@@ -55,13 +56,15 @@ export function GoToChannelDialog({ channels, initial, now, onWatch, onClose }: 
           <span className="live-goto2__what"><b>{match.name}</b><span>{on ? `${on.title} · ${leftWords(Date.parse(on.end), now)}` : 'No listings'}</span></span>
         </div> : <p className="live-goto2__hint">{text}</p>}
         <div className="tv-actions live-goto2__actions">
-          <Button id="goto/watch" variant="primary" autoFocus disabled={!match} why="Type a channel’s number first" onPress={() => { if (match) onWatch(match) }}>{match ? `Watch ${match.number}` : 'Watch'}</Button>
+          <Button id="goto/watch" variant="primary" autoFocus={platform.numberKeys} disabled={!match} why="Type a channel’s number first" onPress={() => { if (match) onWatch(match) }}>{match ? `Watch ${match.number}` : 'Watch'}</Button>
           <Button id="goto/cancel" onPress={onClose}>Cancel</Button>
         </div>
-        <p className="live-goto2__note">Type with the remote’s number keys, or use the pad. It tunes only on OK.</p>
+        <p className="live-goto2__note">{platform.numberKeys ? 'Type with the remote’s number keys, or use the pad. It tunes only on OK.'
+          : `This remote gives apps no number keys: the pad takes the arrows${platform.pointer ? ' or the pointer' : ''}. It tunes only on Watch.`}</p>
       </div>
       <div className="live-goto2__pad" role="group" aria-label="Number pad">
-        {KEYS.map((k) => <button key={k} type="button" className="live-goto2__key" data-focus={`goto/${k === '\b' ? 'delete' : k === '.' ? 'dot' : k}`}
+        {/* Without number keys the pad is how a number is typed: focus starts on 1. */}
+        {KEYS.map((k) => <button key={k} type="button" className="live-goto2__key" data-focus={`goto/${k === '\b' ? 'delete' : k === '.' ? 'dot' : k}`} data-autofocus={!platform.numberKeys && k === '1' ? true : undefined}
           aria-label={k === '\b' ? 'Delete' : k === '.' ? 'Dot' : k} onClick={() => type(k)}>{k === '\b' ? 'Del' : k}</button>)}
       </div>
     </section>
