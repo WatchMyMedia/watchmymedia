@@ -53,8 +53,10 @@ the user asks in this conversation; see Authority in the root file.
 - **Styling**: Tailwind v4 classes and the `@theme` tokens in
   `src/index.css`, no new hex values. Burgundy (`brand`) is only ever a fill,
   never text or a thin line (1.4:1 on the ground); gold (`accent`) marks
-  progress, selection, focus and badges; orange (`warn`) is for warnings. The
-  apps and the site use the same colours. Pages share the component classes
+  progress, selection, focus and badges; orange (`warn`) is for warnings; red
+  (`red-700` under white text, or a red dot) marks Recording and Live, those
+  marks only, never a progress bar. The apps and the site use the same
+  colours. Pages share the component classes
   in `src/index.css` (`btn`, `ib`, `chip`, `tab`, `seg`, `menu`, `meta`,
   `eyebrow`, `pill`, `tag`, `meter`, `panel`, the closed `tech` disclosure,
   `dl`, `rowh`, `tbl`, `wrap`) and the line icons in

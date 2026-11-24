@@ -155,7 +155,7 @@ export function RecordingNowCard({ recording: r }: { recording: Recording }) {
     <article className="panel flex max-w-[660px] flex-wrap items-center gap-4 px-4 py-3.5">
       <span aria-hidden="true" className="relative block aspect-video w-[150px] shrink-0 overflow-hidden rounded-lg bg-surface-2 ring-1 ring-inset ring-white/[.07]">
         {r.pictureUrl && <img src={r.pictureUrl} alt="" className="size-full object-cover" />}
-        <span className="absolute left-2 top-2 rounded-[5px] bg-brand px-[7px] py-0.5 text-[11px] font-bold text-white ring-1 ring-inset ring-brand-line">Recording</span>
+        <span className="absolute left-2 top-2 rounded-[5px] bg-red-700 px-[7px] py-0.5 text-[11px] font-bold text-white">Recording</span>
       </span>
       <div className="flex min-w-0 flex-1 basis-60 flex-col gap-1.5">
         <h3 className="text-[15.5px] font-semibold">

@@ -149,13 +149,13 @@ function RecordingNowPanel({ r, now }: { r: Recording; now: number }) {
   const total = recordingMinutes(r)
   const line = [r.season != null || r.episodeTitle ? recordingEpisodeWords(r) : '', `${r.number} ${r.channelName}`, timeRange(Date.parse(r.start), Date.parse(r.end))].filter(Boolean).join(' · ')
   return <section aria-labelledby={`now-${r.id}`} className="panel flex flex-wrap items-center gap-x-[18px] gap-y-3.5 p-4">
-    <Still r={r} className="w-[176px]" flag={<span className="absolute left-2 top-2 rounded-[5px] bg-brand px-[7px] py-0.5 text-[11px] font-bold text-white ring-1 ring-inset ring-brand-line">Recording</span>} />
+    <Still r={r} className="w-[176px]" flag={<span className="absolute left-2 top-2 rounded-[5px] bg-red-700 px-[7px] py-0.5 text-[11px] font-bold text-white">Recording</span>} />
     <div className="flex min-w-[220px] flex-1 flex-col gap-1.5">
       <h2 id={`now-${r.id}`} className="text-xs font-bold uppercase tracking-[.08em] text-red-400">Recording now</h2>
       <p className="text-lg font-[650] leading-tight">{r.title}</p>
       <p className="text-[13px] text-neutral-400">{line}</p>
       <div className="flex items-center gap-2.5">
-        <span className="meter flex-1" role="img" aria-label={`${sofar} of ${total} minutes recorded`}><i className="!bg-red-400" style={{ width: `${pct}%` }} /></span>
+        <span className="meter flex-1" role="img" aria-label={`${sofar} of ${total} minutes recorded`}><i style={{ width: `${pct}%` }} /></span>
         <span className="whitespace-nowrap text-[13px] text-neutral-300">{sofar} min so far</span>
       </div>
       <div className="mt-1 flex flex-wrap gap-2">
