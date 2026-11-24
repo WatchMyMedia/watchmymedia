@@ -160,7 +160,7 @@ internal fun TitleBlock(state: PlayerUiState, modifier: Modifier = Modifier) {
     }
 }
 
-/** "Recording", in burgundy with its rim: a recording still being made. */
+/** "Recording", in red: a recording still being made. */
 @Composable
 private fun RecordingMark() {
     val shape = RoundedCornerShape(8.dp)
@@ -168,8 +168,8 @@ private fun RecordingMark() {
         "RECORDING",
         Modifier
             .padding(bottom = 6.dp)
-            .background(WmmColors.Brand, shape)
-            .border(2.dp, WmmColors.BrandLine, shape)
+            .background(WmmColors.RecordFill, shape)
+            .border(2.dp, WmmColors.Record, shape)
             .heightIn(min = 38.dp)
             .padding(horizontal = 10.dp, vertical = 3.dp),
         style = TvType.Kicker,

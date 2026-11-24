@@ -52,9 +52,9 @@ import java.time.ZoneId
 
 /*
  * The pieces every Live TV screen on the TV shares: the Guide, Recordings
- * and Reminders tabs, key hints, and the recording marks, which are burgundy
- * with their rim: burgundy and gold are the only accents, and orange is kept
- * for what won't record.
+ * and Reminders tabs, key hints, and the recording marks, which are red:
+ * red marks Recording and Live and nothing else, as on every app, burgundy
+ * and gold are the accents, and orange is kept for what won't record.
  */
 
 /** The three Live TV screens, as tabs along their top. */
@@ -151,8 +151,8 @@ internal fun KeyCap(key: String, modifier: Modifier = Modifier) {
     }
 }
 
-/** The burgundy rim: the dot for a recording, and the edge of Live, REC and Recording marks. */
-internal val RecRim = WmmColors.BrandLine
+/** The red of Recording and Live marks, and only those: the dot for a recording, and the edge of Live, REC and Recording marks. */
+internal val RecRim = WmmColors.Record
 
 /** The round mark beside a programme that will record or is recording (`.dot`). */
 @Composable
@@ -160,13 +160,13 @@ internal fun RecDot(modifier: Modifier = Modifier, size: Dp = 16.dp) {
     Box(modifier.size(size).background(RecRim, CircleShape))
 }
 
-/** A tag (`.tag`) in burgundy with its rim: "Live", "Recording". */
+/** A tag (`.tag`) in red: "Live", "Recording". */
 @Composable
 internal fun RecTag(text: String, modifier: Modifier = Modifier) {
     Text(
         text,
         modifier = modifier
-            .background(WmmColors.Brand, RoundedCornerShape(8.dp))
+            .background(WmmColors.RecordFill, RoundedCornerShape(8.dp))
             .border(2.dp, RecRim, RoundedCornerShape(8.dp))
             .heightIn(min = 38.dp)
             .padding(horizontal = 10.dp, vertical = 3.dp),
@@ -188,7 +188,7 @@ internal fun WarnTag(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-/** A flag on a picture (`.flag`): REC in burgundy, or dark for a channel's number. */
+/** A flag on a picture (`.flag`): REC or LIVE in red, or dark for a channel's number. */
 @Composable
 internal fun PictureFlag(text: String, modifier: Modifier = Modifier, rec: Boolean = false, spoken: String? = null) {
     val shape = RoundedCornerShape(8.dp)
@@ -196,7 +196,7 @@ internal fun PictureFlag(text: String, modifier: Modifier = Modifier, rec: Boole
         text,
         modifier = modifier
             .then(if (spoken != null) Modifier.clearAndSetSemantics { contentDescription = spoken } else Modifier)
-            .background(if (rec) WmmColors.Brand else Color(0xDB0F0F10), shape)
+            .background(if (rec) WmmColors.RecordFill else Color(0xDB0F0F10), shape)
             .border(2.dp, if (rec) RecRim else Color.White.copy(alpha = .18f), shape)
             .heightIn(min = 36.dp)
             .padding(horizontal = 10.dp, vertical = 2.dp),
@@ -208,7 +208,7 @@ internal fun PictureFlag(text: String, modifier: Modifier = Modifier, rec: Boole
 
 /**
  * A programme's recording, as a guide cell's second line marks it: the
- * burgundy dot while it records or will, a ring for a series, and an orange
+ * red dot while it records or will, a ring for a series, and an orange
  * ring for one that won't record because the tuners are taken.
  */
 @Composable

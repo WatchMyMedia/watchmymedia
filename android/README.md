@@ -1197,7 +1197,10 @@ minutes of playing a file, before and after a change.
   1.02 panel rows) and a shadow; while OK is held the target sinks and its
   ring thickens. A card's picture grows rather than the card (`FocusedArt`),
   so its words stay sharp; the main button keeps its burgundy and other
-  controls lift to `TvPalette.Lift`. A choice that stays chosen is a gold
+  controls lift to `TvPalette.Lift`. Recording and Live marks (the dot,
+  REC, LIVE, Recording) are red (`WmmColors.Record`, fills
+  `WmmColors.RecordFill`), those marks only, as on every app; burgundy is a
+  button's fill. A choice that stays chosen is a gold
   tick (`OptionRow`, `PanelRow`, `TvChip`) or a gold underline (`TvTab`),
   never a gold fill or a ring, so it can't be taken for focus. Panels come
   from the right (`TvSidePanel`, 736 wide, 900 for detail); rows remember

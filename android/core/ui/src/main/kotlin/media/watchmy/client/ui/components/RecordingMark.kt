@@ -28,8 +28,8 @@ import media.watchmy.client.model.RecordingGlyph
 import media.watchmy.client.model.RecordingMark
 
 /** The Live tag's red, for a programme that will record or is recording. */
-private val RecordRed = Color(0xFFF04438)
-private val RecTag = Color(0xFFB42318)
+private val RecordRed = media.watchmy.client.ui.WmmColors.Record
+private val RecTag = media.watchmy.client.ui.WmmColors.RecordFill
 
 /** A reminder no longer listed's orange, for one that won't record because of a clash. */
 private val ClashOrange = Color(0xFFFDBA74)

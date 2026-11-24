@@ -252,7 +252,7 @@ internal fun HomeFocusPanel(focus: HomeFocus, modifier: Modifier = Modifier) {
     Column(modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (focus.live) {
-                Box(Modifier.padding(end = 12.dp).size(16.dp).background(WmmColors.BrandLine, CircleShape))
+                Box(Modifier.padding(end = 12.dp).size(16.dp).background(WmmColors.Record, CircleShape))
             }
             Kicker(focus.kicker)
         }
@@ -314,15 +314,15 @@ internal fun FactsLine(facts: List<HomeFact>, modifier: Modifier = Modifier) {
     }
 }
 
-/** A Recording tag: burgundy with its rim, white words. */
+/** A Recording tag: red, white words. */
 @Composable
 internal fun RecordingTag(text: String, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(8.dp)
     Text(
         text.uppercase(),
         modifier = modifier
-            .background(WmmColors.Brand, shape)
-            .border(2.dp, WmmColors.BrandLine, shape)
+            .background(WmmColors.RecordFill, shape)
+            .border(2.dp, WmmColors.Record, shape)
             .padding(horizontal = 10.dp, vertical = 3.dp),
         style = TvType.Caption.copy(fontWeight = FontWeight.Bold, letterSpacing = TvType.Caption.fontSize * 0.03f),
         color = WmmColors.Text,
