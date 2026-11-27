@@ -86,9 +86,11 @@ fun TvSidePanel(
     width: Dp = PanelWidth,
     kicker: String? = null,
     context: String? = null,
+    /** Over what is beside the panel: lighter where the video's subtitles are to be seen (the player's timing). */
+    dim: Color = TvPalette.Dim,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Box(Modifier.fillMaxSize().background(TvPalette.Dim), contentAlignment = if (side == PanelSide.Right) Alignment.CenterEnd else Alignment.CenterStart) {
+    Box(Modifier.fillMaxSize().background(dim), contentAlignment = if (side == PanelSide.Right) Alignment.CenterEnd else Alignment.CenterStart) {
         Column(
             modifier
                 .width(width)

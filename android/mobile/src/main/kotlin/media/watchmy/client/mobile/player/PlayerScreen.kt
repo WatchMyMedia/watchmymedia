@@ -168,6 +168,8 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
     val local = remoteDevice == null
     val library = LocalAppServices.current.library.let { root -> remember(selection.request.serverId) { root.at(selection.request.serverId) ?: root } }
     val state by controller.state.collectAsStateWithLifecycle()
+    // Save for everyone in the player's timing is for admins.
+    val admin = LocalAppServices.current.auth.user.collectAsStateWithLifecycle().value?.isAdmin == true
     // Read only by the scrubber and the clocks, through the lambda, so its ticks recompose only them.
     val progress = controller.progress.collectAsStateWithLifecycle()
     val readProgress = { progress.value }
@@ -517,6 +519,22 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
         }
         if (!inPip) {
             picker?.let { tab ->
+                val extras = PickerExtras(
+                    onSound = { setting, level -> act { setSound(setting, level) } },
+                    onTiming = { action ->
+                        act {
+                            when (action) {
+                                is TimingAction.Move -> moveSubtitleTiming(action.deltaMs)
+                                TimingAction.Reset -> resetSubtitleTiming()
+                                TimingAction.SaveForEveryone -> saveSubtitleTimingForEveryone()
+                                TimingAction.Retry -> retrySubtitleTiming()
+                            }
+                        }
+                    },
+                    admin = admin,
+                    // The sheet pauses the phone's video: the paused frame's cue shows the timing move.
+                    preview = player?.takeIf { !tablet }?.let { p -> { TimingPreview(p, readProgress().positionMs) } },
+                )
                 if (tablet) TabletTrackPicker(
                     state.tracks, tab,
                     onAudio = { act { selectAudio(it) } },
@@ -524,6 +542,7 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
                     onDownload = { act { downloadSubtitle(it) } },
                     onQuality = { act { selectQuality(it) } },
                     onDismiss = ::closePicker,
+                    extras = extras,
                 ) else TrackPicker(
                     state.tracks, tab,
                     onAudio = { act { selectAudio(it) } },
@@ -531,6 +550,7 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
                     onDownload = { act { downloadSubtitle(it) } },
                     onQuality = { act { selectQuality(it) } },
                     onDismiss = ::closePicker,
+                    extras = extras,
                 )
             }
             if (tablet && showEpisodes) PlayerEpisodesPanel(

@@ -231,6 +231,7 @@ class ExoMediaPlayer(
                         .setMimeType(it.mimeType)
                         .setLabel(it.label)
                         .setLanguage(it.language)
+                        .setTimeOffsetUs(it.timingMs * 1_000)
                         .build()
                 },
             )
@@ -274,6 +275,23 @@ class ExoMediaPlayer(
     override fun selectText(selection: TextSelection) {
         pendingText = selection
         applyPending(exo.currentTracks)
+    }
+
+    /**
+     * Media3 1.12 moves a side-loaded track's cues by its configuration's
+     * time offset, and takes a new one through replaceMediaItem without
+     * preparing the stream again. Its text renderer has already read the
+     * cues up to a second ahead, and the paused frame's, at the old timing:
+     * a seek to where the player is reads them again at the new one.
+     */
+    override fun setSubtitleTiming(id: String, timingMs: Long) {
+        val item = exo.currentMediaItem ?: return
+        val configurations = item.localConfiguration?.subtitleConfigurations ?: return
+        val offsetUs = timingMs * 1_000
+        if (configurations.none { it.id == id && it.timeOffsetUs != offsetUs }) return
+        val moved = configurations.map { if (it.id == id) it.buildUpon().setTimeOffsetUs(offsetUs).build() else it }
+        exo.replaceMediaItem(exo.currentMediaItemIndex, item.buildUpon().setSubtitleConfigurations(moved).build())
+        exo.seekTo(exo.currentPosition)
     }
 
     override fun selectAudio(ordinal: Int): Boolean {

@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -56,6 +57,14 @@ import media.watchmy.client.model.ProgressReport
 import media.watchmy.client.model.QualityChange
 import media.watchmy.client.model.Segment
 import media.watchmy.client.model.SkipPrompt
+import media.watchmy.client.model.PlayerSound
+import media.watchmy.client.model.SoundFailure
+import media.watchmy.client.model.SoundLevel
+import media.watchmy.client.model.SoundSetting
+import media.watchmy.client.model.SubtitleTimingState
+import media.watchmy.client.model.TIMING_LIMIT_MS
+import media.watchmy.client.model.TIMING_SETTLE_MS
+import media.watchmy.client.model.TrackTiming
 import media.watchmy.client.model.StreamProtocol
 import media.watchmy.client.model.SubtitleRequestMode
 import media.watchmy.client.model.SubtitleMode
@@ -206,6 +215,30 @@ class RealPlaybackController(
         var subtitleRevision = 0
         var attemptedAutomaticSubtitle = false
         var automaticSubtitleInFlight = false
+
+        /** Each subtitle track's timing, by id: from the first decision that lists it, then this viewing's changes. */
+        val timings = HashMap<String, TrackTiming>()
+
+        /**
+         * Tracks that came as a rendition or from the file and now play from
+         * the server's copy of them, which a timing can move: they moved the
+         * first time their timing wasn't 0.
+         */
+        val sideloaded = HashSet<String>()
+
+        /** Puts a moved timing on the player, a moment after the press (held presses come quickly). */
+        var timingApply: Job? = null
+
+        /** Saves a moved timing once the presses stop. */
+        var timingSave: Job? = null
+
+        /** What a timing that didn't save tries again. */
+        var timingRetry: (() -> Unit)? = null
+
+        /** The sound row whose change is reloading the play, until the load it made has its first frame ([soundLoad]). */
+        var soundBusy: SoundSetting? = null
+        var soundLoad: Int? = null
+        var soundFailure: SoundFailure? = null
 
         /** Subtitles found online, once the search has answered. */
         var online: OnlineSubtitles? = null
@@ -372,7 +405,7 @@ class RealPlaybackController(
         if (!v.subtitleManuallyChosen && d.isOffline && d.burnInSubtitleId == null) {
             val prefs = preferences.playback.value
             v.selectedSubtitle = preferredSubtitleId(d.subtitles.map { it.option }, d.audio[ordinal].language, prefs.audio.languages, prefs.subtitles)
-            media?.selectText(textSelection(d, v.selectedSubtitle))
+            media?.selectText(textSelection(d, v.selectedSubtitle, v.sideloaded))
         }
         // Direct play switches the file's own track when this device plays it; otherwise the server sends it.
         val refreshDefault = d.subtitlePreferencesSupported && !v.subtitleManuallyChosen && !d.isOffline
@@ -398,9 +431,12 @@ class RealPlaybackController(
             burnIn -> reload(v, subtitleId = id, burnIn = true)
             // Leaving a burned-in subtitle needs a stream without it.
             d.burnInSubtitleId != null -> reload(v, subtitleId = id, burnIn = false)
-            // Text subtitles are already loaded (renditions or side-loaded files): switch here.
+            // Text subtitles are already loaded (renditions or side-loaded files): switch here,
+            // unless the track's saved timing needs the server's copy of it, which the stream doesn't have yet.
             else -> {
-                if (!v.loading) media?.selectText(textSelection(d, id))
+                if (!v.loading) {
+                    if (sideloadForTiming(v, d, id)) reloadPlayer(v) else media?.selectText(textSelection(d, id, v.sideloaded))
+                }
                 refresh(0)
             }
         }
@@ -470,6 +506,113 @@ class RealPlaybackController(
         _state.update { it.copy(quality = q) }
         val v = active() ?: return
         if (v.decision != null) reload(v)
+    }
+
+    override fun setSound(setting: SoundSetting, level: SoundLevel) {
+        stillWatching.noteInput()
+        val v = active() ?: return
+        val d = v.decision ?: return
+        if (soundState(v, d) == null || d.isOffline || v.soundBusy != null) return
+        val still = preferences.playback.value.audio.level(setting)
+        if (still == level && v.soundFailure?.setting != setting) return
+        v.soundBusy = setting
+        v.soundFailure = null
+        refresh(0)
+        scope.launch {
+            try {
+                preferences.setSound(setting, level)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not save the sound", e)
+                if (viewing !== v) return@launch
+                v.soundBusy = null
+                v.soundFailure = SoundFailure(setting, level, still)
+                refresh(0)
+                return@launch
+            }
+            if (viewing !== v || v.stopped) return@launch
+            // The server applies the sound when it decides: the same play, from where it is.
+            v.soundLoad = host.loads + 1
+            reload(v)
+        }
+    }
+
+    override fun soundChanged() {
+        val v = active() ?: return
+        if (v.decision?.isOffline == false) reload(v)
+    }
+
+    override fun moveSubtitleTiming(deltaMs: Long) {
+        stillWatching.noteInput()
+        val v = active() ?: return
+        val d = v.decision ?: return
+        val state = timingState(v, d)?.takeIf { it.changeable } ?: return
+        val id = state.trackId
+        val before = timing(v, d, id) ?: return
+        val after = before.moved(deltaMs)
+        if (after.ms == before.ms) return
+        v.timings[id] = after
+        v.timingRetry = null
+        showTiming(v, d, id)
+        // A download from the device keeps it for this play.
+        if (!d.isOffline) {
+            v.timingSave?.cancel()
+            v.timingSave = scope.launch {
+                delay(TIMING_SETTLE_MS)
+                saveTiming(v, id)
+            }
+        }
+        refresh(0)
+    }
+
+    override fun resetSubtitleTiming() {
+        stillWatching.noteInput()
+        val v = active() ?: return
+        val d = v.decision ?: return
+        val state = timingState(v, d)?.takeIf { it.changeable && it.canReset } ?: return
+        val id = state.trackId
+        v.timingSave?.cancel()
+        if (d.isOffline) {
+            v.timings[id] = TrackTiming(0)
+            showTiming(v, d, id)
+            refresh(0)
+            return
+        }
+        timingCall(v, id, retry = { resetSubtitleTiming() }) { before ->
+            before.reset(gateway.resetSubtitleTiming(v.request.fileId, id))
+        }
+    }
+
+    override fun saveSubtitleTimingForEveryone() {
+        stillWatching.noteInput()
+        val v = active() ?: return
+        val d = v.decision ?: return
+        val state = timingState(v, d)?.takeIf { it.changeable && !it.playOnly } ?: return
+        val id = state.trackId
+        v.timingSave?.cancel()
+        timingCall(v, id, retry = { saveSubtitleTimingForEveryone() }) { before ->
+            before.savedForEveryone(gateway.setSubtitleTiming(v.request.fileId, id, before.ms, everyone = true))
+        }
+    }
+
+    override fun retrySubtitleTiming() {
+        val v = active() ?: return
+        val retry = v.timingRetry ?: return
+        v.timingRetry = null
+        retry()
+    }
+
+    override fun showSubtitleTiming(timingMs: Long) {
+        val v = active() ?: return
+        val d = v.decision ?: return
+        val id = v.selectedSubtitle ?: return
+        val before = timing(v, d, id) ?: return
+        val ms = timingMs.coerceIn(-TIMING_LIMIT_MS, TIMING_LIMIT_MS)
+        if (ms == before.ms) return
+        v.timings[id] = before.copy(ms = ms, own = true, shared = false, savedForEveryone = false)
+        showTiming(v, d, id, burnedInSettleMs = CAST_TIMING_SETTLE_MS)
+        refresh(0)
     }
 
     override fun noteUserInput() {
@@ -703,6 +846,8 @@ class RealPlaybackController(
             v.next = d.next
             d.next?.let { describeNext(v, it) }
         }
+        // Each track's saved timing, unless this viewing has already moved it.
+        for (t in d.subtitles) v.timings.getOrPut(t.option.id) { TrackTiming.of(t) }
         val prefs = preferences.playback.value
         v.selectedAudio = when {
             !d.isOffline -> d.selectedAudio ?: v.selectedAudio
@@ -736,26 +881,190 @@ class RealPlaybackController(
         val token = tokens.token
         // The stream's further requests carry this token, and a renewed one after it.
         token?.let { media?.updateMediaToken(it) }
-        host.load(
-            PlayerSource(
-                url = token?.signing(d.url) ?: d.url,
-                hls = d.protocol == StreamProtocol.Hls,
-                live = streamClock.event,
-                startPositionMs = streamClock.playerPosition(start),
-                playWhenReady = playWhenReady,
-                // Direct play reads the file's own text subtitles from the file: the server's copy of
-                // one reads the whole video first, which a long film on a slow disk can't do in time.
-                subtitles = if (d.hasRenditions()) emptyList() else d.subtitles.filterNot { needsBurnIn(it) || readInFile(d, it) }.mapNotNull { sideload(it, token) },
-                embeddedSubtitles = d.embeddedSubtitles(),
-                text = textSelection(d, v.selectedSubtitle),
-                audioOrdinal = if (d.protocol == StreamProtocol.File) d.audio.indexOfFirst { it.index == v.selectedAudio }.takeIf { it >= 0 } else null,
-                audioTracks = d.audio.size.takeIf { d.protocol == StreamProtocol.File },
-                title = v.request.title,
-                subtitle = v.request.subtitle,
-                artworkUrl = lookups.artworkUrl(v.request.backdropPath),
-            ),
-        )
+        host.load(playerSource(v, d, start, playWhenReady))
         refresh(0)
+    }
+
+    /** What the player loads for decision [d], from file position [start]. */
+    private fun playerSource(v: Viewing, d: PlaybackDecision, start: Long, playWhenReady: Boolean): PlayerSource {
+        val token = tokens.token
+        sideloadForTiming(v, d, v.selectedSubtitle)
+        // Direct play reads the file's own text subtitles from the file: the server's copy of
+        // one reads the whole video first, which a long film on a slow disk can't do in time.
+        val usual = if (d.hasRenditions()) emptyList() else d.subtitles.filterNot { needsBurnIn(it) || readInFile(d, it) }
+        val moved = d.subtitles.filter { it.option.id in v.sideloaded && it !in usual && !needsBurnIn(it) }
+        return PlayerSource(
+            url = token?.signing(d.url) ?: d.url,
+            hls = d.protocol == StreamProtocol.Hls,
+            live = v.streamClock.event,
+            startPositionMs = v.streamClock.playerPosition(start),
+            playWhenReady = playWhenReady,
+            subtitles = (usual + moved).mapNotNull { sideload(it, token, playerTiming(v, d, it.option.id)) },
+            embeddedSubtitles = d.embeddedSubtitles(),
+            text = textSelection(d, v.selectedSubtitle, v.sideloaded),
+            audioOrdinal = if (d.protocol == StreamProtocol.File) d.audio.indexOfFirst { it.index == v.selectedAudio }.takeIf { it >= 0 } else null,
+            audioTracks = d.audio.size.takeIf { d.protocol == StreamProtocol.File },
+            title = v.request.title,
+            subtitle = v.request.subtitle,
+            artworkUrl = lookups.artworkUrl(v.request.backdropPath),
+        )
+    }
+
+    /**
+     * Loads the decision playing again where it has got to, playing or
+     * paused as it is: a track moved to the server's copy of it for its
+     * timing. The server's session carries on.
+     */
+    private fun reloadPlayer(v: Viewing) {
+        val d = v.decision ?: return
+        if (v.loading) return
+        v.loadReady = false
+        v.stuckMs = 0
+        host.load(playerSource(v, d, position(v), media?.playWhenReady ?: true))
+        refresh(0)
+    }
+
+    // --- subtitle timing and sound ---
+
+    /** Track [id]'s timing this viewing; null for a track the decision doesn't list. */
+    private fun timing(v: Viewing, d: PlaybackDecision, id: String): TrackTiming? {
+        v.timings[id]?.let { return it }
+        val track = d.subtitles.firstOrNull { it.option.id == id } ?: return null
+        return TrackTiming.of(track).also { v.timings[id] = it }
+    }
+
+    /** The timing the player puts on side-loaded track [id]; a burned-in track's is in the picture. */
+    private fun playerTiming(v: Viewing, d: PlaybackDecision, id: String): Long =
+        if (id == d.burnInSubtitleId) 0 else timing(v, d, id)?.ms ?: 0
+
+    /**
+     * Moves the selected track [id] to the server's copy of it when its
+     * timing isn't 0 and it came as a rendition or from the file: Media3
+     * moves only side-loaded tracks' cues. True when it moved (the player
+     * needs loading again).
+     */
+    private fun sideloadForTiming(v: Viewing, d: PlaybackDecision, id: String?): Boolean {
+        if (id == null || id in v.sideloaded || id == d.burnInSubtitleId) return false
+        val track = d.subtitles.firstOrNull { it.option.id == id } ?: return false
+        if (!movable(d, track) || !d.hasRenditions() && !readInFile(d, track)) return false
+        if ((v.timings[id]?.ms ?: track.timingMs) == 0L) return false
+        v.sideloaded += id
+        return true
+    }
+
+    /**
+     * [track] can be moved to the server's copy of it: one there is, as text
+     * the player draws. A download's renditions are inside it, with no copy
+     * on the device.
+     */
+    private fun movable(d: PlaybackDecision, track: DecisionSubtitle) = track.url != null && !needsBurnIn(track) && !(d.isOffline && d.hasRenditions())
+
+    /**
+     * Puts track [id]'s timing on the player: the cues move a moment after
+     * the press, the first time once the track plays from the server's copy.
+     * A burned-in track's is the server's to draw, in a new stream once the
+     * presses settle ([burnedInSettleMs]; the save comes first).
+     */
+    private fun showTiming(v: Viewing, d: PlaybackDecision, id: String, burnedInSettleMs: Long? = null) {
+        if (id == d.burnInSubtitleId) {
+            if (burnedInSettleMs != null) {
+                v.timingApply?.cancel()
+                v.timingApply = scope.launch {
+                    delay(burnedInSettleMs)
+                    if (viewing === v) reload(v)
+                }
+            }
+            return
+        }
+        if (v.timingApply?.isActive == true) return
+        v.timingApply = scope.launch {
+            delay(TIMING_APPLY_MS)
+            if (viewing !== v || v.loading) return@launch
+            val decision = v.decision ?: return@launch
+            if (decision.burnInSubtitleId == id || v.selectedSubtitle != id) return@launch
+            if (sideloadForTiming(v, decision, id)) reloadPlayer(v)
+            else media?.setSubtitleTiming(id, playerTiming(v, decision, id))
+        }
+    }
+
+    /** Saves the person's own timing for track [id], once the presses have stopped. */
+    private suspend fun saveTiming(v: Viewing, id: String) {
+        val sent = v.timings[id] ?: return
+        try {
+            val reply = withContext(io) { gateway.setSubtitleTiming(v.request.fileId, id, sent.ms) }
+            if (viewing !== v) return
+            val now = v.timings[id] ?: return
+            // A press since the save went out: its own save follows.
+            if (now.ms == sent.ms) v.timings[id] = now.saved(reply)
+            // The server burns it in at the new timing, in a new stream from here.
+            if (v.decision?.burnInSubtitleId == id && now.ms == sent.ms) reload(v)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not save the subtitle timing", e)
+            if (viewing !== v) return
+            val now = v.timings[id] ?: return
+            val d = v.decision
+            // A burned-in track keeps the timing it was burned in with.
+            val shown = d?.subtitles?.firstOrNull { it.option.id == id }?.takeIf { d.burnInSubtitleId == id }?.timingMs ?: now.ms
+            v.timings[id] = now.copy(ms = shown, failed = true)
+            v.timingRetry = { scope.launch { saveTiming(v, id) } }
+        }
+        refresh(0)
+    }
+
+    /** A Reset or a Save for everyone for track [id]: [call] gives the timing afterwards; a failure keeps [retry] for Try again. */
+    private fun timingCall(v: Viewing, id: String, retry: () -> Unit, call: suspend (TrackTiming) -> TrackTiming) {
+        val before = v.timings[id] ?: return
+        v.timingRetry = null
+        scope.launch {
+            try {
+                val after = withContext(io) { call(before) }
+                if (viewing !== v) return@launch
+                v.timings[id] = after
+                v.decision?.let { d -> if (d.burnInSubtitleId == id) { if (after.ms != before.ms) reload(v) } else showTiming(v, d, id) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Could not save the subtitle timing", e)
+                if (viewing !== v) return@launch
+                v.timings[id] = (v.timings[id] ?: before).copy(failed = true)
+                v.timingRetry = retry
+            }
+            refresh(0)
+        }
+    }
+
+    /** The selected track's timing as the player shows it; null with subtitles off, below the server's level, or for a track it can't move. */
+    private fun timingState(v: Viewing, d: PlaybackDecision): SubtitleTimingState? {
+        if (!d.soundSupported) return null
+        val id = v.selectedSubtitle ?: return null
+        val track = d.subtitles.firstOrNull { it.option.id == id } ?: return null
+        val burnedIn = d.burnInSubtitleId == id
+        val playable = burnedIn || id in v.sideloaded || movable(d, track) ||
+            !d.hasRenditions() && !readInFile(d, track) && track.url != null && !needsBurnIn(track)
+        if (!playable) return null
+        val t = v.timings[id] ?: TrackTiming.of(track)
+        return SubtitleTimingState(
+            trackId = id,
+            ms = t.ms,
+            shared = t.shared,
+            own = t.own,
+            canReset = if (d.isOffline) t.ms != 0L else t.canReset,
+            savedForEveryone = t.savedForEveryone,
+            burnedIn = burnedIn,
+            saveFailed = t.failed,
+            playOnly = d.isOffline,
+            // A play cast to this TV: the phone that cast it moves and saves its timing.
+            changeable = gateway.savesForPerson,
+        )
+    }
+
+    /** Boost dialogue and Reduce loud sounds as the player shows them; null where the server can't apply them or this player can't save them. */
+    private fun soundState(v: Viewing, d: PlaybackDecision): PlayerSound? {
+        if (!d.soundSupported || !gateway.savesForPerson) return null
+        val audio = preferences.playback.value.audio
+        return PlayerSound(audio.dialogueBoost, audio.reduceLoudSounds, busy = v.soundBusy, failed = v.soundFailure, download = d.isOffline)
     }
 
     /**
@@ -786,6 +1095,8 @@ class RealPlaybackController(
         if (viewing !== v) return
         Log.w(TAG, "Playback request failed", e)
         v.loading = false
+        v.soundBusy = null
+        v.soundLoad = null
         v.error = e.message?.takeIf { it.isNotBlank() } ?: "Could not start playback."
         refresh(0)
     }
@@ -1174,6 +1485,9 @@ class RealPlaybackController(
                 trickplay = d.trickplay,
                 isOffline = d.isOffline,
                 qualities = if (d.isOffline) emptyList() else StreamQuality.offered(preferences.autoQuality.value),
+                sound = soundState(v, d),
+                timing = timingState(v, d),
+                subtitleSize = v.request.subtitleSize,
             )
         }
 
@@ -1374,8 +1688,13 @@ class RealPlaybackController(
 
         override fun onFirstFrame(load: Int) {
             val v = active() ?: return
+            // The new sound plays: its row settles.
+            val sound = v.soundLoad?.takeIf { load >= it }?.also {
+                v.soundBusy = null
+                v.soundLoad = null
+            }
             // The new step's own first frame: the next heartbeat says it plays.
-            if (v.switch.frame(load) != null) refresh(0)
+            if (v.switch.frame(load) != null || sound != null) refresh(0)
         }
 
         override fun onAudioUnavailable() = audioUnavailable()
@@ -1489,14 +1808,14 @@ class RealPlaybackController(
 
     private fun needsBurnIn(track: DecisionSubtitle) = track.option.requiresBurnIn || track.format in setOf("image", "ass")
 
-    private fun sideload(t: DecisionSubtitle, token: MediaToken?): SideloadedSubtitle? {
+    private fun sideload(t: DecisionSubtitle, token: MediaToken?, timingMs: Long): SideloadedSubtitle? {
         val url = t.url ?: return null
         val mime = when (t.format) {
             "webvtt" -> "text/vtt"
             "ass" -> "text/x-ssa"
             else -> return null
         }
-        return SideloadedSubtitle(t.option.id, token?.signing(url) ?: url, mime, t.option.label, t.option.language)
+        return SideloadedSubtitle(t.option.id, token?.signing(url) ?: url, mime, t.option.label, t.option.language, timingMs)
     }
 
     private inline fun <T> attempt(what: String, block: () -> T): T? = try {
@@ -1514,5 +1833,14 @@ class RealPlaybackController(
         const val TOKEN_RETRY_MS = 30_000L
         const val MAX_RECOVERIES = 2
         const val RECOVERY_RESET_MS = 60_000L
+
+        /** A moved timing reaches the player this long after the press, so held presses move it a few times a second. */
+        const val TIMING_APPLY_MS = 120L
+
+        /**
+         * A burned-in track moved by a phone casting here: the stream starts
+         * again this long after its last move, once the phone has saved it.
+         */
+        const val CAST_TIMING_SETTLE_MS = 2_500L
     }
 }

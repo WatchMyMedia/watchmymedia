@@ -71,7 +71,7 @@ local requests and resolve local reports in the Inbox. Its Open Seerr link
 uses the reserved `seerr.example` hostname. The fake servers are at the current API
 level (`FAKE_SERVER_API_LEVEL`); a test that selects one at a lower level
 gets what that level offers, as from a real server: no requests below 5, no
-Delete below 6, no Automatic quality below 3, no seek thumbnails below 9, no Live TV listings below 13, no casting a channel below 14, no trailers below 20, no arranged rows or lists below 22, no Notify me below 29, no related titles below 30.
+Delete below 6, no Automatic quality below 3, no seek thumbnails below 9, no Live TV listings below 13, no casting a channel below 14, no trailers below 20, no arranged rows or lists below 22, no Notify me below 29, no related titles below 30, no Sound, subtitle size or subtitle timing below 35.
 
 The fakes are a device signed in to several servers ("Several servers"
 below): the Living room server in use, the Cabin server with a small library

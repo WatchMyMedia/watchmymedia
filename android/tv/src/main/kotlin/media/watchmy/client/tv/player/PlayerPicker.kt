@@ -8,9 +8,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -24,6 +30,10 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
 import media.watchmy.client.model.PlaybackProgress
 import media.watchmy.client.model.PlayerTracks
+import media.watchmy.client.model.SOUND_HEADING
+import media.watchmy.client.model.SoundSetting
+import media.watchmy.client.tv.components.tryFocus
+import media.watchmy.client.ui.onBack
 import media.watchmy.client.tv.components.OptionRow
 import media.watchmy.client.tv.components.PanelGroup
 import media.watchmy.client.tv.components.TvButton
@@ -74,13 +84,48 @@ internal fun PickerSheet(
     focus: Map<PickerSection, FocusRequester>,
     onChoose: (PickerChoice) -> Unit,
     modifier: Modifier = Modifier,
+    extras: TvPickerExtras = TvPickerExtras(),
 ) {
     val quality = section.panel == PickerSection.Quality
+    // A sound row's small list of Off, Medium and High, in place of the panel's rows until a choice or Back.
+    var choosing by remember { mutableStateOf<SoundSetting?>(null) }
+    var area by remember { mutableStateOf(PanelArea.Track) }
+    val soundRows = remember { SoundSetting.entries.associateWith { FocusRequester() } }
+    val choiceFocus = remember { FocusRequester() }
+    val timingRow = remember { FocusRequester() }
+    var back by remember { mutableStateOf<SoundSetting?>(null) }
+    LaunchedEffect(choosing) {
+        if (choosing != null) choiceFocus.tryFocus()
+        else back?.let { soundRows.getValue(it).tryFocus() }.also { back = null }
+    }
+    val sound = tracks.sound.takeIf { !quality }
+    val timing = tracks.timing?.takeIf { !quality && it.changeable }
+    val open = choosing
     TvSidePanel(
-        title = if (quality) "Quality" else "Audio & subtitles",
-        modifier = modifier,
+        title = when {
+            open != null -> open.label
+            quality -> "Quality"
+            else -> "Audio & subtitles"
+        },
+        modifier = modifier.onBack(enabled = open != null) {
+            back = open
+            choosing = null
+        },
+        kicker = if (open != null) "Audio & subtitles · $SOUND_HEADING" else null,
         context = if (quality) "Lower it if the picture keeps stopping." else null,
+        // Focus on the timing: the cues beside the panel show through.
+        dim = if (area.timing && open == null) TimingDim else TvPalette.Dim,
     ) {
+        if (open != null && sound != null) {
+            SoundChoices(open, sound.level(open), choiceFocus) { level ->
+                back = open
+                choosing = null
+                if (level != sound.level(open)) extras.onSound(open, level)
+            }
+            Box(Modifier.weight(1f))
+            PickerKeys(onTiming = false, ok = "Chooses", back = "Returns")
+            return@TvSidePanel
+        }
         val sections = remember(tracks) { pickerSections(tracks) }
         Column(
             Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(vertical = 10.dp),
@@ -96,20 +141,37 @@ internal fun PickerSheet(
                             Text(it, Modifier.padding(start = 24.dp, top = 12.dp), style = TvType.Caption.copy(fontWeight = FontWeight.SemiBold), color = WmmColors.TextSoft)
                         }
                         val m = if (i == focusAt) Modifier.focusRequester(focus.getValue(s)) else Modifier
-                        PickerOption(row, onClick = { onChoose(row.choice) }, modifier = m)
+                        PickerOption(row, onClick = { onChoose(row.choice) }, modifier = m.onFocusChanged { if (it.isFocused) area = PanelArea.Track })
                         row.footer?.let {
                             Text(it, Modifier.padding(horizontal = 24.dp), style = TvType.Caption, color = TvPalette.Muted)
                         }
                     }
+                }
+                if (s == PickerSection.Audio && sound != null) {
+                    Column(Modifier.onFocusChanged { if (it.hasFocus) area = PanelArea.Sound }, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SoundRows(sound, soundRows, onOpen = { choosing = it }, onSound = extras.onSound)
+                    }
+                }
+                if (s == PickerSection.Subtitles && timing != null) {
+                    TimingRows(timing, extras.admin, timingRow, extras.onTiming) { focused -> if (focused) area = PanelArea.Timing }
                 }
             }
         }
         if (quality) {
             // Every choice here is kept for this TV, as the TV's own Settings keep it.
             Text("Your choice becomes this TV’s default.", Modifier.padding(horizontal = 24.dp), style = TvType.Second, color = TvPalette.Muted)
+        } else if (sound != null || timing != null) {
+            Box(Modifier.weight(1f))
+            PickerKeys(onTiming = area == PanelArea.Timing, ok = if (area == PanelArea.Sound) "Opens its choices" else "Chooses", back = "Closes this panel")
         }
     }
 }
+
+/** Which part of Audio & subtitles has focus, for the keys' line and the dim beside the panel. */
+private enum class PanelArea(val timing: Boolean) { Track(false), Sound(false), Timing(true) }
+
+/** Lighter over the video while the timing has focus, so its cues can be seen moving (`rgba(0,0,0,.35)`). */
+private val TimingDim = androidx.compose.ui.graphics.Color(0x59000000)
 
 /** A row of a panel: the choice and its words under it, a gold tick when it is the one in use. Dimmed when it can't be chosen. */
 @Composable

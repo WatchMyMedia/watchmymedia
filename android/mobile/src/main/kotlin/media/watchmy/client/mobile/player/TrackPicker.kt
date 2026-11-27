@@ -66,6 +66,8 @@ import kotlinx.coroutines.launch
 import media.watchmy.client.model.OptionLabel
 import media.watchmy.client.model.PlayerTracks
 import media.watchmy.client.model.StreamQuality
+import media.watchmy.client.model.SoundLevel
+import media.watchmy.client.model.SoundSetting
 import media.watchmy.client.model.SubtitleEntry
 import media.watchmy.client.model.audioOptionLabel
 import media.watchmy.client.model.subtitleEntries
@@ -75,11 +77,24 @@ import media.watchmy.client.ui.components.WmmIcons
 internal enum class PickerTab(val title: String) { Audio("Audio"), Subtitles("Subtitles"), Quality("Quality") }
 
 /**
+ * What the pickers' Sound and Subtitle timing do, which keep the panel open;
+ * [admin] offers Save for everyone. [preview] is the phone sheet's paused
+ * frame with its cue.
+ */
+internal class PickerExtras(
+    val onSound: (SoundSetting, SoundLevel) -> Unit = { _, _ -> },
+    val onTiming: (TimingAction) -> Unit = {},
+    val admin: Boolean = false,
+    val preview: (@Composable () -> Unit)? = null,
+)
+
+/**
  * Audio, subtitles and quality in one M3 modal bottom sheet:
  * three columns when the sheet is wide (the player
  * is landscape), tabs when it is narrow. Picking an option applies it and
  * closes the sheet; an online subtitle keeps it open while it downloads,
- * then closes it once it is on. [tab] is the one the viewer opened it from.
+ * then closes it once it is on, and Sound and Subtitle timing ([extras])
+ * keep it open. [tab] is the one the viewer opened it from.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,6 +106,7 @@ internal fun TrackPicker(
     onDownload: (String) -> Unit,
     onQuality: (StreamQuality) -> Unit,
     onDismiss: () -> Unit,
+    extras: PickerExtras = PickerExtras(),
 ) {
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -117,6 +133,7 @@ internal fun TrackPicker(
             onDownload(id)
         },
         onQuality = { pick { onQuality(it) } },
+        extras = extras,
     )
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -143,6 +160,8 @@ private class PickerOptions(
     val onSubtitle: (String?) -> Unit,
     val onDownload: (String) -> Unit,
     val onQuality: (StreamQuality) -> Unit,
+    val extras: PickerExtras = PickerExtras(),
+    val tablet: Boolean = false,
 )
 
 @Composable
@@ -209,21 +228,34 @@ private fun Section(title: String, modifier: Modifier, content: @Composable Colu
 }
 
 @Composable
-private fun AudioOptions(options: PickerOptions) {
+private fun ColumnScope.AudioOptions(options: PickerOptions) {
     val s = options.tracks
     if (s.audio.isEmpty()) Empty("No other audio")
     s.audio.forEach { a -> OptionRow(audioOptionLabel(a), selected = a.index == s.selectedAudio) { options.onAudio(a.index) } }
+    s.sound?.let { SoundSection(it, options.tablet, options.extras.onSound) }
 }
 
 @Composable
-private fun SubtitleOptions(options: PickerOptions) {
-    subtitleEntries(options.tracks).forEach { e ->
-        when (e) {
-            is SubtitleEntry.Heading -> Text(e.text, style = PlayerType.OptionGroup, modifier = Modifier.padding(start = 8.dp, end = 8.dp, top = 10.dp, bottom = 2.dp))
-            is SubtitleEntry.Track -> OptionRow(e.label, selected = e.selected) { options.onSubtitle(e.id) }
-            is SubtitleEntry.Online -> DownloadRow(e) { options.onDownload(e.id) }
-            is SubtitleEntry.Note -> Text(e.text, style = PlayerType.Footnote, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
-        }
+private fun ColumnScope.SubtitleOptions(options: PickerOptions) {
+    val entries = subtitleEntries(options.tracks)
+    // The timing goes under the tracks, before what was found online.
+    val after = entries.indexOfLast { it is SubtitleEntry.Track } + 1
+    val tracks = entries.take(after)
+    val found = entries.drop(after)
+    tracks.forEach { SubtitleRow(it, options) }
+    options.tracks.timing?.takeIf { it.changeable }?.let {
+        TimingSection(it, options.extras.admin, options.tablet, options.extras.onTiming, options.extras.preview)
+    }
+    found.forEach { SubtitleRow(it, options) }
+}
+
+@Composable
+private fun SubtitleRow(e: SubtitleEntry, options: PickerOptions) {
+    when (e) {
+        is SubtitleEntry.Heading -> Text(e.text, style = PlayerType.OptionGroup, modifier = Modifier.padding(start = 8.dp, end = 8.dp, top = 10.dp, bottom = 2.dp))
+        is SubtitleEntry.Track -> OptionRow(e.label, selected = e.selected) { options.onSubtitle(e.id) }
+        is SubtitleEntry.Online -> DownloadRow(e) { options.onDownload(e.id) }
+        is SubtitleEntry.Note -> Text(e.text, style = PlayerType.Footnote, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
     }
 }
 
@@ -332,8 +364,9 @@ internal fun TabletTrackPicker(
     onDownload: (String) -> Unit,
     onQuality: (StreamQuality) -> Unit,
     onDismiss: () -> Unit,
+    extras: PickerExtras = PickerExtras(),
 ) {
-    val options = PickerOptions(tracks, onAudio, onSubtitle, onDownload, onQuality)
+    val options = PickerOptions(tracks, onAudio, onSubtitle, onDownload, onQuality, extras, tablet = true)
     val index = if (tracks.isOffline) tab.ordinal.coerceAtMost(1) else tab.ordinal
     val scroll = rememberLazyListState(initialFirstVisibleItemIndex = index)
     LaunchedEffect(index) { scroll.scrollToItem(index) }

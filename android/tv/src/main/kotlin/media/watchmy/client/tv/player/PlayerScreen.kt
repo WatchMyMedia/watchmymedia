@@ -58,6 +58,7 @@ import media.watchmy.client.model.SubtitleRequestMode
 import media.watchmy.client.model.tracks
 import media.watchmy.client.presentation.player.PlayerEpisodesViewModel
 import media.watchmy.client.presentation.player.PlayerViewModel
+import media.watchmy.client.tv.components.PanelWidth
 import media.watchmy.client.tv.components.SafeX
 import media.watchmy.client.tv.components.SafeY
 import media.watchmy.client.tv.components.TvClock
@@ -195,6 +196,8 @@ private fun PlayerContent(
     onPlay: (PlayRequest) -> Unit = controller::start,
 ) {
     val state by controller.state.collectAsStateWithLifecycle()
+    // Save for everyone in Audio & subtitles' timing is for admins.
+    val admin = LocalAppServices.current.auth.user.collectAsStateWithLifecycle().value?.isAdmin == true
     // Back, focus, hiding the controls and keeping the screen on: the frame Live TV's player shares.
     val shell = rememberPlayerShellState()
     val focus = remember { PlayerFocus(shell.root) }
@@ -481,7 +484,11 @@ private fun PlayerContent(
         focusKeys = arrayOf<Any?>(controlsVisible, overlay, skipShown),
         onFocusChanged = { if (it.isFocused || !it.hasFocus) area = FocusArea.Root },
     ) {
-        VideoLayer(controller, state, imageUrl, raisedSubtitles = chromeVisible || overlay == Overlay.UpNext)
+        VideoLayer(
+            controller, state, imageUrl, raisedSubtitles = chromeVisible || overlay == Overlay.UpNext,
+            // Audio & subtitles from the right: the cues move left of it, where the timing can be seen.
+            besidePanel = overlay == Overlay.Picker && picker?.panel == PickerSection.Audio,
+        )
 
         AnimatedVisibility(chromeVisible, Modifier.fillMaxSize(), enter = fadeIn(tween(150)), exit = fadeOut(tween(250))) {
             Box(Modifier.fillMaxSize()) { PlayerChrome(state, shownMs, readProgress, chromeFocus, chromeActions, seek, episodes = episodeList?.playingCode?.takeIf { episodeList.available }) }
@@ -546,7 +553,7 @@ private fun PlayerContent(
                 }
             } else {
                 Entering(fadeIn(tween(180))) {
-                    PickerSheet(state.tracks, open, focus.picker, onChoose = { choose(controller, it) })
+                    PickerSheet(state.tracks, open, focus.picker, onChoose = { choose(controller, it) }, extras = pickerExtras(controller, admin))
                 }
             }
         }
@@ -633,6 +640,20 @@ private fun overlayFocus(overlay: Overlay, picker: PickerSection?, focus: Player
     Overlay.None -> null
 }
 
+/** Audio & subtitles' Sound and Subtitle timing, on [controller]; Save for everyone for an [admin]. */
+private fun pickerExtras(controller: PlaybackController, admin: Boolean) = TvPickerExtras(
+    onSound = controller::setSound,
+    onTiming = { action ->
+        when (action) {
+            is TimingAction.Move -> controller.moveSubtitleTiming(action.deltaMs)
+            TimingAction.Reset -> controller.resetSubtitleTiming()
+            TimingAction.SaveForEveryone -> controller.saveSubtitleTimingForEveryone()
+            TimingAction.Retry -> controller.retrySubtitleTiming()
+        }
+    },
+    admin = admin,
+)
+
 private fun choose(controller: PlaybackController, choice: PickerChoice) = when (choice) {
     is PickerChoice.Audio -> controller.selectAudio(choice.index)
     is PickerChoice.Subtitle -> controller.selectSubtitle(choice.id)
@@ -649,7 +670,7 @@ private fun choose(controller: PlaybackController, choice: PickerChoice) = when 
  */
 @OptIn(UnstableApi::class)
 @Composable
-private fun VideoLayer(controller: PlaybackController, state: PlayerUiState, imageUrl: (String?, ImageSize) -> String?, raisedSubtitles: Boolean) {
+private fun VideoLayer(controller: PlaybackController, state: PlayerUiState, imageUrl: (String?, ImageSize) -> String?, raisedSubtitles: Boolean, besidePanel: Boolean = false) {
     val player = controller.player.collectAsStateWithLifecycle().value
     val device by LocalAppServices.current.preferences.device.collectAsStateWithLifecycle()
     if (player != null) {
@@ -658,7 +679,8 @@ private fun VideoLayer(controller: PlaybackController, state: PlayerUiState, ima
         SubtitleCues(
             player,
             fontSize = 48.sp,
-            sidePadding = 160.dp,
+            sidePadding = if (besidePanel) SafeX else 160.dp,
+            modifier = if (besidePanel) Modifier.padding(end = PanelWidth - SafeX) else Modifier,
             bottomPadding = if (raisedSubtitles) 270.dp else 72.dp,
             topPadding = 72.dp,
             // The person's size where the server keeps one (or the size of a play cast here); the TV's own before that.
