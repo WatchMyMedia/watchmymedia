@@ -23,6 +23,9 @@ data class TrackTiming(
     /** Reset changes something: the person's own timing differs from what Reset goes back to. */
     val canReset: Boolean get() = own && ms != (sharedMs ?: 0L)
 
+    /** Reset goes back to a timing saved for everyone, where this viewing knows of one. */
+    val resetsToShared: Boolean get() = (sharedMs ?: 0L) != 0L
+
     /** Earlier or later by [deltaMs]: the person's own from now on. */
     fun moved(deltaMs: Long): TrackTiming = copy(ms = movedTiming(ms, deltaMs), shared = false, own = true, savedForEveryone = false, failed = false)
 

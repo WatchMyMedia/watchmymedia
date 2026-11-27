@@ -101,7 +101,8 @@ internal fun ColumnScope.SoundSection(sound: PlayerSound, tablet: Boolean, onSou
             }
             ChoiceSegments(
                 SoundLevel.entries, sound.level(setting), label = { it.label }, onPick = { onSound(setting, it) }, name = setting.label,
-                enabled = !sound.download && (sound.busy == null || busy), busy = busy, busyLabel = CHANGING_SOUND,
+                // While the other row changes the sound this one looks as it is; the player takes one change at a time.
+                enabled = !sound.download, busy = busy, busyLabel = CHANGING_SOUND,
             )
             sound.failed?.takeIf { it.setting == setting }?.let { failure ->
                 FailureRow(soundFailedLine(failure.still)) { onSound(setting, failure.wanted) }
@@ -131,12 +132,12 @@ internal fun ColumnScope.TimingSection(
     if (tablet) {
         Text(SUBTITLE_TIMING, style = PlayerType.OptionGroup, modifier = Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 2.dp))
         Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TimingButton(TIMING_EARLIER, before = true, Modifier.padding(0.dp)) { onTiming(TimingAction.Move(-TIMING_STEP_MS)) }
+            TimingButton(TIMING_EARLIER, before = true, onStep = { onTiming(TimingAction.Move(-TIMING_STEP_MS)) })
             Column(Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite }, horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(timing.label, style = PlayerType.Option.copy(fontSize = 15.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, fontFeatureSettings = "tnum"), textAlign = TextAlign.Center)
                 if (timing.showsSetForEveryone) Text(SET_FOR_EVERYONE, style = PlayerType.OptionDetail, textAlign = TextAlign.Center)
             }
-            TimingButton(TIMING_LATER, before = false, Modifier.padding(0.dp)) { onTiming(TimingAction.Move(TIMING_STEP_MS)) }
+            TimingButton(TIMING_LATER, before = false, onStep = { onTiming(TimingAction.Move(TIMING_STEP_MS)) })
         }
     } else {
         Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 10.dp, bottom = 0.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -146,8 +147,8 @@ internal fun ColumnScope.TimingSection(
         if (timing.showsSetForEveryone) Text(SET_FOR_EVERYONE, style = PlayerType.OptionDetail, textAlign = TextAlign.End, modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp))
         if (!timing.burnedIn) preview?.invoke()
         Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TimingButton(TIMING_EARLIER, before = true, Modifier.weight(1f)) { onTiming(TimingAction.Move(-TIMING_STEP_MS)) }
-            TimingButton(TIMING_LATER, before = false, Modifier.weight(1f)) { onTiming(TimingAction.Move(TIMING_STEP_MS)) }
+            TimingButton(TIMING_EARLIER, before = true, onStep = { onTiming(TimingAction.Move(-TIMING_STEP_MS)) }, modifier = Modifier.weight(1f))
+            TimingButton(TIMING_LATER, before = false, onStep = { onTiming(TimingAction.Move(TIMING_STEP_MS)) }, modifier = Modifier.weight(1f))
         }
     }
     val savedAll = admin && timing.savedForEveryone && !timing.own
@@ -189,7 +190,7 @@ private val FailRed = Color(0xFFFCA5A5)
  * again every tenth of a second while held, after a moment.
  */
 @Composable
-private fun TimingButton(text: String, before: Boolean, modifier: Modifier, onStep: () -> Unit) {
+private fun TimingButton(text: String, before: Boolean, onStep: () -> Unit, modifier: Modifier = Modifier) {
     val step by rememberUpdatedState(onStep)
     Row(
         modifier

@@ -518,7 +518,7 @@ class CastPlaybackController(
                 val t = timing(key)
                 val info = r?.subtitles?.firstOrNull { it.id == key.second }
                 SubtitleTimingState(
-                    trackId = key.second, ms = t.ms, shared = t.shared, own = t.own, canReset = t.canReset,
+                    trackId = key.second, ms = t.ms, shared = t.shared, own = t.own, canReset = t.canReset, resetsToShared = t.resetsToShared,
                     savedForEveryone = t.savedForEveryone, burnedIn = info?.burnInOnly == true || info?.format == "image", saveFailed = t.failed,
                 )
             },

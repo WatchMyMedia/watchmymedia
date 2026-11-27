@@ -293,8 +293,17 @@ Android 10), hardware decoders first, a software-only codec counting for
 1080p at most, and the display's size only when no decoder says. A video
 decoder that fails on a stream gets one more decision for that viewing, at
 a size it takes or without its codec (logged under `WmmPlayback`).
-Subtitle size scales the TV's subtitles; phones follow the
-system's caption settings while captions are on there. Phones and tablets
+The person's Subtitle size (Settings › Audio & subtitles, from API level
+35) scales every player's text subtitles, on top of the system's caption
+size where phones follow it while captions are on; a TV keeps its own size
+for older servers, and gives a size other than Normal to a person with none
+saved once (`moveSubtitleSizeUp`). The player's Audio & subtitles has the
+person's Sound (Boost dialogue and Reduce loud sounds, which the server
+applies when it decides, so a change saves and reloads the play where it
+is) and the selected track's Subtitle timing, which moves a side-loaded
+track's cues with Media3's `SubtitleConfiguration.timeOffsetUs` (a
+rendition or a track read from the file moves to the server's WebVTT copy
+first) and saves for the person a second after the last press. Phones and tablets
 keep 15 s of played video so a jump back plays at once (`PlayerOptions`);
 TVs keep none, as it would come out of the buffer ahead of a 4K remux, and
 neither do low-RAM devices.
@@ -930,7 +939,7 @@ against `cmd/livetvfixture`.
 | `app` | Application (builds `DataServices` and `PlaybackEngine`, the image loader, which also fetches the media notification's artwork; starts the Cast SDK at the first `ON_START`, `FirstForeground`; WorkManager starts on first use), the one activity for both launchers and its routing of casts and links (`IntentRouter`), the local network prompt, reminders' alarms (`app/reminders/`), debug builds' StrictMode (`StrictModeChecks`), the process's past exits (`AndroidDiagnostics`), manifest, icons |
 | `core:model` | Domain models and the interfaces everything builds against: `ServerRepository`, `AuthRepository`, `LibraryRepository`, `PreferencesRepository`, `PlaybackController`, `PlaybackGateway`, `LiveRepository`, `LivePlaybackController`, `AppServices`; and the pure helpers both UIs share, so the phone and the TV say the same thing: labels, dates and counts, error messages and `attempt`, play requests, deep links |
 | `core:presentation` | The ViewModels the phone and the TV share, so both pages behave alike (the Apple apps' WMMFeatures models): their state, with what loads as a `Load` (loading, failed or ready), and their one-shot events. Depends only on `core:model`, lifecycle's ViewModel and SavedStateHandle, and coroutines: no Compose, no Android UI |
-| `core:ui` | Brand tokens (`WmmColors`), Inter, the phone Material 3 theme, `LocalAppServices`, shared pieces: `Artwork`, `Badge`, `ProgressStrip`, `WatchedCheck`, `BrandMark`, `WmmIcons`, the loading skeletons' blocks, lines and sheen (`Skeleton.kt`, still with animations off), `SubtitleCues` (both players' text subtitles, in a `CaptionLook`: the TV's Subtitle size, the phone's system caption settings), `playerKey` (both players' remote and keyboard keys), `SeekThumbnail` and `ScrubberLayout` (both players' seek thumbnails) and `CoilSeekThumbnails` (their tiles), `TrailerPage.kt` (both trailer screens' page for YouTube's player), `PRIVACY_POLICY_URL` |
+| `core:ui` | Brand tokens (`WmmColors`), Inter, the phone Material 3 theme, `LocalAppServices`, shared pieces: `Artwork`, `Badge`, `ProgressStrip`, `WatchedCheck`, `BrandMark`, `WmmIcons`, the loading skeletons' blocks, lines and sheen (`Skeleton.kt`, still with animations off), `SubtitleCues` (both players' text subtitles, in a `CaptionLook`: the person's Subtitle size, `CaptionLook.at`, on top of the phone's system caption settings), `playerKey` (both players' remote and keyboard keys), `SeekThumbnail` and `ScrubberLayout` (both players' seek thumbnails) and `CoilSeekThumbnails` (their tiles), `TrailerPage.kt` (both trailer screens' page for YouTube's player), `PRIVACY_POLICY_URL` |
 | `core:fake` | In-memory fakes of every interface, with the mockups' sample library and a pretend player (tests, previews, the player harnesses, `-Pfakes=true`) |
 | `core:api` | Client generated from `../api/openapi-3.0.json` |
 | `core:data` | Real repositories: servers (DataStore, mDNS), sign-in and pairing, library, preferences, the server's event stream, playback API calls (`DataServices`) |

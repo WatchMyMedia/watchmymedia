@@ -153,7 +153,14 @@ internal fun PickerSheet(
                     }
                 }
                 if (s == PickerSection.Subtitles && timing != null) {
-                    TimingRows(timing, extras.admin, timingRow, extras.onTiming) { focused -> if (focused) area = PanelArea.Timing }
+                    TimingRows(timing, extras.admin, timingRow, extras.onTiming) { on ->
+                        area = when (on) {
+                            TimingFocus.Row -> PanelArea.Timing
+                            TimingFocus.Reset -> if (timing.resetsToShared) PanelArea.ResetShared else PanelArea.Reset
+                            TimingFocus.SaveForEveryone -> PanelArea.SaveForEveryone
+                            TimingFocus.Saved -> PanelArea.Saved
+                        }
+                    }
                 }
             }
         }
@@ -162,13 +169,21 @@ internal fun PickerSheet(
             Text("Your choice becomes this TV’s default.", Modifier.padding(horizontal = 24.dp), style = TvType.Second, color = TvPalette.Muted)
         } else if (sound != null || timing != null) {
             Box(Modifier.weight(1f))
-            PickerKeys(onTiming = area == PanelArea.Timing, ok = if (area == PanelArea.Sound) "Opens its choices" else "Chooses", back = "Closes this panel")
+            PickerKeys(onTiming = area == PanelArea.Timing, ok = area.ok, back = "Closes this panel")
         }
     }
 }
 
-/** Which part of Audio & subtitles has focus, for the keys' line and the dim beside the panel. */
-private enum class PanelArea(val timing: Boolean) { Track(false), Sound(false), Timing(true) }
+/** Which part of Audio & subtitles has focus, for the keys' line ([ok]) and the dim beside the panel. */
+private enum class PanelArea(val timing: Boolean, val ok: String) {
+    Track(false, "Chooses"),
+    Sound(false, "Opens its choices"),
+    Timing(true, "Chooses"),
+    Reset(true, "Puts it back in step"),
+    ResetShared(true, "Goes back to the timing for everyone"),
+    SaveForEveryone(true, "Saves for everyone"),
+    Saved(true, "Saved"),
+}
 
 /** Lighter over the video while the timing has focus, so its cues can be seen moving (`rgba(0,0,0,.35)`). */
 private val TimingDim = androidx.compose.ui.graphics.Color(0x59000000)

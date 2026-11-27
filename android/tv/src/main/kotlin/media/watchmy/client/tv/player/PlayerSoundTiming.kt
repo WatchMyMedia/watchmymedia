@@ -75,6 +75,9 @@ internal sealed interface TimingAction {
     data object Retry : TimingAction
 }
 
+/** Which of the timing's rows has focus, for what the keys' line says. */
+internal enum class TimingFocus { Row, Reset, SaveForEveryone, Saved }
+
 /** What Audio & subtitles' Sound and Subtitle timing call; [admin] offers Save for everyone. */
 internal class TvPickerExtras(
     val onSound: (SoundSetting, SoundLevel) -> Unit = { _, _ -> },
@@ -100,7 +103,8 @@ internal fun ColumnScope.SoundRows(sound: PlayerSound, rows: Map<SoundSetting, F
             text = setting.label,
             onClick = {
                 when {
-                    busy -> Unit
+                    // One change at a time: OK waits while either row's goes through.
+                    sound.busy != null -> Unit
                     failure != null -> onSound(setting, failure.wanted)
                     else -> onOpen(setting)
                 }
@@ -113,7 +117,6 @@ internal fun ColumnScope.SoundRows(sound: PlayerSound, rows: Map<SoundSetting, F
             },
             trailing = sound.level(setting).label,
             chevron = !busy,
-            enabled = sound.busy == null || busy,
         )
     }
     Text(SOUND_NOTE, Modifier.padding(horizontal = 24.dp), style = TvType.Caption, color = TvPalette.Muted)
@@ -153,12 +156,12 @@ internal fun ColumnScope.TimingRows(
     admin: Boolean,
     row: FocusRequester,
     onTiming: (TimingAction) -> Unit,
-    onFocus: (Boolean) -> Unit,
+    onFocus: (TimingFocus) -> Unit,
 ) {
     PanelGroup(SUBTITLE_TIMING, Modifier.semantics { heading() })
-    TimingRow(timing, onTiming, Modifier.focusRequester(row).onFocusChanged { onFocus(it.isFocused) })
+    TimingRow(timing, onTiming, Modifier.focusRequester(row).onFocusChanged { if (it.isFocused) onFocus(TimingFocus.Row) })
     if (timing.canReset) {
-        PanelRow(TIMING_RESET, onClick = { onTiming(TimingAction.Reset) }, modifier = Modifier.onFocusChanged { onFocus(it.isFocused) })
+        PanelRow(TIMING_RESET, onClick = { onTiming(TimingAction.Reset) }, modifier = Modifier.onFocusChanged { if (it.isFocused) onFocus(TimingFocus.Reset) })
     }
     val saveAll = timing.offersSaveForEveryone(admin)
     val savedAll = admin && timing.savedForEveryone && !timing.own
@@ -166,7 +169,7 @@ internal fun ColumnScope.TimingRows(
         PanelRow(
             SAVE_FOR_EVERYONE,
             onClick = { if (saveAll) onTiming(TimingAction.SaveForEveryone) },
-            modifier = Modifier.onFocusChanged { onFocus(it.isFocused) },
+            modifier = Modifier.onFocusChanged { if (it.isFocused) onFocus(if (savedAll) TimingFocus.Saved else TimingFocus.SaveForEveryone) },
             description = if (savedAll) SAVED_FOR_EVERYONE else SAVE_FOR_EVERYONE_HELP,
             chosen = savedAll,
         )
@@ -176,7 +179,7 @@ internal fun ColumnScope.TimingRows(
 }
 
 @Composable
-private fun TimingRow(timing: SubtitleTimingState, onTiming: (TimingAction) -> Unit, modifier: Modifier) {
+private fun TimingRow(timing: SubtitleTimingState, onTiming: (TimingAction) -> Unit, modifier: Modifier = Modifier) {
     // The end that is held, for its pressed look: true for Later.
     var held by remember { mutableStateOf<Boolean?>(null) }
     val words = listOfNotNull("$SUBTITLE_TIMING, ${timing.label}", SET_FOR_EVERYONE.takeIf { timing.showsSetForEveryone }).joinToString(", ") +

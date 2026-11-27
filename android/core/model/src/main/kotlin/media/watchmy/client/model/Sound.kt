@@ -148,6 +148,8 @@ data class SubtitleTimingState(
     val own: Boolean = false,
     /** Reset would change something: back to the one saved for everyone, else in step. */
     val canReset: Boolean = false,
+    /** Reset goes back to a timing an admin saved for everyone, not to in step. */
+    val resetsToShared: Boolean = false,
     /** An admin's Save for everyone has just saved [ms]. */
     val savedForEveryone: Boolean = false,
     /** The server burns this track into the picture: a change restarts the video once it settles. */

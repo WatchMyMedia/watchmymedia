@@ -1051,6 +1051,7 @@ class RealPlaybackController(
             shared = t.shared,
             own = t.own,
             canReset = if (d.isOffline) t.ms != 0L else t.canReset,
+            resetsToShared = !d.isOffline && t.resetsToShared,
             savedForEveryone = t.savedForEveryone,
             burnedIn = burnedIn,
             saveFailed = t.failed,
