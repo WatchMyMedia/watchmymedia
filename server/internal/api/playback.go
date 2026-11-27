@@ -244,6 +244,25 @@ func startFilePlayback(ctx context.Context, deps Deps, in *PlaybackInput) (*Play
 	if deps.Playback != nil {
 		caps = deps.Playback.Capabilities()
 	}
+	// The person's preferences: their sound settings apply to every play
+	// of theirs; their audio languages to a request that names no track,
+	// and their subtitle preferences only to players that ask for them
+	// (subtitleMode auto).
+	user, signedIn := auth.UserFrom(ctx)
+	preferences := defaultTrackPreferences()
+	if signedIn {
+		p, err := loadPreferences(ctx, deps, user.ID)
+		if err != nil {
+			return nil, err
+		}
+		in.Body.Effects = p.Audio.Effects()
+		if in.Body.SubtitleMode == "auto" || in.Body.AudioIndex == nil {
+			// An episode starts the way the person last picked for its show.
+			if preferences, err = withShowTracks(ctx, deps, user.ID, row.ID, p.tracks()); err != nil {
+				return nil, err
+			}
+		}
+	}
 	// Automatic quality: the server picks the step and caps the profile
 	// to it, as a client does for a fixed quality.
 	var auto *playback.AutoChoice
@@ -253,7 +272,6 @@ func startFilePlayback(ctx context.Context, deps Deps, in *PlaybackInput) (*Play
 		in.Body.Profile = step.Cap(in.Body.Profile)
 		auto = &playback.AutoChoice{Step: step.ID, Reason: reason, Generation: in.Body.SwitchGeneration}
 	}
-	user, signedIn := auth.UserFrom(ctx)
 	switchUpgrade := false
 	if in.Body.SwitchGeneration != 0 && signedIn && deps.Activity != nil {
 		current := deps.Activity.AutoHint(in.Body.PlayID, user.ID, row.ID, "", netip.Addr{})
@@ -268,19 +286,6 @@ func startFilePlayback(ctx context.Context, deps Deps, in *PlaybackInput) (*Play
 		}
 	}
 	originalRequest := in.Body
-	// Audio languages apply to any request that names no track; subtitle
-	// preferences only to players that ask for them (subtitleMode auto).
-	preferences := defaultTrackPreferences()
-	if signedIn && (in.Body.SubtitleMode == "auto" || in.Body.AudioIndex == nil) {
-		p, err := loadPreferences(ctx, deps, user.ID)
-		if err != nil {
-			return nil, err
-		}
-		// An episode starts the way the person last picked for its show.
-		if preferences, err = withShowTracks(ctx, deps, user.ID, row.ID, p.tracks()); err != nil {
-			return nil, err
-		}
-	}
 	d, selectedRequest := decideTracks(ctx, deps, row, info, in.Body, sidecars, caps, preferences)
 	in.Body = selectedRequest
 	d.Auto = auto
@@ -415,9 +420,9 @@ func startFilePlayback(ctx context.Context, deps Deps, in *PlaybackInput) (*Play
 		if adaptive != nil {
 			r := adaptive.Renditions[len(adaptive.Renditions)-1]
 			d.Video = playback.VideoPlan{Codec: "h264", Encoder: "libx264", Width: r.Width, Height: r.Height}
-			d.Audio = playback.AudioPlan{Index: spec.Audio.Index, Codec: "aac", Channels: 2}
+			d.Audio = spec.Audio.AsAAC(2)
 			if spec.Audio.Channels == 1 || in.Body.Profile.MaxAudioChannels == 1 {
-				d.Audio.Channels = 1
+				d.Audio = spec.Audio.AsAAC(1)
 			}
 		}
 		if err != nil {

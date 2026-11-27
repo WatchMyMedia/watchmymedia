@@ -43,6 +43,9 @@ type Owner struct {
 	SignInID string
 	Name     string
 	Admin    bool
+	// Effects are the person's sound settings, which their sessions apply
+	// to the broadcast's audio.
+	Effects playback.AudioEffects
 }
 type SessionView struct {
 	Adaptive              *playback.AdaptiveStream `json:"adaptive,omitempty" required:"false"`
@@ -96,6 +99,7 @@ type session struct {
 	family                            *liveFamily
 	input                             io.ReadCloser
 	profile                           *LiveProfile
+	effects                           playback.AudioEffects // the viewer's sound settings
 	sourceInfo                        SourceInfo
 	parentID                          string
 	auto                              *liveAuto
@@ -243,7 +247,7 @@ func (m *Sessions) StartWithProfile(ctx context.Context, owner Owner, channelID,
 	now := time.Now()
 	m.startOrder++
 	runCtx, cancel := context.WithCancel(m.ctx)
-	s := &session{shared: shared, owner: owner, requestID: requestID, sourceID: source.ID, address: source.Address, deviceID: source.DeviceID, path: channel.StreamPath, ctx: runCtx, cancel: cancel, done: make(chan struct{}), ready: make(chan struct{}), interactedAt: now, profile: profile}
+	s := &session{shared: shared, owner: owner, requestID: requestID, sourceID: source.ID, address: source.Address, deviceID: source.DeviceID, path: channel.StreamPath, ctx: runCtx, cancel: cancel, done: make(chan struct{}), ready: make(chan struct{}), interactedAt: now, profile: profile, effects: owner.Effects}
 	s.startOrder = m.startOrder
 	s.view = SessionView{ID: id, Channel: Channel{ID: channel.ID, SourceID: source.ID, Number: channel.Number, Name: channel.Name, Enabled: true, Available: true}, State: "starting", Quality: quality, UserID: owner.UserID, UserName: owner.Name, ClientName: clientName, StartedAt: now, LastSeenAt: now, BufferSeconds: SegmentSeconds * WindowSegments}
 	s.view.URL = "/api/live-tv/sessions/" + s.view.ID + "/hls/live.m3u8"
@@ -808,6 +812,17 @@ func (m *Sessions) run(s *session) {
 		}
 		plan = LivePlan{Mode: "video", Reason: "adaptive_family", SegmentFormat: "fmp4"}
 	}
+	var caps playback.Capabilities
+	if plan.Mode == "video" || family != nil || s.effects.On() {
+		caps = m.playback.CapabilitiesContext(s.ctx)
+		if s.ctx.Err() != nil {
+			return
+		}
+	}
+	plan = plan.withEffects(s.effects, caps.AudioFilters(), s.profile, inspected)
+	if family != nil {
+		family.sound = plan
+	}
 	m.mu.Lock()
 	s.family = family
 	s.sourceInfo = inspected
@@ -817,19 +832,14 @@ func (m *Sessions) run(s *session) {
 		m.fail(s, "storage_error")
 		return
 	}
-	var caps playback.Capabilities
-	if plan.Mode == "video" {
-		caps = m.playback.CapabilitiesContext(s.ctx)
-		if s.ctx.Err() != nil {
-			return
-		}
-		if plan.hdrType != "" && (plan.hdrType == "unknown" || !caps.CPUToneMap()) {
-			m.fail(s, "source_unsupported")
-			return
-		}
+	if plan.Mode == "video" && plan.hdrType != "" && (plan.hdrType == "unknown" || !caps.CPUToneMap()) {
+		m.fail(s, "source_unsupported")
+		return
 	}
+	// Only video mode encodes a picture; the capabilities read for the
+	// sound settings choose no encoder and probe none.
 	encoder := "libx264"
-	if !s.producer {
+	if !s.producer && plan.Mode == "video" {
 		encoder = selectLiveEncoder(s.ctx, m.opts.FFmpeg, caps, s.profile != nil)
 	}
 	step := playback.StepByID(s.view.Quality)

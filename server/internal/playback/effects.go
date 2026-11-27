@@ -215,15 +215,22 @@ func EffectsFilter(e AudioEffects, layout string, n, target int, f AudioFilters)
 	if !e.On() {
 		return "", nil
 	}
+	var chain, notes []string
 	if n <= 0 {
-		n = 2
+		// The source's channels aren't known (a broadcast that wasn't
+		// inspected): convert to the target's first, and work from that.
+		n = target
+		if n <= 0 {
+			n = 2
+		}
+		layout = targetLayout(n)
+		chain = append(chain, "aformat=channel_layouts="+layout)
 	}
 	if target <= 0 || target > n {
 		target = n
 	}
 	chans := sourceChannels(layout, n)
 	at := func(name string) int { return slices.Index(chans, name) }
-	var chain, notes []string
 	// down converts to the target's channels inside the chain, so that the
 	// compressor and the limiter work on what is sent.
 	down := func(from int) {

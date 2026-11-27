@@ -57,6 +57,9 @@ func TestEffectsFilter(t *testing.T) {
 		{"both", AudioEffects{Dialogue: EffectHigh, Loudness: EffectMedium}, "5.1", 6, 2,
 			"pan=stereo|c0=0.2*c0+0.65*c2+0.15*c4|c1=0.2*c1+0.65*c2+0.15*c5," + compM + "," + limiter},
 		{"both off", AudioEffects{}, "5.1", 6, 2, ""},
+		// A source whose channels aren't known is converted first.
+		{"unknown source to stereo", medium, "", 0, 2, "aformat=channel_layouts=stereo,dialoguenhance=original=1:enhance=2:voice=8,pan=stereo|c0=0.4*c0+0.6*c2|c1=0.4*c1+0.6*c2," + limiter},
+		{"unknown source to 5.1", loudM, "", 0, 6, "aformat=channel_layouts=5.1," + compM + "," + limiter},
 	} {
 		got, notes := EffectsFilter(c.effects, c.layout, c.n, c.to, AudioFilters{})
 		if got != c.want || len(notes) != 0 {

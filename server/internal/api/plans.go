@@ -55,14 +55,16 @@ func registerPlans(h huma.API, deps Deps) {
 			caps = deps.Playback.Capabilities()
 		}
 		// Version lists say what starting playback would do, which follows
-		// the person's audio languages (a remux for some files).
+		// the person's audio languages (a remux for some files) and their
+		// sound settings (the sound converted).
 		var audioLanguages []string
+		var effects playback.AudioEffects
 		if user, ok := auth.UserFrom(ctx); ok {
 			prefs, err := loadPreferences(ctx, deps, user.ID)
 			if err != nil {
 				return nil, err
 			}
-			audioLanguages = prefs.Audio.Languages
+			audioLanguages, effects = prefs.Audio.Languages, prefs.Audio.Effects()
 		}
 		out := &PlanOutput{Body: PlanList{Items: []PlaybackPlan{}}}
 		seen := map[int64]bool{}
@@ -90,7 +92,7 @@ func registerPlans(h huma.API, deps Deps) {
 				}
 				languages = tracks.audio
 			}
-			req, why := withPreferredAudio(playback.Request{Profile: in.Body.Profile}, info, languages)
+			req, why := withPreferredAudio(playback.Request{Profile: in.Body.Profile, Effects: effects}, info, languages)
 			d := playback.Decide(info, filepath.Ext(row.Path), req, sidecars, caps)
 			if why != "" {
 				d.Reasons = append(d.Reasons, why)

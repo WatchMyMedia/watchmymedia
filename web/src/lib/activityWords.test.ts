@@ -61,12 +61,15 @@ describe('decisions in words', () => {
     expect(reasonWords('3840x2160 exceeds the client\'s 1920x1080')).toBe('the picture is bigger than this device shows')
     expect(reasonWords('subtitle burn-in requested')).toBe('the subtitles are drawn into the picture')
     expect(reasonWords('something new')).toBe('something new')
+    expect(reasonWords('dialogue boosted (high)')).toBe('Boost dialogue is on (High)')
+    expect(reasonWords('loud sounds reduced (medium)')).toBe('Reduce loud sounds is on (Medium)')
   })
 
   it('says why a play is sent as it is', () => {
     expect(playDecision({ mode: 'direct', reasons: [], device: 'Living room TV' })).toEqual({ chip: 'Original quality', warn: false, why: 'Living room TV plays this file as it is.' })
     expect(playDecision({ mode: 'remux', reasons: [] }).why).toBe('Repackaged for this device; the picture and sound are untouched.')
     expect(playDecision({ mode: 'audio', reasons: ['client cannot decode dts audio'] }).why).toBe('Converting the sound: this device can’t play DTS sound.')
+    expect(playDecision({ mode: 'audio', reasons: ['dialogue boosted (medium)', 'loud sounds reduced (high)'] }).why).toBe('Converting the sound: Boost dialogue is on (Medium).')
     expect(playDecision({ mode: 'transcode', reasons: [], step: '720', network: 'remote' })).toEqual({ chip: 'Converting video', warn: true, why: 'Away from home, so the picture is sent smaller (720p).' })
     expect(playDecision({ mode: 'transcode', reasons: ['client cannot decode hevc video'], step: 'original' }).why).toBe('Converting the video: this device can’t play HEVC video.')
     expect(playDecision({ mode: 'transcode', reasons: ["1920x1080 exceeds the client's 0x720"], step: '720', quality: '720', network: 'local' }).why).toBe('Sent smaller (720p), as chosen in the player.')
@@ -75,6 +78,7 @@ describe('decisions in words', () => {
 
   it('says how a channel is sent', () => {
     expect(liveDecision({ mode: 'original', automatic: false, quality: '1080' }, false).why).toBe('The broadcast is passed on as it arrives.')
+    expect(liveDecision({ mode: 'audio', modeReason: 'sound_settings', automatic: false, quality: '1080' }, false).why).toBe('Converting the sound for Boost dialogue or Reduce loud sounds; the picture is passed on as it arrives.')
     expect(liveDecision({ mode: 'transcode', automatic: true, actualQuality: '720', quality: 'auto' }, true).why).toBe('Away from home, so the picture is sent smaller (720p).')
     expect(liveDecision({ mode: 'video', modeReason: 'deinterlace_required', automatic: false, quality: '1080' }, false).why).toBe('Converting the video: the channel sends an interlaced picture, which players can’t show smoothly.')
     expect(liveDecision({ mode: 'video', modeReason: 'resolution_limit', automatic: false, quality: '720', actualQuality: '720' }, false).why).toBe('Sent smaller (720p), as chosen in the player.')

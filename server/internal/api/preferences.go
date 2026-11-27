@@ -53,8 +53,8 @@ func DefaultPreferences() Preferences {
 		Skip:                  map[string]string{"intro": SkipAsk, "recap": SkipAsk, "credits": SkipAsk, "preview": SkipNone, "commercial": SkipAsk},
 		AutoplayNext:          true,
 		LiveTVReminderMinutes: defaultReminderMinutes,
-		Subtitles:             playback.SubtitlePreferences{Languages: []string{}, Mode: "forced"},
-		Audio:                 playback.AudioPreferences{Languages: []string{}},
+		Subtitles:             playback.SubtitlePreferences{Languages: []string{}, Mode: "forced", Size: "normal"},
+		Audio:                 playback.AudioPreferences{Languages: []string{}, DialogueBoost: playback.EffectOff, ReduceLoudSounds: playback.EffectOff},
 	}
 }
 
@@ -79,7 +79,9 @@ type UpdatePreferencesInput struct {
 }
 
 type UpdateAudioPreferences struct {
-	Languages *[]string `json:"languages,omitempty" maxItems:"16" doc:"Ordered BCP 47 languages. An empty list clears them. Saving languages for a person who never saved a subtitle mode also turns on subtitles.foreignAudio."`
+	Languages        *[]string `json:"languages,omitempty" maxItems:"16" doc:"Ordered BCP 47 languages. An empty list clears them. Saving languages for a person who never saved a subtitle mode also turns on subtitles.foreignAudio."`
+	DialogueBoost    *string   `json:"dialogueBoost,omitempty" required:"false" doc:"off, medium or high. From apiLevel 35; older servers reject it."`
+	ReduceLoudSounds *string   `json:"reduceLoudSounds,omitempty" required:"false" doc:"off, medium or high. From apiLevel 35; older servers reject it."`
 }
 
 type UpdateSubtitlePreferences struct {
@@ -87,6 +89,7 @@ type UpdateSubtitlePreferences struct {
 	Mode              *string   `json:"mode,omitempty" doc:"off, forced or on."`
 	ForeignAudio      *bool     `json:"foreignAudio,omitempty" required:"false" doc:"With mode forced, subtitles as on does when the audio isn't in the person's languages. From API level 21; older servers reject it."`
 	AutomaticDownload *bool     `json:"automaticDownload,omitempty" doc:"Allow exact-file automatic downloads, off by default."`
+	Size              *string   `json:"size,omitempty" required:"false" doc:"smaller, normal, larger or largest. From apiLevel 35; older servers reject it."`
 }
 
 func registerPreferences(h huma.API, deps Deps) {
@@ -170,6 +173,18 @@ func loadPreferences(ctx context.Context, deps Deps, userID int64) (Preferences,
 			if langs, ok := storedLanguages(r.Value); ok {
 				p.Audio.Languages = langs
 			}
+		case r.Key == "audio.dialogueBoost":
+			if playback.ValidEffect(r.Value) {
+				p.Audio.DialogueBoost = r.Value
+			}
+		case r.Key == "audio.reduceLoudSounds":
+			if playback.ValidEffect(r.Value) {
+				p.Audio.ReduceLoudSounds = r.Value
+			}
+		case r.Key == "subtitles.size":
+			if slices.Contains(playback.SubtitleSizes, r.Value) {
+				p.Subtitles.Size = r.Value
+			}
 		case len(r.Key) > 5 && r.Key[:5] == "skip." && skipModes[r.Value]:
 			if kind := r.Key[5:]; slices.Contains(SkipKinds, kind) {
 				p.Skip[kind] = r.Value
@@ -234,10 +249,21 @@ func validatePreferencePatch(in *UpdatePreferencesInput) error {
 				return err
 			}
 		}
+		if sub.Size != nil && !slices.Contains(playback.SubtitleSizes, *sub.Size) {
+			return huma.Error422UnprocessableEntity("subtitle size must be smaller, normal, larger or largest")
+		}
 	}
-	if audio := in.Body.Audio; audio != nil && audio.Languages != nil {
-		if _, err := canonicalLanguages(*audio.Languages, "audio"); err != nil {
-			return err
+	if audio := in.Body.Audio; audio != nil {
+		if audio.Languages != nil {
+			if _, err := canonicalLanguages(*audio.Languages, "audio"); err != nil {
+				return err
+			}
+		}
+		if audio.DialogueBoost != nil && !playback.ValidEffect(*audio.DialogueBoost) {
+			return huma.Error422UnprocessableEntity("dialogueBoost must be off, medium or high")
+		}
+		if audio.ReduceLoudSounds != nil && !playback.ValidEffect(*audio.ReduceLoudSounds) {
+			return huma.Error422UnprocessableEntity("reduceLoudSounds must be off, medium or high")
 		}
 	}
 	return nil
@@ -277,15 +303,26 @@ func savePreferencePatch(ctx context.Context, deps Deps, userID int64, in *Updat
 		if update.AutomaticDownload != nil {
 			changes["subtitles.automaticDownload"] = strconv.FormatBool(*update.AutomaticDownload)
 		}
+		if update.Size != nil {
+			changes["subtitles.size"] = *update.Size
+		}
 	}
 	addsAudioLanguages := false
-	if update := in.Body.Audio; update != nil && update.Languages != nil {
-		encoded, err := encodedLanguages(*update.Languages, "audio")
-		if err != nil {
-			return err
+	if update := in.Body.Audio; update != nil {
+		if update.Languages != nil {
+			encoded, err := encodedLanguages(*update.Languages, "audio")
+			if err != nil {
+				return err
+			}
+			changes["audio.languages"] = encoded
+			addsAudioLanguages = len(*update.Languages) > 0
 		}
-		changes["audio.languages"] = encoded
-		addsAudioLanguages = len(*update.Languages) > 0
+		if update.DialogueBoost != nil {
+			changes["audio.dialogueBoost"] = *update.DialogueBoost
+		}
+		if update.ReduceLoudSounds != nil {
+			changes["audio.reduceLoudSounds"] = *update.ReduceLoudSounds
+		}
 	}
 	if len(changes) == 0 {
 		return nil
