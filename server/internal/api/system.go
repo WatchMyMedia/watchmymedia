@@ -181,7 +181,17 @@ type HealthOutput struct {
 // than one server has: GET /movies?tmdbId= and /shows?tmdbId=
 // (findMoviesByTMDB, findShowsByTMDB), ContinueItem.tmdbId,
 // EpisodeCard.showTmdbId and SearchEpisode.showTmdbId.
-const APILevel = 34
+// 35: dialogue and subtitles. Preferences.audio.dialogueBoost and
+// .reduceLoudSounds (off, medium, high), which the server applies to the
+// sound of every play of the person's but downloads, converting sound it
+// would have copied (AudioPlan.effects says what it applied, and Live TV
+// follows them); Preferences.subtitles.size (smaller, normal, larger,
+// largest), which the apps apply. Subtitle timing per person and track:
+// PUT and DELETE /files/{id}/subtitles/{track}/timing (setSubtitleTiming,
+// deleteSubtitleTiming), with everyone for admins, and
+// SubtitleTrack.timingMs, .timingShared and .timingApplied, the last for a
+// track burned in with its timing.
+const APILevel = 35
 
 // ServerInfo identifies the server to apps before anyone signs in.
 type ServerInfo struct {

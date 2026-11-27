@@ -27,6 +27,25 @@ channel above, stereo when the quality pick is under 4 Mbps. PCM is copied only 
 direct play of Matroska. A device that passes Dolby through but takes fewer channels of PCM (a
 soundbar over ARC, a Cast TV) says so with `maxPcmChannels`, so it gets E-AC-3 5.1.
 
+### Boost dialogue and Reduce loud sounds
+
+Each person can turn on Boost dialogue and Reduce loud sounds (Off, Medium or High) in
+Settings › Audio & subtitles or in the player. The server applies them, so they work the same
+in every app, on Cast and on Live TV. While either is on, the server converts the sound of
+that person's plays even when it could have been copied: the picture is still copied where it
+can be, surround stays surround (E-AC-3 5.1 where the device takes it), and lossless sound,
+Dolby Atmos and passthrough of the film's own track come back once both are Off. Downloads
+keep the film's own sound. Changing one while watching reloads the play at the same place.
+
+Boost dialogue favours the centre channel, where films put dialogue: down to stereo with
+more of it, or kept in surround with the centre raised against the rest; a stereo film's
+dialogue is found with ffmpeg's `dialoguenhance`, and mono gets a lift in the speech band.
+Reduce loud sounds compresses loud passages towards the level of speech, across all channels
+together so a surround mix keeps its balance. A limiter keeps every peak under −1 dBFS. Both
+add nothing noticeable to the start of a play. An ffmpeg older than 5.1 has no
+`dialoguenhance`, so stereo films then get a gentler boost; the play's reasons on the
+Activity page say when a filter was missing.
+
 ## Buffers and temporary storage
 
 Event HLS prepares about 32 seconds at a time and resumes near the prepared edge as
@@ -284,7 +303,15 @@ languages and subtitle languages in order, and how subtitles start: Off, Forced 
 in my languages, or On. A video starts on the best audio track in the first audio language it
 has (never a commentary or audio description), otherwise on the file’s default; someone who
 adds audio languages without having chosen how subtitles start gets subtitles for audio they
-don’t follow. Automatic download is off until that person enables it with On or When the
+don’t follow. Subtitle size (Smaller, Normal, Larger, Largest) is each person's too, and each
+app draws its subtitles at it; subtitles drawn with their own styles (ASS) and those burned
+into the picture keep theirs. Subtitle timing moves a track's subtitles earlier or later for a
+file whose subtitles are out of step, in steps of 0.1 s and up to a minute either way. It is
+saved for that person, for that track of that file, so their other devices play it in step;
+an admin can also save it for everyone who plays the file, and a person's own timing still
+wins for them. Subtitles the server burns into the picture (image tracks) get the timing in
+the conversion, so changing it restarts the play there. When a file is replaced by another
+(its size changes), the timings saved for it no longer apply. Automatic download is off until that person enables it with On or When the
 audio isn’t in my languages, and a subtitle language; it looks for an exact-file match after
 video starts. A player choice, including Off, always wins. Without online subtitles or allowance, video continues
 and local tracks stay available. The browser’s shared provider account and download
