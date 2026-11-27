@@ -2,6 +2,7 @@ import type { components } from '../../src/api/schema'
 import { FakePlayer, type OpenOptions } from '../player'
 import { AIRED, CONTINUE, MOVIE_ITEMS, SHOW_ITEMS } from './data'
 import { FakeServer, problem } from './server'
+import { effects, withTiming } from './dialogue'
 
 // The player's side of the fictional server, and a simulated stream for
 // the browser preview, where the fake server has no media a <video> could
@@ -228,9 +229,10 @@ function decide(key: string, length: () => number, body: DecisionRequest | undef
   return {
     protocol: session ? 'hls' : 'file', mode: transcoding ? 'transcode' : 'direct', url, sessionId: session, playlist: session ? (extra.growing ? 'event' : 'vod') : undefined,
     playId: body?.playId ?? `play-${key}-${++plays}`, durationMs: length(), startMs: extra.growing ? 0 : body?.startMs ?? 0, resumeMs: 0, reasons: [],
-    audio: { copy: !transcoding, index: body?.audioIndex ?? 1, codec: transcoding ? 'aac' : 'eac3', channels: transcoding ? 2 : 6 },
+    // Boost dialogue or Reduce loud sounds on: the sound is converted, and the decision says with what.
+    audio: { copy: !transcoding && !effects(), index: body?.audioIndex ?? 1, codec: transcoding ? 'aac' : 'eac3', channels: transcoding ? 2 : 6, ...(effects() && { effects: effects() }) },
     video: { copy: !transcoding, codec: 'hevc', width, height, hdr: capped ? undefined : 'hdr10', toneMap: capped },
-    audioTracks: AUDIO, subtitles, subtitleId, burnIn: burn, segments: [], creditsMs: 0, upNextMs: 0, watchedAtMs: Math.round(length() * .9),
+    audioTracks: AUDIO, subtitles: subtitles.map((s) => withTiming(Number(key.split(':')[1]) || 0, s, s.id === burn?.id)), subtitleId, burnIn: burn, segments: [], creditsMs: 0, upNextMs: 0, watchedAtMs: Math.round(length() * .9),
     mediaToken: { token: 'fake-media', param: 'access_token', expiresAt: at(Date.now() + 4 * 60 * MIN) },
     ...(quality === 'auto' && { auto: { step: step as NonNullable<Decision['auto']>['step'], reason: capped ? 'slow' : 'start' } }),
     ...extra,

@@ -34,7 +34,8 @@ function modelOf(s: FilePlaybackState) {
   return {
     phase: s.phase, request: s.request, title: s.title, stream: s.stream, mode: s.mode, video: s.video,
     audio: s.audio, quality: s.quality, note: s.note, trickplay: s.trickplay, recording: s.recording,
-    subtitles: { options: s.subtitles.options, selected: s.subtitles.selected, online: s.subtitles.online },
+    subtitles: { options: s.subtitles.options, selected: s.subtitles.selected, online: s.subtitles.online, timing: s.subtitles.timing },
+    sound: s.sound,
     skipId: s.skip?.segmentId,
     next: s.next && { episode: s.next.episode, heading: s.next.heading },
     askStillWatching: s.askStillWatching, adminStop: s.adminStop, error: s.error, failure: s.failure, exited: s.exited,
@@ -326,7 +327,7 @@ export function FilePlayer({ play, request, player, source }: { play: PlayReques
   }
 
   return <div className="pl" onFocus={onFocus} onBlur={onBlur}>
-    <Cues playback={playback} raised={chromeVisible || overlay === 'next'}/>
+    <Cues playback={playback} raised={chromeVisible || overlay === 'next'} beside={overlay === 'panel' && panel === 'tracks'}/>
     {chromeVisible && <PlayerChrome playback={playback} model={model} actions={actions}/>}
     {(overlay === 'panel' || overlay === 'still' || overlay === 'message' || starting) && <>
       <div className="pl-shade pl-shade--top"/>

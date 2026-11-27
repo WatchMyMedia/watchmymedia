@@ -1,4 +1,5 @@
 import { qualityById, saveQuality, savedQuality } from '../../../src/lib/quality'
+import { preferencesQuery } from '../../../src/api/queries'
 import type { PlayRequest } from '../../app/routes'
 import { localSettings } from '../../app/localSettings'
 import { platform } from '../../platform/current'
@@ -7,6 +8,7 @@ import type { ActiveSession } from '../../session/active'
 import type { Source } from '../../session/peerRegistry'
 import type { PlaybackMedia } from '../../app/playbackErrors'
 import { episodeLine, type PlayerKind } from './labels'
+import { playerSubtitleSize } from '../../session/subtitleSizeMove'
 
 /** What the player route asks for, as the engine's request; undefined for what this player can't play (a trailer with no file). */
 export function fileRequest(play: PlayRequest): FileRequest | undefined {
@@ -73,6 +75,8 @@ export class PlayerSession {
   readonly controller: FilePlayback
   private preferences?: Preferences
   private quality: string
+  /** The current server's level, whose preferences hold the person's subtitle size. */
+  private readonly sizeLevel: number | undefined
   private settingsMemo?: { preferences?: Preferences; size: string; quality: string; value: PlaybackSettings }
   private headings = new Map<string, Heading>()
   private unsubscribe: () => void
@@ -86,6 +90,7 @@ export class PlayerSession {
     const peer = source?.peer
     const level = peer ? peer.apiLevel ?? session.server.apiLevel : session.server.apiLevel
     this.quality = savedQuality(level).id
+    this.sizeLevel = session.server.apiLevel
     this.controller = new FilePlayback({
       api: peer ? peer.api : session.api,
       player,
@@ -95,6 +100,11 @@ export class PlayerSession {
       settings: () => this.settings(),
       stillWatching: stillWatchingFor(session),
       saveQuality: (id) => { this.quality = id; saveQuality(qualityById(id, level)) },
+      apiLevel: level,
+      // Save for everyone is the current server's admin's; another server's copy plays without it.
+      admin: !peer && session.isAdmin,
+      // A sound setting changed in the player: the current server's preferences, as Settings shows them.
+      onPreferences: (p) => { if (!peer) session.queryClient.setQueryData(preferencesQuery.queryKey, p) },
     })
     // The next episode's words, kept before it plays, for when it does.
     this.unsubscribe = this.controller.subscribe(() => {
@@ -104,9 +114,9 @@ export class PlayerSession {
     })
   }
 
-  /** Read at each play and as it goes: the account's skip, autoplay and subtitle settings, the TV's quality and subtitle size. */
+  /** Read at each play and as it goes: the account's skip, autoplay and subtitle settings and size (the TV's own below API level 35), the TV's quality. */
   private settings(): PlaybackSettings {
-    const size = localSettings().subtitleSize
+    const size = playerSubtitleSize(this.sizeLevel, this.preferences, localSettings().subtitleSize)
     const m = this.settingsMemo
     if (m && m.preferences === this.preferences && m.size === size && m.quality === this.quality) return m.value
     const value = playbackSettings(this.preferences, { quality: this.quality, subtitleSize: size, hdr10: platform.takesHdr10() })

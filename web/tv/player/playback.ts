@@ -10,6 +10,10 @@ import { call, PlayerError, safeMessage, type ClientInfo, type Decision, type De
 import { PlaybackFailure, uhd, type Player, type PlayerFailure, type PlayerState, type PlayerUpdate } from './player'
 import { systemClock, type Clock } from './clock'
 import type { Cue } from '../../src/lib/play/vtt'
+import { cueTime } from '../../src/lib/play/cues'
+import { SubtitleTiming, type TimingTarget, type TimingView } from '../../src/lib/play/subtitleTiming'
+import { subtitleTimingSaver } from '../../src/api/subtitleTiming'
+import { SOUND_LEVEL, soundLevel, type SoundLevel, type SoundSetting } from '../../src/lib/sound'
 import { audioWords, automaticStepNote, episodeWords, onlineWords, SLOW_CONNECTION_NOTE, STOPPED_BY_ADMIN, streamPill, SUBTITLE_FAILED_NOTE, AUTOMATIC_SUBTITLE_FAILED, subtitleWords, videoWords, type OptionWords } from './labels'
 import { Scrub, SEND_AFTER_MS, seekStepLabel } from './seek'
 import { STUCK_MESSAGE, StuckWatch } from './stuck'
@@ -80,6 +84,12 @@ export type PlaybackContext = {
   clock?: Clock
   fetchText?: (url: string) => Promise<string>
   loadImage?: (url: string) => Promise<void>
+  /** The deciding server's API level: from 35 the player offers the sound settings and subtitle timing. */
+  apiLevel?: number
+  /** The person is that server's admin: Save for everyone. */
+  admin?: boolean
+  /** A sound setting saved from the player: the server's reply, for the app's copy of the preferences. */
+  onPreferences?: (preferences: Preferences) => void
 }
 
 export type FilePhase = 'idle' | 'loading' | 'buffering' | 'playing' | 'paused' | 'ended' | 'error'
@@ -88,6 +98,21 @@ export type FilePhase = 'idle' | 'loading' | 'buffering' | 'playing' | 'paused' 
 export type AudioOption = OptionWords & { index: number; channels?: number; title?: string }
 export type SubtitleOption = OptionWords & { id: string; language?: string; burnIn: boolean; source?: string; forced?: boolean; hearingImpaired?: boolean }
 export type OnlineOption = OptionWords & { id: string; trackId?: string }
+
+/**
+ * Boost dialogue and Reduce loud sounds as this play has them (API level
+ * 35): what the server applied, or while a change reloads the play, the new
+ * value and `busy` (the setting, and where the play carries on from); after
+ * a change that couldn't be saved, `failed` and what it stayed at.
+ */
+export type SoundState = {
+  dialogueBoost: SoundLevel
+  reduceLoudSounds: SoundLevel
+  busy?: SoundSetting
+  busyFromMs?: number
+  failed?: SoundSetting
+  stayed?: SoundLevel
+}
 
 export type FilePlaybackState = {
   phase: FilePhase
@@ -115,7 +140,11 @@ export type FilePlaybackState = {
     /** Showing now, at size px. */
     cues: readonly Cue[]
     size: SubtitleSize
+    /** The timing of the track that is on (API level 35, a file's text or burned-in track). */
+    timing?: TimingView
   }
+  /** The sound settings, from API level 35. */
+  sound?: SoundState
   quality: { id: string; options: readonly { id: string; label: string }[]; autoStep?: string }
   note?: string
   skip?: { segmentId: number; kind: string; label: string; progress?: number }
@@ -216,6 +245,9 @@ class Viewing {
   parkedAtMs?: number
   thumbnails?: Thumbnails
   cueTimer?: unknown
+  /** A sound setting being changed: saved, then the play reloads here. */
+  soundBusy?: { setting: SoundSetting; level: SoundLevel; fromMs: number; saved: boolean }
+  soundFailed?: { setting: SoundSetting; stayed: SoundLevel }
   readonly meter = new StallMeter()
   readonly subtitles: AutomaticSubtitles<SubtitleTrack>
   constructor(readonly request: FileRequest, readonly generation: number, readonly quality: { id: string }, automatic: (playId: string, cancel?: boolean) => Promise<{ track?: SubtitleTrack; error?: string }>) {
@@ -250,6 +282,7 @@ export class FilePlayback {
   private readonly scrub = new Scrub()
   private sendTimer?: unknown
   private readonly cues: CueTracks
+  private readonly timing: SubtitleTiming
   private ticker?: unknown
   private lastTick = 0
   private unlisten?: () => void
@@ -266,6 +299,13 @@ export class FilePlayback {
     this.clock = ctx.clock ?? systemClock
     this.tokens = new MediaTokenClock(this.clock)
     this.cues = new CueTracks(ctx.fetchText ?? fetchCueText, () => this.refresh(0), (key) => this.cueFailed(key))
+    this.timing = new SubtitleTiming({
+      saver: subtitleTimingSaver(() => this.ctx.api),
+      admin: !!ctx.admin,
+      timers: { setTimeout: (fn, ms) => this.clock.setTimeout(fn, ms), clearTimeout: (h) => this.clock.clearTimeout(h) },
+      onChange: () => this.refresh(0),
+      onBurnedSaved: (target) => this.burnedTimingSaved(target),
+    })
   }
 
   // ------------------------------------------------------------ commands
@@ -410,10 +450,51 @@ export class FilePlayback {
     v.subtitles.choose(id ?? '')
     if (id === v.subtitleId) { this.refresh(0); return }
     v.subtitleId = id
+    this.trackTiming(v)
     if (burnsIn(track)) this.reload(v, { subtitleId: id, burnIn: true })
     else if (d.burnIn) this.reload(v, { subtitleId: id, burnIn: false })
     else this.refresh(0)
   }
+
+  /**
+   * Boost dialogue or Reduce loud sounds, from the player: saved for the
+   * person, then the play reloads where it is, as a quality change does, and
+   * the server converts the sound with it. A save that fails leaves the
+   * setting and the play as they were.
+   */
+  changeSound(setting: SoundSetting, level: SoundLevel) {
+    this.noteInput()
+    const v = this.active()
+    if (!v?.decision || !this.soundOn() || v.soundBusy) return
+    const stayed = this.soundOf(v)[setting]
+    v.soundFailed = undefined
+    if (level === stayed) { this.refresh(0); return }
+    v.soundBusy = { setting, level, fromMs: this.position(v), saved: false }
+    this.refresh(0)
+    void call<Preferences>((signal) => this.ctx.api.PUT('/api/me/preferences', { body: { audio: { [setting]: level } }, signal })).then((preferences) => {
+      if (this.viewing !== v || v.stopped || !v.soundBusy) return
+      this.ctx.onPreferences?.(preferences)
+      v.soundBusy = { ...v.soundBusy, saved: true }
+      this.reload(v)
+    }, () => {
+      if (this.viewing !== v || v.stopped) return
+      v.soundBusy = undefined
+      v.soundFailed = { setting, stayed }
+      this.refresh(0)
+    })
+  }
+
+  /** Subtitle timing, 0.1 s a press: -1 earlier, 1 later. The cues move at once; it is saved a second after the last press. */
+  stepTiming(by: 1 | -1) { this.noteInput(); this.timing.step(by) }
+
+  /** Back to the timing saved for everyone, else in step. */
+  resetTiming() { this.noteInput(); this.timing.reset() }
+
+  /** An admin's Save for everyone. */
+  shareTiming() { this.noteInput(); this.timing.share() }
+
+  /** Try again after a timing couldn't be saved. */
+  retryTiming() { this.noteInput(); this.timing.retry() }
 
   /** Downloads an OpenSubtitles result and turns it on. */
   downloadSubtitle(resultId: string) {
@@ -507,6 +588,7 @@ export class FilePlayback {
     const done = this.stop()
     this.released = true
     this.cues.close()
+    this.timing.close()
     return done
   }
 
@@ -687,6 +769,7 @@ export class FilePlayback {
     v.paused = paused
     v.playerState = 'buffering'
     v.playerDurationMs = 0
+    this.trackTiming(v)
     this.refresh(0)
     try {
       const latest = latestMs !== undefined && start === requestedMs ? { latestMs: latestMs - offset } : {}
@@ -897,6 +980,52 @@ export class FilePlayback {
     this.refresh(0)
   }
 
+  private soundOn(): boolean {
+    return (this.ctx.apiLevel ?? 0) >= SOUND_LEVEL
+  }
+
+  /** The sound as the server applied it to this play's decision, or the value a change is reloading with. */
+  private soundOf(v: Viewing): Record<SoundSetting, SoundLevel> {
+    const fx = v.decision?.audio.effects
+    const sound = { dialogueBoost: soundLevel(fx?.dialogue), reduceLoudSounds: soundLevel(fx?.loudness) }
+    if (v.soundBusy) sound[v.soundBusy.setting] = v.soundBusy.level
+    return sound
+  }
+
+  private soundState(v: Viewing): SoundState | undefined {
+    if (!this.soundOn()) return undefined
+    return {
+      ...this.soundOf(v),
+      ...(v.soundBusy && { busy: v.soundBusy.setting, busyFromMs: v.soundBusy.fromMs }),
+      ...(v.soundFailed && { failed: v.soundFailed.setting, stayed: v.soundFailed.stayed }),
+    }
+  }
+
+  /** The track a timing is for: one that is on, of a file (a recording has none), on a server from API level 35. */
+  private timedTrack(v: Viewing): { fileId: number; track: SubtitleTrack } | undefined {
+    const track = v.subtitleId === undefined ? undefined : v.decision?.subtitles.find((s) => s.id === v.subtitleId)
+    if (!track || v.request.kind === 'recording' || !this.soundOn()) return undefined
+    return { fileId: v.request.fileId, track }
+  }
+
+  private timingShown(v: Viewing): boolean {
+    return !!this.timedTrack(v)
+  }
+
+  /** The timing follows the track that is on. */
+  private trackTiming(v: Viewing) {
+    const on = this.timedTrack(v)
+    if (!on) { this.timing.track(undefined, undefined); return }
+    this.timing.track({ fileId: on.fileId, trackId: on.track.id }, on.track, burnsIn(on.track) || v.decision?.burnIn?.id === on.track.id)
+  }
+
+  /** A burned-in track's timing was saved: the server burns it in again from here. */
+  private burnedTimingSaved(target: TimingTarget) {
+    const v = this.active()
+    if (!v?.decision || v.request.kind === 'recording' || v.request.fileId !== target.fileId || v.subtitleId !== target.trackId) return
+    this.reload(v, { subtitleId: target.trackId, burnIn: true })
+  }
+
   private cueFailed(key: string) {
     const v = this.active()
     const track = v?.decision?.subtitles.find((s) => s.url && trackKey(s.url) === key)
@@ -1053,6 +1182,8 @@ export class FilePlayback {
     const waiting: FilePhase = v.everPlayed ? 'buffering' : 'loading'
     const phase: FilePhase = v.error ? 'error' : replacing ? waiting : ps === 'ended' ? 'ended' : v.paused || ps === 'paused' ? 'paused' : ps === 'buffering' ? waiting : ps === 'playing' ? 'playing' : waiting
     const ended = phase === 'ended'
+    // A sound change has settled once its reload plays (or stopped short).
+    if (v.soundBusy?.saved && !v.loading && (phase === 'playing' || phase === 'paused' || phase === 'error' || ended)) v.soundBusy = undefined
     if (phase === 'playing' && v.recoveries > 0 && now - v.recoveredAt >= RECOVERY_RESET_MS) v.recoveries = 0
     if (phase === 'playing' && v.unsticks > 0 && now - v.unstuckAt >= RECOVERY_RESET_MS) v.unsticks = 0
     // Should be moving: the viewer wants it playing, it has played, and nothing is loading or has failed.
@@ -1096,7 +1227,9 @@ export class FilePlayback {
       mode: d.mode,
       video: videoWords(d.video),
       audio: { options: v.audioOptions, selected: v.audioIndex },
-      subtitles: { options: v.subtitleOptions, selected: v.subtitleId, automatic: v.subtitles.intent.automatic, online: v.online, cues, size: settings.subtitleSize },
+      subtitles: { options: v.subtitleOptions, selected: v.subtitleId, automatic: v.subtitles.intent.automatic, online: v.online, cues, size: settings.subtitleSize,
+        timing: this.timingShown(v) ? this.timing.view() : undefined },
+      sound: this.soundState(v),
       skip,
       next: showNext && next ? { episode: next, heading: episodeWords(next), countdownMs: v.countdownMs, seconds: v.countdownMs === undefined ? undefined : Math.ceil(v.countdownMs / 1000) } : undefined,
       scrub: scrub && { ...scrub, step: seekStepLabel(scrub.stepMs), thumbnail: v.thumbnails?.at(scrub.targetMs) },
@@ -1124,7 +1257,8 @@ export class FilePlayback {
     this.clock.clearTimeout(v.cueTimer)
     const track = v.subtitleId === undefined ? undefined : d.subtitles.find((s) => s.id === v.subtitleId)
     if (!track?.url || burnsIn(track) || d.burnIn) return IDLE.subtitles.cues
-    const t = pos - timelineOffset(d) * 1000
+    const timing = this.timing.view()
+    const t = cueTime(pos - timelineOffset(d) * 1000, timing && !timing.burned ? timing.ms : 0)
     const { cues, next } = this.cues.at(track.url, (url) => this.sign(url), t)
     if (phase === 'playing' && next - t < TICK_MS) v.cueTimer = this.clock.setTimeout(() => this.refresh(0), Math.max(10, next - t))
     return cues
