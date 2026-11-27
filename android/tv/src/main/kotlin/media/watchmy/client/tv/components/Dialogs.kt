@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -136,6 +137,8 @@ fun <T> OptionsDialog(
     context: String? = null,
     /** A small heading over the title: the list the item is from ("Shows you follow"). */
     kicker: String? = null,
+    /** The option focus is on, as it moves: a preview follows it (Subtitle size's). */
+    onFocus: ((T) -> Unit)? = null,
 ) {
     val focus = remember { FocusRequester() }
     TvDialog(onDismiss) {
@@ -153,7 +156,8 @@ fun <T> OptionsDialog(
                         description = description?.invoke(option),
                         selected = option == selected,
                         onClick = { onSelect(option) },
-                        modifier = if (i == selectedIndex) Modifier.focusRequester(focus) else Modifier,
+                        modifier = (if (i == selectedIndex) Modifier.focusRequester(focus) else Modifier)
+                            .then(if (onFocus != null) Modifier.onFocusChanged { if (it.isFocused) onFocus(option) } else Modifier),
                     )
                 }
             }

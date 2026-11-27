@@ -45,7 +45,12 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import androidx.media3.common.text.Cue
 import androidx.media3.common.text.CueGroup
+import androidx.compose.runtime.collectAsState
+import media.watchmy.client.model.ServerFeatures
+import media.watchmy.client.model.SubtitleSize
+import media.watchmy.client.model.subtitleSizeFor
 import media.watchmy.client.ui.Inter
+import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.WmmColors
 
 /**
@@ -57,8 +62,8 @@ import media.watchmy.client.ui.WmmColors
  * italics and underlines are kept. A cue that spans HLS segments comes in
  * each of them and Media3 keeps every copy, so a line shows once. Image
  * subtitles never reach here: the server burns them in. [look] is the
- * players' own unless a setting changes it (the TV's Subtitle size, the
- * phone's caption settings). media3-ui-compose has no subtitle view yet,
+ * players' own unless a setting changes it (the person's Subtitle size, on
+ * top of the phone's caption settings; [CaptionLook.at]). media3-ui-compose has no subtitle view yet,
  * hence this one.
  */
 @Composable
@@ -148,6 +153,22 @@ data class CaptionLook(
     companion object {
         val Default = CaptionLook()
     }
+}
+
+/** This look at the person's [size], on top of the scale it has (the system's caption size, where it follows it). */
+fun CaptionLook.at(size: SubtitleSize): CaptionLook = if (size == SubtitleSize.Normal) this else copy(scale = scale * size.scale)
+
+/**
+ * The size this device's players draw text subtitles at ([subtitleSizeFor]):
+ * [play]'s own, else the person's where the server in use keeps one, else
+ * [deviceOwn].
+ */
+@Composable
+fun playerSubtitleSize(play: SubtitleSize?, deviceOwn: SubtitleSize = SubtitleSize.Normal): SubtitleSize {
+    val services = LocalAppServices.current
+    val preferences by services.preferences.playback.collectAsState()
+    val server by services.servers.current.collectAsState()
+    return subtitleSizeFor(play, preferences.subtitles.size, ServerFeatures(server?.server?.apiLevel ?: 0).subtitleSize, deviceOwn)
 }
 
 /** The text's edge, as the system's caption styles name them. */

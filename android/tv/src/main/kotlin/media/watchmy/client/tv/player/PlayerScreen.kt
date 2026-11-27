@@ -65,6 +65,8 @@ import media.watchmy.client.ui.LocalAppServices
 import media.watchmy.client.ui.components.Artwork
 import media.watchmy.client.ui.components.CaptionLook
 import media.watchmy.client.ui.components.SubtitleCues
+import media.watchmy.client.ui.components.at
+import media.watchmy.client.ui.components.playerSubtitleSize
 import media.watchmy.client.ui.playerKey
 
 /**
@@ -659,7 +661,8 @@ private fun VideoLayer(controller: PlaybackController, state: PlayerUiState, ima
             sidePadding = 160.dp,
             bottomPadding = if (raisedSubtitles) 270.dp else 72.dp,
             topPadding = 72.dp,
-            look = CaptionLook(scale = device.subtitleSize.scale),
+            // The person's size where the server keeps one (or the size of a play cast here); the TV's own before that.
+            look = CaptionLook.Default.at(playerSubtitleSize(state.subtitleSize, deviceOwn = device.subtitleSize)),
         )
     } else {
         Artwork(imageUrl(state.backdropPath, ImageSize.W1280), seed = state.title.ifEmpty { "player" }, contentDescription = null, modifier = Modifier.fillMaxSize())

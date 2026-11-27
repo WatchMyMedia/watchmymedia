@@ -83,6 +83,14 @@ const val SUBTITLE_SIZE_MOVED = "Subtitle size is in Audio & subtitles now, the 
 fun subtitleSizeMovedFrom(size: SubtitleSize): String =
     "Subtitle size is in Audio & subtitles now. This TV’s ${size.label} size became yours on all your devices."
 
+/**
+ * The size a player draws text subtitles at: [play]'s own (one a phone cast
+ * here), else the person's where the server keeps one ([personal]), else
+ * the device's own (a TV's, for older servers; phones have none).
+ */
+fun subtitleSizeFor(play: SubtitleSize?, person: SubtitleSize, personal: Boolean, device: SubtitleSize = SubtitleSize.Normal): SubtitleSize =
+    play ?: if (personal) person else device
+
 /** A press of Earlier or Later. */
 const val TIMING_STEP_MS = 100L
 

@@ -82,6 +82,8 @@ import media.watchmy.client.ui.TabletLayout
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.Artwork
 import media.watchmy.client.ui.components.SubtitleCues
+import media.watchmy.client.ui.components.at
+import media.watchmy.client.ui.components.playerSubtitleSize
 import media.watchmy.client.ui.components.rememberSystemCaptionLook
 import media.watchmy.client.ui.rememberTabletLayout
 
@@ -374,8 +376,8 @@ private fun PlayerContent(controller: PlaybackController, selection: PlayerSelec
                                 else -> 24.dp
                             },
                             topPadding = if (inPip) 6.dp else 24.dp,
-                            // The system's caption size and style (Accessibility settings).
-                            look = rememberSystemCaptionLook(),
+                            // The system's caption size and style (Accessibility settings), at the person's size.
+                            look = rememberSystemCaptionLook().at(playerSubtitleSize(state.subtitleSize)),
                         )
                     }
                 }
