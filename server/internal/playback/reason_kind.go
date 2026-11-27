@@ -42,9 +42,14 @@ var reasonShapes = []struct{ shape, kind string }{
 }
 
 // reasonNotes say what a conversion did, not why there was one: the play
-// counts under its other reasons.
+// counts under its other reasons. The person's sound settings are notes
+// too: they are a choice, not something the device lacks.
 var reasonNotes = []string{
 	"audio converted to ",
+	"dialogue boosted",
+	"loud sounds reduced",
+	"loud sounds not reduced",
+	"sound settings not applied",
 	"the server cannot convert Dolby Vision",
 	" failed, so the transcode runs in software",
 }

@@ -113,6 +113,10 @@ type Request struct {
 	// Download is an offline download's decision, which never converts to
 	// FLAC: a download is kept on the device.
 	Download bool `json:"-"`
+	// Effects are the person's Boost dialogue and Reduce loud sounds, from
+	// their preferences. A download keeps the film's own sound: it ignores
+	// them.
+	Effects AudioEffects `json:"-"`
 }
 
 // Start is where the request asks to start, 0 when it doesn't say.
@@ -192,7 +196,28 @@ type AudioPlan struct {
 	Channels int    `json:"channels,omitempty"`
 	// Bitrate is a converted track's encoder rate (for FLAC an estimate),
 	// which the stream's bitrate and declared bandwidth count.
-	Bitrate int64 `json:"-"`
+	Bitrate int64        `json:"-"`
+	Effects AudioEffects `json:"effects,omitzero" required:"false" doc:"Boost dialogue and Reduce loud sounds as the server applied them to this converted track, from the person's preferences; absent when neither is on or the track is copied. From apiLevel 35."`
+	// The converted track's source, which the effects' filters are built
+	// from, and the filters ffmpeg has; set only with effects.
+	sourceLayout   string
+	sourceChannels int
+	filters        AudioFilters
+}
+
+// AsAAC is the same track converted to AAC at channels, keeping its
+// effects: what an adaptive family's shared audio is.
+func (p AudioPlan) AsAAC(channels int) AudioPlan {
+	return AudioPlan{Index: p.Index, Codec: "aac", Channels: channels, Effects: p.Effects, sourceLayout: p.sourceLayout, sourceChannels: p.sourceChannels, filters: p.filters}
+}
+
+// effectsFilter is the plan's -af chain, empty without effects.
+func (p AudioPlan) effectsFilter() string {
+	if p.Copy || !p.Effects.On() {
+		return ""
+	}
+	chain, _ := EffectsFilter(p.Effects, p.sourceLayout, p.sourceChannels, p.Channels, p.filters)
+	return chain
 }
 
 // Decision is the chosen mode and everything the player needs.
@@ -612,6 +637,19 @@ func Decide(info *probe.MediaInfo, ext string, req Request, sidecars []Sidecar, 
 		}
 	}
 
+	// The person's sound settings convert a track that could have been
+	// copied: the picture is still copied where it could be (mode audio).
+	// A download keeps the film's own sound.
+	var effects AudioEffects
+	if audio != nil && !req.Download {
+		var effectNotes []string
+		effects, effectNotes = req.Effects.Within(caps.audio)
+		d.Reasons = append(d.Reasons, effectNotes...)
+		if effects.On() {
+			audioOK = false
+		}
+	}
+
 	// --- mode ---
 	containerOK := has(p.Containers, containerOf(ext))
 	if req.AudioIndex != nil && audio != nil && len(info.Audio) > 1 && containerOK && !p.SelectsAudioTrack {
@@ -700,7 +738,14 @@ func Decide(info *probe.MediaInfo, ext string, req Request, sidecars []Sidecar, 
 	}
 	switch {
 	case !d.Audio.Copy && audio != nil:
-		d.Audio = audioTarget(*audio, p, d.Video.Copy, req.Download)
+		// While an effect is on the track is never FLAC: the film's lossless
+		// sound comes back when both are off.
+		d.Audio = audioTarget(*audio, p, d.Video.Copy, req.Download || effects.On())
+		if effects.On() {
+			d.Audio.Effects, d.Audio.sourceLayout, d.Audio.sourceChannels, d.Audio.filters = effects, audio.ChannelLayout, audio.Channels, caps.audio
+			_, notes := EffectsFilter(effects, audio.ChannelLayout, audio.Channels, d.Audio.Channels, caps.audio)
+			d.Reasons = append(append(d.Reasons, effects.Reasons()...), notes...)
+		}
 		if why := audioReason(d.Audio); why != "" {
 			d.Reasons = append(d.Reasons, why)
 		}

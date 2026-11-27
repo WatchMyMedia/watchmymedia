@@ -246,8 +246,9 @@ type capsKey struct {
 
 // Revision 2 invalidates detections made by the old encoder-only 4K test;
 // revision 3 those that timed ffmpeg's start-up with the 4K frames;
-// revision 4 those made before VAAPI had a GPU pipeline to prove.
-const hardwareProbeRevision = 4
+// revision 4 those made before VAAPI had a GPU pipeline to prove;
+// revision 5 those made before the sound filters were listed.
+const hardwareProbeRevision = 5
 
 func capsKeyForDevice(ctx context.Context, ffmpeg, pref string, device *int) capsKey {
 	path, err := exec.LookPath(ffmpeg)
@@ -283,6 +284,7 @@ type capsFile struct {
 	ZScale      bool                 `json:"zscale"`
 	GPUToneMap  bool                 `json:"gpuToneMap"`
 	DoviStrip   bool                 `json:"doviStrip"`
+	Audio       AudioFilters         `json:"audioFilters"`
 	Diagnostics []HardwareDiagnostic `json:"diagnostics,omitempty"`
 }
 
@@ -299,7 +301,7 @@ func loadCaps(file string, key capsKey) (Capabilities, bool) {
 		return Capabilities{}, false
 	}
 	c := f.Caps
-	c.zscale, c.gpuToneMap, c.doviStrip = f.ZScale, f.GPUToneMap, f.DoviStrip
+	c.zscale, c.gpuToneMap, c.doviStrip, c.audio = f.ZScale, f.GPUToneMap, f.DoviStrip, f.Audio
 	c.Diagnostics = f.Diagnostics
 	if c.Encoders == nil {
 		c.Encoders = []string{}
@@ -311,7 +313,7 @@ func storeCaps(file string, key capsKey, c Capabilities) {
 	if file == "" || key == (capsKey{}) {
 		return
 	}
-	b, err := json.Marshal(capsFile{Key: key, Caps: c, ZScale: c.zscale, GPUToneMap: c.gpuToneMap, DoviStrip: c.doviStrip, Diagnostics: c.Diagnostics})
+	b, err := json.Marshal(capsFile{Key: key, Caps: c, ZScale: c.zscale, GPUToneMap: c.gpuToneMap, DoviStrip: c.doviStrip, Audio: c.audio, Diagnostics: c.Diagnostics})
 	if err != nil {
 		return
 	}
