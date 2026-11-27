@@ -11,8 +11,26 @@ const val SUBTITLE_PREFERENCES_API_LEVEL = 18
  */
 const val AUDIO_LANGUAGES_API_LEVEL = 21
 
-/** The person's audio languages, in order; empty plays each file's default track. */
-data class AudioPreferences(val languages: List<String> = emptyList())
+/**
+ * The person's audio languages, in order (empty plays each file's default
+ * track), and their two sound settings, Off from servers before
+ * [SOUND_API_LEVEL].
+ */
+data class AudioPreferences(
+    val languages: List<String> = emptyList(),
+    val dialogueBoost: SoundLevel = SoundLevel.Off,
+    val reduceLoudSounds: SoundLevel = SoundLevel.Off,
+) {
+    fun level(setting: SoundSetting): SoundLevel = when (setting) {
+        SoundSetting.DialogueBoost -> dialogueBoost
+        SoundSetting.ReduceLoudSounds -> reduceLoudSounds
+    }
+
+    fun with(setting: SoundSetting, level: SoundLevel): AudioPreferences = when (setting) {
+        SoundSetting.DialogueBoost -> copy(dialogueBoost = level)
+        SoundSetting.ReduceLoudSounds -> copy(reduceLoudSounds = level)
+    }
+}
 
 data class SubtitlePreferences(
     val languages: List<String> = emptyList(),
@@ -24,6 +42,8 @@ data class SubtitlePreferences(
      * released apps read it as Forced only and leave it alone when they save.
      */
     val foreignAudio: Boolean = false,
+    /** How big subtitles are drawn on every device of the person's; Normal from servers before [SOUND_API_LEVEL]. */
+    val size: SubtitleSize = SubtitleSize.Normal,
 ) {
     /** How subtitles start, as the settings pages offer it. */
     val choice: SubtitleChoice

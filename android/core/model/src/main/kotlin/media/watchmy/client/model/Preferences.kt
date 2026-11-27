@@ -69,12 +69,23 @@ enum class AudioPassthrough(val label: String, val description: String) {
     Off("Off", "Stereo or surround as PCM"),
 }
 
-/** The TV's subtitle size; [scale] is against Normal (22, 28, 34 and 42 px). */
-enum class SubtitleSize(val label: String, val scale: Float) {
-    Smaller("Smaller", 22f / 28f),
-    Normal("Normal", 1f),
-    Larger("Larger", 34f / 28f),
-    Largest("Largest", 42f / 28f),
+/**
+ * How big text subtitles are drawn: the person's, from [SOUND_API_LEVEL]
+ * ([SubtitlePreferences.size], [id] as the server keeps it), and a TV's own
+ * before that ([DevicePlayback.subtitleSize]). [scale] is against Normal (the
+ * TVs' 22, 28, 34 and 42 px); each player multiplies its own cue size by it.
+ */
+enum class SubtitleSize(val id: String, val label: String, val scale: Float) {
+    Smaller("smaller", "Smaller", 22f / 28f),
+    Normal("normal", "Normal", 1f),
+    Larger("larger", "Larger", 34f / 28f),
+    Largest("largest", "Largest", 42f / 28f),
+    ;
+
+    companion object {
+        /** The size [id] names; Normal for none or one this app doesn't know. */
+        fun byId(id: String?): SubtitleSize = entries.firstOrNull { it.id == id } ?: Normal
+    }
 }
 
 /**
@@ -88,7 +99,11 @@ data class DevicePlayback(
     val matchFrameRate: Boolean = false,
     /** TV: how Dolby and DTS audio leave the device. */
     val audioPassthrough: AudioPassthrough = AudioPassthrough.Auto,
-    /** TV: how big text subtitles are drawn. */
+    /**
+     * TV: how big text subtitles are drawn, kept on the TV for servers
+     * before [SOUND_API_LEVEL]; from it the person's size is used
+     * ([SubtitlePreferences.size]).
+     */
     val subtitleSize: SubtitleSize = SubtitleSize.Normal,
 )
 
@@ -144,5 +159,22 @@ interface PreferencesRepository {
 
     suspend fun setAudioPassthrough(mode: AudioPassthrough)
 
+    /** This TV's own subtitle size ([DevicePlayback.subtitleSize]), for servers before [SOUND_API_LEVEL]. */
     suspend fun setSubtitleSize(size: SubtitleSize)
+
+    /**
+     * Saves Boost dialogue or Reduce loud sounds for the person (from
+     * [SOUND_API_LEVEL]); only that field goes to the server. Their later
+     * plays get it from the server, which applies it when it decides.
+     */
+    suspend fun setSound(setting: SoundSetting, level: SoundLevel) {
+        throw ApiException(503, "Update the server to change the sound.")
+    }
+
+    /**
+     * This TV's own subtitle size, written up once to a person who has
+     * none saved, on the first start against a server at [SOUND_API_LEVEL].
+     * True when it was sent: Playback says the size became theirs.
+     */
+    suspend fun moveSubtitleSizeUp(): Boolean = false
 }

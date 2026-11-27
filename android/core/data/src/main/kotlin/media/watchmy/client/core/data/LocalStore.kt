@@ -53,6 +53,11 @@ internal data class StoredSubtitlePreferences(
     val automaticDownload: Boolean,
     val foreignAudio: Boolean = false,
     val audioLanguages: List<String> = emptyList(),
+    /** [media.watchmy.client.model.SubtitleSize]'s id; null for Normal. */
+    val size: String? = null,
+    /** [media.watchmy.client.model.SoundLevel]'s id; null for Off. */
+    val dialogueBoost: String? = null,
+    val reduceLoudSounds: String? = null,
 )
 
 @Serializable
@@ -72,6 +77,11 @@ internal data class StoredServer(
     val showMissing: List<Long> = emptyList(),
     /** Last acknowledged subtitle settings, for a cold offline start by this account/endpoint. */
     val subtitlePreferences: StoredSubtitlePreferences? = null,
+    /**
+     * The people (user ids) this TV has offered its own subtitle size to,
+     * once each, on this server: written up to one with no size saved.
+     */
+    val subtitleSizeOffered: List<Long> = emptyList(),
     /**
      * The people (user ids) who turned new-episode notifications off on this
      * device for this server: the switch is kept

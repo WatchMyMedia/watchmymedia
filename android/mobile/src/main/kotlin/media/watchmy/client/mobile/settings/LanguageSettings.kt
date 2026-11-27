@@ -5,9 +5,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -36,26 +38,40 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.util.Locale
+import media.watchmy.client.mobile.components.ChoiceSegments
 import media.watchmy.client.mobile.components.GoldTextButton
 import media.watchmy.client.mobile.components.ListRow
 import media.watchmy.client.mobile.components.RowValue
 import media.watchmy.client.mobile.components.TonalButton
 import media.watchmy.client.model.ON_EVERY_DEVICE
 import media.watchmy.client.model.SaveFailure
+import media.watchmy.client.model.SOUND_HEADING
+import media.watchmy.client.model.SOUND_NOTE
+import media.watchmy.client.model.SUBTITLE_SIZE_FOLLOWS_DEVICE
+import media.watchmy.client.model.SUBTITLE_SIZE_PICTURE_NOTE
+import media.watchmy.client.model.SoundLevel
+import media.watchmy.client.model.SoundSetting
 import media.watchmy.client.model.SubtitleChoice
+import media.watchmy.client.model.SubtitleSize
 import media.watchmy.client.model.listLine
 import media.watchmy.client.model.subtitleLanguageLabel
 import media.watchmy.client.model.subtitleLanguageOptions
@@ -64,6 +80,7 @@ import media.watchmy.client.presentation.settings.SettingsViewModel
 import media.watchmy.client.ui.Inter
 import media.watchmy.client.ui.WmmColors
 import media.watchmy.client.ui.components.WmmIcons
+import media.watchmy.client.ui.components.rememberSystemCaptionLook
 import media.watchmy.client.presentation.settings.LanguageList
 
 private val Heading = TextStyle(fontFamily = Inter, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, color = WmmColors.Text)
@@ -108,20 +125,37 @@ internal fun LanguageSettings(tablet: Boolean, online: Boolean, modifier: Modifi
     val onlineSection: @Composable ColumnScope.() -> Unit = {
         OnlineSubtitles(state, tablet, ready, save(SettingKey.AutomaticSubtitles), onRetry = { vm.retry(SettingKey.AutomaticSubtitles) }, vm::setAutomaticSubtitles)
     }
+    // Servers that apply the person's sound and keep their subtitle size.
+    val sound = state.soundAvailable && audio
+    val soundSection: @Composable ColumnScope.() -> Unit = {
+        Sound(state.playback.audio.dialogueBoost, state.playback.audio.reduceLoudSounds, tablet, ready, { save(SettingKey.Sound(it)) }, onRetry = { vm.retry(SettingKey.Sound(it)) }, onPick = vm::setSound)
+    }
+    val sizeSection: @Composable ColumnScope.() -> Unit = {
+        SubtitleSizeSection(state.playback.subtitles.size, tablet, ready, save(SettingKey.AccountSubtitleSize), onRetry = { vm.retry(SettingKey.AccountSubtitleSize) }, onPick = vm::setAccountSubtitleSize)
+    }
 
     Column(modifier) {
         AccountLoadCard(state, online, tablet, onRetry = vm::reloadAccount, held = "your audio and subtitle settings can’t be changed yet.")
         PageHeading(ON_EVERY_DEVICE, tablet)
         AccountRows(ready) {
-            if (tablet) {
+            if (tablet && sound) {
+                // Two by two, in the page's order: each language list beside what follows it.
+                Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    PanelRow(audioSection, soundSection)
+                    PanelRow(startSection, subtitleSection)
+                    PanelRow(sizeSection, onlineSection)
+                }
+            } else if (tablet) {
                 Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     PanelRow(if (audio) audioSection else startSection, if (audio) startSection else onlineSection)
                     PanelRow(subtitleSection, if (audio) onlineSection else null)
                 }
             } else {
                 if (audio) Column(content = audioSection)
+                if (sound) Column(content = soundSection)
                 Column(content = startSection)
                 Column(content = subtitleSection)
+                if (sound) Column(content = sizeSection)
                 Column(content = onlineSection)
             }
         }
@@ -383,6 +417,124 @@ private fun ColumnScope.OnlineSubtitles(state: SettingsViewModel.State, tablet: 
     Footnote("When subtitles would start and no local track matches, try one exact-file match from OpenSubtitles.com after the video starts. Uses the server’s download allowance.", tablet)
     if (!available) Footnote(state.automaticBlockedNote, tablet, color = WmmColors.TextSoft)
 }
+
+/**
+ * Sound: Boost dialogue and Reduce loud sounds, Off, Medium or High in
+ * segmented buttons, each with its line, saved as it changes with Saving…
+ * and its failure under it; the note on what they do beneath.
+ */
+@Composable
+private fun ColumnScope.Sound(
+    dialogue: SoundLevel,
+    loud: SoundLevel,
+    tablet: Boolean,
+    enabled: Boolean,
+    save: (SoundSetting) -> SaveLine,
+    onRetry: (SoundSetting) -> Unit,
+    onPick: (SoundSetting, SoundLevel) -> Unit,
+) {
+    Head(SOUND_HEADING, null, tablet)
+    if (tablet) Spacer(8)
+    Rows(tablet) {
+        SoundChoice(SoundSetting.DialogueBoost, dialogue, tablet, enabled, save(SoundSetting.DialogueBoost), onRetry, onPick)
+        if (tablet) Box(Modifier.padding(horizontal = 12.dp).fillMaxWidth().height(1.dp).background(WmmColors.Line))
+        SoundChoice(SoundSetting.ReduceLoudSounds, loud, tablet, enabled, save(SoundSetting.ReduceLoudSounds), onRetry, onPick)
+    }
+    Footnote(SOUND_NOTE, tablet)
+}
+
+@Composable
+private fun SoundChoice(
+    setting: SoundSetting,
+    level: SoundLevel,
+    tablet: Boolean,
+    enabled: Boolean,
+    save: SaveLine,
+    onRetry: (SoundSetting) -> Unit,
+    onPick: (SoundSetting, SoundLevel) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = if (tablet) 12.dp else 16.dp, vertical = if (tablet) 10.dp else 8.dp)) {
+        Text(setting.label, style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = if (tablet) 15.sp else 16.sp, lineHeight = if (tablet) 20.sp else 22.sp, color = WmmColors.Text))
+        Text(setting.help, style = Description.copy(fontSize = if (tablet) 12.sp else 13.sp, lineHeight = if (tablet) 17.sp else 19.sp), modifier = Modifier.padding(top = 2.dp))
+        ChoiceSegments(
+            SoundLevel.entries, level, label = { it.label }, onPick = { onPick(setting, it) }, name = setting.label,
+            modifier = Modifier.padding(top = 10.dp), enabled = enabled,
+        )
+        if (save.saving) SavingLine(Modifier.padding(top = 8.dp))
+    }
+    RowFailure(save.failure, level.label) { onRetry(setting) }
+}
+
+/**
+ * Subtitle size: a preview of a cue at the chosen size (on top of the
+ * system's caption size, as the players draw it) over the four sizes, saved
+ * as it changes.
+ */
+@Composable
+private fun ColumnScope.SubtitleSizeSection(
+    size: SubtitleSize,
+    tablet: Boolean,
+    enabled: Boolean,
+    save: SaveLine,
+    onRetry: () -> Unit,
+    onPick: (SubtitleSize) -> Unit,
+) {
+    Head("Subtitle size", null, tablet)
+    if (tablet) Spacer(8)
+    Rows(tablet) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = if (tablet) 12.dp else 16.dp, vertical = if (tablet) 8.dp else 0.dp)) {
+            SubtitleSizePreview(size, Modifier.padding(top = if (tablet) 0.dp else 10.dp).height(if (tablet) 150.dp else 168.dp))
+            ChoiceSegments(
+                SubtitleSize.entries, size, label = { it.label }, onPick = onPick, name = "Subtitle size",
+                modifier = Modifier.padding(top = if (tablet) 10.dp else 14.dp), enabled = enabled,
+            )
+            if (save.saving) SavingLine(Modifier.padding(top = 8.dp))
+        }
+        RowFailure(save.failure, size.label, onRetry)
+    }
+    Text(SUBTITLE_SIZE_FOLLOWS_DEVICE, style = Description, modifier = Modifier.padding(horizontal = if (tablet) 4.dp else 16.dp).padding(top = 8.dp))
+    Footnote(SUBTITLE_SIZE_PICTURE_NOTE, tablet)
+}
+
+/** A harbour at dusk with a two-line cue on its plate, drawn as the players draw it at [size]. */
+@Composable
+private fun SubtitleSizePreview(chosen: SubtitleSize, modifier: Modifier = Modifier) {
+    val look = rememberSystemCaptionLook()
+    val px = 18f * look.scale * chosen.scale
+    Box(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(PreviewScene)
+            .drawBehind {
+                drawRect(Brush.radialGradient(listOf(PreviewGlow, Color.Transparent), center = Offset(size.width * 0.64f, size.height * 0.38f), radius = size.width * 0.5f))
+            }
+            .semantics { contentDescription = "Preview: a subtitle at ${chosen.label} size" },
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Text(
+            "Who left the lamp on\nin the signal box?",
+            style = TextStyle(fontFamily = Inter, fontWeight = FontWeight.Medium, fontSize = px.sp, lineHeight = (px * 1.25f).sp, color = WmmColors.Text, textAlign = TextAlign.Center),
+            modifier = Modifier
+                .padding(start = 16.dp, end = 16.dp, bottom = 14.dp)
+                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
+                .padding(horizontal = (px * 0.32f).dp, vertical = (px * 0.09f).dp)
+                .clearAndSetSemantics {},
+        )
+    }
+}
+
+/** The preview's harbour at dusk, and its lamp's glow. */
+private val PreviewScene = Brush.verticalGradient(
+    0f to Color(0xFF0C1A22),
+    0.46f to Color(0xFF1B3542),
+    0.48f to Color(0xFF0A1216),
+    1f to Color(0xFF06090B),
+)
+private val PreviewGlow = Color(0xFFFFCD78).copy(alpha = 0.18f)
+
+@Composable
+private fun Spacer(height: Int) = androidx.compose.foundation.layout.Spacer(Modifier.height(height.dp))
 
 /** The phone's Start subtitles dialog: the four choices, each with its line. */
 @Composable

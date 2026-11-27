@@ -48,6 +48,8 @@ internal class OfflinePlaybackGateway(
 
     override fun bind(): PlaybackGateway = OfflinePlaybackGateway(online.bind(), plays, main)
 
+    override val savesForPerson: Boolean get() = online.savesForPerson
+
     override suspend fun decide(request: DecisionRequest): PlaybackDecision {
         val play = if (request.recordingId == null) withContext(main) { plays.offlinePlay(request.fileId) } else null
         playing = play
@@ -78,6 +80,12 @@ internal class OfflinePlaybackGateway(
     override suspend fun cancelAutomaticSubtitle(fileId: Long, playId: String) {
         if (playing == null) online.cancelAutomaticSubtitle(fileId, playId)
     }
+
+    // A play from the device keeps its timing for that play; one from the server saves it there.
+    override suspend fun setSubtitleTiming(fileId: Long, trackId: String, timingMs: Long, everyone: Boolean) =
+        online.setSubtitleTiming(fileId, trackId, timingMs, everyone)
+
+    override suspend fun resetSubtitleTiming(fileId: Long, trackId: String) = online.resetSubtitleTiming(fileId, trackId)
 
     companion object {
         /** The play ID of a play from the device; heartbeats need one, and it never reaches the server. */
