@@ -8,6 +8,6 @@ export { LivePlayback, channelNumberHint, editChannelNumber, exactChannel, tvLiv
 export { seekStepLabel } from './seek'
 export { SUBTITLE_PX, type SubtitleSize } from './subtitles'
 export type { Thumbnail } from './thumbnails'
-export type { Cue } from './vtt'
+export type { Cue } from '../../src/lib/play/vtt'
 export { StillWatchingSession } from '../../src/lib/stillWatching'
 export { codecWords } from './labels'
