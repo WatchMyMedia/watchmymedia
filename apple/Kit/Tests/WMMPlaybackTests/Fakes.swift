@@ -73,6 +73,15 @@ final class FakeGateway: PlaybackGateway {
     private var heldReports: [CheckedContinuation<Void, Never>] = []
     /// The order of every call, by kind: "decide", "token", "token answered", "decision answered".
     var calls: [String] = []
+    /// The server's API level, for what it offers.
+    var level: Int?
+    var features: ServerFeatures { ServerFeatures(apiLevel: level) }
+    /// Timings saved ("s3 400", "s3 400 everyone") and reset ("s3 reset"), in order.
+    var timingCalls: [String] = []
+    /// What the server answers a timing change with; throwing refuses it.
+    var timingAnswer: (_ trackID: String, _ timingMs: Int?, _ everyone: Bool) throws -> SavedTiming = { _, ms, everyone in
+        SavedTiming(timingMs: ms ?? 0, shared: everyone && (ms ?? 0) != 0)
+    }
 
     init(clock: TestClock) {
         self.clock = clock
@@ -136,6 +145,16 @@ final class FakeGateway: PlaybackGateway {
 
     func cancelAutomaticSubtitle(fileID: Int, playID: String) async throws {
         automaticCancellations.append((fileID, playID))
+    }
+
+    func setSubtitleTiming(fileID: Int, trackID: String, timingMs: Int, everyone: Bool) async throws -> SavedTiming {
+        timingCalls.append("\(trackID) \(timingMs)\(everyone ? " everyone" : "")")
+        return try timingAnswer(trackID, timingMs, everyone)
+    }
+
+    func deleteSubtitleTiming(fileID: Int, trackID: String) async throws -> SavedTiming {
+        timingCalls.append("\(trackID) reset")
+        return try timingAnswer(trackID, nil, false)
     }
 
     func subtitleText(_ url: URL) async throws -> String {
@@ -284,6 +303,24 @@ final class TestPreferences: PreferencesRepository {
     func setSkip(_ kind: SegmentKind, mode: SkipMode) async throws { playback.skip[kind] = mode }
 
     func setAutoplayNext(_ enabled: Bool) async throws { playback.autoplayNext = enabled }
+
+    /// Changes saved, in order; `languageFailure` refuses them, and
+    /// `languageSaving` runs before each answers (a test can hold it there).
+    var languageChanges: [LanguageChange] = []
+    var languageFailure: (any Error)?
+    var languageSaving: (@MainActor () async -> Void)?
+
+    /// Shows the change at once and puts it back when refused, as the real repository does.
+    func setLanguages(_ change: LanguageChange) async throws {
+        languageChanges.append(change)
+        let before = playback
+        change.apply(to: &playback)
+        await languageSaving?()
+        if let languageFailure {
+            playback = before
+            throw languageFailure
+        }
+    }
 
     func setQuality(_ quality: StreamQuality) { self.quality = quality }
 }
@@ -491,8 +528,10 @@ final class Harness {
     private var listening: Task<Void, Never>?
 
     /// - Parameter quality: the device's saved quality, which the controller reads as it is made.
-    init(preferences: PlaybackPreferences = PlaybackPreferences(), quality: StreamQuality = .original, lookups: any PlaybackLookups = NoLookups(), servers: (any ServerRepository)? = nil) {
+    init(preferences: PlaybackPreferences = PlaybackPreferences(), quality: StreamQuality = .original, lookups: any PlaybackLookups = NoLookups(), servers: (any ServerRepository)? = nil,
+         level: Int? = nil, admin: Bool = false) {
         gateway = FakeGateway(clock: clock)
+        gateway.level = level
         prefs = TestPreferences(preferences)
         prefs.quality = quality
         let player = FakeMediaPlayer(clock: clock)
@@ -508,7 +547,8 @@ final class Harness {
             system: system,
             lookups: lookups,
             servers: servers,
-            clock: clock
+            clock: clock,
+            viewerIsAdmin: { admin }
         )
         let events = controller.events
         listening = Task { [weak self] in

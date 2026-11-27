@@ -300,6 +300,30 @@ public final class TVPlayerModel {
         controller.downloadSubtitle(resultID)
     }
 
+    /// Boost dialogue or Reduce loud sounds: saved, then the play reloads
+    /// from where it is; the panel stays, the row busy until it settles.
+    public func setSound(_ setting: SoundSetting, to level: SoundLevel) {
+        controller.noteUserInput()
+        controller.setSound(setting, to: level)
+    }
+
+    /// Left (Earlier) or Right (Later) on the timing row, one step a press:
+    /// the cues under the panel move at once.
+    public func moveTiming(later: Bool) {
+        controller.noteUserInput()
+        controller.moveSubtitleTiming(byMs: later ? SubtitleTimingState.stepMs : -SubtitleTimingState.stepMs)
+    }
+
+    public func resetTiming() {
+        controller.noteUserInput()
+        controller.resetSubtitleTiming()
+    }
+
+    public func saveTimingForEveryone() {
+        controller.noteUserInput()
+        controller.saveSubtitleTimingForEveryone()
+    }
+
     // MARK: - Private
 
     /// Notes when the admin's stop message came, and where the video was.

@@ -107,6 +107,17 @@ private struct TVHarness {
         #expect(h.spy.calls.last == "noteSeek 70000")
     }
 
+    @Test func soundAndTimingApplyAtOnceAndCountAsInput() {
+        let h = TVHarness()
+        h.model.setSound(.reduceLoudSounds, to: .medium)
+        h.model.moveTiming(later: false)
+        h.model.moveTiming(later: true)
+        h.model.resetTiming()
+        h.model.saveTimingForEveryone()
+        #expect(h.spy.calls == ["start 9101", "sound reduceLoudSounds medium", "timing -100", "timing 100", "timing reset", "timing everyone"])
+        #expect(h.spy.inputs == 5)
+    }
+
     @Test func picksApplyAtOnce() {
         let h = TVHarness()
         h.model.pickAudio(2)
