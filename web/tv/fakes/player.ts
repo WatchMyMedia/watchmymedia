@@ -232,10 +232,12 @@ function decide(key: string, length: () => number, body: DecisionRequest | undef
     // Boost dialogue or Reduce loud sounds on: the sound is converted, and the decision says with what.
     audio: { copy: !transcoding && !effects(), index: body?.audioIndex ?? 1, codec: transcoding ? 'aac' : 'eac3', channels: transcoding ? 2 : 6, ...(effects() && { effects: effects() }) },
     video: { copy: !transcoding, codec: 'hevc', width, height, hdr: capped ? undefined : 'hdr10', toneMap: capped },
-    audioTracks: AUDIO, subtitles: subtitles.map((s) => withTiming(Number(key.split(':')[1]) || 0, s, s.id === burn?.id)), subtitleId, burnIn: burn, segments: [], creditsMs: 0, upNextMs: 0, watchedAtMs: Math.round(length() * .9),
+    audioTracks: AUDIO, subtitles, subtitleId, burnIn: burn, segments: [], creditsMs: 0, upNextMs: 0, watchedAtMs: Math.round(length() * .9),
     mediaToken: { token: 'fake-media', param: 'access_token', expiresAt: at(Date.now() + 4 * 60 * MIN) },
     ...(quality === 'auto' && { auto: { step: step as NonNullable<Decision['auto']>['step'], reason: capped ? 'slow' : 'start' } }),
     ...extra,
+    // Each track with the person's timing, or the one saved for everyone; a burned-in one's applied.
+    ...(key.startsWith('file:') && { subtitles: subtitles.map((s) => withTiming(Number(key.slice(5)), s, s.id === burn?.id)) }),
     ...(session && { url }),
   }
 }

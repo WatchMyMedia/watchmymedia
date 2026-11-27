@@ -122,7 +122,8 @@
 .pl-panel__heading:first-child { margin-top: 0; }
 .pl-panel__credit { margin-top: .5rem; padding: 0 1.625rem; font-size: var(--t-small); color: var(--muted); }
 .pl-panel__foot { font-size: var(--t-small); line-height: 1.4; color: var(--muted); }
-.pl-panel__keys { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.5rem; }
+.pl-panel__foot--steady { min-height: 5.5rem; }
+.pl-panel__keys { display: flex; align-content: flex-start; flex-wrap: wrap; align-items: center; gap: .75rem 1.5rem; }
 .pl-panel__keys > span { display: inline-flex; align-items: center; gap: .625rem; white-space: nowrap; }
 .pl-panel__focus { display: contents; }
 

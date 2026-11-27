@@ -9,7 +9,9 @@ import { LeftRun, remember, type FocusMemory } from './focusRules'
 //   data-scope="modal"   a dialog or side panel; focus stays inside it
 // Inside them:
 //   data-group="<id>"    remembers its last focused child: focus coming in
-//                        from outside goes back to it (rows remember their card)
+//                        from outside goes back to it (rows remember their card);
+//                        before it has one, to a child marked data-group-start
+//                        (a row of choices starts on the chosen one)
 //   data-row             a horizontal row: ◀ ▶ go card by card in order, and
 //                        a run of ◀ stops at the first card
 //   data-autofocus       where a screen's focus starts when it has no memory
@@ -266,6 +268,6 @@ export class FocusEngine {
     const id = group?.dataset.group
     if (!group || !id || group.contains(from)) return undefined
     const last = this.memory?.groups[id]
-    return last ? this.find(last, group) : undefined
+    return (last ? this.find(last, group) : undefined) ?? group.querySelector<HTMLElement>('[data-group-start]') ?? undefined
   }
 }

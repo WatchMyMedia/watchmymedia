@@ -1,4 +1,6 @@
-import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useFocus } from '../../app/hooks'
+import { pointerShown } from '../../app/pointer'
 import { SHARE_DONE, SHARE_HELP, SHARE_LABEL, TIMING_BURNED, TIMING_FAILED, TIMING_HELP, TIMING_SHARED, type TimingView } from '../../../src/lib/play/subtitleTiming'
 import { SOUND_LEVELS, SOUND_NOTE, SOUND_ROWS } from '../../../src/lib/sound'
 import type { FilePlayback, SoundState } from '../../player'
@@ -30,7 +32,7 @@ export function SoundRows({ sound, playback }: { sound: SoundState; playback: Fi
         {line.kind === 'help' && <p className="pl-sound__help">{line.text}</p>}
         <div className="pl-sound__chips">
           <Chips id={`${SOUND_ROW}${row.id}`} label={row.label} options={SOUND_LEVELS.map((l) => ({ value: l.id, label: l.label }))} value={sound[row.id]}
-            onChange={(level) => playback.changeSound(row.id, level)}/>
+            onChange={(level) => playback.changeSound(row.id, level)} startOnChosen/>
         </div>
       </div>
     })}
@@ -51,7 +53,12 @@ function useHoldRepeat(step: () => void) {
   const every = Math.max(100, platform.repeatMs)
   const again = () => { latest.current(); timer.current = setTimeout(again, every) }
   return {
-    onPointerDown: (e: ReactPointerEvent) => { e.preventDefault(); stop(); latest.current(); timer.current = setTimeout(again, 400) },
+    onPointerDown: (e: ReactPointerEvent) => {
+      e.preventDefault()
+      // Held, it keeps stepping even if the list moves under the pointer.
+      try { e.currentTarget.setPointerCapture(e.pointerId) } catch { /* not a pointer that captures */ }
+      stop(); latest.current(); timer.current = setTimeout(again, 400)
+    },
     onPointerUp: stop, onPointerLeave: stop, onPointerCancel: stop,
     // The press already stepped; the click it ends with does nothing more.
     onClick: (e: { stopPropagation(): void }) => e.stopPropagation(),
@@ -60,11 +67,31 @@ function useHoldRepeat(step: () => void) {
 
 /** Subtitle timing, while a track is on. The cues move as it is pressed, beside the open panel. */
 export function TimingRows({ timing, playback }: { timing: TimingView; playback: FilePlayback }) {
+  const focus = useFocus()
   const earlier = useHoldRepeat(() => playback.stepTiming(-1))
   const later = useHoldRepeat(() => playback.stepTiming(1))
   const failed = timing.status === 'failed'
   const shared = timing.status === 'shared'
-  return <>
+  // Save for everyone stays where it is while it saves, so focus stays on it.
+  const [sharing, setSharing] = useState(false)
+  if (sharing && timing.status !== 'saving') setSharing(false)
+  const reset = () => {
+    playback.resetTiming()
+    // Reset goes once it has done its work: focus goes back to the timing.
+    focus.focusId(TIMING_ROW, focus.scope('modal'))
+  }
+  const share = () => { if (shared) return; setSharing(true); playback.shareTiming() }
+  // Rows come and go under the timing as it changes (Reset, Save for everyone, a failure):
+  // the list scrolls again so the section stays in sight round the row with focus.
+  const section = useRef<HTMLDivElement>(null)
+  const shape = [timing.canReset, timing.canShare || shared || sharing, failed, timing.burned].join()
+  // Not under a pointer that shows: what it points at stays where it is.
+  useLayoutEffect(() => {
+    const active = document.activeElement
+    if (active && !pointerShown() && section.current?.contains(active)) active.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+  }, [shape])
+  // One section for the list's scroll: whichever of its rows has focus, the lines under the timing show too.
+  return <div ref={section} data-vitem>
     <Heading>Subtitle timing</Heading>
     <div className="pl-timing" role="group" aria-label={`Subtitle timing, ${timing.words}`} tabIndex={-1} data-focus={TIMING_ROW}
       onClick={() => { if (failed) playback.retryTiming() }}>
@@ -78,19 +105,20 @@ export function TimingRows({ timing, playback }: { timing: TimingView; playback:
     {timing.burned && <p className="pl-timing__burned">{TIMING_BURNED}</p>}
     {failed ? <p className="pl-timing__help pl-timing__help--error" role="alert">{TIMING_FAILED} Press OK to try again.</p>
       : <p className="pl-timing__help">{TIMING_HELP}</p>}
-    {timing.canReset && <Option id="timing/reset" label="Reset" detail={resetDetail(timing.resetTo)} onPress={() => playback.resetTiming()}/>}
-    {(timing.canShare || shared) && <Option id="timing/everyone" label={shared ? SHARE_DONE : SHARE_LABEL} detail={SHARE_HELP}
-      end={shared ? <span className="pl-timing__done"><Icon name="check"/></span> : undefined} onPress={() => { if (!shared) playback.shareTiming() }}/>}
-  </>
+    {timing.canReset && <Option id="timing/reset" label="Reset" detail={resetDetail(timing.resetTo)} onPress={reset}/>}
+    {(timing.canShare || shared || sharing) && <Option id="timing/everyone" label={shared ? SHARE_DONE : SHARE_LABEL} detail={SHARE_HELP}
+      end={shared ? <span className="pl-timing__done"><Icon name="check"/></span> : undefined} onPress={share}/>}
+  </div>
 }
 
 /** The panel's foot: the keys of the row focused, in words on a remote that points. */
 export function PanelFoot({ focused, timingFailed }: { focused: string | undefined; timingFailed: boolean }) {
   const foot = panelFoot(focused)
   const said = platform.pointer ? pointerFoot(foot, BACK) : undefined
-  if (foot === 'sentence' || said) return <p className="pl-panel__foot">{said ?? `A choice applies straight away. ${BACK} closes this.`}</p>
+  // Two lines' room whichever it says, so the list above never shrinks as focus moves.
+  if (foot === 'sentence' || said) return <p className="pl-panel__foot pl-panel__foot--steady">{said ?? `A choice applies straight away. ${BACK} closes this.`}</p>
   const kbd = (k: string) => <span className="tv-kbd">{k}</span>
-  return <p className="pl-panel__foot pl-panel__keys">
+  return <p className="pl-panel__foot pl-panel__foot--steady pl-panel__keys">
     {foot === 'timing' ? <>
       <span>{kbd('◀')}Earlier</span><span>{kbd('▶')}Later</span><span>Hold to repeat</span>
       {timingFailed && <span>{kbd('OK')}Try again</span>}
