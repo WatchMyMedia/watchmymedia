@@ -318,11 +318,12 @@ func (s *Subtitles) convert(input, charset string, outs []output, low bool) erro
 	return nil
 }
 
-// ShiftSubtitle moves every cue of a WebVTT or ASS track ms earlier,
-// dropping cues that end before zero: an event playlist's time starts at
-// the session's start, while tracks are in file time.
+// ShiftSubtitle moves every cue of a WebVTT or ASS track ms earlier, or
+// for a negative ms later, dropping cues that end before zero: an event
+// playlist's time starts at the session's start, while tracks are in file
+// time; and a burned-in track is drawn at the person's timing.
 func ShiftSubtitle(data []byte, format string, ms int64) []byte {
-	if ms <= 0 {
+	if ms == 0 {
 		return data
 	}
 	if format == "ass" {
@@ -344,6 +345,35 @@ func ShiftSubtitle(data []byte, format string, ms int64) []byte {
 		b.WriteString("\n" + c.text + "\n\n")
 	}
 	return []byte(b.String())
+}
+
+// Shifted writes data, a track in format, with its cues timingMs later (or
+// earlier) into the cache, for a session to burn in, and returns the file.
+// key names the track; the file is written again only when its content
+// changes, so a session that restarts finds the same file.
+func (s *Subtitles) Shifted(key string, data []byte, format string, timingMs int64) (string, error) {
+	if err := os.MkdirAll(s.dir, 0o700); err != nil {
+		return "", err
+	}
+	path := filepath.Join(s.dir, fmt.Sprintf("%s.t%d.%s", key, timingMs, ext(format)))
+	shifted := ShiftSubtitle(data, format, -timingMs)
+	if old, err := readSubtitle(path); err == nil && bytes.Equal(old, shifted) {
+		return path, nil
+	}
+	tmp, err := os.CreateTemp(s.dir, filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return "", err
+	}
+	_, werr := tmp.Write(shifted)
+	if cerr := tmp.Close(); werr != nil || cerr != nil {
+		_ = os.Remove(tmp.Name())
+		return "", errors.Join(werr, cerr)
+	}
+	if err := os.Rename(tmp.Name(), path); err != nil {
+		_ = os.Remove(tmp.Name())
+		return "", err
+	}
+	return path, nil
 }
 
 // shiftASS moves the Start and End of each Dialogue line (H:MM:SS.cc).

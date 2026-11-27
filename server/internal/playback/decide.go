@@ -164,6 +164,10 @@ type SubtitleTrack struct {
 	Source          string `json:"source" enum:"embedded,sidecar,opensubtitles" required:"false"`
 	Release         string `json:"release,omitempty" doc:"A download's release name."`
 	HearingImpaired bool   `json:"hearingImpaired" required:"false"`
+	// The saved timing, which the app applies where it draws the cues.
+	TimingMs      int64 `json:"timingMs,omitempty" required:"false" doc:"The person's saved timing for this track, in milliseconds: positive shows each cue later, negative earlier, absent for none. Their own timing, else the one an admin saved for everyone (timingShared). Saved with PUT /api/files/{id}/subtitles/{track}/timing. From apiLevel 35."`
+	TimingShared  bool  `json:"timingShared,omitempty" required:"false" doc:"timingMs is the one an admin saved for everyone who plays the file, not the person's own (API level 35)."`
+	TimingApplied bool  `json:"timingApplied,omitempty" required:"false" doc:"The server burned this track into the picture with timingMs already applied: the app shows it as it comes. A change of timing needs a new decision (API level 35)."`
 }
 
 type VideoPlan struct {

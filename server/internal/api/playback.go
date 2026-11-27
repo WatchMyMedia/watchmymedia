@@ -360,6 +360,9 @@ func startFilePlayback(ctx context.Context, deps Deps, in *PlaybackInput) (*Play
 	if signedIn {
 		watch = watchForFile(ctx, deps, user, row)
 	}
+	if signedIn {
+		withSubtitleTimings(ctx, deps, user.ID, row, sidecars, &d)
+	}
 	encoder := ""
 	for i := range d.Subtitles {
 		t := &d.Subtitles[i]
@@ -385,6 +388,7 @@ func startFilePlayback(ctx context.Context, deps Deps, in *PlaybackInput) (*Play
 			return nil, huma.Error503ServiceUnavailable("transcoder not available")
 		}
 		spec := sessionSpec(row, user.ID, d, in.Body.Profile.MaxBitrate, sidecars)
+		withBurnInTiming(ctx, deps, row, sidecars, caps, &d, &spec)
 		spec.PreservePrevious = switchUpgrade
 		if continues != "" {
 			deps.Playback.StopPlay(continues, user.ID)

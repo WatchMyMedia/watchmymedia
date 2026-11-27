@@ -269,6 +269,7 @@ func New(deps Deps) (*chi.Mux, huma.API) {
 	registerWatchlists(h, deps)
 	registerPlayback(h, r, deps)
 	registerSubtitles(h, deps)
+	registerSubtitleTiming(h, deps)
 	registerPlans(h, deps)
 	registerActivity(h, deps)
 	registerSettings(h, r, deps)

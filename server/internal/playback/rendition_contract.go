@@ -86,6 +86,7 @@ func renditionContract(spec Spec) (string, error) {
 		BurnInImage        bool
 		BurnInSub          int
 		BurnInFile         string
+		BurnInTimingMs     int64
 		BurnInSize         int64
 		BurnInModifiedNs   int64
 		DurationMs         int64
@@ -107,7 +108,7 @@ func renditionContract(spec Spec) (string, error) {
 		Mode: spec.Mode, Video: spec.Video, KeepDV: spec.Video.KeepDV, StripDV: spec.Video.StripDV,
 		Deinterlace: spec.Video.Deinterlace, Audio: spec.Audio, AudioFilter: spec.Audio.effectsFilter(), MaxBitrate: spec.MaxBitrate,
 		BurnIn: spec.BurnIn, BurnInImage: spec.BurnInImage, BurnInSub: spec.BurnInSub, BurnInFile: spec.BurnInFile,
-		BurnInSize: burnInSize, BurnInModifiedNs: burnInModifiedNs,
+		BurnInTimingMs: spec.BurnInTimingMs, BurnInSize: burnInSize, BurnInModifiedNs: burnInModifiedNs,
 		DurationMs: spec.VOD.DurationMs, Keyframes: spec.VOD.Keyframes, FrameRate: spec.VOD.FrameRate,
 		ConstantFrameRate: spec.ReserveSlot && !spec.Video.Copy && spec.VOD.FrameRate > 0,
 		Bandwidth:         spec.VOD.Bandwidth, VideoRange: spec.VOD.VideoRange, Codecs: spec.VOD.Codecs,

@@ -62,6 +62,10 @@ type Spec struct {
 	BurnInSub int
 	// BurnInFile burns in a sidecar subtitle file instead.
 	BurnInFile string
+	// BurnInTimingMs shows an image subtitle that much later (negative:
+	// earlier), the person's saved timing. A text track's timing is in the
+	// shifted copy BurnInFile names.
+	BurnInTimingMs int64
 	// VOD, when set, makes a VOD session: one playlist for the whole file,
 	// with ffmpeg started wherever segments are wanted (see vod.go).
 	VOD *VODOptions
@@ -1101,16 +1105,30 @@ func (m *Manager) args(spec Spec, dir string) []string {
 	// the next. The overlay reads the subtitle from the file again, opened
 	// up to imageSubLookbackMs earlier and lined up with the first input,
 	// whose video and audio keep their timing.
+	//
+	// The person's timing moves that input too: -itsoffset shows each cue
+	// timing later, and the cue on screen at the run's start is the one
+	// from timing earlier, so the read starts that much earlier as well.
 	burnImage := !spec.Video.Copy && spec.BurnIn >= 0 && spec.BurnInImage && caps.Overlay
 	subInput := 0
-	if burnImage && spec.StartMs > 0 {
-		from := max(spec.StartMs-imageSubLookbackMs, 0)
-		if spec.VOD == nil {
+	timing := int64(0)
+	if burnImage {
+		timing = spec.BurnInTimingMs
+	}
+	if burnImage && (spec.StartMs > 0 || timing != 0) {
+		from := max(spec.StartMs-timing-imageSubLookbackMs, 0)
+		switch {
+		case spec.VOD == nil:
 			// Without -copyts an input's timestamps start at zero where it
 			// was seeked to: shift this one back to the first's, and keep
 			// what accurate seeking would trim from before zero.
-			a = append(a, "-noaccurate_seek", "-ss", ffexec.Seconds(from), "-itsoffset", ffexec.Seconds(from-spec.StartMs))
-		} else {
+			a = append(a, "-noaccurate_seek", "-ss", ffexec.Seconds(from), "-itsoffset", ffexec.Seconds(from-spec.StartMs+timing))
+		case timing != 0:
+			if from > 0 {
+				a = append(a, "-ss", ffexec.Seconds(from))
+			}
+			a = append(a, "-itsoffset", ffexec.Seconds(timing))
+		default:
 			a = append(a, "-ss", ffexec.Seconds(from))
 		}
 		a = append(a, "-i", spec.Path)
