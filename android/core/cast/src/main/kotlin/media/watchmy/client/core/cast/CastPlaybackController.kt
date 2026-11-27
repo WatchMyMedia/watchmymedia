@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import media.watchmy.client.model.ApiException
 import media.watchmy.client.model.AudioOption
 import media.watchmy.client.model.CastGateway
@@ -39,6 +40,14 @@ import media.watchmy.client.model.automaticStepNote
 import media.watchmy.client.model.playbackModeOf
 import media.watchmy.client.model.segmentKindOf
 import media.watchmy.client.model.skipLabel
+import media.watchmy.client.model.PlayerSound
+import media.watchmy.client.model.ServerFeatures
+import media.watchmy.client.model.SoundFailure
+import media.watchmy.client.model.SoundLevel
+import media.watchmy.client.model.SoundSetting
+import media.watchmy.client.model.SubtitleTimingState
+import media.watchmy.client.model.TIMING_SETTLE_MS
+import media.watchmy.client.model.TrackTiming
 
 /**
  * The TV's play as a remote: the receiver runs the play
@@ -92,6 +101,18 @@ class CastPlaybackController(
     /** Automatic's switch note while it shows, and what clears it. */
     private var note: String? = null
     private var noteJob: Job? = null
+
+    /** A sound row whose change is saved and with the TV, until it plays on with it ([soundJob]). */
+    private var soundBusy: SoundSetting? = null
+    private var soundFailure: SoundFailure? = null
+    private var soundJob: Job? = null
+
+    /** The TV's tracks' timings as moved from here, by file and track; the TV's own say until then. */
+    private val timings = HashMap<Pair<Long, String>, TrackTiming>()
+    private var timingSave: Job? = null
+    private var timingRetry: (() -> Unit)? = null
+
+    private val features: ServerFeatures get() = ServerFeatures(gateway.apiLevel())
 
     private val listener = object : SharedLink.Listener {
         override fun onStatus(status: ReceiverStatus) = onReceiverStatus(status)
@@ -170,6 +191,8 @@ class CastPlaybackController(
                     subtitleId = request.subtitleId,
                     subtitleMode = request.subtitleMode.id,
                     quality = preferences.quality.value.id,
+                    // The TV draws the person's size, as this phone would.
+                    subtitleSize = preferences.playback.value.subtitles.size.id.takeIf { features.subtitleSize },
                 )
                 l.load(LoadRequest(request.fileId, request.title, request.subtitle, data))
                 loading = false
@@ -226,6 +249,123 @@ class CastPlaybackController(
         send(CastCommand.Quality(quality.id))
         // Remembered on this phone, as for its own player.
         scope.launch { runCatching { preferences.setQuality(quality) } }
+    }
+
+    /**
+     * Saves the person's sound setting here, then has the TV decide again at
+     * its position. The row is busy until the TV plays on (or a while has
+     * passed), and keeps the old level when the save fails.
+     */
+    override fun setSound(setting: SoundSetting, level: SoundLevel) {
+        noteUserInput()
+        if (!features.sound || soundBusy != null || currentFileId() == null) return
+        val still = preferences.playback.value.audio.level(setting)
+        if (still == level && soundFailure?.setting != setting) return
+        soundBusy = setting
+        soundFailure = null
+        render()
+        soundJob?.cancel()
+        soundJob = scope.launch {
+            try {
+                preferences.setSound(setting, level)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                soundBusy = null
+                soundFailure = SoundFailure(setting, level, still)
+                render()
+                return@launch
+            }
+            send(CastCommand.Sound)
+            delay(SOUND_SETTLE_MS)
+            soundBusy = null
+            render()
+        }
+    }
+
+    override fun moveSubtitleTiming(deltaMs: Long) {
+        noteUserInput()
+        val key = timingKey() ?: return
+        val before = timing(key)
+        val after = before.moved(deltaMs)
+        if (after.ms == before.ms) return
+        timings[key] = after
+        timingRetry = null
+        // The TV moves its cues now; this phone saves it once the presses stop.
+        send(CastCommand.SubtitleTiming(after.ms))
+        timingSave?.cancel()
+        timingSave = scope.launch {
+            delay(TIMING_SETTLE_MS)
+            saveTiming(key)
+        }
+        render()
+    }
+
+    override fun resetSubtitleTiming() {
+        noteUserInput()
+        val key = timingKey() ?: return
+        if (!timing(key).canReset) return
+        timingSave?.cancel()
+        timingCall(key, retry = ::resetSubtitleTiming) { it.reset(gateway.resetSubtitleTiming(key.first, key.second)) }
+    }
+
+    override fun saveSubtitleTimingForEveryone() {
+        noteUserInput()
+        val key = timingKey() ?: return
+        timingSave?.cancel()
+        timingCall(key, retry = ::saveSubtitleTimingForEveryone) { it.savedForEveryone(gateway.setSubtitleTiming(key.first, key.second, it.ms, everyone = true)) }
+    }
+
+    override fun retrySubtitleTiming() {
+        val retry = timingRetry ?: return
+        timingRetry = null
+        retry()
+    }
+
+    /** The file and subtitle track on the TV now, where the server saves timings. */
+    private fun timingKey(): Pair<Long, String>? {
+        if (!features.subtitleTiming) return null
+        val file = currentFileId() ?: return null
+        val track = remote?.selectedSubtitle ?: return null
+        return file to track
+    }
+
+    /** [key]'s timing: as moved here, else as the TV says. */
+    private fun timing(key: Pair<Long, String>): TrackTiming = timings[key] ?: run {
+        val info = remote?.subtitles?.firstOrNull { it.id == key.second }
+        TrackTiming.of(info?.timingMs ?: 0, info?.timingShared == true)
+    }
+
+    private suspend fun saveTiming(key: Pair<Long, String>) {
+        val sent = timings[key] ?: return
+        try {
+            val reply = withContext(io) { gateway.setSubtitleTiming(key.first, key.second, sent.ms) }
+            timings[key]?.takeIf { it.ms == sent.ms }?.let { timings[key] = it.saved(reply) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            timings[key] = (timings[key] ?: sent).copy(failed = true)
+            timingRetry = { scope.launch { saveTiming(key) } }
+        }
+        render()
+    }
+
+    private fun timingCall(key: Pair<Long, String>, retry: () -> Unit, call: suspend (TrackTiming) -> TrackTiming) {
+        val before = timing(key)
+        timingRetry = null
+        scope.launch {
+            try {
+                val after = withContext(io) { call(before) }
+                timings[key] = after
+                if (after.ms != before.ms) send(CastCommand.SubtitleTiming(after.ms))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                timings[key] = before.copy(failed = true)
+                timingRetry = retry
+            }
+            render()
+        }
     }
 
     /** Throttled ([SharedLink.noteInput]): the player screen calls this on every touch. */
@@ -370,6 +510,18 @@ class CastPlaybackController(
             autoStep = StreamQuality.byId(r?.autoStep)?.takeIf { quality == StreamQuality.Auto && it != StreamQuality.Auto },
             mode = playbackModeOf(r?.mode),
             note = note,
+            sound = if (features.sound && r?.fileId != null) {
+                val audio = preferences.playback.value.audio
+                PlayerSound(audio.dialogueBoost, audio.reduceLoudSounds, busy = soundBusy, failed = soundFailure)
+            } else null,
+            timing = timingKey()?.let { key ->
+                val t = timing(key)
+                val info = r?.subtitles?.firstOrNull { it.id == key.second }
+                SubtitleTimingState(
+                    trackId = key.second, ms = t.ms, shared = t.shared, own = t.own, canReset = t.canReset,
+                    savedForEveryone = t.savedForEveryone, burnedIn = info?.burnInOnly == true || info?.format == "image", saveFailed = t.failed,
+                )
+            },
             stopMessage = r?.stopMessage?.takeIf { r.phase == StateMessage.STOPPED }
                 ?: if (r?.phase == StateMessage.STOPPED) STOPPED_BY_ADMIN else null,
             error = shownError ?: if (status == PlayerStatus.Error) "The TV couldn't play this." else null,
@@ -382,6 +534,9 @@ class CastPlaybackController(
 
         /** How long Automatic's switch note shows. */
         const val NOTE_MS = 5_000L
+
+        /** A sound row stays busy this long after the TV was told: about the time it takes to decide and play on. */
+        const val SOUND_SETTLE_MS = 3_000L
 
         private fun SegmentInfo.toModel() = segmentKindOf(kind)?.let { Segment(it, startMs, endMs, final == true) }
 

@@ -43,7 +43,11 @@ internal fun castConnectState(fileId: Long, state: PlayerUiState, imageUrl: (Str
         stillWatching = s.askStillWatching,
         audio = s.audio.map { AudioInfo(it.index, codec = "", channels = 0, language = it.language, title = it.label, default = it.isDefault) },
         selectedAudio = s.selectedAudio,
-        subtitles = s.subtitles.map { SubtitleInfo(it.id, title = it.label, format = if (it.burnInOnly) "image" else "webvtt", burnInOnly = it.burnInOnly) },
+        subtitles = s.subtitles.map {
+            // The selected track's timing, where a remote's Subtitle timing starts.
+            val timing = s.timing?.takeIf { t -> t.trackId == it.id }
+            SubtitleInfo(it.id, title = it.label, format = if (it.burnInOnly) "image" else "webvtt", burnInOnly = it.burnInOnly, timingMs = timing?.ms, timingShared = timing?.shared)
+        },
         selectedSubtitle = s.selectedSubtitle,
         stopMessage = s.stopMessage,
         error = s.error,

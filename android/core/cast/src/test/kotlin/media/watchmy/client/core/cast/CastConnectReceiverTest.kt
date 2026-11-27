@@ -94,6 +94,20 @@ class CastConnectReceiverTest {
     }
 
     @Test
+    fun `a LOAD's subtitle size draws the play, and the sender's sound and timing reach the player`() = runTest {
+        val receiver = receiver()
+        sdk.loads.onLoad("sender-1", load(fileId = 4, subtitleId = "s3", subtitleSize = "largest"))
+        runCurrent()
+        assertEquals(media.watchmy.client.model.SubtitleSize.Largest, receiver.incoming.value!!.request.subtitleSize)
+        sdk.onMessage("phone", """{"type":"subtitleTiming","timingMs":-400}""")
+        sdk.onMessage("phone", """{"type":"sound"}""")
+        runCurrent()
+        val calls = controllers.single().calls
+        assertTrue(calls.toString(), "timing -400" in calls)
+        assertTrue(calls.toString(), "sound" in calls)
+    }
+
+    @Test
     fun `a second LOAD replaces the first, which no longer reports`() = runTest {
         sdk.senders += "phone"
         val receiver = receiver()
@@ -262,10 +276,11 @@ class CastConnectReceiverTest {
         title: String = "Harbor Lights",
         subtitle: String? = null,
         customData: JSONObject? = null,
+        subtitleSize: String? = null,
     ): MediaLoadRequestData {
         val data = LoadData(
             server = LoadServer("srv-1", listOf("http://192.168.1.20:27587")), token = "c1.secret", fileId = fileId,
-            startMs = startMs, audioIndex = audioIndex, subtitleId = subtitleId,
+            startMs = startMs, audioIndex = audioIndex, subtitleId = subtitleId, subtitleSize = subtitleSize,
         )
         val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE).apply {
             putString(MediaMetadata.KEY_TITLE, title)
@@ -355,6 +370,13 @@ class CastConnectReceiverTest {
         override fun selectSubtitle(id: String?) { calls += "subtitle $id" }
         override fun selectQuality(quality: StreamQuality) { calls += "quality $quality" }
         override fun noteUserInput() { calls += "input" }
+        override fun soundChanged() { calls += "sound" }
+        override fun showSubtitleTiming(timingMs: Long) { calls += "timing $timingMs" }
+        override fun setSound(setting: media.watchmy.client.model.SoundSetting, level: media.watchmy.client.model.SoundLevel) { calls += "setSound $setting $level" }
+        override fun moveSubtitleTiming(deltaMs: Long) { calls += "move $deltaMs" }
+        override fun resetSubtitleTiming() { calls += "reset" }
+        override fun saveSubtitleTimingForEveryone() { calls += "everyone" }
+        override fun retrySubtitleTiming() { calls += "retry timing" }
         override fun stop() { calls += "stop" }
         override fun release() { calls += "release" }
     }

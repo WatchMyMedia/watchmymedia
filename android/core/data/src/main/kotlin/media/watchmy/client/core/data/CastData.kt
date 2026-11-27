@@ -149,6 +149,15 @@ internal class RealCastGateway(
         return CastToken(t.token, tokenExpiry(t.expiresAt), t.urls)
     }
 
+    override fun apiLevel(): Int = store.session()?.server?.apiLevel ?: 0
+
+    // The remote's timing goes through the phone's own sign-in, as its player's would.
+    override suspend fun setSubtitleTiming(fileId: Long, trackId: String, timingMs: Long, everyone: Boolean) =
+        RealPlaybackGateway(SignedInAccess(http), { "" }, { "" }, { error("no media token for a remote") }).setSubtitleTiming(fileId, trackId, timingMs, everyone)
+
+    override suspend fun resetSubtitleTiming(fileId: Long, trackId: String) =
+        RealPlaybackGateway(SignedInAccess(http), { "" }, { "" }, { error("no media token for a remote") }).resetSubtitleTiming(fileId, trackId)
+
     companion object {
         /** The API level that brought cast tokens. */
         const val CAST_API_LEVEL = media.watchmy.client.model.CAST_API_LEVEL

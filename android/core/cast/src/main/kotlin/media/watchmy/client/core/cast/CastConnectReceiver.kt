@@ -171,6 +171,8 @@ class CastConnectReceiver internal constructor(
                     audioIndex = load.audioIndex,
                     subtitleId = load.subtitleId,
                     subtitleMode = if (load.subtitleMode == "auto" || load.subtitleId != null) media.watchmy.client.model.SubtitleRequestMode.Auto else media.watchmy.client.model.SubtitleRequestMode.Off,
+                    // The sender's subtitle size, which this play draws at in place of the TV's.
+                    subtitleSize = load.subtitleSize?.let(media.watchmy.client.model.SubtitleSize::byId),
                 )
                 current?.job?.cancel()
                 endLive()
@@ -234,6 +236,8 @@ class CastConnectReceiver internal constructor(
             is CastCommand.Subtitle -> c?.selectSubtitle(command.id)
             is CastCommand.Quality -> StreamQuality.byId(command.id)?.let { c?.selectQuality(it) }
             CastCommand.Input -> c?.noteUserInput()
+            CastCommand.Sound -> c?.soundChanged()
+            is CastCommand.SubtitleTiming -> c?.showSubtitleTiming(command.timingMs)
             // A channel command with no channel cast here: nothing to change.
             is CastCommand.Channel, is CastCommand.ChannelStep -> Unit
             null -> Unit
@@ -324,7 +328,7 @@ class CastConnectReceiver internal constructor(
             CastCommand.Input -> c.noteUserInput()
             // File commands mean nothing to a channel.
             is CastCommand.Seek, CastCommand.Skip, CastCommand.PlayNext, CastCommand.WatchCredits,
-            is CastCommand.Audio, is CastCommand.Subtitle, null -> Unit
+            is CastCommand.Audio, is CastCommand.Subtitle, CastCommand.Sound, is CastCommand.SubtitleTiming, null -> Unit
         }
     }
 
