@@ -32,6 +32,10 @@
 .settings-row__detail--wrap { white-space: normal; }
 .settings-row__error { font-size: var(--t-small); color: var(--error-text); }
 .settings-row__value { margin-left: auto; display: inline-flex; align-items: center; gap: .5rem; font-size: var(--t-small); color: var(--text-3); white-space: nowrap; flex: none; }
+.settings-row__saved, .settings-panel__status--ok { display: inline-flex; align-items: center; gap: .375rem; color: var(--accent); font-weight: 600; }
+.settings-row__saved svg, .settings-panel__status svg { width: 1.5rem; height: 1.5rem; }
+.settings-panel__status { display: inline-flex; align-items: center; gap: .5rem; font-size: var(--t-label); }
+.settings-panel__note--error { color: var(--error-text); }
 .settings-row--off .settings-row__label { color: var(--faint); }
 .settings-row--off .settings-row__value { color: var(--muted); }
 .settings-row--danger { color: var(--error-text); }

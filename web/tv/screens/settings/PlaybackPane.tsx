@@ -6,13 +6,14 @@ import { qualitiesFor } from '../../../src/lib/quality'
 import { skipModeOf } from '../../../src/lib/youSettings'
 import { setLocalSettings, useLocalSettings } from '../../app/localSettings'
 import { useSession } from '../../app/hooks'
+import { from35 } from '../../session/features'
 import { SUBTITLE_PX } from '../../player'
 import { setDefaultQuality, useDefaultQuality } from './defaultQuality'
 import { AccountNotLoaded, ChoicePanel } from './Panels'
 import { usePreferenceSaves } from './saves'
 import type { PaneProps } from './SettingsScreen'
 import { paneRowId } from './settingsGroups'
-import { PaneHeading, SettingRow } from './SettingRow'
+import { PaneHeading, PaneNote, SettingRow } from './SettingRow'
 import { LEADS, leadLabel, qualityDescription, SKIP_ROWS, skipExplanation, skipLabel, SUBTITLE_SIZES, subtitleSizeLabel, TV_SKIP_MODES } from './settingsWords'
 
 type Panel = { kind: 'quality' } | { kind: 'size' } | { kind: 'lead' } | { kind: 'skip'; part: string }
@@ -21,7 +22,8 @@ const id = (row: string) => paneRowId('playback', row)
 
 /**
  * Settings › Playback: this TV's Default
- * quality and Subtitle size, then the account's, on every device:
+ * quality and, below API level 35, Subtitle size (from 35 it is the
+ * person's, in Audio & subtitles), then the account's, on every device:
  * Autoplay next episode, the five skip rows and the Live TV reminders'
  * lead time. The account's rows wait for its settings, so a default is
  * never saved over someone's choice.
@@ -45,7 +47,9 @@ export function PlaybackPane({ first }: PaneProps) {
     <PaneHeading>On this TV</PaneHeading>
     <SettingRow id={id('quality')} label="Default quality" detail={qualityDescription(quality.id)} value={quality.label} chevron autoFocus={first && !prefs.isError}
       onPress={() => setPanel({ kind: 'quality' })}/>
-    <SettingRow id={id('subtitle-size')} label="Subtitle size" value={subtitleSizeLabel(subtitleSize)} chevron onPress={() => setPanel({ kind: 'size' })}/>
+    {from35(apiLevel)
+      ? <PaneNote>Subtitle size is in Audio &amp; subtitles now, the same on all your devices.</PaneNote>
+      : <SettingRow id={id('subtitle-size')} label="Subtitle size" value={subtitleSizeLabel(subtitleSize)} chevron onPress={() => setPanel({ kind: 'size' })}/>}
 
     <PaneHeading>Your account · on every device</PaneHeading>
     <SettingRow id={id('autoplay')} label="Autoplay next episode" detail="Counts down 10 s from the credits" toggle={p?.autoplayNext ?? true} disabled={!p} save={saves.status('autoplay')}

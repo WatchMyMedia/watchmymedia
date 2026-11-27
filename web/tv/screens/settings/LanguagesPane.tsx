@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useFocus } from '../../app/hooks'
+import { useFocus, useSession } from '../../app/hooks'
+import { from35 } from '../../session/features'
+import { SizeSection, SoundSection } from './SoundAndSize'
 import { preferencesQuery } from '../../../src/api/queries'
 import { languageName } from '../../../src/lib/format'
 import { automaticAvailable, draftOf, emptySubtitleText, languagePatch, MAX_LANGUAGES, subtitleChoices, type LanguageDraft } from '../../../src/lib/languagePreferences'
@@ -19,11 +21,14 @@ const id = (row: string) => paneRowId('languages', row)
 
 /**
  * Settings › Audio & subtitles:
- * the account's audio languages, how subtitles start, its subtitle
- * languages and Automatic download, each change saved at once.
+ * the account's audio languages, its sound (from API level 35), how
+ * subtitles start, its subtitle languages and size (from 35) and Automatic
+ * download, each change saved at once.
  */
 export function LanguagesPane({ first }: PaneProps) {
   const focus = useFocus()
+  const session = useSession()
+  const level35 = from35(session.server.apiLevel)
   const prefs = useQuery(preferencesQuery)
   const saves = usePreferenceSaves()
   const [panel, setPanel] = useState<Panel | null>(null)
@@ -55,6 +60,7 @@ export function LanguagesPane({ first }: PaneProps) {
     <PaneHeading>Audio languages · your account</PaneHeading>
     <PaneNote>Videos start in the first of these languages they have. If they have none, they play the file’s default.</PaneNote>
     {list('audio', saved.audio)}
+    {level35 && prefs.data && <SoundSection prefs={prefs.data} saves={saves}/>}
 
     <PaneHeading>Start subtitles</PaneHeading>
     <SettingRow id={id('start')} label="When a video starts" detail={startSubtitlesLine(saved.choice, saved.audio)} value={choice.short} chevron autoFocus={first}
@@ -63,6 +69,7 @@ export function LanguagesPane({ first }: PaneProps) {
     <PaneHeading>Subtitle languages</PaneHeading>
     {!saved.subtitles.length && <PaneNote>{emptySubtitleText(saved)}</PaneNote>}
     {list('subtitles', saved.subtitles)}
+    {level35 && prefs.data && <SizeSection prefs={prefs.data} saves={saves}/>}
 
     <PaneHeading>Automatic download</PaneHeading>
     <SettingRow id={id('automatic')} label="Automatic download" stacked toggle={automatic && saved.automaticDownload} disabled={!automatic} save={saves.status('automatic')}

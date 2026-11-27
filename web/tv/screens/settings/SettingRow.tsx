@@ -42,10 +42,11 @@ export type SettingRowProps = {
 export function SettingRow({ id, label, detail, value, chevron, toggle, stacked, onPress, disabled, save, tone, icon, autoFocus }: SettingRowProps) {
   const failed = save?.state === 'failed' ? save : undefined
   const two = stacked || !!failed
+  const saved = save?.state === 'saved' && <><span className="settings-row__saved"><Icon name="check"/>Saved</span><span aria-hidden="true">·</span></>
   const right = save?.state === 'saving'
     ? <span className="settings-row__value"><span className="tv-spinner" aria-hidden="true"/>Saving…</span>
     : toggle !== undefined ? <Toggle on={toggle}/>
-      : value !== undefined || chevron ? <span className="settings-row__value">{value}{chevron && <Chevron/>}</span> : null
+      : value !== undefined || chevron ? <span className="settings-row__value">{saved}{value}{chevron && <Chevron/>}</span> : null
   return <button type="button" data-focus={id} data-autofocus={autoFocus || undefined} aria-disabled={disabled || undefined}
     role={toggle !== undefined ? 'switch' : undefined} aria-checked={toggle !== undefined ? toggle : undefined}
     className={`settings-row${two ? ' settings-row--two' : ''}${disabled ? ' settings-row--dim' : ''}${tone ? ` settings-row--${tone}` : ''}`}
