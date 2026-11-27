@@ -70,6 +70,8 @@ export type TimingView = {
   setForEveryone: boolean
   /** Reset would change something. */
   canReset: boolean
+  /** What Reset goes back to: the timing saved for everyone, when known, else 0. */
+  resetTo: number
   /** Save for everyone: an admin, with a timing of their own that isn't everyone's already. */
   canShare: boolean
   /** The track is part of the picture: the play restarts to apply a change. */
@@ -77,7 +79,7 @@ export type TimingView = {
   status: TimingStatus
 }
 
-const IDLE_VIEW: TimingView = { ms: 0, words: 'In step', setForEveryone: false, canReset: false, canShare: false, burned: false, status: 'idle' }
+const IDLE_VIEW: TimingView = { ms: 0, words: 'In step', setForEveryone: false, canReset: false, resetTo: 0, canShare: false, burned: false, status: 'idle' }
 
 /**
  * The timing of the subtitle track a player shows, one per play. Earlier
@@ -241,6 +243,7 @@ export class SubtitleTiming {
       words: timingWords(this.ms),
       setForEveryone: this.onShared && this.ms !== 0,
       canReset: own && this.ms !== base,
+      resetTo: base,
       canShare: this.opts.admin && !this.burned && own && this.ms !== base && this.status !== 'saving',
       burned: this.burned,
       status: this.status,
