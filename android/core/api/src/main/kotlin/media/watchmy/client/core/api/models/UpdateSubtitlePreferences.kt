@@ -38,6 +38,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param foreignAudio With mode forced, subtitles as on does when the audio isn't in the person's languages. From API level 21; older servers reject it.
  * @param languages Ordered BCP 47 languages. An empty list clears them.
  * @param mode off, forced or on.
+ * @param propertySize smaller, normal, larger or largest. From apiLevel 35; older servers reject it.
  */
 @Serializable
 
@@ -57,7 +58,11 @@ data class UpdateSubtitlePreferences (
 
     /* off, forced or on. */
     @SerialName(value = "mode")
-    val mode: kotlin.String? = null
+    val mode: kotlin.String? = null,
+
+    /* smaller, normal, larger or largest. From apiLevel 35; older servers reject it. */
+    @SerialName(value = "size")
+    val propertySize: kotlin.String? = null
 
 ) {
 

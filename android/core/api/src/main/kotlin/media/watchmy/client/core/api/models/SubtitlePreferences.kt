@@ -38,6 +38,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param languages Preferred BCP 47 languages, in order; empty until the person chooses or accepts their device's language.
  * @param mode off, forced (only foreign-language parts in the audio's language), or on.
  * @param foreignAudio With mode forced: when the audio isn't in the person's languages, start as on does, in their subtitle languages or else their audio languages. Turned on when a person first saves audio languages without having saved a subtitle mode (API level 21).
+ * @param propertySize Subtitle size: smaller, normal, larger or largest, which apps draw at 0.79, 1, 1.21 and 1.5 times their own size. Normal by default (API level 35).
  */
 @Serializable
 
@@ -57,7 +58,11 @@ data class SubtitlePreferences (
 
     /* With mode forced: when the audio isn't in the person's languages, start as on does, in their subtitle languages or else their audio languages. Turned on when a person first saves audio languages without having saved a subtitle mode (API level 21). */
     @SerialName(value = "foreignAudio")
-    val foreignAudio: kotlin.Boolean? = null
+    val foreignAudio: kotlin.Boolean? = null,
+
+    /* Subtitle size: smaller, normal, larger or largest, which apps draw at 0.79, 1, 1.21 and 1.5 times their own size. Normal by default (API level 35). */
+    @SerialName(value = "size")
+    val propertySize: kotlin.String? = null
 
 ) {
 

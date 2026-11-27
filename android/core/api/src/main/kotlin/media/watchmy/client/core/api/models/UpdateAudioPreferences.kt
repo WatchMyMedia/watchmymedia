@@ -34,15 +34,25 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
+ * @param dialogueBoost off, medium or high. From apiLevel 35; older servers reject it.
  * @param languages Ordered BCP 47 languages. An empty list clears them. Saving languages for a person who never saved a subtitle mode also turns on subtitles.foreignAudio.
+ * @param reduceLoudSounds off, medium or high. From apiLevel 35; older servers reject it.
  */
 @Serializable
 
 data class UpdateAudioPreferences (
 
+    /* off, medium or high. From apiLevel 35; older servers reject it. */
+    @SerialName(value = "dialogueBoost")
+    val dialogueBoost: kotlin.String? = null,
+
     /* Ordered BCP 47 languages. An empty list clears them. Saving languages for a person who never saved a subtitle mode also turns on subtitles.foreignAudio. */
     @SerialName(value = "languages")
-    val languages: kotlin.collections.List<kotlin.String>? = null
+    val languages: kotlin.collections.List<kotlin.String>? = null,
+
+    /* off, medium or high. From apiLevel 35; older servers reject it. */
+    @SerialName(value = "reduceLoudSounds")
+    val reduceLoudSounds: kotlin.String? = null
 
 ) {
 

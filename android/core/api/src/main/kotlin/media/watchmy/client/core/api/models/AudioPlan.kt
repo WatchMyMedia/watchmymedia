@@ -23,6 +23,7 @@
 
 package media.watchmy.client.core.api.models
 
+import media.watchmy.client.core.api.models.AudioEffects
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -38,6 +39,7 @@ import kotlinx.serialization.encoding.Encoder
  * @param index
  * @param channels
  * @param codec The track's codec when copied; when converted, aac, or from apiLevel 31 also flac, eac3 or ac3.
+ * @param effects
  */
 @Serializable
 
@@ -54,7 +56,10 @@ data class AudioPlan (
 
     /* The track's codec when copied; when converted, aac, or from apiLevel 31 also flac, eac3 or ac3. */
     @SerialName(value = "codec")
-    val codec: kotlin.String? = null
+    val codec: kotlin.String? = null,
+
+    @SerialName(value = "effects")
+    val effects: AudioEffects? = null
 
 ) {
 

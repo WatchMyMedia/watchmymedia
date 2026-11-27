@@ -36,9 +36,11 @@ import media.watchmy.client.core.api.models.ErrorModel
 import media.watchmy.client.core.api.models.PlanInputBody
 import media.watchmy.client.core.api.models.PlanList
 import media.watchmy.client.core.api.models.Request
+import media.watchmy.client.core.api.models.SetSubtitleTimingInputBody
 import media.watchmy.client.core.api.models.ShowTracks
 import media.watchmy.client.core.api.models.ShowTracksInputBody
 import media.watchmy.client.core.api.models.SubtitleSearch
+import media.watchmy.client.core.api.models.SubtitleTiming
 import media.watchmy.client.core.api.models.SubtitleTrack
 import media.watchmy.client.core.api.models.Trickplay
 
@@ -214,6 +216,82 @@ open class PlaybackApi(basePath: kotlin.String = defaultBasePath, client: Call.F
         return RequestConfig(
             method = RequestMethod.DELETE,
             path = "/api/files/{id}/subtitles/{track}".replace("{"+"id"+"}", encodeURIComponent(id.toString())).replace("{"+"track"+"}", encodeURIComponent(track.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * DELETE /api/files/{id}/subtitles/{track}/timing
+     * Remove the caller&#39;s own timing for a subtitle track: back to the one saved for everyone, else in step
+     * From apiLevel 35. The player&#39;s Reset. A timing an admin saved for everyone stays.
+     * @param id Media file ID.
+     * @param track The track&#39;s id in a decision: s&lt;index&gt; inside the file, x&lt;n&gt; beside it, d&lt;id&gt; downloaded.
+     * @return SubtitleTiming
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    suspend fun deleteSubtitleTiming(id: kotlin.Long, track: kotlin.String) : SubtitleTiming = withContext(Dispatchers.IO) {
+        val localVarResponse = deleteSubtitleTimingWithHttpInfo(id = id, track = track)
+
+        return@withContext when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as SubtitleTiming
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * DELETE /api/files/{id}/subtitles/{track}/timing
+     * Remove the caller&#39;s own timing for a subtitle track: back to the one saved for everyone, else in step
+     * From apiLevel 35. The player&#39;s Reset. A timing an admin saved for everyone stays.
+     * @param id Media file ID.
+     * @param track The track&#39;s id in a decision: s&lt;index&gt; inside the file, x&lt;n&gt; beside it, d&lt;id&gt; downloaded.
+     * @return ApiResponse<SubtitleTiming?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    suspend fun deleteSubtitleTimingWithHttpInfo(id: kotlin.Long, track: kotlin.String) : ApiResponse<SubtitleTiming?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = deleteSubtitleTimingRequestConfig(id = id, track = track)
+
+        return@withContext request<Unit, SubtitleTiming>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation deleteSubtitleTiming
+     *
+     * @param id Media file ID.
+     * @param track The track&#39;s id in a decision: s&lt;index&gt; inside the file, x&lt;n&gt; beside it, d&lt;id&gt; downloaded.
+     * @return RequestConfig
+     */
+    fun deleteSubtitleTimingRequestConfig(id: kotlin.Long, track: kotlin.String) : RequestConfig<Unit> {
+        val localVariableBody = null
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Accept"] = "application/json, application/problem+json"
+
+        return RequestConfig(
+            method = RequestMethod.DELETE,
+            path = "/api/files/{id}/subtitles/{track}/timing".replace("{"+"id"+"}", encodeURIComponent(id.toString())).replace("{"+"track"+"}", encodeURIComponent(track.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = false,
@@ -737,6 +815,86 @@ open class PlaybackApi(basePath: kotlin.String = defaultBasePath, client: Call.F
         return RequestConfig(
             method = RequestMethod.PUT,
             path = "/api/shows/{id}/tracks".replace("{"+"id"+"}", encodeURIComponent(id.toString())),
+            query = localVariableQuery,
+            headers = localVariableHeaders,
+            requiresAuthentication = false,
+            body = localVariableBody
+        )
+    }
+
+    /**
+     * PUT /api/files/{id}/subtitles/{track}/timing
+     * Save how much later or earlier a subtitle track shows, for the caller or (admins) for everyone
+     * From apiLevel 35. Any signed-in person who can play the file saves their own timing; with everyone, an admin saves it for everyone who plays the file. Decisions then carry it on the track as timingMs.
+     * @param id Media file ID.
+     * @param track The track&#39;s id in a decision: s&lt;index&gt; inside the file, x&lt;n&gt; beside it, d&lt;id&gt; downloaded.
+     * @param setSubtitleTimingInputBody 
+     * @return SubtitleTiming
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     * @throws UnsupportedOperationException If the API returns an informational or redirection response
+     * @throws ClientException If the API returns a client error response
+     * @throws ServerException If the API returns a server error response
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class, UnsupportedOperationException::class, ClientException::class, ServerException::class)
+    suspend fun setSubtitleTiming(id: kotlin.Long, track: kotlin.String, setSubtitleTimingInputBody: SetSubtitleTimingInputBody) : SubtitleTiming = withContext(Dispatchers.IO) {
+        val localVarResponse = setSubtitleTimingWithHttpInfo(id = id, track = track, setSubtitleTimingInputBody = setSubtitleTimingInputBody)
+
+        return@withContext when (localVarResponse.responseType) {
+            ResponseType.Success -> (localVarResponse as Success<*>).data as SubtitleTiming
+            ResponseType.Informational -> throw UnsupportedOperationException("Client does not support Informational responses.")
+            ResponseType.Redirection -> throw UnsupportedOperationException("Client does not support Redirection responses.")
+            ResponseType.ClientError -> {
+                val localVarError = localVarResponse as ClientError<*>
+                throw ClientException("Client error : ${localVarError.statusCode} ${localVarError.message.orEmpty()}", localVarError.statusCode, localVarResponse)
+            }
+            ResponseType.ServerError -> {
+                val localVarError = localVarResponse as ServerError<*>
+                throw ServerException("Server error : ${localVarError.statusCode} ${localVarError.message.orEmpty()} ${localVarError.body}", localVarError.statusCode, localVarResponse)
+            }
+        }
+    }
+
+    /**
+     * PUT /api/files/{id}/subtitles/{track}/timing
+     * Save how much later or earlier a subtitle track shows, for the caller or (admins) for everyone
+     * From apiLevel 35. Any signed-in person who can play the file saves their own timing; with everyone, an admin saves it for everyone who plays the file. Decisions then carry it on the track as timingMs.
+     * @param id Media file ID.
+     * @param track The track&#39;s id in a decision: s&lt;index&gt; inside the file, x&lt;n&gt; beside it, d&lt;id&gt; downloaded.
+     * @param setSubtitleTimingInputBody 
+     * @return ApiResponse<SubtitleTiming?>
+     * @throws IllegalStateException If the request is not correctly configured
+     * @throws IOException Rethrows the OkHttp execute method exception
+     */
+    @Suppress("UNCHECKED_CAST")
+    @Throws(IllegalStateException::class, IOException::class)
+    suspend fun setSubtitleTimingWithHttpInfo(id: kotlin.Long, track: kotlin.String, setSubtitleTimingInputBody: SetSubtitleTimingInputBody) : ApiResponse<SubtitleTiming?> = withContext(Dispatchers.IO) {
+        val localVariableConfig = setSubtitleTimingRequestConfig(id = id, track = track, setSubtitleTimingInputBody = setSubtitleTimingInputBody)
+
+        return@withContext request<SetSubtitleTimingInputBody, SubtitleTiming>(
+            localVariableConfig
+        )
+    }
+
+    /**
+     * To obtain the request config of the operation setSubtitleTiming
+     *
+     * @param id Media file ID.
+     * @param track The track&#39;s id in a decision: s&lt;index&gt; inside the file, x&lt;n&gt; beside it, d&lt;id&gt; downloaded.
+     * @param setSubtitleTimingInputBody 
+     * @return RequestConfig
+     */
+    fun setSubtitleTimingRequestConfig(id: kotlin.Long, track: kotlin.String, setSubtitleTimingInputBody: SetSubtitleTimingInputBody) : RequestConfig<SetSubtitleTimingInputBody> {
+        val localVariableBody = setSubtitleTimingInputBody
+        val localVariableQuery: MultiValueMap = mutableMapOf()
+        val localVariableHeaders: MutableMap<String, String> = mutableMapOf()
+        localVariableHeaders["Content-Type"] = "application/json"
+        localVariableHeaders["Accept"] = "application/json, application/problem+json"
+
+        return RequestConfig(
+            method = RequestMethod.PUT,
+            path = "/api/files/{id}/subtitles/{track}/timing".replace("{"+"id"+"}", encodeURIComponent(id.toString())).replace("{"+"track"+"}", encodeURIComponent(track.toString())),
             query = localVariableQuery,
             headers = localVariableHeaders,
             requiresAuthentication = false,

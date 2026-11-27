@@ -45,6 +45,9 @@ import kotlinx.serialization.encoding.Encoder
  * @param language
  * @param release A download's release name.
  * @param source
+ * @param timingApplied The server burned this track into the picture with timingMs already applied: the app shows it as it comes. A change of timing needs a new decision (API level 35).
+ * @param timingMs The person's saved timing for this track, in milliseconds: positive shows each cue later, negative earlier, absent for none. Their own timing, else the one an admin saved for everyone (timingShared). Saved with PUT /api/files/{id}/subtitles/{track}/timing. From apiLevel 35.
+ * @param timingShared timingMs is the one an admin saved for everyone who plays the file, not the person's own (API level 35).
  * @param title
  * @param url
  */
@@ -86,6 +89,18 @@ data class SubtitleTrack (
 
     @SerialName(value = "source")
     val source: SubtitleTrack.Source? = null,
+
+    /* The server burned this track into the picture with timingMs already applied: the app shows it as it comes. A change of timing needs a new decision (API level 35). */
+    @SerialName(value = "timingApplied")
+    val timingApplied: kotlin.Boolean? = null,
+
+    /* The person's saved timing for this track, in milliseconds: positive shows each cue later, negative earlier, absent for none. Their own timing, else the one an admin saved for everyone (timingShared). Saved with PUT /api/files/{id}/subtitles/{track}/timing. From apiLevel 35. */
+    @SerialName(value = "timingMs")
+    val timingMs: kotlin.Long? = null,
+
+    /* timingMs is the one an admin saved for everyone who plays the file, not the person's own (API level 35). */
+    @SerialName(value = "timingShared")
+    val timingShared: kotlin.Boolean? = null,
 
     @SerialName(value = "title")
     val title: kotlin.String? = null,
