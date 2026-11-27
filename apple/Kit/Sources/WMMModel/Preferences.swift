@@ -126,9 +126,16 @@ public struct PlaybackPreferences: Hashable, Sendable {
 public struct AudioPreferences: Hashable, Sendable {
     /// Ordered BCP 47 tags; empty plays the file's default track.
     public var languages: [String]
+    /// Boost dialogue and Reduce loud sounds (API level 35): while either
+    /// is on, the server converts the sound of the person's plays (but
+    /// downloads) and applies them.
+    public var dialogueBoost: SoundLevel
+    public var reduceLoudSounds: SoundLevel
 
-    public init(languages: [String] = []) {
+    public init(languages: [String] = [], dialogueBoost: SoundLevel = .off, reduceLoudSounds: SoundLevel = .off) {
         self.languages = languages
+        self.dialogueBoost = dialogueBoost
+        self.reduceLoudSounds = reduceLoudSounds
     }
 }
 
@@ -141,12 +148,15 @@ public struct SubtitlePreferences: Hashable, Sendable {
     /// older apps read and save Forced only and leave it alone.
     public var foreignAudio: Bool
     public var automaticDownload: Bool
+    /// How big the subtitles the apps draw are (API level 35).
+    public var size: SubtitleSize
 
-    public init(languages: [String] = [], mode: SubtitleMode = .forced, foreignAudio: Bool = false, automaticDownload: Bool = false) {
+    public init(languages: [String] = [], mode: SubtitleMode = .forced, foreignAudio: Bool = false, automaticDownload: Bool = false, size: SubtitleSize = .normal) {
         self.languages = languages
         self.mode = mode
         self.foreignAudio = foreignAudio
         self.automaticDownload = automaticDownload
+        self.size = size
     }
 
     /// How subtitles start, as the settings pages list it.
@@ -229,24 +239,55 @@ public struct LanguageChange: Hashable, Sendable {
     public var subtitleLanguages: [String]?
     public var choice: SubtitleChoice?
     public var automaticDownload: Bool?
+    public var dialogueBoost: SoundLevel?
+    public var reduceLoudSounds: SoundLevel?
+    public var subtitleSize: SubtitleSize?
 
-    public init(audioLanguages: [String]? = nil, subtitleLanguages: [String]? = nil, choice: SubtitleChoice? = nil, automaticDownload: Bool? = nil) {
+    public init(audioLanguages: [String]? = nil, subtitleLanguages: [String]? = nil, choice: SubtitleChoice? = nil, automaticDownload: Bool? = nil,
+                dialogueBoost: SoundLevel? = nil, reduceLoudSounds: SoundLevel? = nil, subtitleSize: SubtitleSize? = nil) {
         self.audioLanguages = audioLanguages
         self.subtitleLanguages = subtitleLanguages
         self.choice = choice
         self.automaticDownload = automaticDownload
+        self.dialogueBoost = dialogueBoost
+        self.reduceLoudSounds = reduceLoudSounds
+        self.subtitleSize = subtitleSize
     }
 
-    public var isEmpty: Bool { audioLanguages == nil && subtitleLanguages == nil && choice == nil && automaticDownload == nil }
+    /// One sound setting at `level`.
+    public init(_ setting: SoundSetting, _ level: SoundLevel) {
+        switch setting {
+        case .dialogueBoost: self.init(dialogueBoost: level)
+        case .reduceLoudSounds: self.init(reduceLoudSounds: level)
+        }
+    }
+
+    public var isEmpty: Bool {
+        audioLanguages == nil && subtitleLanguages == nil && choice == nil && automaticDownload == nil
+            && dialogueBoost == nil && reduceLoudSounds == nil && subtitleSize == nil
+    }
 
     /// Needs a server at ``audioPreferencesAPILevel``.
     public var needsAudioLanguages: Bool { audioLanguages != nil || choice == .foreign }
+
+    /// Needs a server at ``ServerFeatures/Level/dialogueAndSubtitles``: older ones reject the fields.
+    public var needsDialogueAndSubtitles: Bool { dialogueBoost != nil || reduceLoudSounds != nil || subtitleSize != nil }
+
+    /// The sound setting this change makes, if it is one.
+    public var sound: (setting: SoundSetting, level: SoundLevel)? {
+        if let dialogueBoost { return (.dialogueBoost, dialogueBoost) }
+        if let reduceLoudSounds { return (.reduceLoudSounds, reduceLoudSounds) }
+        return nil
+    }
 
     public func apply(to p: inout PlaybackPreferences) {
         if let audioLanguages { p.audio.languages = audioLanguages }
         if let subtitleLanguages { p.subtitles.languages = subtitleLanguages }
         if let choice { p.subtitles.choice = choice }
         if let automaticDownload { p.subtitles.automaticDownload = automaticDownload }
+        if let dialogueBoost { p.audio.dialogueBoost = dialogueBoost }
+        if let reduceLoudSounds { p.audio.reduceLoudSounds = reduceLoudSounds }
+        if let subtitleSize { p.subtitles.size = subtitleSize }
     }
 }
 

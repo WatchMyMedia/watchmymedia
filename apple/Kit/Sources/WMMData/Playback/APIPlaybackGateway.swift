@@ -168,6 +168,34 @@ public struct APIPlaybackGateway: PlaybackGateway {
         let data = try await api().data(url)
         return String(decoding: data, as: UTF8.self)
     }
+
+    @MainActor public var features: ServerFeatures { ServerFeatures(apiLevel: apiLevel()) }
+
+    /// Sends `everyone` only when it is asked for: a person who isn't an admin never sends it.
+    public func setSubtitleTiming(fileID: Int, trackID: String, timingMs: Int, everyone: Bool) async throws -> SavedTiming {
+        try await guardTiming()
+        let limit = SubtitleTimingState.limitMs
+        let body = Components.Schemas.SetSubtitleTimingInputBody(everyone: everyone ? true : nil, timingMs: Int64(min(max(timingMs, -limit), limit)))
+        let saved = try await api().call {
+            try await $0.setSubtitleTiming(path: .init(id: Int64(fileID), track: trackID), body: .json(body)).ok.body.json
+        }
+        return SavedTiming(timingMs: PlaybackMapping.timing(saved.timingMs), shared: saved.timingShared)
+    }
+
+    public func deleteSubtitleTiming(fileID: Int, trackID: String) async throws -> SavedTiming {
+        try await guardTiming()
+        let saved = try await api().call {
+            try await $0.deleteSubtitleTiming(path: .init(id: Int64(fileID), track: trackID)).ok.body.json
+        }
+        return SavedTiming(timingMs: PlaybackMapping.timing(saved.timingMs), shared: saved.timingShared)
+    }
+
+    /// An older server has no such route: nothing is sent to it.
+    private func guardTiming() async throws {
+        guard ServerFeatures(apiLevel: await apiLevel()).dialogueAndSubtitles else {
+            throw APIError(status: nil, message: "Update the server to save subtitle timing.")
+        }
+    }
 }
 
 /// The generated client's playback types as the model's (android/core/data/.../Mapping.kt).
@@ -255,7 +283,8 @@ enum PlaybackMapping {
             audio: d.audioTracks.map(audio),
             selectedAudio: d.audio.index >= 0 ? Int(d.audio.index) : nil,
             subtitles: d.subtitles.filter { Components.Schemas.SubtitleTrack.FormatPayload.allCases.contains($0.format) }.map { s in
-                DecisionSubtitle(option: subtitle(s), format: s.format.rawValue, url: nonBlank(s.url).map { absolute($0, base: base) }.flatMap { ServerAPI.owns(base, $0) ? $0 : nil })
+                DecisionSubtitle(option: subtitle(s), format: s.format.rawValue, url: nonBlank(s.url).map { absolute($0, base: base) }.flatMap { ServerAPI.owns(base, $0) ? $0 : nil },
+                                 timingMs: timing(s.timingMs), timingShared: s.timingShared ?? false, timingApplied: s.timingApplied ?? false)
             },
             selectedSubtitleID: d.subtitleId,
             burnInSubtitleID: d.burnIn?.id,
@@ -280,6 +309,12 @@ enum PlaybackMapping {
     /// The profile's key for a copied video, as the server classifies it
     /// (`classify` in server/internal/playback/decide.go): Dolby Vision kept
     /// is its profile's dovi key, 10-bit HEVC hevc10, the rest its codec.
+    /// A track's saved timing, within the minute either way the server keeps.
+    static func timing(_ ms: Int64?) -> Int {
+        let limit = Int64(SubtitleTimingState.limitMs)
+        return Int(min(max(ms ?? 0, -limit), limit))
+    }
+
     static func copiedVideoCodec(_ v: Components.Schemas.VideoPlan) -> String? {
         guard v.copy, let codec = nonBlank(v.codec)?.lowercased() else { return nil }
         if v.hdr == "dolbyvision", let profile = v.dvProfile, profile > 0 { return "dovi\(profile)" }

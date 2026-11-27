@@ -8,7 +8,9 @@ public struct FakeSaveRefusal: Hashable, Sendable {
     /// What is refused: a Skipping part (`intro`, `recap`, `credits`,
     /// `preview`, `commercial` or `ads`), `autoplay`, `languages` (every
     /// Audio & subtitles change) or one part of it (`audioLanguages`,
-    /// `subtitleChoice`, `subtitleLanguages`, `automaticDownload`), or `all`.
+    /// `subtitleChoice`, `subtitleLanguages`, `automaticDownload`,
+    /// `dialogueBoost`, `reduceLoudSounds`, `subtitleSize`), `timing` (a
+    /// subtitle timing saved in the player), or `all`.
     public var parts: Set<String>
     /// nil: the server didn't answer. 422: it didn't know the value, so the
     /// row says the app may be older than the server. Any other status as given.

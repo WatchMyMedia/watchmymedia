@@ -13627,6 +13627,33 @@ extension Components {
                 case items
             }
         }
+        /// - Remark: Generated from `#/components/schemas/SetSubtitleTimingInputBody`.
+        public struct SetSubtitleTimingInputBody: Codable, Hashable, Sendable {
+            /// Admins only: save it for everyone who plays the file (0 removes that), and remove the admin's own timing for the track, so they hear what everyone does. A person's own timing still wins for them.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SetSubtitleTimingInputBody/everyone`.
+            public var everyone: Swift.Bool?
+            /// Milliseconds: positive shows each cue later, negative earlier. Without everyone, 0 is the person's own "in step", which wins over a timing saved for everyone.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SetSubtitleTimingInputBody/timingMs`.
+            public var timingMs: Swift.Int64
+            /// Creates a new `SetSubtitleTimingInputBody`.
+            ///
+            /// - Parameters:
+            ///   - everyone: Admins only: save it for everyone who plays the file (0 removes that), and remove the admin's own timing for the track, so they hear what everyone does. A person's own timing still wins for them.
+            ///   - timingMs: Milliseconds: positive shows each cue later, negative earlier. Without everyone, 0 is the person's own "in step", which wins over a timing saved for everyone.
+            public init(
+                everyone: Swift.Bool? = nil,
+                timingMs: Swift.Int64
+            ) {
+                self.everyone = everyone
+                self.timingMs = timingMs
+            }
+            public enum CodingKeys: String, CodingKey {
+                case everyone
+                case timingMs
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/Show`.
         public struct Show: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/Show/backdropPath`.
@@ -14544,6 +14571,33 @@ extension Components {
                 case index
                 case language
                 case title
+            }
+        }
+        /// - Remark: Generated from `#/components/schemas/SubtitleTiming`.
+        public struct SubtitleTiming: Codable, Hashable, Sendable {
+            /// The timing the caller's plays of this track now get: their own, else the one saved for everyone, else 0.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubtitleTiming/timingMs`.
+            public var timingMs: Swift.Int64
+            /// timingMs is the one an admin saved for everyone, not the caller's own.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubtitleTiming/timingShared`.
+            public var timingShared: Swift.Bool
+            /// Creates a new `SubtitleTiming`.
+            ///
+            /// - Parameters:
+            ///   - timingMs: The timing the caller's plays of this track now get: their own, else the one saved for everyone, else 0.
+            ///   - timingShared: timingMs is the one an admin saved for everyone, not the caller's own.
+            public init(
+                timingMs: Swift.Int64,
+                timingShared: Swift.Bool
+            ) {
+                self.timingMs = timingMs
+                self.timingShared = timingShared
+            }
+            public enum CodingKeys: String, CodingKey {
+                case timingMs
+                case timingShared
             }
         }
         /// - Remark: Generated from `#/components/schemas/SubtitleTrack`.

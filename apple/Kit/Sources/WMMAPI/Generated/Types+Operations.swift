@@ -4534,6 +4534,403 @@ public enum Operations {
             }
         }
     }
+    /// Save how much later or earlier a subtitle track shows, for the caller or (admins) for everyone
+    ///
+    /// From apiLevel 35. Any signed-in person who can play the file saves their own timing; with everyone, an admin saves it for everyone who plays the file. Decisions then carry it on the track as timingMs.
+    ///
+    /// - Remark: HTTP `PUT /api/files/{id}/subtitles/{track}/timing`.
+    /// - Remark: Generated from `#/paths//api/files/{id}/subtitles/{track}/timing/put(setSubtitleTiming)`.
+    public enum SetSubtitleTiming {
+        public static let id: Swift.String = "setSubtitleTiming"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/api/files/{id}/subtitles/{track}/timing/PUT/path`.
+            public struct Path: Sendable, Hashable {
+                /// Media file ID.
+                ///
+                /// - Remark: Generated from `#/paths/api/files/{id}/subtitles/{track}/timing/PUT/path/id`.
+                public var id: Swift.Int64
+                /// The track's id in a decision: s<index> inside the file, x<n> beside it, d<id> downloaded.
+                ///
+                /// - Remark: Generated from `#/paths/api/files/{id}/subtitles/{track}/timing/PUT/path/track`.
+                public var track: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - id: Media file ID.
+                ///   - track: The track's id in a decision: s<index> inside the file, x<n> beside it, d<id> downloaded.
+                public init(
+                    id: Swift.Int64,
+                    track: Swift.String
+                ) {
+                    self.id = id
+                    self.track = track
+                }
+            }
+            public var path: Operations.SetSubtitleTiming.Input.Path
+            /// - Remark: Generated from `#/paths/api/files/{id}/subtitles/{track}/timing/PUT/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SetSubtitleTiming.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.SetSubtitleTiming.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.SetSubtitleTiming.Input.Headers
+            /// - Remark: Generated from `#/paths/api/files/{id}/subtitles/{track}/timing/PUT/requestBody`.
+            @frozen public enum Body: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/files/{id}/subtitles/{track}/timing/PUT/requestBody/content/application\/json`.
+                case json(Components.Schemas.SetSubtitleTimingInputBody)
+            }
+            public var body: Operations.SetSubtitleTiming.Input.Body
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            ///   - body:
+            public init(
+                path: Operations.SetSubtitleTiming.Input.Path,
+                headers: Operations.SetSubtitleTiming.Input.Headers = .init(),
+                body: Operations.SetSubtitleTiming.Input.Body
+            ) {
+                self.path = path
+                self.headers = headers
+                self.body = body
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/files/{id}/subtitles/{track}/timing/PUT/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/files/{id}/subtitles/{track}/timing/PUT/responses/200/content/application\/json`.
+                    case json(Components.Schemas.SubtitleTiming)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.SubtitleTiming {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.SetSubtitleTiming.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.SetSubtitleTiming.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//api/files/{id}/subtitles/{track}/timing/put(setSubtitleTiming)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.SetSubtitleTiming.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.SetSubtitleTiming.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Default: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/files/{id}/subtitles/{track}/timing/PUT/responses/default/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/files/{id}/subtitles/{track}/timing/PUT/responses/default/content/application\/problem+json`.
+                    case applicationProblemJson(Components.Schemas.ErrorModel)
+                    /// The associated value of the enum case if `self` is `.applicationProblemJson`.
+                    ///
+                    /// - Throws: An error if `self` is not `.applicationProblemJson`.
+                    /// - SeeAlso: `.applicationProblemJson`.
+                    public var applicationProblemJson: Components.Schemas.ErrorModel {
+                        get throws {
+                            switch self {
+                            case let .applicationProblemJson(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.SetSubtitleTiming.Output.Default.Body
+                /// Creates a new `Default`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.SetSubtitleTiming.Output.Default.Body) {
+                    self.body = body
+                }
+            }
+            /// Error
+            ///
+            /// - Remark: Generated from `#/paths//api/files/{id}/subtitles/{track}/timing/put(setSubtitleTiming)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Operations.SetSubtitleTiming.Output.Default)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Operations.SetSubtitleTiming.Output.Default {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
+    /// Remove the caller's own timing for a subtitle track: back to the one saved for everyone, else in step
+    ///
+    /// From apiLevel 35. The player's Reset. A timing an admin saved for everyone stays.
+    ///
+    /// - Remark: HTTP `DELETE /api/files/{id}/subtitles/{track}/timing`.
+    /// - Remark: Generated from `#/paths//api/files/{id}/subtitles/{track}/timing/delete(deleteSubtitleTiming)`.
+    public enum DeleteSubtitleTiming {
+        public static let id: Swift.String = "deleteSubtitleTiming"
+        public struct Input: Sendable, Hashable {
+            /// - Remark: Generated from `#/paths/api/files/{id}/subtitles/{track}/timing/DELETE/path`.
+            public struct Path: Sendable, Hashable {
+                /// Media file ID.
+                ///
+                /// - Remark: Generated from `#/paths/api/files/{id}/subtitles/{track}/timing/DELETE/path/id`.
+                public var id: Swift.Int64
+                /// The track's id in a decision: s<index> inside the file, x<n> beside it, d<id> downloaded.
+                ///
+                /// - Remark: Generated from `#/paths/api/files/{id}/subtitles/{track}/timing/DELETE/path/track`.
+                public var track: Swift.String
+                /// Creates a new `Path`.
+                ///
+                /// - Parameters:
+                ///   - id: Media file ID.
+                ///   - track: The track's id in a decision: s<index> inside the file, x<n> beside it, d<id> downloaded.
+                public init(
+                    id: Swift.Int64,
+                    track: Swift.String
+                ) {
+                    self.id = id
+                    self.track = track
+                }
+            }
+            public var path: Operations.DeleteSubtitleTiming.Input.Path
+            /// - Remark: Generated from `#/paths/api/files/{id}/subtitles/{track}/timing/DELETE/header`.
+            public struct Headers: Sendable, Hashable {
+                public var accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteSubtitleTiming.AcceptableContentType>]
+                /// Creates a new `Headers`.
+                ///
+                /// - Parameters:
+                ///   - accept:
+                public init(accept: [OpenAPIRuntime.AcceptHeaderContentType<Operations.DeleteSubtitleTiming.AcceptableContentType>] = .defaultValues()) {
+                    self.accept = accept
+                }
+            }
+            public var headers: Operations.DeleteSubtitleTiming.Input.Headers
+            /// Creates a new `Input`.
+            ///
+            /// - Parameters:
+            ///   - path:
+            ///   - headers:
+            public init(
+                path: Operations.DeleteSubtitleTiming.Input.Path,
+                headers: Operations.DeleteSubtitleTiming.Input.Headers = .init()
+            ) {
+                self.path = path
+                self.headers = headers
+            }
+        }
+        @frozen public enum Output: Sendable, Hashable {
+            public struct Ok: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/files/{id}/subtitles/{track}/timing/DELETE/responses/200/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/files/{id}/subtitles/{track}/timing/DELETE/responses/200/content/application\/json`.
+                    case json(Components.Schemas.SubtitleTiming)
+                    /// The associated value of the enum case if `self` is `.json`.
+                    ///
+                    /// - Throws: An error if `self` is not `.json`.
+                    /// - SeeAlso: `.json`.
+                    public var json: Components.Schemas.SubtitleTiming {
+                        get throws {
+                            switch self {
+                            case let .json(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.DeleteSubtitleTiming.Output.Ok.Body
+                /// Creates a new `Ok`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.DeleteSubtitleTiming.Output.Ok.Body) {
+                    self.body = body
+                }
+            }
+            /// OK
+            ///
+            /// - Remark: Generated from `#/paths//api/files/{id}/subtitles/{track}/timing/delete(deleteSubtitleTiming)/responses/200`.
+            ///
+            /// HTTP response code: `200 ok`.
+            case ok(Operations.DeleteSubtitleTiming.Output.Ok)
+            /// The associated value of the enum case if `self` is `.ok`.
+            ///
+            /// - Throws: An error if `self` is not `.ok`.
+            /// - SeeAlso: `.ok`.
+            public var ok: Operations.DeleteSubtitleTiming.Output.Ok {
+                get throws {
+                    switch self {
+                    case let .ok(response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "ok",
+                            response: self
+                        )
+                    }
+                }
+            }
+            public struct Default: Sendable, Hashable {
+                /// - Remark: Generated from `#/paths/api/files/{id}/subtitles/{track}/timing/DELETE/responses/default/content`.
+                @frozen public enum Body: Sendable, Hashable {
+                    /// - Remark: Generated from `#/paths/api/files/{id}/subtitles/{track}/timing/DELETE/responses/default/content/application\/problem+json`.
+                    case applicationProblemJson(Components.Schemas.ErrorModel)
+                    /// The associated value of the enum case if `self` is `.applicationProblemJson`.
+                    ///
+                    /// - Throws: An error if `self` is not `.applicationProblemJson`.
+                    /// - SeeAlso: `.applicationProblemJson`.
+                    public var applicationProblemJson: Components.Schemas.ErrorModel {
+                        get throws {
+                            switch self {
+                            case let .applicationProblemJson(body):
+                                return body
+                            }
+                        }
+                    }
+                }
+                /// Received HTTP response body
+                public var body: Operations.DeleteSubtitleTiming.Output.Default.Body
+                /// Creates a new `Default`.
+                ///
+                /// - Parameters:
+                ///   - body: Received HTTP response body
+                public init(body: Operations.DeleteSubtitleTiming.Output.Default.Body) {
+                    self.body = body
+                }
+            }
+            /// Error
+            ///
+            /// - Remark: Generated from `#/paths//api/files/{id}/subtitles/{track}/timing/delete(deleteSubtitleTiming)/responses/default`.
+            ///
+            /// HTTP response code: `default`.
+            case `default`(statusCode: Swift.Int, Operations.DeleteSubtitleTiming.Output.Default)
+            /// The associated value of the enum case if `self` is `.`default``.
+            ///
+            /// - Throws: An error if `self` is not `.`default``.
+            /// - SeeAlso: `.`default``.
+            public var `default`: Operations.DeleteSubtitleTiming.Output.Default {
+                get throws {
+                    switch self {
+                    case let .`default`(_, response):
+                        return response
+                    default:
+                        try throwUnexpectedResponseStatus(
+                            expectedStatus: "default",
+                            response: self
+                        )
+                    }
+                }
+            }
+        }
+        @frozen public enum AcceptableContentType: AcceptableProtocol {
+            case json
+            case applicationProblemJson
+            case other(Swift.String)
+            public init?(rawValue: Swift.String) {
+                switch rawValue.lowercased() {
+                case "application/json":
+                    self = .json
+                case "application/problem+json":
+                    self = .applicationProblemJson
+                default:
+                    self = .other(rawValue)
+                }
+            }
+            public var rawValue: Swift.String {
+                switch self {
+                case let .other(string):
+                    return string
+                case .json:
+                    return "application/json"
+                case .applicationProblemJson:
+                    return "application/problem+json"
+                }
+            }
+            public static var allCases: [Self] {
+                [
+                    .json,
+                    .applicationProblemJson
+                ]
+            }
+        }
+    }
     /// Everything the home screen shows
     ///
     /// - Remark: HTTP `GET /api/home`.
