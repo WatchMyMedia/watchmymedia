@@ -121,3 +121,22 @@ describe('castChannel', () => {
     expect(sender.castSnapshot().castingChannelId).toBe('ch2')
   })
 })
+
+describe('sound and subtitles', () => {
+  it('carries the person’s subtitle size to the TV, and leaves it out when unknown', async () => {
+    fakeSdk()
+    const sender = await import('./sender')
+    await sender.castFile({ fileId: 7, subtitleSize: 'larger' })
+    expect(loads[0].customData.subtitleSize).toBe('larger')
+    await sender.castFile({ fileId: 7 })
+    expect('subtitleSize' in loads[1].customData).toBe(false)
+  })
+
+  it('tells the TV to decide again for a sound change and moves its cues for a timing', async () => {
+    const session = fakeSdk()
+    const sender = await import('./sender')
+    sender.castSound()
+    sender.castSubtitleTiming(-400)
+    expect(session.sendMessage.mock.calls.map((c) => (c as unknown[])[1])).toEqual([{ type: 'sound' }, { type: 'subtitleTiming', timingMs: -400 }])
+  })
+})

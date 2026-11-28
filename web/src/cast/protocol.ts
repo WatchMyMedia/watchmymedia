@@ -70,13 +70,27 @@ export type LoadData = {
   device?: { id?: string; name?: string }
   /** Who cast, for the receiver's screens ("Cast from Pixel 9"). */
   sender?: { name?: string }
+  /**
+   * The person's subtitle size (API level 35), from the sender's copy of
+   * their preferences: the receiver draws its cues at it. Absent is normal.
+   */
+  subtitleSize?: 'smaller' | 'normal' | 'larger' | 'largest'
 }
 
 export type SegmentInfo = { kind: string; startMs: number; endMs?: number | null; final?: boolean }
 
 export type AudioOption = { index: number; codec: string; channels: number; language?: string; title?: string; default: boolean }
 
-export type SubtitleOption = { id: string; language?: string; title?: string; format: string; forced?: boolean; burnInOnly?: boolean }
+export type SubtitleOption = {
+  id: string; language?: string; title?: string; format: string; forced?: boolean; burnInOnly?: boolean
+  /**
+   * The track's subtitle timing on the TV now, in milliseconds (positive
+   * shows cues later), and whether it is the one an admin saved for everyone,
+   * so a remote's timing starts where the TV is. Absent from older receivers.
+   */
+  timingMs?: number
+  timingShared?: boolean
+}
 
 export type UpNextInfo = {
   fileId: number
@@ -173,3 +187,14 @@ export type CommandMessage =
   /** Live TV: change to this channel, or the next or previous one the viewer may watch. */
   | { type: 'channel'; channelId: string }
   | { type: 'channelStep'; by: 1 | -1 }
+  /**
+   * The sender saved a change to the person's Boost dialogue or Reduce loud
+   * sounds (API level 35): decide again at the current position, as for a
+   * quality change, so the server applies it.
+   */
+  | { type: 'sound' }
+  /**
+   * Move the cues of the subtitle track on now to this timing at once
+   * (positive shows them later). The sender saves the timing itself.
+   */
+  | { type: 'subtitleTiming'; timingMs: number }
