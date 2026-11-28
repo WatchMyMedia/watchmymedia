@@ -140,7 +140,9 @@ with its preview, and the player's options have Sound under the audio tracks
 and Subtitle timing under the subtitles. With it, `-playerSubtitle s4
 -playerTiming 400` starts that subtitle 0.4 s later, `-playerTimingShared 600`
 as a timing an admin saved for everyone, and `-fakesSaveFails timing` refuses
-the timing's saves. `UITests/DialogueTests.swift` and
+the timing's saves. With `-fakesCast` too, the Cast remote has the same
+Sound and Subtitle timing for the TV's play (`CastSoundAndTiming` in the Kit;
+`UITests/CastTests.swift`). `UITests/DialogueTests.swift` and
 `TVUITests/DialogueTests.swift` run them. `UITests/DialogueServerTests.swift`
 runs the timing against a server at API level 35: an admin's run saves a
 subtitle's timing for everyone, then another person's run, on a fresh install,

@@ -5,12 +5,15 @@ import WMMModel
 import WMMUI
 
 /// The receiver's own state drives the remote; this view runs no playback rules.
+/// From API level 35 a file this sign-in is playing has the player's Sound
+/// and Subtitle timing beside its tracks (``CastSoundAndTiming``).
 struct CastRemoteScreen: View {
     @Environment(CastService.self) private var cast
     @Environment(AppServices.self) private var services
     @Environment(\.dismiss) private var dismiss
     @State private var scrub: Double?
     @State private var handback = false
+    @State private var dialogue: CastSoundAndTiming?
 
     private var state: PlayerState { cast.state }
     private var live: CastReceiverState.Live? { cast.receiver?.live }
@@ -34,6 +37,13 @@ struct CastRemoteScreen: View {
         }
         .presentationBackground(Palette.ground)
         .task { cast.command(.input) }
+        .task {
+            let services = services
+            let model = CastSoundAndTiming(cast: cast, preferences: services.preferences, timings: services.playback,
+                                           isAdmin: { services.auth.user?.isAdmin == true })
+            dialogue = model
+            await model.load()
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("cast.remote")
     }
@@ -148,13 +158,24 @@ struct CastRemoteScreen: View {
                     ForEach(state.audio) { Text($0.label).tag($0.index) }
                 }.labelsHidden().disabled(state.audio.isEmpty)
             }
+            if let dialogue, let sound = dialogue.sound {
+                VStack(alignment: .leading, spacing: 0) {
+                    SoundOptions(sound: sound, large: false) { dialogue.setSound($0, to: $1) }
+                }
+            }
             Divider()
             VStack(alignment: .leading, spacing: 4) {
                 Text("Subtitles").font(.caption).foregroundStyle(Palette.muted)
                 Picker("Subtitles", selection: Binding(get: { state.selectedSubtitle ?? "" }, set: { cast.command(.subtitle($0.isEmpty ? nil : $0)) })) {
                     Text("Off").tag("")
                     ForEach(state.subtitles) { Text($0.label).tag($0.id) }
-                }.labelsHidden()
+                }.labelsHidden().accessibilityIdentifier("cast.remote.subtitles")
+            }
+            if let dialogue, let timing = dialogue.timing {
+                VStack(alignment: .leading, spacing: 0) {
+                    TimingOptions(timing: timing, large: false, pausedCue: nil, move: { dialogue.moveTiming(later: $0) },
+                                  reset: { dialogue.resetTiming() }, share: { dialogue.saveTimingForEveryone() })
+                }
             }
             if state.subtitles.contains(where: { $0.source == .online }) { Text(openSubtitlesCredit).font(.caption).foregroundStyle(Palette.muted) }
             Divider()

@@ -215,7 +215,7 @@ struct PlayerOptionSections: View {
             OptionRow(label: audioOptionLabel(a), selected: a.index == state.selectedAudio, large: large) { model.pickAudio(a.index) }
         }
         if let sound = state.sound {
-            SoundOptions(model: model, sound: sound, large: large)
+            SoundOptions(sound: sound, large: large) { model.setSound($0, to: $1) }
         }
     }
 
@@ -246,7 +246,8 @@ struct PlayerOptionSections: View {
             }
         }
         if let timing = state.timing {
-            TimingOptions(model: model, timing: timing, large: large, pausedCue: pausedCue)
+            TimingOptions(timing: timing, large: large, pausedCue: pausedCue ? model.clock : nil,
+                          move: { model.moveTiming(later: $0) }, reset: { model.resetTiming() }, share: { model.saveTimingForEveryone() })
         }
     }
 
@@ -349,7 +350,7 @@ private struct OptionRow: View {
 }
 
 /// A small heading inside a tab's list: SOUND, SUBTITLE TIMING.
-private struct OptionsSubheading: View {
+struct OptionsSubheading: View {
     let text: String
     let large: Bool
 
@@ -369,11 +370,12 @@ private struct OptionsSubheading: View {
 /// choice of Off, Medium and High with its line, and what turning either
 /// on does. A choice is saved and the play reloads where it is; the
 /// options stay open and the row says it is changing the sound until it
-/// plays again. A download keeps its own sound: the choices are off.
-private struct SoundOptions: View {
-    let model: PlayerChromeModel
+/// plays again. A download keeps its own sound: the choices are off. The
+/// Cast remote shows the same, for the TV's play.
+struct SoundOptions: View {
     let sound: PlayerSound
     let large: Bool
+    let pick: (SoundSetting, SoundLevel) -> Void
 
     var body: some View {
         OptionsSubheading(text: SoundWords.heading, large: large)
@@ -385,7 +387,7 @@ private struct SoundOptions: View {
                 line(setting)
                 Picker(setting.title, selection: Binding(get: { sound[setting] }, set: { level in
                     guard sound.enabled else { return }
-                    model.setSound(setting, to: level)
+                    pick(setting, level)
                 })) {
                     ForEach(SoundLevel.allCases, id: \.self) { Text($0.label).tag($0) }
                 }
@@ -425,19 +427,22 @@ private struct SoundOptions: View {
 /// Subtitle timing under the subtitle tracks, while one is on: the value
 /// and Reset, Earlier and Later (held, they repeat), where it is saved,
 /// and an admin's Save for everyone. The cues move as it is pressed; where
-/// the options pause the video (`pausedCue`), the paused frame's cue shows
-/// here, since the sheet covers the picture's.
-private struct TimingOptions: View {
-    let model: PlayerChromeModel
+/// the options pause the video (`pausedCue`, the player's clock), the
+/// paused frame's cue shows here, since the sheet covers the picture's.
+/// The Cast remote shows the same, for the TV's cues.
+struct TimingOptions: View {
     let timing: SubtitleTimingState
     let large: Bool
-    let pausedCue: Bool
+    let pausedCue: PlayerClock?
+    let move: (Bool) -> Void
+    let reset: () -> Void
+    let share: () -> Void
 
     var body: some View {
         OptionsSubheading(text: TimingWords.title, large: large)
         VStack(alignment: .leading, spacing: 4) {
-            if pausedCue, !timing.burnedIn {
-                PausedCue(clock: model.clock)
+            if let pausedCue, !timing.burnedIn {
+                PausedCue(clock: pausedCue)
             }
             if timing.burnedIn {
                 Text(TimingWords.burnedIn)
@@ -453,7 +458,7 @@ private struct TimingOptions: View {
                     .accessibilityIdentifier("player-timing-value")
                 Spacer(minLength: 8)
                 if timing.canReset {
-                    Button(TimingWords.reset) { model.resetTiming() }
+                    Button(TimingWords.reset, action: reset)
                         .buttonStyle(GoldTextButtonStyle(font: .system(size: large ? 15 : 14, weight: .semibold)))
                         .frame(minHeight: 32)
                         .accessibilityIdentifier("player-timing-reset")
@@ -479,7 +484,7 @@ private struct TimingOptions: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("player-timing-line")
             if timing.canSaveForEveryone {
-                Button { model.saveTimingForEveryone() } label: {
+                Button(action: share) {
                     Text(TimingWords.saveForEveryone)
                         .font(.system(size: large ? 14 : 13, weight: .semibold))
                         .foregroundStyle(Palette.text)
@@ -511,7 +516,7 @@ private struct TimingOptions: View {
 
     /// Earlier or Later: one step a press, repeating while held.
     private func stepButton(_ title: String, later: Bool, enabled: Bool) -> some View {
-        Button { model.moveTiming(later: later) } label: {
+        Button { move(later) } label: {
             Text(title)
                 .font(.system(size: large ? 14 : 13, weight: .semibold))
                 .foregroundStyle(Palette.text)
