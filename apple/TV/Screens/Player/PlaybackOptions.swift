@@ -30,9 +30,17 @@ struct PlaybackOptions: View {
         HStack(alignment: .top, spacing: 40) {
             switch tab {
             case .tracks:
-                column("Audio") { audio(state) }
+                column("Audio") {
+                    audio(state)
+                    if let sound = state.sound { soundRows(sound) }
+                }
                 column(findingMore ? "Find more subtitles" : "Subtitles") {
-                    if findingMore { online(state) } else { subtitles(state) }
+                    if findingMore {
+                        online(state)
+                    } else {
+                        subtitles(state)
+                        if let timing = state.timing { timingRows(timing) }
+                    }
                 }
             case .quality:
                 column("Quality") { quality(state) }
@@ -112,6 +120,96 @@ struct PlaybackOptions: View {
         }
     }
 
+    /// Sound under the audio tracks: Boost dialogue and Reduce loud sounds,
+    /// each its name and three pills (Off, Medium, High), the chosen one in
+    /// gold. Select saves it and the play reloads from here, the panel open;
+    /// the pill spins until the new sound plays.
+    @ViewBuilder
+    private func soundRows(_ sound: PlayerSound) -> some View {
+        TVGroupLabel(SoundWords.heading).padding(.leading, 24).padding(.top, 20).padding(.bottom, 6)
+        ForEach(SoundSetting.allCases, id: \.self) { setting in
+            HStack(spacing: 12) {
+                Text(setting.title)
+                    .font(.tv(.body, .semibold))
+                    .foregroundStyle(Palette.text)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                ForEach(SoundLevel.allCases, id: \.self) { level in
+                    Button { model.setSound(setting, to: level) } label: {
+                        SoundPillLabel(level: level, chosen: sound[setting] == level, busy: sound.busy == setting && sound[setting] == level)
+                    }
+                    .buttonStyle(SoundPillStyle(chosen: sound[setting] == level))
+                    .disabled(sound.download)
+                    .focused($focus, equals: "sound:\(setting.rawValue):\(level.rawValue)")
+                    .accessibilityLabel("\(setting.title), \(level.label)")
+                    .accessibilityAddTraits(sound[setting] == level ? .isSelected : [])
+                    .accessibilityIdentifier("player-sound-\(setting.rawValue)-\(level.rawValue)")
+                }
+            }
+            .padding(.leading, 24)
+            .frame(minHeight: 76)
+            // Up and Down reach the row whichever pill is level with the move.
+            .focusSection()
+            Note(text: sound.line(setting), tone: sound.failed == setting ? .warning : sound.busy == setting ? .strong : .muted)
+                .accessibilityIdentifier("player-sound-\(setting.rawValue)-line")
+        }
+        Note(text: sound.note).padding(.top, 8)
+    }
+
+    /// Subtitle timing under the subtitle tracks, while one is on: one row
+    /// whose Left is Earlier and Right is Later, a tenth of a second a press,
+    /// held to repeat, with the cue under the panel moving as it goes; where
+    /// it is saved; and Reset and an admin's Save for everyone, which Select presses.
+    @ViewBuilder
+    private func timingRows(_ timing: SubtitleTimingState) -> some View {
+        TVGroupLabel(TimingWords.title).padding(.leading, 24).padding(.top, 20).padding(.bottom, 6)
+        TimingRow(timing: timing) { later in model.moveTiming(later: later) }
+        if timing.shared {
+            Note(text: TimingWords.setForEveryone, tone: .strong).accessibilityIdentifier("player-timing-shared")
+        }
+        Note(text: timing.burnedIn && !timing.failed ? TimingWords.burnedIn : timing.line, tone: timing.failed ? .warning : .muted)
+            .accessibilityIdentifier("player-timing-line")
+        // Reset and Save for everyone go once they would do nothing, but not
+        // from under focus: pressed, each stays, dimmed, until focus moves on
+        // (a focused button that turns off keeps focus), so focus doesn't
+        // jump to the top of the panel.
+        let reset = timing.canReset || focus == "timing:reset"
+        let everyone = timing.canSaveForEveryone || focus == "timing:everyone"
+        if reset || everyone {
+            HStack(spacing: 16) {
+                if reset {
+                    Button(TimingWords.reset) { model.resetTiming() }
+                        .buttonStyle(TVButtonStyle(height: 72, fontSize: 29))
+                        .disabled(!timing.canReset)
+                        .focused($focus, equals: "timing:reset")
+                        .accessibilityIdentifier("player-timing-reset")
+                }
+                if everyone {
+                    Button(TimingWords.saveForEveryone) { model.saveTimingForEveryone() }
+                        .buttonStyle(TVButtonStyle(height: 72, fontSize: 29))
+                        .disabled(!timing.canSaveForEveryone)
+                        .focused($focus, equals: "timing:everyone")
+                        .accessibilityIdentifier("player-timing-everyone")
+                }
+            }
+            .padding(.top, 12)
+            .padding(.leading, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .focusSection()
+        }
+        if timing.canSaveForEveryone {
+            Note(text: TimingWords.saveForEveryoneLine)
+        }
+        if timing.savedForEveryone {
+            Text("\(Text("✓").foregroundStyle(Palette.gold).fontWeight(.bold)) \(TimingWords.savedForEveryone)")
+                .font(.tv(.caption2, .semibold))
+                .foregroundStyle(Palette.textSecondary)
+                .padding(.horizontal, 24)
+                .padding(.top, 12)
+                .accessibilityIdentifier("player-timing-saved-everyone")
+        }
+    }
+
     /// What the server's online provider found, its note and its credit,
     /// under a row back to the subtitle list.
     @ViewBuilder
@@ -183,17 +281,111 @@ private struct WhatIsPlaying: View {
     }
 }
 
-/// A muted line among the rows: the quality note, the provider's credit.
+/// A muted line among the rows: the quality note, the provider's credit,
+/// a setting's line (brighter while it changes, orange when it couldn't).
 private struct Note: View {
+    enum Tone { case muted, strong, warning }
+
     let text: String
+    var tone = Tone.muted
 
     var body: some View {
         Text(text)
             .font(.tv(.caption2))
-            .foregroundStyle(Palette.muted)
+            .foregroundStyle(tone == .warning ? Palette.warning : tone == .strong ? Palette.textSecondary : Palette.muted)
             .padding(.horizontal, 24)
             .padding(.vertical, 4)
             .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// A sound level's pill: a tick before the chosen one, a spinner while it is being applied.
+private struct SoundPillLabel: View {
+    let level: SoundLevel
+    let chosen: Bool
+    let busy: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if busy {
+                ProgressView().controlSize(.small).scaleEffect(0.7).frame(width: 22, height: 22)
+            } else if chosen {
+                // In the words, so the focused button doesn't enlarge an image beside them.
+                Text("\(Image(systemName: "checkmark"))").font(.tv(.caption2, .bold))
+            }
+            Text(level.label)
+        }
+    }
+}
+
+/// A pill beside a sound setting's name, 64 pt high: gold tinted when
+/// chosen, white when focused.
+private struct SoundPillStyle: ButtonStyle {
+    let chosen: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        Styled(configuration: configuration, chosen: chosen)
+    }
+
+    private struct Styled: View {
+        let configuration: Configuration
+        let chosen: Bool
+        @Environment(\.isFocused) private var focused
+        @Environment(\.isEnabled) private var enabled
+
+        var body: some View {
+            let pressed = configuration.isPressed && focused
+            configuration.label
+                .font(.tv(.body, .semibold))
+                .foregroundStyle(focused ? Palette.ground : chosen ? Palette.gold : Palette.textSecondary)
+                .padding(.horizontal, 26)
+                .frame(height: 64)
+                .background(focused ? (pressed ? Color.tvPressed : Palette.text) : chosen ? Palette.gold.opacity(0.16) : .white.opacity(0.08),
+                            in: Capsule())
+                .scaleEffect(focused && !pressed ? 1.06 : 1)
+                .shadow(color: .black.opacity(focused ? 0.6 : 0), radius: focused ? 20 : 0, y: focused ? 16 : 0)
+                .animation(.easeOut(duration: 0.15), value: focused)
+                .opacity(enabled ? 1 : 0.45)
+        }
+    }
+}
+
+/// The timing row: Earlier at the left, the value, Later at the right.
+/// Left and Right change it rather than move focus (``TimingStepper``);
+/// Up and Down leave it.
+private struct TimingRow: View {
+    let timing: SubtitleTimingState
+    let move: (Bool) -> Void
+    @State private var focused = false
+
+    var body: some View {
+        ZStack {
+            TimingStepper(value: timing.value, move: move, focused: $focused)
+            HStack(spacing: 16) {
+                Text("\(Image(systemName: "chevron.left")) \(TimingWords.earlier)")
+                    .font(.tv(.caption1, .semibold))
+                    .foregroundStyle(focused ? Color(hex: 0x3A3A3F) : Palette.muted)
+                    .frame(width: 170, alignment: .leading)
+                Text(timing.value)
+                    .font(.tv(.body, .bold).monospacedDigit())
+                    .foregroundStyle(focused ? Palette.ground : Palette.text)
+                    .contentTransition(.numericText())
+                    .frame(maxWidth: .infinity)
+                Text("\(TimingWords.later) \(Image(systemName: "chevron.right"))")
+                    .font(.tv(.caption1, .semibold))
+                    .foregroundStyle(focused ? Color(hex: 0x3A3A3F) : Palette.muted)
+                    .frame(width: 170, alignment: .trailing)
+            }
+            .padding(.horizontal, 28)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+        .frame(minHeight: 76)
+        .background(focused ? Palette.text : .white.opacity(0.07), in: RoundedRectangle(cornerRadius: 16))
+        .scaleEffect(focused ? 1.03 : 1)
+        .shadow(color: .black.opacity(focused ? 0.6 : 0), radius: focused ? 20 : 0, y: focused ? 16 : 0)
+        .animation(.easeOut(duration: 0.15), value: focused)
+        .padding(.horizontal, 4)
     }
 }
 
@@ -268,6 +460,92 @@ private struct MenuItemStyle: ButtonStyle {
             .animation(.easeOut(duration: 0.15), value: focused)
             .opacity(enabled ? 1 : 0.45)
             .accessibilityAddTraits(ticked == true ? .isSelected : [])
+        }
+    }
+}
+
+/// A focusable row that takes Left and Right itself, for a value changed
+/// a step at a time: the focus engine would otherwise move focus to the
+/// other column. A press steps once; held, it steps again after half a
+/// second and then every tenth of a second. VoiceOver adjusts it as a
+/// slider.
+private struct TimingStepper: UIViewRepresentable {
+    let value: String
+    let move: (Bool) -> Void
+    @Binding var focused: Bool
+
+    func makeUIView(context: Context) -> StepperView {
+        let view = StepperView()
+        view.isAccessibilityElement = true
+        view.accessibilityLabel = TimingWords.title
+        view.accessibilityTraits = .adjustable
+        view.accessibilityIdentifier = "player-timing"
+        return view
+    }
+
+    func updateUIView(_ view: StepperView, context: Context) {
+        view.move = move
+        view.accessibilityValue = value
+        let focused = $focused
+        view.focusChanged = { focused.wrappedValue = $0 }
+    }
+
+    final class StepperView: UIView {
+        var move: ((Bool) -> Void)?
+        var focusChanged: ((Bool) -> Void)?
+        private var held: UIPress.PressType?
+        private var repeating: Timer?
+
+        override var canBecomeFocused: Bool { true }
+
+        override func shouldUpdateFocus(in context: UIFocusUpdateContext) -> Bool {
+            if context.previouslyFocusedItem === self, context.focusHeading.contains(.left) || context.focusHeading.contains(.right) {
+                return false
+            }
+            return super.shouldUpdateFocus(in: context)
+        }
+
+        override func didUpdateFocus(in context: UIFocusUpdateContext, with coordinator: UIFocusAnimationCoordinator) {
+            super.didUpdateFocus(in: context, with: coordinator)
+            focusChanged?(isFocused)
+            if !isFocused { stop() }
+        }
+
+        override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+            guard let press = presses.first(where: { $0.type == .leftArrow || $0.type == .rightArrow }) else {
+                return super.pressesBegan(presses, with: event)
+            }
+            let type = press.type
+            let later = type == .rightArrow
+            move?(later)
+            stop()
+            held = type
+            repeating = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self, self.held == type else { return }
+                    self.move?(later)
+                    self.repeating = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+                        MainActor.assumeIsolated { self?.move?(later) }
+                    }
+                }
+            }
+        }
+
+        override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+            if presses.contains(where: { $0.type == held }) { stop() } else { super.pressesEnded(presses, with: event) }
+        }
+
+        override func pressesCancelled(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+            if presses.contains(where: { $0.type == held }) { stop() } else { super.pressesCancelled(presses, with: event) }
+        }
+
+        override func accessibilityIncrement() { move?(true) }
+        override func accessibilityDecrement() { move?(false) }
+
+        private func stop() {
+            held = nil
+            repeating?.invalidate()
+            repeating = nil
         }
     }
 }

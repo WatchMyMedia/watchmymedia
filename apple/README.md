@@ -134,6 +134,14 @@ code, so `-open watchmymedia://play/9101 -playerKeepControls -playerScrub 0.44`
 holds the scrubber at 44 % with its tile up.
 `-playerPanel episodes|audio|subtitles|quality` opens that panel beside the
 picture, or its tab under the fold, on the iPhone Duo's inner screen.
+`-fakesDialogue` puts the fakes' server at API level 35: Settings › Audio &
+subtitles has Sound (Boost dialogue and Reduce loud sounds) and Subtitle size
+with its preview, and the player's options have Sound under the audio tracks
+and Subtitle timing under the subtitles. With it, `-playerSubtitle s4
+-playerTiming 400` starts that subtitle 0.4 s later, `-playerTimingShared 600`
+as a timing an admin saved for everyone, and `-fakesSaveFails timing` refuses
+the timing's saves. `UITests/DialogueTests.swift` and
+`TVUITests/DialogueTests.swift` run them.
 
 The fakes' server is at API level 6, so requests, missing episodes
 and deleting show: Harbor Lights' season 2
@@ -275,7 +283,8 @@ to see a row say why.
 `-settingsGroup playback|languages|homeRows|account|requests|server|about`
 shows a group with focus on it at launch; `-renameDevice`, `-changePassword`,
 `-serverSettingsCode`, `-signOutQuestion`, `-addServer`,
-`-serverPage <server id>`, `-subtitlesSettings` (with `-addLanguage audio|subtitles`) and
+`-serverPage <server id>`, `-subtitlesSettings` (with `-addLanguage audio|subtitles`),
+`-subtitleSizeSettings` (with `-fakesDialogue`) and
 `-homeRowsSettings` open the rest, in debug builds.
 `TVUITests/SettingsTests.swift` drives them with the remote.
 

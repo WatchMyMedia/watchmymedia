@@ -19,6 +19,8 @@ import WMMPlayback
 /// the server at API level 22, with arranged rows and lists.
 /// `-fakesFollows` puts it at API level 29: the bell on a show's page,
 /// Settings › Notifications' list and Home's New from shows you follow.
+/// `-fakesDialogue` puts it at API level 35: Boost dialogue and Reduce loud
+/// sounds, Subtitle size, and subtitle timing in the player.
 /// `-fakesRedesign` puts it at API level 34: the cast as people who open
 /// their titles, a card's counts, the library's totals and rating filter,
 /// and Remove from Continue watching (`-fakesServers` does too).
@@ -44,7 +46,8 @@ enum ServicesFactory {
             profile: profile,
             library: data.library,
             // Now Playing's picture. No `servers`: the AirPlay restart is the sender's, never the TV's.
-            images: data.images
+            images: data.images,
+            viewerIsAdmin: { data.auth.user?.isAdmin == true }
         )
         let services = data.makeAppServices(playback: playback, livePlayback: LivePlaybackEngine(repository: data.liveTV, profile: profile, userAgent: APIPlaybackGateway.userAgent))
         // Another server signed in to, for one card: a title opened in place, a copy played from there.
@@ -82,7 +85,8 @@ enum ServicesFactory {
             related: arguments.contains("-fakesRelated"),
             watchlists: arguments.contains("-fakesWatchlists"),
             several: arguments.contains("-fakesServers"),
-            redesign: arguments.contains("-fakesRedesign") || arguments.contains("-fakesServers")
+            redesign: arguments.contains("-fakesRedesign") || arguments.contains("-fakesServers"),
+            dialogue: arguments.contains("-fakesDialogue")
         )
         (services.library as? FakeLibraryRepository)?.firstRun = FakeFirstRunState.from(arguments)
         // The server in use doesn't answer at all: Home's Can't reach.
