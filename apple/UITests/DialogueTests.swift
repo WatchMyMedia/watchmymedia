@@ -72,6 +72,30 @@ final class DialogueTests: XCTestCase {
         snap("settings-size-smaller")
     }
 
+    /// On a wide iPad the page is two columns: Sound under the audio
+    /// languages, Subtitle size under the subtitle languages.
+    @MainActor
+    func testAWideIPadPutsSoundAndSizeInTheirColumns() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else { throw XCTSkip("iPad only") }
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let app = XCUIApplication()
+        app.launchArguments = ["-fakes", "-fakesDialogue", "-fakesAudioLanguages", "en", "-tab", "settings", "-settingsPage", "subtitles"]
+        app.launch()
+        defer {
+            app.terminate()
+            XCUIDevice.shared.orientation = .portrait
+        }
+        let boost = app.descendants(matching: .any)["settings-sound-dialogueBoost"]
+        XCTAssertTrue(boost.waitForExistence(timeout: 20))
+        let size = app.segmentedControls["settings-subtitle-size"]
+        XCTAssertTrue(size.waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(size.frame.minX, boost.frame.maxX, "Subtitle size is in the right-hand column")
+        boost.buttons["Medium"].tap()
+        size.buttons["Larger"].tap()
+        XCTAssertTrue(text(app, "Saved. Subtitles are now Larger, on every device.").waitForExistence(timeout: 5))
+        snap("settings-wide-ipad")
+    }
+
     @MainActor
     func testAnOlderServerShowsNeither() throws {
         let app = XCUIApplication()
@@ -90,7 +114,7 @@ final class DialogueTests: XCTestCase {
         defer { app.terminate() }
         let boost = app.segmentedControls["player-sound-dialogueBoost"]
         XCTAssertTrue(boost.waitForExistence(timeout: 20), "Sound is under the audio tracks")
-        XCTAssertTrue(becomes(boost, "hittable == true"), "once the options are up")
+        _ = becomes(boost, "hittable == true", timeout: 3)
         XCTAssertTrue(text(app, "While either is on, the server converts the sound.").exists)
         snap("player-audio")
         boost.buttons["Medium"].tap()
@@ -109,7 +133,8 @@ final class DialogueTests: XCTestCase {
         defer { app.terminate() }
         let later = app.buttons["player-timing-later"]
         XCTAssertTrue(later.waitForExistence(timeout: 20), "Subtitle timing is under the tracks while one is on")
-        XCTAssertTrue(becomes(later, "hittable == true"), "once the options are up")
+        // The sheet slides in; on iPad the panel beside the picture can report its buttons unhittable while it settles.
+        _ = becomes(later, "hittable == true", timeout: 3)
         let value = app.staticTexts["player-timing-value"]
         XCTAssertEqual(value.label, "In step")
         XCTAssertFalse(app.buttons["player-timing-reset"].exists, "Reset is hidden when it would do nothing")

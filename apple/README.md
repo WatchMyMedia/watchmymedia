@@ -141,7 +141,10 @@ and Subtitle timing under the subtitles. With it, `-playerSubtitle s4
 -playerTiming 400` starts that subtitle 0.4 s later, `-playerTimingShared 600`
 as a timing an admin saved for everyone, and `-fakesSaveFails timing` refuses
 the timing's saves. `UITests/DialogueTests.swift` and
-`TVUITests/DialogueTests.swift` run them.
+`TVUITests/DialogueTests.swift` run them. `UITests/DialogueServerTests.swift`
+runs the timing against a server at API level 35: an admin's run saves a
+subtitle's timing for everyone, then another person's run, on a fresh install,
+gets it and resets their own back to it (its comment has the variables).
 
 The fakes' server is at API level 6, so requests, missing episodes
 and deleting show: Harbor Lights' season 2
