@@ -89,6 +89,10 @@ Play on a TV and use the phone or browser as the remote:
 - **AirPlay** from Safari on a Mac, iPhone or iPad: the player's AirPlay button sends the
   stream to an Apple TV or AirPlay TV. The iPhone and iPad app also supports AirPlay.
 
+The casting controls in the web app, the Android app and the iPhone and iPad app also change
+Boost dialogue, Reduce loud sounds and subtitle timing for what's playing on the TV, and the TV
+draws subtitles at the size of the person who cast ([Accessibility](accessibility.md)).
+
 The sender hands the TV a cast token: it plays, reports progress and reads your playback
 settings for 12 hours at a time, renewed while you stay signed in, and stops when the phone or
 browser that cast signs out. Settings in `config.yaml` (`cast:`) or the environment:

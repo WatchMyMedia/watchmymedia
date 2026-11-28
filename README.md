@@ -51,6 +51,15 @@ accounts and what you watch stay on your own computer.
 - Chromecast, Google TV and AirPlay
 - Downloads to watch offline on iPhone, iPad and Android phones and tablets
 
+**Accessibility**
+
+- Boost dialogue and Reduce loud sounds, Off, Medium or High, the same in every app, on Cast
+  and on Live TV
+- Subtitle size for each person, on top of the device's own caption settings on iPhone, iPad,
+  Apple TV and Android phones
+- Subtitle timing: move a track's subtitles earlier or later, kept on all your devices, and
+  saved for everyone by an admin
+
 **Live TV**
 
 - Antenna channels from an HDHomeRun tuner, in a browser and in the apps
@@ -138,6 +147,7 @@ reference in [docs/](docs/README.md) has every setting and detail:
 [The library and the web app](docs/library.md) ·
 [Apps, casting and downloads](docs/apps.md) ·
 [Playback and transcoding](docs/playback.md) ·
+[Accessibility](docs/accessibility.md) ·
 [Live TV and recording](docs/live-tv.md) ·
 [Plex, Radarr, Sonarr and Seerr](docs/integrations.md) ·
 [Watching away from home](docs/remote-access.md) ·
