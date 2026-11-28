@@ -96,7 +96,7 @@ func (m *Sessions) startShared(ctx context.Context, owner Owner, channelID, qual
 		runCtx, cancel := context.WithCancel(m.ctx)
 		s := &session{shared: true, owner: owner, requestID: requestID, sourceID: source.ID,
 			address: source.Address, deviceID: source.DeviceID, path: channel.StreamPath,
-			ctx: runCtx, cancel: cancel, done: make(chan struct{}), ready: make(chan struct{}), interactedAt: now, profile: profile, parentID: parentID}
+			ctx: runCtx, cancel: cancel, done: make(chan struct{}), ready: make(chan struct{}), interactedAt: now, profile: profile, effects: owner.Effects, parentID: parentID}
 		s.startOrder = m.startOrder
 		s.outputKind = outputKind
 		if automatic {

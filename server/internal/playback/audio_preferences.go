@@ -15,7 +15,14 @@ import (
 // the decision's track.
 type AudioPreferences struct {
 	Languages []string `json:"languages" nullable:"false" doc:"Preferred BCP 47 languages for the audio track, in order. Empty plays the file's default track."`
+	// DialogueBoost and ReduceLoudSounds are plain strings, not enums, so a
+	// strength added later doesn't break an app that reads them.
+	DialogueBoost    string `json:"dialogueBoost" required:"false" doc:"Boost dialogue: off, medium or high. While it or reduceLoudSounds is on, the server converts the sound of every play of this person's except downloads (API level 35)."`
+	ReduceLoudSounds string `json:"reduceLoudSounds" required:"false" doc:"Reduce loud sounds: off, medium or high (API level 35)."`
 }
+
+// Effects are the sound settings as a play's request carries them.
+func (p AudioPreferences) Effects() AudioEffects { return Effects(p.DialogueBoost, p.ReduceLoudSounds) }
 
 // DefaultAudioIndex is the stream Decide plays when a request names none:
 // the first default-flagged audio stream, else the first; -1 when the file

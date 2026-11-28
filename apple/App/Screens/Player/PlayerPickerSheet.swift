@@ -156,8 +156,16 @@ struct PlayerPickerSheet: View {
         .accessibilityAddTraits(.isModal)
     }
 
+    /// A tab's column. The sheet pauses the video, so the subtitles' column
+    /// shows the paused frame's cue moving as the timing changes. The chosen
+    /// tab's column opens scrolled to its end, where Sound and Subtitle
+    /// timing are, under the tracks.
     private func column(_ tab: PickerTab, _ state: PlayerState, large: Bool = false) -> some View {
-        ScrollView { PlayerOptionSections(model: model, tab: tab, large: large) }
+        let extra = (tab == .audio && state.sound != nil) || (tab == .subtitles && state.timing != nil)
+        return ScrollView {
+            PlayerOptionSections(model: model, tab: tab, large: large, pausedCue: true)
+        }
+        .defaultScrollAnchor(extra && tab == self.tab ? .bottom : .top)
     }
 }
 
@@ -170,6 +178,9 @@ struct PlayerOptionSections: View {
     var large = false
     /// The heading over the choices; off where a tab or panel names them already.
     var heading = true
+    /// Subtitle timing shows the paused frame's cue: the sheet that pauses
+    /// covers the picture's own.
+    var pausedCue = false
 
     var body: some View {
         sectionContent(tab, model.state, large: large)
@@ -203,6 +214,9 @@ struct PlayerOptionSections: View {
         ForEach(state.audio) { a in
             OptionRow(label: audioOptionLabel(a), selected: a.index == state.selectedAudio, large: large) { model.pickAudio(a.index) }
         }
+        if let sound = state.sound {
+            SoundOptions(sound: sound, large: large) { model.setSound($0, to: $1) }
+        }
     }
 
     @ViewBuilder
@@ -230,6 +244,10 @@ struct PlayerOptionSections: View {
                     .padding(.horizontal, large ? 12 : 10)
                     .padding(.vertical, 2)
             }
+        }
+        if let timing = state.timing {
+            TimingOptions(timing: timing, large: large, pausedCue: pausedCue ? model.clock : nil,
+                          move: { model.moveTiming(later: $0) }, reset: { model.resetTiming() }, share: { model.saveTimingForEveryone() })
         }
     }
 
@@ -328,5 +346,226 @@ private struct OptionRow: View {
         case .downloading:
             ProgressView().controlSize(.small).tint(Palette.gold).frame(width: 22, height: 22)
         }
+    }
+}
+
+/// A small heading inside a tab's list: SOUND, SUBTITLE TIMING.
+struct OptionsSubheading: View {
+    let text: String
+    let large: Bool
+
+    var body: some View {
+        Text(text.uppercased())
+            .font(.system(size: large ? 11 : 10, weight: .semibold))
+            .tracking(0.6)
+            .foregroundStyle(Palette.faint)
+            .padding(.horizontal, large ? 12 : 0)
+            .padding(.top, large ? 14 : 8)
+            .padding(.bottom, 2)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// Boost dialogue and Reduce loud sounds under the audio tracks: each a
+/// choice of Off, Medium and High with its line, and what turning either
+/// on does. A choice is saved and the play reloads where it is; the
+/// options stay open and the row says it is changing the sound until it
+/// plays again. A download keeps its own sound: the choices are off. The
+/// Cast remote shows the same, for the TV's play.
+struct SoundOptions: View {
+    let sound: PlayerSound
+    let large: Bool
+    let pick: (SoundSetting, SoundLevel) -> Void
+
+    var body: some View {
+        OptionsSubheading(text: SoundWords.heading, large: large)
+        ForEach(SoundSetting.allCases, id: \.self) { setting in
+            VStack(alignment: .leading, spacing: 4) {
+                Text(setting.title)
+                    .font(.system(size: large ? 15 : 14, weight: .semibold))
+                    .foregroundStyle(Palette.text)
+                line(setting)
+                Picker(setting.title, selection: Binding(get: { sound[setting] }, set: { level in
+                    guard sound.enabled else { return }
+                    pick(setting, level)
+                })) {
+                    ForEach(SoundLevel.allCases, id: \.self) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .controlSize(.small)
+                .disabled(sound.download)
+                .allowsHitTesting(sound.enabled)
+                .accessibilityIdentifier("player-sound-\(setting.rawValue)")
+            }
+            .padding(.horizontal, large ? 12 : 2)
+            .padding(.vertical, 6)
+            .accessibilityElement(children: .contain)
+        }
+        Text(sound.note)
+            .font(.system(size: large ? 11 : 10))
+            .foregroundStyle(Palette.faint)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, large ? 12 : 2)
+            .padding(.top, 2)
+            .accessibilityIdentifier("player-sound-note")
+    }
+
+    @ViewBuilder private func line(_ setting: SoundSetting) -> some View {
+        let text = sound.line(setting)
+        HStack(spacing: 5) {
+            if sound.busy == setting { ProgressView().controlSize(.mini).tint(Palette.gold) }
+            Text(text)
+                .font(.system(size: large ? 12 : 11))
+                .foregroundStyle(sound.failed == setting ? Palette.warning : sound.busy == setting ? Palette.textSecondary : Palette.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("player-sound-\(setting.rawValue)-line")
+    }
+}
+
+/// Subtitle timing under the subtitle tracks, while one is on: the value
+/// and Reset, Earlier and Later (held, they repeat), where it is saved,
+/// and an admin's Save for everyone. The cues move as it is pressed; where
+/// the options pause the video (`pausedCue`, the player's clock), the
+/// paused frame's cue shows here, since the sheet covers the picture's.
+/// The Cast remote shows the same, for the TV's cues.
+struct TimingOptions: View {
+    let timing: SubtitleTimingState
+    let large: Bool
+    let pausedCue: PlayerClock?
+    let move: (Bool) -> Void
+    let reset: () -> Void
+    let share: () -> Void
+
+    var body: some View {
+        OptionsSubheading(text: TimingWords.title, large: large)
+        VStack(alignment: .leading, spacing: 4) {
+            if let pausedCue, !timing.burnedIn {
+                PausedCue(clock: pausedCue)
+            }
+            if timing.burnedIn {
+                Text(TimingWords.burnedIn)
+                    .font(.system(size: large ? 12 : 11))
+                    .foregroundStyle(Palette.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(timing.value)
+                    .font(.system(size: large ? 16 : 15, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(Palette.text)
+                    .contentTransition(.numericText())
+                    .accessibilityIdentifier("player-timing-value")
+                Spacer(minLength: 8)
+                if timing.canReset {
+                    Button(TimingWords.reset, action: reset)
+                        .buttonStyle(GoldTextButtonStyle(font: .system(size: large ? 15 : 14, weight: .semibold)))
+                        .frame(minHeight: 32)
+                        .accessibilityIdentifier("player-timing-reset")
+                }
+            }
+            .frame(minHeight: 32)
+            if timing.shared {
+                Text(TimingWords.setForEveryone)
+                    .font(.system(size: large ? 12 : 11))
+                    .foregroundStyle(Palette.textSecondary)
+                    .accessibilityIdentifier("player-timing-shared")
+            }
+            HStack(spacing: 2) {
+                stepButton(TimingWords.earlier, later: false, enabled: timing.canMoveEarlier)
+                stepButton(TimingWords.later, later: true, enabled: timing.canMoveLater)
+            }
+            .padding(2)
+            .background(Palette.outline, in: RoundedRectangle(cornerRadius: 9))
+            .padding(.top, 2)
+            Text(timing.line)
+                .font(.system(size: timing.failed ? (large ? 12 : 11) : (large ? 11 : 10)))
+                .foregroundStyle(timing.failed ? Palette.warning : Palette.faint)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("player-timing-line")
+            if timing.canSaveForEveryone {
+                Button(action: share) {
+                    Text(TimingWords.saveForEveryone)
+                        .font(.system(size: large ? 14 : 13, weight: .semibold))
+                        .foregroundStyle(Palette.text)
+                        .frame(maxWidth: .infinity, minHeight: 32)
+                        .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                        .contentShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(.plain)
+                .disabled(timing.save == .saving)
+                .padding(.top, 4)
+                .accessibilityIdentifier("player-timing-everyone")
+                Text(TimingWords.saveForEveryoneLine)
+                    .font(.system(size: large ? 11 : 10))
+                    .foregroundStyle(Palette.faint)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if timing.savedForEveryone {
+                Text("\(Text("✓").foregroundStyle(Palette.gold).fontWeight(.bold)) \(TimingWords.savedForEveryone)")
+                    .font(.system(size: large ? 13 : 12, weight: .semibold))
+                    .foregroundStyle(Palette.textSecondary)
+                    .padding(.top, 4)
+                    .accessibilityIdentifier("player-timing-saved-everyone")
+            }
+        }
+        .padding(.horizontal, large ? 12 : 2)
+        .padding(.top, 4)
+        .accessibilityElement(children: .contain)
+    }
+
+    /// Earlier or Later: one step a press, repeating while held.
+    private func stepButton(_ title: String, later: Bool, enabled: Bool) -> some View {
+        Button { move(later) } label: {
+            Text(title)
+                .font(.system(size: large ? 14 : 13, weight: .semibold))
+                .foregroundStyle(Palette.text)
+                .frame(maxWidth: .infinity, minHeight: large ? 32 : 28)
+                .background(Palette.outlineStrong, in: RoundedRectangle(cornerRadius: 7))
+                .contentShape(RoundedRectangle(cornerRadius: 7))
+        }
+        .buttonStyle(.plain)
+        .buttonRepeatBehavior(.enabled)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.45)
+        .accessibilityHint(later ? "Shows each subtitle 0.1 seconds later" : "Shows each subtitle 0.1 seconds sooner")
+        .accessibilityIdentifier(later ? "player-timing-later" : "player-timing-earlier")
+    }
+}
+
+/// The paused frame and its cue, in a small picture, while the sheet that
+/// pauses the video covers the picture's own: the time, and the cue drawn
+/// at the player's place, moving as the timing does.
+private struct PausedCue: View {
+    let clock: PlayerClock
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            LinearGradient(stops: [.init(color: Color(hex: 0x14262E), location: 0), .init(color: Color(hex: 0x21404D), location: 0.55),
+                                   .init(color: Color(hex: 0x0B1418), location: 1)], startPoint: .top, endPoint: .bottom)
+            Text(formatClock(ms: clock.positionMs))
+                .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.white.opacity(0.7))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(.leading, 6)
+                .padding(.top, 4)
+            if let line = SubtitleCuesView.lines(clock.cues).first {
+                Text(line)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 2))
+                    .padding(.bottom, 6)
+                    .transition(.opacity)
+            }
+        }
+        .frame(height: 50)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .animation(.easeOut(duration: 0.15), value: clock.cues)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(SubtitleCuesView.lines(clock.cues).first.map { "The subtitle at \(formatClock(ms: clock.positionMs)): \($0)" } ?? "No subtitle at \(formatClock(ms: clock.positionMs))")
+        .accessibilityIdentifier("player-timing-cue")
     }
 }

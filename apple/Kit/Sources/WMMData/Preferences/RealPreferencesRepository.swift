@@ -75,7 +75,9 @@ final class RealPreferencesRepository: PreferencesRepository {
 
     /// Sends only what changed, and the audio
     /// languages and foreignAudio only to a server at
-    /// ``ServerFeatures/audioLanguages``, since older ones reject them.
+    /// ``ServerFeatures/audioLanguages``, and the sound settings and
+    /// subtitle size only to one at ``ServerFeatures/dialogueAndSubtitles``,
+    /// since older ones reject them.
     func setLanguages(_ edit: LanguageChange) async throws {
         let features = store.features
         guard features.subtitlePreferences else {
@@ -84,15 +86,25 @@ final class RealPreferencesRepository: PreferencesRepository {
         guard features.audioLanguages || !edit.needsAudioLanguages else {
             throw APIError(status: nil, message: "Update the server to use audio languages.")
         }
+        guard features.dialogueAndSubtitles || !edit.needsDialogueAndSubtitles else {
+            throw APIError(status: nil, message: "Update the server to change the sound and the subtitle size.")
+        }
         guard !edit.isEmpty else { return }
         let subtitles: Components.Schemas.UpdateSubtitlePreferences? =
-            edit.subtitleLanguages == nil && edit.choice == nil && edit.automaticDownload == nil ? nil : .init(
+            edit.subtitleLanguages == nil && edit.choice == nil && edit.automaticDownload == nil && edit.subtitleSize == nil ? nil : .init(
                 automaticDownload: edit.automaticDownload,
                 foreignAudio: features.audioLanguages ? edit.choice?.foreignAudio : nil,
                 languages: edit.subtitleLanguages,
-                mode: edit.choice?.mode.rawValue
+                mode: edit.choice?.mode.rawValue,
+                size: edit.subtitleSize?.rawValue
             )
-        try await change({ edit.apply(to: &$0) }, body: .init(audio: edit.audioLanguages.map { .init(languages: $0) }, subtitles: subtitles))
+        let audio: Components.Schemas.UpdateAudioPreferences? =
+            edit.audioLanguages == nil && edit.dialogueBoost == nil && edit.reduceLoudSounds == nil ? nil : .init(
+                dialogueBoost: edit.dialogueBoost?.rawValue,
+                languages: edit.audioLanguages,
+                reduceLoudSounds: edit.reduceLoudSounds?.rawValue
+            )
+        try await change({ edit.apply(to: &$0) }, body: .init(audio: audio, subtitles: subtitles))
     }
 
     func setQuality(_ quality: StreamQuality) {

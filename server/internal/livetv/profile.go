@@ -31,6 +31,7 @@ type SourceInfo struct {
 	Height        int
 	Bitrate       int64
 	AudioChannels int
+	AudioLayout   string // ffprobe's channel layout, such as 5.1(side)
 	AudioPresent  bool
 	Interlaced    bool
 	ScanKnown     bool
@@ -51,6 +52,34 @@ type LivePlan struct {
 	// audioChannels is what a conversion may keep (liveAudioChannels); video
 	// mode keeps more than two only at liveSurroundVideoKbps or above.
 	audioChannels int
+	// effects are the viewer's sound settings, which a conversion applies
+	// to the broadcast's audio, of layout and sourceChannels, with what
+	// ffmpeg's filters allow.
+	effects        playback.AudioEffects
+	audioLayout    string
+	sourceChannels int
+	filters        playback.AudioFilters
+}
+
+// withEffects applies the viewer's sound settings: the broadcast's sound is
+// converted, even where it would have been copied, and the picture is sent
+// as it would have been. Original and remux become audio mode.
+func (plan LivePlan) withEffects(effects playback.AudioEffects, filters playback.AudioFilters, profile *LiveProfile, source SourceInfo) LivePlan {
+	effects, _ = effects.Within(filters)
+	if !effects.On() {
+		return plan
+	}
+	if plan.Mode == "original" || plan.Mode == "remux" {
+		plan.Mode, plan.Reason = "audio", "sound_settings"
+		plan.audioChannels = liveAudioChannels(profile, source)
+	}
+	if plan.Mode == "video" && plan.copyAudio {
+		plan.copyAudio = false
+		plan.audioChannels = liveAudioChannels(profile, source)
+	}
+	plan.effects, plan.filters = effects, filters
+	plan.audioLayout, plan.sourceChannels = source.AudioLayout, source.AudioChannels
+	return plan
 }
 
 // Live audio conversions are AAC: stereo at 192 kbps, as before, or up to 5.1

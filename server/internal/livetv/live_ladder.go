@@ -59,6 +59,8 @@ type liveFamily struct {
 	master    []byte
 	last      int
 	advanced  bool
+	// sound carries the viewer's sound settings for the common audio.
+	sound LivePlan
 }
 
 func newLiveFamily(source SourceInfo, profile *LiveProfile, quality string) (*liveFamily, error) {
@@ -105,7 +107,7 @@ func (f *liveFamily) args(dir string) []string {
 		n := strconv.Itoa(i)
 		a = append(a, "-b:v:"+n, strconv.FormatInt(rung.bitrate, 10), "-maxrate:v:"+n, strconv.FormatInt(rung.bitrate, 10), "-bufsize:v:"+n, strconv.FormatInt(2*rung.bitrate, 10), "-force_key_frames:v:"+n, "expr:gte(t,n_forced*2)")
 	}
-	a = append(a, "-c:a", "aac", "-ac", "2", "-ar", "48000", "-b:a", "192k", "-af", "aresample=async=1:first_pts=0",
+	a = append(a, "-c:a", "aac", "-ac", "2", "-ar", "48000", "-b:a", "192k", "-af", f.sound.effectsFilter(2)+liveResample,
 		"-f", "hls", "-hls_time", "2", "-hls_list_size", "30", "-hls_delete_threshold", "30", "-hls_flags", "delete_segments+temp_file+independent_segments+omit_endlist",
 		"-hls_segment_type", "fmp4", "-hls_fmp4_init_filename", "%v-init.mp4", "-var_stream_map", "v:0,agroup:audio,name:low v:1,agroup:audio,name:high a:0,agroup:audio,default:yes,name:audio",
 		"-hls_segment_filename", filepath.ToSlash(filepath.Join(dir, "%v-segment-%09d.m4s")), filepath.ToSlash(filepath.Join(dir, "%v-live.m3u8")))

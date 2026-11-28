@@ -138,6 +138,28 @@ class FakeGateway(private val clock: Clock) : PlaybackGateway {
         downloads += resultId
         return download(resultId)
     }
+
+    /** Each timing call: "put s3 400", "put s3 400 everyone", "delete s3". */
+    val timingCalls = mutableListOf<String>()
+
+    /** Set, the next timing call fails with it. */
+    var timingError: Exception? = null
+
+    /** What a Reset gets back: the timing saved for everyone, else 0. */
+    var sharedTiming = 0L
+
+    override suspend fun setSubtitleTiming(fileId: Long, trackId: String, timingMs: Long, everyone: Boolean): media.watchmy.client.model.SavedTiming {
+        timingCalls += "put $trackId $timingMs" + if (everyone) " everyone" else ""
+        timingError?.let { timingError = null; throw it }
+        if (everyone) sharedTiming = timingMs
+        return media.watchmy.client.model.SavedTiming(timingMs, shared = everyone && timingMs != 0L)
+    }
+
+    override suspend fun resetSubtitleTiming(fileId: Long, trackId: String): media.watchmy.client.model.SavedTiming {
+        timingCalls += "delete $trackId"
+        timingError?.let { timingError = null; throw it }
+        return media.watchmy.client.model.SavedTiming(sharedTiming, shared = sharedTiming != 0L)
+    }
 }
 
 /** True while a task of an [OffMainDispatcher] runs: what the app's IO threads are to the player. */
@@ -253,6 +275,8 @@ class FakeMediaPlayer(private val clock: Clock) : MediaPlayer {
         }
         loads += source
         text = source.text
+        timings.clear()
+        source.subtitles.forEach { timings[it.id] = it.timingMs }
         audioOrdinal = source.audioOrdinal
         stalls = Stalls()
         change {
@@ -278,6 +302,14 @@ class FakeMediaPlayer(private val clock: Clock) : MediaPlayer {
     override fun selectText(selection: TextSelection) {
         onItsThread()
         text = selection
+    }
+
+    /** Each side-loaded track's timing, as the controller last set it (or loaded it). */
+    val timings = mutableMapOf<String, Long>()
+
+    override fun setSubtitleTiming(id: String, timingMs: Long) {
+        onItsThread()
+        timings[id] = timingMs
     }
 
     override fun selectAudio(ordinal: Int): Boolean {
@@ -339,6 +371,14 @@ class FakePreferences(initial: PlaybackPreferences = PlaybackPreferences()) : Pr
     override suspend fun setAudioPassthrough(mode: AudioPassthrough) = device.update { it.copy(audioPassthrough = mode) }
 
     override suspend fun setSubtitleSize(size: SubtitleSize) = device.update { it.copy(subtitleSize = size) }
+
+    /** Set, the next sound change fails with it, and the level stays. */
+    var soundError: Exception? = null
+
+    override suspend fun setSound(setting: media.watchmy.client.model.SoundSetting, level: media.watchmy.client.model.SoundLevel) {
+        soundError?.let { soundError = null; throw it }
+        playback.update { it.copy(audio = it.audio.with(setting, level)) }
+    }
 }
 
 class FakeWatchNext : WatchNext {

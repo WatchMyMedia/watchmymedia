@@ -8,6 +8,7 @@ import { scopeName } from './focus'
 import { NavStack } from './nav'
 import { chromeOf, isSection, ROUTES, sameRoute, SECTION_ROUTES, sectionOf, type Route, type ScreenProps, type Section } from './routes'
 import type { ActiveSession } from '../session/active'
+import { useSubtitleSizeMove } from '../session/subtitleSizeMove'
 import type { Arrival } from '../session/session'
 import { Rail } from '../ui/Rail'
 import { Dialog } from '../ui/Overlays'
@@ -58,6 +59,7 @@ function Frame({ nav, entries, arrival, exit }: { nav: NavStack<Route>; entries:
   const state = useAppState()
   const session = useSession()
   const input = useInput()
+  useSubtitleSizeMove()
   const [leaving, setLeaving] = useState(false)
   const [servers, setServers] = useState<'rail' | 'screen'>()
   const [arrived, setArrived] = useState(() => greeted.has(session) ? undefined : arrival?.how)

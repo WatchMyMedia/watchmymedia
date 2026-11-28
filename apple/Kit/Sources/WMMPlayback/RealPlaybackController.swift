@@ -41,6 +41,8 @@ public final class RealPlaybackController: PlaybackController {
     @ObservationIgnored let lookups: any PlaybackLookups
     @ObservationIgnored let servers: (any ServerRepository)?
     @ObservationIgnored let clock: any PlaybackClock
+    /// Whether the person watching is an admin, who may save a subtitle timing for everyone.
+    @ObservationIgnored let viewerIsAdmin: @MainActor () -> Bool
 
     @ObservationIgnored var media: (any MediaPlayer)?
     @ObservationIgnored var session: (any SystemSession)?
@@ -89,6 +91,7 @@ public final class RealPlaybackController: PlaybackController {
     ///   - servers: finds the server's LAN address when AirPlay starts, and
     ///     says whether it can do Automatic quality; nil never looks, and
     ///     plays a saved Automatic as Original.
+    ///   - viewerIsAdmin: whether the person is an admin, read when the player shows Save for everyone.
     public init(
         gateway: any PlaybackGateway,
         preferences: any PreferencesRepository,
@@ -99,8 +102,10 @@ public final class RealPlaybackController: PlaybackController {
         system: (any PlaybackSystem)? = nil,
         lookups: any PlaybackLookups = NoLookups(),
         servers: (any ServerRepository)? = nil,
-        clock: any PlaybackClock
+        clock: any PlaybackClock,
+        viewerIsAdmin: @escaping @MainActor () -> Bool = { false }
     ) {
+        self.viewerIsAdmin = viewerIsAdmin
         self.gateway = gateway.bound()
         self.preferences = preferences
         self.client = client
@@ -398,6 +403,19 @@ public final class RealPlaybackController: PlaybackController {
         /// A switch whose new stream hasn't shown a frame yet.
         var awaitingFrameGeneration: Int64?
         var stepMessage: String?
+        /// A sound setting saved and being applied: its row is busy until the
+        /// play reloaded with it (`soundReloading`) is ready again.
+        var soundBusy: SoundSetting?
+        /// The level it is changing to, shown from the press.
+        var soundBusyLevel: SoundLevel?
+        var soundReloading = false
+        /// The sound setting whose change failed, and the line that says so.
+        var soundFailed: SoundSetting?
+        var soundFailure: String?
+        /// Each subtitle track's timing in this play, by track ID, once shown or moved.
+        var timings: [String: TrackTiming] = [:]
+        /// A track's timing waiting to be saved, a second after its last change.
+        var timingSaves: [String: TimerHandle] = [:]
 
         init(request: PlayRequest, generation: Int, at now: Int) {
             self.request = request
@@ -719,6 +737,7 @@ public final class RealPlaybackController: PlaybackController {
     func endViewing(_ playState: PlayState) {
         guard let v = viewing, !v.stopped else { return }
         PerformanceSignposts.shared.playEnded()
+        flushTimingSaves(v)
         loadTask?.cancel()
         v.loading = false
         if let d = v.decision {
@@ -1006,6 +1025,10 @@ public final class RealPlaybackController: PlaybackController {
         s.selectedAudio = v.selectedAudio
         s.subtitles = d.subtitles.map(\.option)
         s.selectedSubtitle = v.selectedSubtitle
+        settleSound(v, ready: !v.loading && v.loadReady)
+        s.sound = playerSound(v, d)
+        s.timing = timingState(v, d)
+        s.subtitleSize = features.dialogueAndSubtitles ? prefs.subtitles.drawnSize : .normal
         s.cues = cues(v, d, p)
         s.online = v.online
         s.quality = asked

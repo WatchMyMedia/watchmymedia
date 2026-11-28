@@ -47,8 +47,9 @@ func lossless(a probe.AudioStream) bool {
 // in this order:
 //
 //  1. FLAC, for a lossless source, when the video is copied, the play has
-//     no rate cap and is not a download, and the result keeps every channel
-//     or at least six of them: the source's own audio.
+//     no rate cap and FLAC isn't ruled out (a download, or the person's
+//     sound settings, which change the sound), and the result keeps every
+//     channel or at least six of them: the source's own audio.
 //  2. E-AC-3 (or AC-3 where only that is listed), for more than two
 //     channels, when the play may spend the rate and the device takes six
 //     channels as the format: what a receiver on HDMI or ARC takes as a
@@ -58,7 +59,7 @@ func lossless(a probe.AudioStream) bool {
 //
 // The plan keeps a's index. Its Bitrate is the encoder's rate, or for FLAC
 // an estimate.
-func audioTarget(a probe.AudioStream, p Profile, videoCopied, download bool) AudioPlan {
+func audioTarget(a probe.AudioStream, p Profile, videoCopied, noFLAC bool) AudioPlan {
 	n := a.Channels
 	if n <= 0 {
 		n = 2
@@ -75,7 +76,7 @@ func audioTarget(a probe.AudioStream, p Profile, videoCopied, download bool) Aud
 		return c
 	}
 	plan := AudioPlan{Index: a.Index}
-	if lossless(a) && has(p.AudioCodecs, "flac") && videoCopied && p.MaxBitrate == 0 && !download {
+	if lossless(a) && has(p.AudioCodecs, "flac") && videoCopied && p.MaxBitrate == 0 && !noFLAC {
 		if c := within(pcmMax, maxFLACChannels); c == n || c >= 6 {
 			plan.Codec, plan.Channels = "flac", c
 			plan.Bitrate = flacBitrate(a, c)
@@ -162,22 +163,26 @@ func channelLayout(channels int) string {
 	return strconv.Itoa(channels) + " channels"
 }
 
-// audioEncodeArgs are ffmpeg's arguments for a converted track.
+// audioEncodeArgs are ffmpeg's arguments for a converted track: the
+// effects' filters first, when the person has one on.
 func audioEncodeArgs(plan AudioPlan) []string {
 	var a []string
+	if chain := plan.effectsFilter(); chain != "" {
+		a = append(a, "-af", chain)
+	}
 	switch plan.Codec {
 	case "flac":
 		// Sample format and depth follow the source: TrueHD and DTS-HD MA
 		// decode to 24-bit s32, which FLAC keeps, downmixed or not.
-		a = []string{"-c:a", "flac"}
+		a = append(a, "-c:a", "flac")
 	case "eac3", "ac3":
-		a = []string{"-c:a", plan.Codec, "-b:a", strconv.FormatInt(dolbyBitrate/1000, 10) + "k"}
+		a = append(a, "-c:a", plan.Codec, "-b:a", strconv.FormatInt(dolbyBitrate/1000, 10)+"k")
 	default:
 		rate := plan.Bitrate
 		if rate <= 0 {
 			rate = transcodeAudioBitrate
 		}
-		a = []string{"-c:a", "aac", "-b:a", strconv.FormatInt(rate/1000, 10) + "k"}
+		a = append(a, "-c:a", "aac", "-b:a", strconv.FormatInt(rate/1000, 10)+"k")
 	}
 	if plan.Channels > 0 {
 		a = append(a, "-ac", strconv.Itoa(plan.Channels))

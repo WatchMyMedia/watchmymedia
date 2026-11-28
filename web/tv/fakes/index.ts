@@ -9,6 +9,7 @@ import { registerSettings } from './settings'
 import { registerDetails } from './details'
 import { registerPlayer } from './player'
 import { registerWatchlists } from './watchlists'
+import { registerDialogue } from './dialogue'
 import { FAKE_USER } from './data'
 import { ATTIC, CABIN, CABIN_TITLES, CABIN_TOKEN, DEN, DEN_TOKEN, LAKESIDE, LAKESIDE_TOKEN, registerCabin, type FakeIdentity } from './others'
 import { CABIN_AWAY, DEN_SILENT, registerCabinOneCard, registerLakesideCopies, silentServer } from './onecard'
@@ -49,6 +50,7 @@ export function createFakeServer(mode = '', identity: FakeIdentity = LAKESIDE): 
   registerWatchlists(server)
   registerSearch(server)
   registerSettings(server, mode)
+  registerDialogue(server, mode)
   if (mode !== 'player') registerPlayer(server, mode)
   return server
 }

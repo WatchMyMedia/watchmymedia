@@ -256,7 +256,7 @@ func (m *Manager) checkVODLadder(a, b Spec) error {
 		a.Audio.Copy || a.Audio.Codec != "aac" || a.Audio.Channels < 1 || a.Audio.Channels > 2 ||
 		a.VOD.AudioChannels != a.Audio.Channels ||
 		a.BurnIn != b.BurnIn || a.BurnInImage != b.BurnInImage || a.BurnInSub != b.BurnInSub || a.BurnInFile != b.BurnInFile ||
-		a.StartMs != b.StartMs || a.VOD.DurationMs <= 0 || a.VOD.DurationMs != b.VOD.DurationMs ||
+		a.BurnInTimingMs != b.BurnInTimingMs || a.StartMs != b.StartMs || a.VOD.DurationMs <= 0 || a.VOD.DurationMs != b.VOD.DurationMs ||
 		a.VOD.FrameRate <= 0 || a.VOD.FrameRate != b.VOD.FrameRate ||
 		a.VOD.Codecs == "" || a.VOD.Codecs != b.VOD.Codecs || a.VOD.VideoRange == "" || a.VOD.VideoRange != b.VOD.VideoRange ||
 		!a.VOD.SeparateAudio || !b.VOD.SeparateAudio ||

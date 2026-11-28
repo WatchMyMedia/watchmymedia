@@ -4,9 +4,10 @@ import WMMModel
 import WMMUI
 
 /// Settings › Audio & subtitles (in two columns
-/// where the page is wide): the audio languages, how subtitles start, the
-/// subtitle languages and automatic download. Each change saves at once.
-/// Add language opens every language by name, to search.
+/// where the page is wide): the audio languages, Sound (Boost dialogue and
+/// Reduce loud sounds), how subtitles start, the subtitle languages,
+/// Subtitle size with a preview, and automatic download. Each change saves
+/// at once. Add language opens every language by name, to search.
 struct LanguageSettingsPage: View {
     let model: SettingsModel
     @State private var width: CGFloat = 0
@@ -27,14 +28,16 @@ struct LanguageSettingsPage: View {
                 } else if model.supportsAudioLanguages && width >= 680 {
                     notice
                     HStack(alignment: .top, spacing: 24) {
-                        VStack(alignment: .leading, spacing: 22) { audioSection; startSection }
-                        VStack(alignment: .leading, spacing: 22) { subtitleSection; onlineSection }
+                        VStack(alignment: .leading, spacing: 22) { audioSection; soundSection; startSection }
+                        VStack(alignment: .leading, spacing: 22) { subtitleSection; sizeSection; onlineSection }
                     }
                 } else {
                     if model.supportsAudioLanguages { audioSection }
+                    soundSection
                     notice
                     startSection
                     subtitleSection
+                    sizeSection
                     onlineSection
                 }
             }
@@ -154,6 +157,55 @@ struct LanguageSettingsPage: View {
         }
     }
 
+    /// Boost dialogue and Reduce loud sounds, each Off, Medium or High, from API level 35.
+    @ViewBuilder private var soundSection: some View {
+        if model.supportsDialogueAndSubtitles {
+            section(SoundWords.heading, nil, note: .plain(SoundWords.note)) {
+                ForEach(SoundSetting.allCases, id: \.self) { setting in
+                    let save = model.saveState(.sound(setting))
+                    VStack(alignment: .leading, spacing: 8) {
+                        RowTitle(title: setting.title, line: save.rowLine(rest: setting.line))
+                        Picker(setting.title, selection: Binding(get: { model.soundLevel(setting) },
+                                                                  set: { level in Task { await model.setSound(setting, to: level) } })) {
+                            ForEach(SoundLevel.allCases, id: \.self) { Text($0.label).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .disabled(save.isSaving)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.top, 10)
+                    .padding(.bottom, 12)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("settings-sound-\(setting.rawValue)")
+                }
+            }
+        }
+    }
+
+    /// Subtitle size: a preview drawn as the player draws cues, then the
+    /// four steps; Normal follows the system's caption size.
+    @ViewBuilder private var sizeSection: some View {
+        if model.supportsDialogueAndSubtitles {
+            let save = model.saveState(.subtitleSize)
+            section(SubtitleSizeWords.title, nil, note: .plain("\(SubtitleSizeWords.burnedInKeep) \(SubtitleSizeWords.timingInPlayer)")) {
+                SubtitleSizePreview(size: model.subtitleSize)
+                VStack(alignment: .leading, spacing: 8) {
+                    Picker(SubtitleSizeWords.title, selection: Binding(get: { model.subtitleSize },
+                                                                       set: { size in Task { await model.setSubtitleSize(size) } })) {
+                        ForEach(SubtitleSize.allCases, id: \.self) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .disabled(save.isSaving)
+                    .accessibilityIdentifier("settings-subtitle-size")
+                    SizeLine(line: save.rowLine(rest: SubtitleSizeWords.normalFollows))
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, 10)
+                .padding(.bottom, 12)
+            }
+        }
+    }
+
     private var onlineSection: some View {
         section(SettingsWords.onlineSubtitles, nil, note: .plain(model.automaticDownloadAvailable
                 ? "When subtitles would start and no local track matches, download the exact-file match in your first subtitle language. Uses the server’s OpenSubtitles quota and download permissions. Kept on the server for apps that support subtitle preferences."
@@ -261,6 +313,65 @@ private struct LanguageRow: View {
             if !first { Button("Move up") { Task { await model.moveLanguage(tag, in: list, by: -1) } } }
             if !last { Button("Move down") { Task { await model.moveLanguage(tag, in: list, by: 1) } } }
             Button("Remove", role: .destructive) { Task { await model.removeLanguage(tag, from: list) } }
+        }
+    }
+}
+
+/// The cue at the size the player would draw it, over a picture: the
+/// player's 20 pt × the system's caption size × the step.
+private struct SubtitleSizePreview: View {
+    let size: SubtitleSize
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            LinearGradient(stops: [.init(color: Color(hex: 0x0C1A22), location: 0), .init(color: Color(hex: 0x1B3542), location: 0.52),
+                                   .init(color: Color(hex: 0x0A1216), location: 0.54), .init(color: Color(hex: 0x06090B), location: 1)],
+                           startPoint: .top, endPoint: .bottom)
+            // A soft light over the water, drawn small: a blurred ellipse, not a radial gradient.
+            Ellipse()
+                .fill(Color(red: 1, green: 0.8, blue: 0.47).opacity(0.16))
+                .frame(width: 220, height: 70)
+                .blur(radius: 24)
+                .offset(x: 30, y: -50)
+            Text(SubtitleSizeWords.preview.uppercased())
+                .font(.caption2.weight(.semibold))
+                .tracking(0.6)
+                .foregroundStyle(.white.opacity(0.65))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(.leading, 10)
+                .padding(.top, 8)
+                .accessibilityHidden(true)
+            SubtitleCuePreview(SubtitleSizeWords.sample, size: size)
+                .padding(.bottom, 12)
+                .padding(.horizontal, 8)
+        }
+        .frame(height: 118)
+        .clipped()
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("settings-subtitle-size-preview")
+    }
+}
+
+/// The line under the size's steps: what Normal follows, or how its save went.
+private struct SizeLine: View {
+    let line: RowLine?
+
+    var body: some View {
+        switch line {
+        case .plain(let text)?:
+            Text(text).font(.footnote).foregroundStyle(Palette.muted).fixedSize(horizontal: false, vertical: true)
+        case .saving?:
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.mini).tint(Palette.gold)
+                Text("Saving…").font(.footnote).foregroundStyle(Palette.muted)
+            }
+        case .saved(let text)?:
+            Text("\(Text("✓").foregroundStyle(Palette.gold).fontWeight(.bold)) \(text)")
+                .font(.footnote).foregroundStyle(Palette.textSecondary).fixedSize(horizontal: false, vertical: true)
+        case .failed(let text)?:
+            Text(text).font(.footnote).foregroundStyle(Palette.warning).fixedSize(horizontal: false, vertical: true)
+        case nil:
+            EmptyView()
         }
     }
 }

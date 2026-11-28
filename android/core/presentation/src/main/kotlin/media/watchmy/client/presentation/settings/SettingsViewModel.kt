@@ -25,6 +25,9 @@ import media.watchmy.client.model.SegmentKind
 import media.watchmy.client.model.ServerRepository
 import media.watchmy.client.model.SettingsNotice
 import media.watchmy.client.model.SkipMode
+import media.watchmy.client.model.SOUND_API_LEVEL
+import media.watchmy.client.model.SoundLevel
+import media.watchmy.client.model.SoundSetting
 import media.watchmy.client.model.StreamQuality
 import media.watchmy.client.model.SubtitleChoice
 import media.watchmy.client.model.SubtitleSize
@@ -130,6 +133,23 @@ class SettingsViewModel(
 
         /** The settings page's name: Audio & subtitles where audio languages can be chosen. */
         val languagesTitle: String get() = if (audioLanguagesAvailable) "Audio & subtitles" else "Subtitles"
+
+        /** Boost dialogue and Reduce loud sounds, and the person's subtitle size (API level [SOUND_API_LEVEL]); hidden below it. */
+        val soundAvailable: Boolean get() = apiLevel >= SOUND_API_LEVEL
+
+        /**
+         * The size subtitles are drawn at on this device's players: the
+         * person's where the server keeps one, else a TV's own.
+         */
+        val subtitleSize: media.watchmy.client.model.SubtitleSize
+            get() = if (soundAvailable) playback.subtitles.size else device.subtitleSize
+
+        /**
+         * A TV's own size other than Normal is the person's now: it became
+         * theirs when the server first kept one (Playback says so on the TV).
+         */
+        val subtitleSizeFromThisTv: Boolean
+            get() = soundAvailable && device.subtitleSize != media.watchmy.client.model.SubtitleSize.Normal && playback.subtitles.size == device.subtitleSize
     }
 
     /** What happened that the screen acts on once. */
@@ -218,7 +238,21 @@ class SettingsViewModel(
 
     fun setAudioPassthrough(mode: AudioPassthrough) = save(SettingKey.AudioPassthrough, "Couldn't save the setting.") { preferences.setAudioPassthrough(mode) }
 
+    /** This TV's own size, kept on the TV, for servers below [SOUND_API_LEVEL]; from it, the person's ([setAccountSubtitleSize]). */
     fun setSubtitleSize(size: SubtitleSize) = save(SettingKey.SubtitleSize, "Couldn't save the setting.") { preferences.setSubtitleSize(size) }
+
+    /** The person's subtitle size, on all their devices (API level [SOUND_API_LEVEL]). */
+    fun setAccountSubtitleSize(size: SubtitleSize) {
+        if (!state.value.soundAvailable || size == preferences.playback.value.subtitles.size) return
+        changeSubtitles(SettingKey.AccountSubtitleSize) { it.copy(size = size) }
+    }
+
+    /** Boost dialogue or Reduce loud sounds, on all the person's plays (API level [SOUND_API_LEVEL]). */
+    fun setSound(setting: SoundSetting, level: SoundLevel) {
+        if (!state.value.soundAvailable || !state.value.accountReady) return
+        if (level == preferences.playback.value.audio.level(setting) && SettingKey.Sound(setting) !in state.value.failed) return
+        save(SettingKey.Sound(setting), "Couldn't change the sound.") { preferences.setSound(setting, level) }
+    }
 
     fun setSkip(kind: SegmentKind, mode: SkipMode) {
         if (state.value.accountReady) save(SettingKey.Skip(kind), "Couldn't save the skip setting.") { preferences.setSkip(kind, mode) }
@@ -405,9 +439,18 @@ sealed interface SettingKey {
     data object AutomaticSubtitles : SettingKey
     data object DeviceName : SettingKey
 
+    /** Boost dialogue or Reduce loud sounds. */
+    data class Sound(val setting: SoundSetting) : SettingKey
+
+    /** The person's subtitle size, beside this TV's own [SubtitleSize]. */
+    data object AccountSubtitleSize : SettingKey
+
     companion object {
         /** The Audio & subtitles settings. */
-        val LANGUAGES: Set<SettingKey> = setOf(AudioLanguages, SubtitleLanguages, SubtitleChoice, AutomaticSubtitles)
+        val LANGUAGES: Set<SettingKey> = setOf(
+            AudioLanguages, SubtitleLanguages, SubtitleChoice, AutomaticSubtitles,
+            Sound(SoundSetting.DialogueBoost), Sound(SoundSetting.ReduceLoudSounds), AccountSubtitleSize,
+        )
     }
 }
 

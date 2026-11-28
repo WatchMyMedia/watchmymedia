@@ -80,11 +80,13 @@ func renditionContract(spec Spec) (string, error) {
 		StripDV            bool
 		Deinterlace        bool
 		Audio              AudioPlan
+		AudioFilter        string
 		MaxBitrate         int64
 		BurnIn             int
 		BurnInImage        bool
 		BurnInSub          int
 		BurnInFile         string
+		BurnInTimingMs     int64
 		BurnInSize         int64
 		BurnInModifiedNs   int64
 		DurationMs         int64
@@ -104,9 +106,9 @@ func renditionContract(spec Spec) (string, error) {
 	}{
 		Version: 2, FileID: spec.FileID, Path: spec.Path, Size: st.Size(), ModifiedNs: st.ModTime().UnixNano(),
 		Mode: spec.Mode, Video: spec.Video, KeepDV: spec.Video.KeepDV, StripDV: spec.Video.StripDV,
-		Deinterlace: spec.Video.Deinterlace, Audio: spec.Audio, MaxBitrate: spec.MaxBitrate,
+		Deinterlace: spec.Video.Deinterlace, Audio: spec.Audio, AudioFilter: spec.Audio.effectsFilter(), MaxBitrate: spec.MaxBitrate,
 		BurnIn: spec.BurnIn, BurnInImage: spec.BurnInImage, BurnInSub: spec.BurnInSub, BurnInFile: spec.BurnInFile,
-		BurnInSize: burnInSize, BurnInModifiedNs: burnInModifiedNs,
+		BurnInTimingMs: spec.BurnInTimingMs, BurnInSize: burnInSize, BurnInModifiedNs: burnInModifiedNs,
 		DurationMs: spec.VOD.DurationMs, Keyframes: spec.VOD.Keyframes, FrameRate: spec.VOD.FrameRate,
 		ConstantFrameRate: spec.ReserveSlot && !spec.Video.Copy && spec.VOD.FrameRate > 0,
 		Bandwidth:         spec.VOD.Bandwidth, VideoRange: spec.VOD.VideoRange, Codecs: spec.VOD.Codecs,

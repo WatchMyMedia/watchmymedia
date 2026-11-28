@@ -174,6 +174,20 @@ public protocol APIProtocol: Sendable {
     /// - Remark: HTTP `GET /api/files/{id}/subtitles/search`.
     /// - Remark: Generated from `#/paths//api/files/{id}/subtitles/search/get(searchSubtitles)`.
     func searchSubtitles(_ input: Operations.SearchSubtitles.Input) async throws -> Operations.SearchSubtitles.Output
+    /// Save how much later or earlier a subtitle track shows, for the caller or (admins) for everyone
+    ///
+    /// From apiLevel 35. Any signed-in person who can play the file saves their own timing; with everyone, an admin saves it for everyone who plays the file. Decisions then carry it on the track as timingMs.
+    ///
+    /// - Remark: HTTP `PUT /api/files/{id}/subtitles/{track}/timing`.
+    /// - Remark: Generated from `#/paths//api/files/{id}/subtitles/{track}/timing/put(setSubtitleTiming)`.
+    func setSubtitleTiming(_ input: Operations.SetSubtitleTiming.Input) async throws -> Operations.SetSubtitleTiming.Output
+    /// Remove the caller's own timing for a subtitle track: back to the one saved for everyone, else in step
+    ///
+    /// From apiLevel 35. The player's Reset. A timing an admin saved for everyone stays.
+    ///
+    /// - Remark: HTTP `DELETE /api/files/{id}/subtitles/{track}/timing`.
+    /// - Remark: Generated from `#/paths//api/files/{id}/subtitles/{track}/timing/delete(deleteSubtitleTiming)`.
+    func deleteSubtitleTiming(_ input: Operations.DeleteSubtitleTiming.Input) async throws -> Operations.DeleteSubtitleTiming.Output
     /// Everything the home screen shows
     ///
     /// - Remark: HTTP `GET /api/home`.
@@ -1029,6 +1043,38 @@ extension APIProtocol {
         try await searchSubtitles(Operations.SearchSubtitles.Input(
             path: path,
             query: query,
+            headers: headers
+        ))
+    }
+    /// Save how much later or earlier a subtitle track shows, for the caller or (admins) for everyone
+    ///
+    /// From apiLevel 35. Any signed-in person who can play the file saves their own timing; with everyone, an admin saves it for everyone who plays the file. Decisions then carry it on the track as timingMs.
+    ///
+    /// - Remark: HTTP `PUT /api/files/{id}/subtitles/{track}/timing`.
+    /// - Remark: Generated from `#/paths//api/files/{id}/subtitles/{track}/timing/put(setSubtitleTiming)`.
+    public func setSubtitleTiming(
+        path: Operations.SetSubtitleTiming.Input.Path,
+        headers: Operations.SetSubtitleTiming.Input.Headers = .init(),
+        body: Operations.SetSubtitleTiming.Input.Body
+    ) async throws -> Operations.SetSubtitleTiming.Output {
+        try await setSubtitleTiming(Operations.SetSubtitleTiming.Input(
+            path: path,
+            headers: headers,
+            body: body
+        ))
+    }
+    /// Remove the caller's own timing for a subtitle track: back to the one saved for everyone, else in step
+    ///
+    /// From apiLevel 35. The player's Reset. A timing an admin saved for everyone stays.
+    ///
+    /// - Remark: HTTP `DELETE /api/files/{id}/subtitles/{track}/timing`.
+    /// - Remark: Generated from `#/paths//api/files/{id}/subtitles/{track}/timing/delete(deleteSubtitleTiming)`.
+    public func deleteSubtitleTiming(
+        path: Operations.DeleteSubtitleTiming.Input.Path,
+        headers: Operations.DeleteSubtitleTiming.Input.Headers = .init()
+    ) async throws -> Operations.DeleteSubtitleTiming.Output {
+        try await deleteSubtitleTiming(Operations.DeleteSubtitleTiming.Input(
+            path: path,
             headers: headers
         ))
     }

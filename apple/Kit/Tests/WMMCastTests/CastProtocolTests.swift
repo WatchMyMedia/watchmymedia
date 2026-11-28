@@ -12,6 +12,13 @@ import WMMModel
         #expect(object["id"] is NSNull)
     }
 
+    /// The sound and subtitle timing commands, as web/src/cast/protocol.ts has them.
+    @Test func soundAndTimingCommandsMirrorTheWebs() throws {
+        let sound = try #require(try JSONSerialization.jsonObject(with: CastCommand.sound.data()) as? [String: Any])
+        #expect(sound as NSDictionary == ["type": "sound"])
+        #expect(String(decoding: CastCommand.subtitleTiming(-400).data(), as: UTF8.self) == #"{"timingMs":-400,"type":"subtitleTiming"}"#)
+    }
+
     @Test func rejectsOtherProtocolsAndIgnoresFutureSegmentKinds() throws {
         #expect(CastProtocol.decode(Data(#"{"type":"state","v":2,"phase":"playing"}"#.utf8)) == nil)
         #expect(CastProtocol.decode(Data(#"{"type":"state","v":1,"phase":"new-state"}"#.utf8)) == nil)

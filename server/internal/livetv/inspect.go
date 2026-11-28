@@ -46,7 +46,7 @@ func InspectSample(ctx context.Context, ffprobe string, sample []byte, observedB
 	cmd := ffexec.Command(ctx, ffprobe,
 		"-v", "error", "-print_format", "json", "-probesize", strconv.Itoa(InspectBytes),
 		"-analyzeduration", "2000000", "-f", "mpegts", "-show_entries",
-		"stream=codec_type,codec_name,width,height,field_order,sample_aspect_ratio,bit_rate,channels,color_transfer,pix_fmt:format=bit_rate",
+		"stream=codec_type,codec_name,width,height,field_order,sample_aspect_ratio,bit_rate,channels,channel_layout,color_transfer,pix_fmt:format=bit_rate",
 		"-show_streams", "-show_format", "-i", "pipe:0")
 	cmd.Stdin = bytes.NewReader(sample)
 	out := &inspectWriter{}
@@ -63,6 +63,7 @@ func InspectSample(ctx context.Context, ffprobe string, sample []byte, observedB
 			FieldOrder    string `json:"field_order"`
 			BitRate       string `json:"bit_rate"`
 			Channels      int    `json:"channels"`
+			ChannelLayout string `json:"channel_layout"`
 			ColorTransfer string `json:"color_transfer"`
 			PixelFormat   string `json:"pix_fmt"`
 			SampleAspect  string `json:"sample_aspect_ratio"`
@@ -105,7 +106,7 @@ func InspectSample(ctx context.Context, ffprobe string, sample []byte, observedB
 			if info.AudioPresent {
 				continue
 			}
-			info.AudioPresent, info.AudioCodec, info.AudioChannels = true, stream.CodecName, stream.Channels
+			info.AudioPresent, info.AudioCodec, info.AudioChannels, info.AudioLayout = true, stream.CodecName, stream.Channels, stream.ChannelLayout
 		}
 	}
 	info.Bitrate = max(info.Bitrate, summed, observedBps)

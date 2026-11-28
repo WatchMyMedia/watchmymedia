@@ -4,7 +4,7 @@ import { platform } from '../platform/current'
 export type ClientInfo = components['schemas']['Client']
 
 /** This app's version, as sign-ins and plays report it; each TV's package carries the same (checked by its tests). */
-export const TV_APP_VERSION = '2.2.0'
+export const TV_APP_VERSION = '2.3.0'
 
 const DEVICE_KEY = platform.storage.device
 let fallback = ''

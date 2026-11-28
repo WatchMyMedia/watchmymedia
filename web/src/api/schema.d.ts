@@ -692,6 +692,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/files/{id}/subtitles/{track}/timing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save how much later or earlier a subtitle track shows, for the caller or (admins) for everyone
+         * @description From apiLevel 35. Any signed-in person who can play the file saves their own timing; with everyone, an admin saves it for everyone who plays the file. Decisions then carry it on the track as timingMs.
+         */
+        put: operations["setSubtitleTiming"];
+        post?: never;
+        /**
+         * Remove the caller's own timing for a subtitle track: back to the one saved for everyone, else in step
+         * @description From apiLevel 35. The player's Reset. A timing an admin saved for everyone stays.
+         */
+        delete: operations["deleteSubtitleTiming"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/files/{id}/trickplay": {
         parameters: {
             query?: never;
@@ -4491,18 +4515,30 @@ export interface components {
              */
             tmdbId: number;
         };
+        AudioEffects: {
+            /** @description Boost dialogue: medium or high. Absent when off. */
+            dialogue?: string;
+            /** @description Reduce loud sounds: medium or high. Absent when off. */
+            loudness?: string;
+        };
         AudioPlan: {
             /** Format: int64 */
             channels?: number;
             /** @description The track's codec when copied; when converted, aac, or from apiLevel 31 also flac, eac3 or ac3. */
             codec?: string;
             copy: boolean;
+            /** @description Boost dialogue and Reduce loud sounds as the server applied them to this converted track, from the person's preferences; absent when neither is on or the track is copied. From apiLevel 35. */
+            effects?: components["schemas"]["AudioEffects"];
             /** Format: int64 */
             index: number;
         };
         AudioPreferences: {
+            /** @description Boost dialogue: off, medium or high. While it or reduceLoudSounds is on, the server converts the sound of every play of this person's except downloads (API level 35). */
+            dialogueBoost?: string;
             /** @description Preferred BCP 47 languages for the audio track, in order. Empty plays the file's default track. */
             languages: string[];
+            /** @description Reduce loud sounds: off, medium or high (API level 35). */
+            reduceLoudSounds?: string;
         };
         AudioStream: {
             /** Format: int64 */
@@ -9294,6 +9330,15 @@ export interface components {
             /** @description A link to a JPEG, PNG or WebP picture on the internet. The server copies it once. */
             url?: string;
         };
+        SetSubtitleTimingInputBody: {
+            /** @description Admins only: save it for everyone who plays the file (0 removes that), and remove the admin's own timing for the track, so they hear what everyone does. A person's own timing still wins for them. */
+            everyone?: boolean;
+            /**
+             * Format: int64
+             * @description Milliseconds: positive shows each cue later, negative earlier. Without everyone, 0 is the person's own "in step", which wins over a timing saved for everyone.
+             */
+            timingMs: number;
+        };
         Settings: {
             activity: components["schemas"]["ActivitySettings"];
             /**
@@ -9616,6 +9661,8 @@ export interface components {
             languages: string[];
             /** @description off, forced (only foreign-language parts in the audio's language), or on. */
             mode: string;
+            /** @description Subtitle size: smaller, normal, larger or largest, which apps draw at 0.79, 1, 1.21 and 1.5 times their own size. Absent until the person chooses one, and drawn as normal then; a TV that kept its own size before API level 35 moves it up only while this is absent (API level 35). */
+            size?: string;
         };
         SubtitleQuota: {
             /**
@@ -9668,6 +9715,15 @@ export interface components {
             language?: string;
             title?: string;
         };
+        SubtitleTiming: {
+            /**
+             * Format: int64
+             * @description The timing the caller's plays of this track now get: their own, else the one saved for everyone, else 0.
+             */
+            timingMs: number;
+            /** @description timingMs is the one an admin saved for everyone, not the caller's own. */
+            timingShared: boolean;
+        };
         SubtitleTrack: {
             burnInOnly: boolean;
             /** @example subrip */
@@ -9685,6 +9741,15 @@ export interface components {
             release?: string;
             /** @enum {string} */
             source?: "embedded" | "sidecar" | "opensubtitles";
+            /** @description The server burned this track into the picture with timingMs already applied: the app shows it as it comes. A change of timing needs a new decision (API level 35). */
+            timingApplied?: boolean;
+            /**
+             * Format: int64
+             * @description The person's saved timing for this track, in milliseconds: positive shows each cue later, negative earlier, absent for none. Their own timing, else the one an admin saved for everyone (timingShared). Saved with PUT /api/files/{id}/subtitles/{track}/timing. From apiLevel 35.
+             */
+            timingMs?: number;
+            /** @description timingMs is the one an admin saved for everyone who plays the file, not the person's own (API level 35). */
+            timingShared?: boolean;
             title?: string;
             url?: string;
         };
@@ -9928,8 +9993,12 @@ export interface components {
             title: string;
         };
         UpdateAudioPreferences: {
+            /** @description off, medium or high. From apiLevel 35; older servers reject it. */
+            dialogueBoost?: string;
             /** @description Ordered BCP 47 languages. An empty list clears them. Saving languages for a person who never saved a subtitle mode also turns on subtitles.foreignAudio. */
             languages?: string[];
+            /** @description off, medium or high. From apiLevel 35; older servers reject it. */
+            reduceLoudSounds?: string;
         };
         UpdateLibraryInputBody: {
             name: string;
@@ -10034,6 +10103,8 @@ export interface components {
             languages?: string[];
             /** @description off, forced or on. */
             mode?: string;
+            /** @description smaller, normal, larger or largest. From apiLevel 35; older servers reject it. */
+            size?: string;
         };
         UpdateUserInputBody: {
             recordHistory?: boolean;
@@ -11720,6 +11791,78 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    setSubtitleTiming: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Media file ID. */
+                id: number;
+                /** @description The track's id in a decision: s<index> inside the file, x<n> beside it, d<id> downloaded. */
+                track: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetSubtitleTimingInputBody"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubtitleTiming"];
+                };
+            };
+            /** @description Error */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["ErrorModel"];
+                };
+            };
+        };
+    };
+    deleteSubtitleTiming: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Media file ID. */
+                id: number;
+                /** @description The track's id in a decision: s<index> inside the file, x<n> beside it, d<id> downloaded. */
+                track: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubtitleTiming"];
+                };
             };
             /** @description Error */
             default: {

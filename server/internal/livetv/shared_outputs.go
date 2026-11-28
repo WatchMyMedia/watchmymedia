@@ -54,11 +54,14 @@ func liveOutputKey(capture string, generation int64, s *session) string {
 	// Exact profile equality is conservative. Track mapping is always first
 	// video/audio, no burn-in, and the private encoder recipe is software only.
 	// A changed recipe needs a new version even if its public profile is equal.
+	// The viewer's sound settings change the audio: only viewers with the
+	// same ones share an output.
 	contract, _ := json.Marshal(struct {
 		Recipe, Capture, Kind, Quality string
 		Generation                     int64
 		Profile                        *LiveProfile
-	}{"live-output-v2-software", capture, s.outputKind, s.view.Quality, generation, s.profile})
+		Effects                        playback.AudioEffects
+	}{"live-output-v2-software", capture, s.outputKind, s.view.Quality, generation, s.profile, s.effects})
 	return fmt.Sprintf("%x", sha256.Sum256(contract))
 }
 
@@ -109,7 +112,7 @@ func (m *Sessions) acquireOutput(s *session) (*sharedLiveOutput, error) {
 			return nil, err
 		}
 		p := &session{producer: true, ctx: ctx, cancel: cancel, ready: make(chan struct{}), done: make(chan struct{}),
-			profile: s.profile, outputKind: s.outputKind, view: SessionView{ID: newID(), Quality: s.view.Quality, State: "starting", StartedAt: time.Now()}}
+			profile: s.profile, effects: s.effects, outputKind: s.outputKind, view: SessionView{ID: newID(), Quality: s.view.Quality, State: "starting", StartedAt: time.Now()}}
 		fork, ok := body.(liveCapture)
 		if !ok {
 			_ = body.Close()

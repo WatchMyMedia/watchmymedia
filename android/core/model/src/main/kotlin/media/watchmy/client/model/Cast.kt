@@ -197,6 +197,21 @@ interface CastGateway {
 
     /** POST /api/auth/cast-token with this device's sign-in. */
     suspend fun castToken(): CastToken
+
+    /** The server in use's API level as this device last heard it; 0 when none is in use. */
+    fun apiLevel(): Int = 0
+
+    /**
+     * Saves the person's timing for a subtitle track of a file playing on the
+     * TV, as the player's own gateway does ([PlaybackGateway.setSubtitleTiming]):
+     * a remote's Subtitle timing, which the TV only shows.
+     */
+    suspend fun setSubtitleTiming(fileId: Long, trackId: String, timingMs: Long, everyone: Boolean = false): SavedTiming =
+        throw ApiException(503, "Update the server to save subtitle timing.")
+
+    /** Reset, from a remote ([PlaybackGateway.resetSubtitleTiming]). */
+    suspend fun resetSubtitleTiming(fileId: Long, trackId: String): SavedTiming =
+        throw ApiException(503, "Update the server to save subtitle timing.")
 }
 
 /**

@@ -13,6 +13,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import media.watchmy.client.model.SERVERS
+import media.watchmy.client.model.SUBTITLE_SIZE_MOVED
+import media.watchmy.client.model.subtitleSizeMovedFrom
 import media.watchmy.client.model.DeviceSession
 import media.watchmy.client.model.ON_EVERY_DEVICE
 import media.watchmy.client.model.SKIP_KINDS
@@ -109,11 +111,16 @@ internal fun ColumnScope.PlaybackPane(
         description = "Dolby and DTS as they are, when the TV or receiver can decode them",
         status = state.status(SettingKey.AudioPassthrough, state.device.audioPassthrough.label),
     ) { Value(state.device.audioPassthrough.label, chevron = true) }
-    SettingRow(
-        "Subtitle size",
-        onClick = state.onOk(SettingKey.SubtitleSize, calls) { calls.show(Overlay.SubtitleSize) },
-        status = state.status(SettingKey.SubtitleSize, state.device.subtitleSize.label),
-    ) { Value(state.device.subtitleSize.label, chevron = true) }
+    if (state.soundAvailable) {
+        // The size is the person's now, in Audio & subtitles.
+        Note(if (state.subtitleSizeFromThisTv) subtitleSizeMovedFrom(state.device.subtitleSize) else SUBTITLE_SIZE_MOVED, Modifier.padding(top = 6.dp, bottom = 4.dp))
+    } else {
+        SettingRow(
+            "Subtitle size",
+            onClick = state.onOk(SettingKey.SubtitleSize, calls) { calls.show(Overlay.SubtitleSize) },
+            status = state.status(SettingKey.SubtitleSize, state.device.subtitleSize.label),
+        ) { Value(state.device.subtitleSize.label, chevron = true) }
+    }
 
     // Held until the account's settings load, so a default is never saved over someone's choice.
     val ready = state.accountReady

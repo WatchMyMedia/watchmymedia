@@ -35,6 +35,8 @@ import kotlinx.serialization.encoding.Encoder
 
 /**
  * @param languages Preferred BCP 47 languages for the audio track, in order. Empty plays the file's default track.
+ * @param dialogueBoost Boost dialogue: off, medium or high. While it or reduceLoudSounds is on, the server converts the sound of every play of this person's except downloads (API level 35).
+ * @param reduceLoudSounds Reduce loud sounds: off, medium or high (API level 35).
  */
 @Serializable
 
@@ -42,7 +44,15 @@ data class AudioPreferences (
 
     /* Preferred BCP 47 languages for the audio track, in order. Empty plays the file's default track. */
     @SerialName(value = "languages")
-    val languages: kotlin.collections.List<kotlin.String>
+    val languages: kotlin.collections.List<kotlin.String>,
+
+    /* Boost dialogue: off, medium or high. While it or reduceLoudSounds is on, the server converts the sound of every play of this person's except downloads (API level 35). */
+    @SerialName(value = "dialogueBoost")
+    val dialogueBoost: kotlin.String? = null,
+
+    /* Reduce loud sounds: off, medium or high (API level 35). */
+    @SerialName(value = "reduceLoudSounds")
+    val reduceLoudSounds: kotlin.String? = null
 
 ) {
 

@@ -7,6 +7,29 @@ import org.junit.Test
 
 /** The live parts of the protocol, as web/src/cast/protocol.ts writes them. */
 class CastProtocolTest {
+    @Test fun `a load carries the person's subtitle size, and leaves it out when unset`() {
+        val load = CastProtocol.decodeLoad("""{"server":{"id":"s1","urls":[]},"token":"c1.x","fileId":42,"subtitleSize":"larger"}""")!!
+        assertEquals("larger", load.subtitleSize)
+        assertEquals(load, CastProtocol.decodeLoad(CastProtocol.encodeLoad(load)))
+        assertTrue(!CastProtocol.encodeLoad(load.copy(subtitleSize = null)).contains("subtitleSize"))
+    }
+
+    @Test fun `the sound and timing commands are as the web names them`() {
+        assertEquals("""{"type":"sound"}""", CastCommand.Sound.encode())
+        assertEquals("""{"type":"subtitleTiming","timingMs":-1200}""", CastCommand.SubtitleTiming(-1_200).encode())
+        assertEquals(CastCommand.Sound, CastCommand.decode("""{"type":"sound"}"""))
+        assertEquals(CastCommand.SubtitleTiming(400), CastCommand.decode("""{"type":"subtitleTiming","timingMs":400}"""))
+        // A timing with no number is nothing this version knows.
+        assertNull(CastCommand.decode("""{"type":"subtitleTiming"}"""))
+    }
+
+    @Test fun `a state's track may say its timing, and older receivers' don't`() {
+        val state = CastProtocol.decodeState("""{"type":"state","phase":"playing","fileId":4,"subtitles":[{"id":"s3","format":"webvtt","timingMs":800,"timingShared":true},{"id":"x0","format":"webvtt"}],"selectedSubtitle":"s3"}""")!!
+        assertEquals(800L, state.subtitles!![0].timingMs)
+        assertEquals(true, state.subtitles!![0].timingShared)
+        assertNull(state.subtitles!![1].timingMs)
+    }
+
     @Test fun `a channel's load has no file`() {
         val text = """{"v":1,"server":{"id":"s1","urls":["http://127.0.0.1:27587"]},"token":"c1.x","live":{"channelId":"c7","quality":"720"},"device":{"name":"Living Room TV"}}"""
         val load = CastProtocol.decodeLoad(text)!!

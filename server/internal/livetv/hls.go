@@ -175,7 +175,20 @@ func liveAudioArgs(plan LivePlan, videoKbps int) []string {
 	if plan.audioChannels > 2 && (plan.Mode != "video" || videoKbps >= liveSurroundVideoKbps) {
 		channels, kbps = plan.audioChannels, liveAudioKbpsPerChannel*plan.audioChannels
 	}
-	return []string{"-c:a", "aac", "-ac", strconv.Itoa(channels), "-b:a", strconv.Itoa(kbps) + "k", "-af", "aresample=async=1:first_pts=0"}
+	return []string{"-c:a", "aac", "-ac", strconv.Itoa(channels), "-b:a", strconv.Itoa(kbps) + "k", "-af", plan.effectsFilter(channels) + liveResample}
+}
+
+// liveResample keeps converted audio on the input's clock.
+const liveResample = "aresample=async=1:first_pts=0"
+
+// effectsFilter is the viewer's sound settings' chain for channels out,
+// with a comma to go ahead of the resampler; empty without them.
+func (plan LivePlan) effectsFilter(channels int) string {
+	chain, _ := playback.EffectsFilter(plan.effects, plan.audioLayout, plan.sourceChannels, channels, plan.filters)
+	if chain == "" {
+		return ""
+	}
+	return chain + ","
 }
 
 func appendHLSOutput(a []string, dir, format string) []string {

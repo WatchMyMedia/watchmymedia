@@ -69,7 +69,10 @@ the picture is converted (MPEG-2 or interlaced channels), a profile that lists
 the broadcast's audio keeps it as it is, so the native apps keep AC-3 5.1.
 Converted audio stays 5.1 AAC for a profile that asks for six channels or more,
 except under 4 Mbps of video; the web, the receiver and the Automatic ladder
-get stereo.
+get stereo. A viewer with Boost dialogue or Reduce loud sounds on
+([Playback](playback.md#boost-dialogue-and-reduce-loud-sounds)) gets the
+broadcast's sound converted with them, even where it would have been copied;
+viewers of one channel share an output only when their settings match.
 
 API-level-25 clients can also opt into Live TV Automatic when shared sources
 are enabled. A client starts with `quality: "auto"`, `autoRecovery: true` and

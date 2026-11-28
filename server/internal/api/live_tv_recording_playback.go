@@ -106,14 +106,18 @@ func registerRecordingPlayback(h huma.API, deps Deps) {
 			request.Profile = playback.StepByID("1080").Cap(request.Profile)
 		}
 		// A broadcast often carries a second language (SAP): the person's
-		// audio languages choose, as for a finished recording.
+		// audio languages choose, as for a finished recording. Their sound
+		// settings apply as to any play.
 		why := ""
-		if request.AudioIndex == nil && u.ID != 0 {
+		if u.ID != 0 {
 			prefs, err := loadPreferences(ctx, deps, u.ID)
 			if err != nil {
 				return nil, err
 			}
-			request, why = withPreferredAudio(request, info, prefs.Audio.Languages)
+			request.Effects = prefs.Audio.Effects()
+			if request.AudioIndex == nil {
+				request, why = withPreferredAudio(request, info, prefs.Audio.Languages)
+			}
 		}
 		d := playback.Decide(info, ".ts", request, nil, deps.Playback.Capabilities())
 		if why != "" {

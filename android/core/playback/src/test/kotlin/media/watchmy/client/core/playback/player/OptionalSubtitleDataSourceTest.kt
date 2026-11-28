@@ -49,4 +49,19 @@ class OptionalSubtitleDataSourceTest {
         assertEquals(listOf("s2"), failures)
         source.close()
     }
+
+    /**
+     * A load the player stops (the text track turned off and on again to
+     * read its cues at a new timing) isn't the track failing: it was taken
+     * off the list as broken.
+     */
+    @Test fun `a load the player stops is not a failure`() {
+        val failures = mutableListOf<String>()
+        val stopped = object : DataSource by ByteArrayDataSource(byteArrayOf(1)) {
+            override fun open(dataSpec: DataSpec): Long = throw java.io.InterruptedIOException("Load canceled")
+        }
+        val source = OptionalSubtitleDataSource(stopped, { track }, { failures += it.id })
+        assertThrows(java.io.InterruptedIOException::class.java) { source.open(DataSpec(uri)) }
+        assertTrue(failures.isEmpty())
+    }
 }

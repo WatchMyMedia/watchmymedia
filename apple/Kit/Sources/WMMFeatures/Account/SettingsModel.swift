@@ -228,6 +228,24 @@ public final class SettingsModel {
     public var subtitles: SubtitlePreferences { pendingLanguages?.subtitles ?? preferences.playback.subtitles }
     public var subtitleChoice: SubtitleChoice { subtitles.choice }
 
+    /// Boost dialogue, Reduce loud sounds and Subtitle size, from API level 35.
+    public var supportsDialogueAndSubtitles: Bool { ServerFeatures(apiLevel: server?.apiLevel).dialogueAndSubtitles }
+
+    /// A sound setting's level, as shown: the change being saved, else the person's.
+    public func soundLevel(_ setting: SoundSetting) -> SoundLevel { audio[setting] }
+
+    /// The subtitle size, as shown.
+    public var subtitleSize: SubtitleSize { subtitles.drawnSize }
+
+    /// Saves a sound setting at once; its row says Saving, then what it did or why it couldn't.
+    public func setSound(_ setting: SoundSetting, to level: SoundLevel) async {
+        await save(LanguageChange(setting, level))
+    }
+
+    public func setSubtitleSize(_ size: SubtitleSize) async {
+        await save(LanguageChange(subtitleSize: size))
+    }
+
     /// The four ways to start subtitles; three on a server before level 21.
     public var subtitleChoices: [SubtitleChoice] { SubtitleChoice.offered(apiLevel: server?.apiLevel) }
 
@@ -277,6 +295,10 @@ public final class SettingsModel {
             languageError = "Update the server to use audio languages."
             return
         }
+        guard supportsDialogueAndSubtitles || !change.needsDialogueAndSubtitles else {
+            languageError = "Update the server to change the sound and the subtitle size."
+            return
+        }
         var after = PlaybackPreferences(subtitles: subtitles, audio: audio)
         change.apply(to: &after)
         guard after.audio != audio || after.subtitles != subtitles else { return }
@@ -306,6 +328,8 @@ public final class SettingsModel {
 
     /// What a language change did, for its row or section.
     private static func savedLine(_ change: LanguageChange, before: PlaybackPreferences) -> String {
+        if let (setting, level) = change.sound { return SoundWords.saved(setting, level) }
+        if let size = change.subtitleSize { return SubtitleSizeWords.saved(size) }
         if let audio = change.audioLanguages {
             return SettingsWords.listSaved(.audio, before: before.audio.languages, after: audio)
         }
@@ -321,6 +345,8 @@ public final class SettingsModel {
         func list(_ tags: [String], _ noun: String) -> String {
             SettingsWords.listValue(tags).map { "your \(noun)s are still \($0)" } ?? "you still have no \(noun)"
         }
+        if let (setting, _) = change.sound { return saveFailed(error, stillValue: saved.audio[setting].label) }
+        if change.subtitleSize != nil { return saveFailed(error, stillValue: saved.subtitles.drawnSize.label) }
         if change.audioLanguages != nil { return saveFailed(error, still: list(saved.audio.languages, "audio language"), retry: .tryAgain) }
         if change.subtitleLanguages != nil { return saveFailed(error, still: list(saved.subtitles.languages, "subtitle language"), retry: .tryAgain) }
         if change.choice != nil { return saveFailed(error, stillValue: saved.subtitles.choice.label) }
@@ -518,6 +544,8 @@ public struct DeviceSignOut: Hashable, Sendable {
 extension LanguageChange {
     /// The control a change belongs to, whose row says how it went.
     var settingKey: SettingKey {
+        if let (setting, _) = sound { return .sound(setting) }
+        if subtitleSize != nil { return .subtitleSize }
         if audioLanguages != nil { return .audioLanguages }
         if subtitleLanguages != nil { return .subtitleLanguages }
         if choice != nil { return .subtitleChoice }

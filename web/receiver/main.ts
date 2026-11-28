@@ -19,6 +19,7 @@ import { render } from './ui'
 import { publicCastMessage } from './security'
 import { castClient, castServerKey, type CastCredential } from './server'
 import { manualSubtitleSelection, nextEpisodeSubtitles, startingSubtitle, subtitleRequest } from './subtitles'
+import { ReceiverCues, cueSource, loadSize, trackTiming } from './cues'
 import { BANNER_MS, HEARTBEAT_MS, LIVE_CAST_LEVEL, LiveRefused, START_TIMEOUT_MS, castLiveTransport, liveInfo, nowEnds, receiverFailure, refusedLiveInfo, withCurrentToken, type ReceiverFailure } from './live'
 import { nowAndNext } from '../src/lib/liveGuide'
 import type { LiveScreen } from './ui'
@@ -87,6 +88,8 @@ type Play = {
   subtitleId?: string
   /** Text subtitle ID → the player's track ID. */
   trackIds: Map<string, number>
+  /** Subtitle timings a sender moved tracks to in this play, by track ID: they win over the decision's until it has them. */
+  movedTimings: Map<string, number>
   /** Stalls and startup for the heartbeats, across the play's reloads. */
   meter: StallMeter
   /** Set once this stream first played: from then on Shaka's estimate is measured, not its default. */
@@ -329,8 +332,8 @@ async function prepare(req: framework.messages.LoadRequestData, sequence: number
       trackIds.set(s.id, i + 1)
     })
     media.tracks = tracks
-    const active = sub ? trackIds.get(sub) : undefined
-    req.activeTrackIds = active ? [active] : []
+    // The receiver draws the cues itself (drawCues): CAF shows none.
+    req.activeTrackIds = []
   }
   if (!media.metadata) {
     const meta = new M.GenericMediaMetadata()
@@ -372,6 +375,7 @@ async function prepare(req: framework.messages.LoadRequestData, sequence: number
     audioIndex: load.audioIndex ?? d.audio.index,
     subtitleId: sub,
     trackIds,
+    movedTimings: cont && prev ? prev.movedTimings : new Map(),
     meter,
     sampled: false,
     transfer: new TransferMeter(),
@@ -1076,9 +1080,15 @@ function stateMessage(): StateMessage {
     stillWatching: p.askingStill,
     audio: d.audioTracks.map((a) => ({ index: a.index, codec: a.codec, channels: a.channels, language: a.language, title: a.title, default: a.default })),
     selectedAudio: p.audioIndex ?? null,
-    subtitles: d.subtitles.map((s) => ({ id: s.id, language: s.language, title: s.title, format: s.format, forced: s.forced, burnInOnly: s.burnInOnly })),
+    subtitles: d.subtitles.map((s) => ({ id: s.id, language: s.language, title: s.title, format: s.format, forced: s.forced, burnInOnly: s.burnInOnly, ...timingState(s, p) })),
     selectedSubtitle: p.subtitleId ?? null,
   }
+}
+
+/** A track's timing for senders' remotes: only from servers that keep timings, and only when not 0. */
+function timingState(track: Decision['subtitles'][number], p: Play): { timingMs?: number; timingShared?: boolean } {
+  const t = trackTiming(track, p.movedTimings)
+  return t.timingMs || t.timingShared ? { timingMs: t.timingMs, ...(t.timingShared ? { timingShared: true } : {}) } : {}
 }
 
 let lastSent = ''
@@ -1086,6 +1096,7 @@ let senderName: string | undefined
 
 /** Sends the state to every sender when it changed, and draws the screens. */
 function broadcast(force = false, to?: string) {
+  drawCues()
   const msg = stateMessage()
   if (note && note.until <= Date.now()) note = undefined
   render({ ...msg, senderName, note: note?.text, liveScreen: liveScreen() })
@@ -1369,11 +1380,38 @@ ctx.addEventListener(cast.framework.system.EventType.SENDER_CONNECTED, (e) => {
   broadcast(true, (e as framework.system.SenderConnectedEvent).senderId)
 })
 
+/**
+ * The receiver draws subtitles itself (cues.ts), so CAF shows none of its
+ * text tracks: the chosen track is drawn from its WebVTT at the person's
+ * size and timing.
+ */
 function showSubtitle(id: string | undefined) {
   const p = play
   if (!p) return
-  const tid = id ? p.trackIds.get(id) : undefined
-  pm.getTextTracksManager().setActiveByIds(tid ? [tid] : [])
+  p.subtitleId = id
+  try { pm.getTextTracksManager().setActiveByIds([]) } catch { /* No text tracks loaded. */ }
+  drawCues()
+}
+
+const cues = new ReceiverCues(document.getElementById('cues') as HTMLElement, async (url) => {
+  const response = await fetch(url, { credentials: 'omit', redirect: 'error' })
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  return response.text()
+}, mediaElement)
+
+/** What the cue layer draws for the play now: nothing for Live TV, a burned-in track or Off. */
+function drawCues() {
+  const p = play
+  const track = p && !live ? p.decision.subtitles.find((s) => s.id === p.subtitleId) : undefined
+  const url = p && cueSource(track, p.decision.burnIn?.id)
+  if (!p || !track || !url) return cues.set(null)
+  const token = p.credential
+  cues.set({
+    url: p.base + url,
+    sign: (u) => `${u}${u.includes('?') ? '&' : '?'}access_token=${encodeURIComponent(token.token)}`,
+    timingMs: trackTiming(track, p.movedTimings).timingMs,
+    size: loadSize(p.load.subtitleSize),
+  })
 }
 
 ctx.addCustomMessageListener(NAMESPACE, (event) => {
@@ -1454,6 +1492,14 @@ ctx.addCustomMessageListener(NAMESPACE, (event) => {
       p.quality = qualityById(msg.id, levels.get(p.load.server.id)).id
       note = undefined
       reload({ quality: p.quality, audioIndex: p.audioIndex ?? null })
+      break
+    case 'sound':
+      // The person's sound settings changed: the server applies them when
+      // it decides, so decide again from here, as for a quality change.
+      reload({ audioIndex: p.audioIndex ?? null })
+      break
+    case 'subtitleTiming':
+      if (p.subtitleId && Number.isFinite(msg.timingMs)) p.movedTimings.set(p.subtitleId, Math.round(msg.timingMs))
       break
   }
   broadcast()

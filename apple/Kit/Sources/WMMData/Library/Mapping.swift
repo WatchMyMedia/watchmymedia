@@ -620,7 +620,17 @@ extension Components.Schemas.Preferences {
             if let kind = Mapping.segmentKind(key), let mode = Mapping.skipMode(value) { skipModes[kind] = mode }
         }
         return PlaybackPreferences(skip: skipModes, autoplayNext: autoplayNext, subtitles: subtitles?.model ?? SubtitlePreferences(),
-                                   audio: AudioPreferences(languages: audio?.languages ?? []))
+                                   audio: audio?.model ?? AudioPreferences())
+    }
+}
+
+extension Components.Schemas.AudioPreferences {
+    /// A level this app doesn't know reads as Off: the server applies it all
+    /// the same, and a change saved here names its own level.
+    var model: AudioPreferences {
+        AudioPreferences(languages: languages,
+                         dialogueBoost: dialogueBoost.flatMap(SoundLevel.init(rawValue:)) ?? .off,
+                         reduceLoudSounds: reduceLoudSounds.flatMap(SoundLevel.init(rawValue:)) ?? .off)
     }
 }
 
@@ -629,8 +639,10 @@ extension Components.Schemas.SubtitlePreferences {
     /// downloads any, which could spend the server's quota; the languages
     /// stay, so a change saved here doesn't clear them.
     var model: SubtitlePreferences {
-        guard let mode = SubtitleMode(rawValue: mode) else { return SubtitlePreferences(languages: languages, mode: .off) }
-        return SubtitlePreferences(languages: languages, mode: mode, foreignAudio: foreignAudio ?? false, automaticDownload: automaticDownload)
+        // Absent until the person chooses one (a size this app doesn't know too): drawn as Normal, never written back.
+        let size = size.flatMap(SubtitleSize.init(rawValue:))
+        guard let mode = SubtitleMode(rawValue: mode) else { return SubtitlePreferences(languages: languages, mode: .off, size: size) }
+        return SubtitlePreferences(languages: languages, mode: mode, foreignAudio: foreignAudio ?? false, automaticDownload: automaticDownload, size: size)
     }
 }
 

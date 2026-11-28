@@ -68,6 +68,8 @@ public struct ServerFeatures: Hashable, Sendable {
         /// Continue watching, a recording's facts), and finding a title on
         /// several servers by its TMDB id.
         public static let redesign = 34
+        /// Boost dialogue and Reduce loud sounds, Subtitle size, and subtitle timing per track.
+        public static let dialogueAndSubtitles = 35
     }
 
     /// The server's API level; 0 when it isn't known.
@@ -143,6 +145,10 @@ public struct ServerFeatures: Hashable, Sendable {
     /// 34: a title found by TMDB id (findMoviesByTMDB, findShowsByTMDB) and the TMDB ids on
     /// Continue watching and episode cards, so a title on several servers is one card.
     public var titlesByTMDB: Bool { apiLevel >= Level.redesign }
+    /// 35: Boost dialogue and Reduce loud sounds, which the server applies to
+    /// the sound it sends; Subtitle size; and subtitle timing per track, the
+    /// person's own and an admin's for everyone.
+    public var dialogueAndSubtitles: Bool { apiLevel >= Level.dialogueAndSubtitles }
 }
 
 extension Server {

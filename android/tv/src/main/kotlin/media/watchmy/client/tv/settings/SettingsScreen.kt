@@ -81,6 +81,11 @@ import media.watchmy.client.model.SettingsGroup
 import media.watchmy.client.model.SkipMode
 import media.watchmy.client.model.StreamQuality
 import media.watchmy.client.model.SubtitleSize
+import media.watchmy.client.model.SOUND_HEADING
+import media.watchmy.client.model.SOUND_NOTE
+import media.watchmy.client.model.SUBTITLE_SIZE_PICTURE_NOTE
+import media.watchmy.client.model.SoundLevel
+import media.watchmy.client.model.SoundSetting
 import media.watchmy.client.model.aboutSummary
 import media.watchmy.client.model.accountSettingsUrl
 import media.watchmy.client.model.GO_TO_SHOW
@@ -141,6 +146,10 @@ import media.watchmy.client.ui.onBack
 /** Settings' panels and confirmations; one is open at a time. */
 internal enum class Overlay {
     Quality, Passthrough, SubtitleSize, SubtitleChoice, AddLanguage, LanguageActions, DeviceName, Privacy, Licences, ReminderLead, Diagnostics,
+
+    /** Audio & subtitles' Sound rows, and the person's Subtitle size (beside this TV's own [SubtitleSize]). */
+    DialogueBoost, ReduceLoudSounds, AccountSubtitleSize,
+
     Skip, ChangePassword, SignOut, Revoke, FollowedShow,
 
     /** Account & devices' Servers page, one server's page, and the question Remove this server… asks. */
@@ -548,6 +557,50 @@ fun SettingsScreen(
                 BackClosesNote()
             },
         )
+        Overlay.DialogueBoost, Overlay.ReduceLoudSounds -> {
+            val setting = if (overlay == Overlay.DialogueBoost) SoundSetting.DialogueBoost else SoundSetting.ReduceLoudSounds
+            OptionsDialog(
+                title = setting.label,
+                kicker = "Audio & subtitles · $SOUND_HEADING",
+                context = setting.help,
+                options = SoundLevel.entries,
+                selected = state.playback.audio.level(setting),
+                label = { it.label },
+                onSelect = {
+                    overlay = null
+                    vm.setSound(setting, it)
+                },
+                onDismiss = { overlay = null },
+                footer = {
+                    Note(SOUND_NOTE)
+                    Box(Modifier.weight(1f))
+                    BackClosesNote()
+                },
+            )
+        }
+        Overlay.AccountSubtitleSize -> {
+            // The preview follows focus, so each size can be seen before it is chosen.
+            var peek by remember { mutableStateOf(state.playback.subtitles.size) }
+            OptionsDialog(
+                title = "Subtitle size",
+                kicker = "Audio & subtitles · your account",
+                options = SubtitleSize.entries,
+                selected = state.playback.subtitles.size,
+                label = { it.label },
+                onFocus = { peek = it },
+                onSelect = {
+                    overlay = null
+                    vm.setAccountSubtitleSize(it)
+                },
+                onDismiss = { overlay = null },
+                // No spacer above Back's line: it would take half the room the four sizes need.
+                footer = {
+                    SubtitlePreview(peek, Modifier.padding(top = 8.dp))
+                    Note(SUBTITLE_SIZE_PICTURE_NOTE, Modifier.padding(top = 10.dp))
+                    BackClosesNote(Modifier.padding(top = 12.dp))
+                },
+            )
+        }
         // A skip row's four modes, each with what it does.
         Overlay.Skip -> OptionsDialog(
             title = skipKind.skipRowLabel,

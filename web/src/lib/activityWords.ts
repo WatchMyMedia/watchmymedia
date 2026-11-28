@@ -109,7 +109,16 @@ export function reasonWords(reason: string, device = 'this device'): string {
   if (m) return `${device} can’t open ${m[1].toUpperCase()} files`
   if (/selected audio track requires a remux/.test(reason)) return 'the sound chosen isn’t the file’s first'
   if (/Dolby Vision/.test(reason)) return 'Dolby Vision is converted, so colours may be off'
+  // The person's sound settings, which convert sound that could be copied.
+  m = /^dialogue boosted \((medium|high)\)/.exec(reason)
+  if (m) return `Boost dialogue is on (${strength(m[1])})`
+  m = /^loud sounds reduced \((medium|high)\)/.exec(reason)
+  if (m) return `Reduce loud sounds is on (${strength(m[1])})`
   return reason
+}
+
+function strength(s: string): string {
+  return s === 'high' ? 'High' : 'Medium'
 }
 
 /**
@@ -157,6 +166,8 @@ const LIVE_REASONS: Record<string, string> = {
 export function liveDecision(s: Pick<LiveSession, 'mode' | 'modeReason' | 'automatic' | 'actualQuality' | 'quality'>, away: boolean): Decision {
   const kind = liveKind(s.mode)
   if (kind === 'original' || kind === 'repackaged') return { chip: 'Original quality', warn: false, why: 'The broadcast is passed on as it arrives.' }
+  if (kind === 'sound' && s.modeReason === 'sound_settings')
+    return { chip: 'Converting sound', warn: false, why: 'Converting the sound for Boost dialogue or Reduce loud sounds; the picture is passed on as it arrives.' }
   if (kind === 'sound') return { chip: 'Converting sound', warn: false, why: 'Converting the sound; the picture is passed on as it arrives.' }
   const step = s.actualQuality && /^\d+$/.test(s.actualQuality) ? s.actualQuality : /^\d+$/.test(s.quality) ? s.quality : ''
   if (away && step) return { chip: 'Converting video', warn: true, why: `Away from home, so the picture is sent smaller (${step}p).` }

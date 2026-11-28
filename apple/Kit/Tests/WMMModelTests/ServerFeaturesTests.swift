@@ -39,6 +39,7 @@ import WMMModel
         ("hideFromContinueWatching", 34, "hidden", { $0.hideFromContinueWatching }),
         ("recordingFacts", 34, "LiveTVRecording.kind", { $0.recordingFacts }),
         ("titlesByTMDB", 34, "several servers", { $0.titlesByTMDB }),
+        ("dialogueAndSubtitles", 35, "dialogue and subtitles", { $0.dialogueAndSubtitles }),
     ]
 
     @Test(arguments: table.indices)

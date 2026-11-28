@@ -38,9 +38,10 @@ func startAdaptiveVOD(ctx context.Context, deps Deps, req playback.Request, info
 	}
 	high := spec
 	high.Video = playback.VideoPlan{Codec: "h264", Encoder: "libx264", Width: width(h), Height: h, BitDepth: 8}
-	high.Audio = playback.AudioPlan{Index: spec.Audio.Index, Codec: "aac", Channels: 2}
+	// The family's shared audio keeps the person's sound settings.
+	high.Audio = spec.Audio.AsAAC(2)
 	if spec.Audio.Channels == 1 || req.Profile.MaxAudioChannels == 1 {
-		high.Audio.Channels = 1
+		high.Audio = spec.Audio.AsAAC(1)
 	}
 	high.MaxBitrate = rate
 	opts := *spec.VOD

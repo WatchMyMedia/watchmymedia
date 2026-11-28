@@ -21,6 +21,8 @@ data class SideloadedSubtitle(
     val mimeType: String,
     val label: String,
     val language: String?,
+    /** How much later its cues show (negative: earlier): the person's timing for the track. */
+    val timingMs: Long = 0,
 )
 
 /**
@@ -168,6 +170,13 @@ interface MediaPlayer {
     fun seekTo(positionMs: Long)
 
     fun selectText(selection: TextSelection)
+
+    /**
+     * Shows the side-loaded subtitle [id]'s cues [timingMs] later (negative:
+     * earlier) from now on, the cue on screen included, without loading the
+     * stream again. A track that isn't side-loaded is left alone.
+     */
+    fun setSubtitleTiming(id: String, timingMs: Long) = Unit
 
     /** Direct play: switches to the file's [ordinal]th audio track. False when this device cannot play it, or the tracks are not known yet. */
     fun selectAudio(ordinal: Int): Boolean

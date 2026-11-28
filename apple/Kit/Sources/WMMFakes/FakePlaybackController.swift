@@ -35,11 +35,33 @@ public final class FakePlaybackController: PlaybackController {
     ]
     @ObservationIgnored private var ticker: Task<Void, Never>?
     @ObservationIgnored private var creditsDismissed = false
+    /// The person's sound settings and subtitle size, and the server's level: Sound and Subtitle timing show from API level 35.
+    @ObservationIgnored private let preferences: (any PreferencesRepository)?
+    @ObservationIgnored private let features: @MainActor () -> ServerFeatures
+    @ObservationIgnored private let admin: Bool
+    /// Each track's timing this play, and the one saved for everyone where there is one.
+    @ObservationIgnored private var timings: [String: TrackTimingPreview] = [:]
+    @ObservationIgnored private var soundBusy: SoundSetting?
+    @ObservationIgnored private var soundBusyLevel: SoundLevel?
+    @ObservationIgnored private var soundFailed: (SoundSetting, String)?
+    @ObservationIgnored private var timingSave: Task<Void, Never>?
 
-    public init(speed: Double = 1, tick: Duration = .milliseconds(250), sleep: (@MainActor (Duration) async throws -> Void)? = nil, offlineFiles: @escaping @MainActor (Int) -> Bool = { _ in false }) {
+    private struct TrackTimingPreview {
+        var ms = 0
+        var shared = false
+        var sharedMs: Int?
+        var save: SubtitleTimingState.Save = .rest
+        var savedForEveryone = false
+    }
+
+    public init(speed: Double = 1, tick: Duration = .milliseconds(250), sleep: (@MainActor (Duration) async throws -> Void)? = nil, offlineFiles: @escaping @MainActor (Int) -> Bool = { _ in false },
+                preferences: (any PreferencesRepository)? = nil, features: @escaping @MainActor () -> ServerFeatures = { ServerFeatures(apiLevel: nil) }, admin: Bool = false) {
         self.speed = speed
         self.tick = tick
         self.offlineFiles = offlineFiles
+        self.preferences = preferences
+        self.features = features
+        self.admin = admin
         // Define this closure in the library, rather than copying an async
         // default argument into every caller (swiftlang/swift#92017).
         self.sleep = sleep ?? { try await Task.sleep(for: $0) }
@@ -129,7 +151,12 @@ public final class FakePlaybackController: PlaybackController {
         } else {
             state.skip = nil
         }
-        state.cues = state.selectedSubtitle == nil ? [] : sampleCues.filter { pos >= $0.startMs && pos < $0.endMs }
+        refreshDialogue()
+        // A track in the picture has no cues to draw; a text track's move by its timing.
+        let timing = state.timing.flatMap { $0.burnedIn ? nil : $0.timingMs } ?? 0
+        state.cues = state.selectedSubtitle == nil || state.timing?.burnedIn == true ? [] : sampleCues
+            .filter { pos - timing >= $0.startMs && pos - timing < $0.endMs }
+            .map { SubtitleCue(startMs: $0.startMs + timing, endMs: $0.endMs + timing, text: $0.text) }
         if let nextEpisode = state.nextEpisode, !creditsDismissed, pos >= credits.startMs {
             let previous = state.upNext?.countdownMs ?? upNextCountdownMs
             let countdown = state.status == .playing ? max(previous - Int(Double(tickMs) * speed), 0) : previous
@@ -248,6 +275,121 @@ public final class FakePlaybackController: PlaybackController {
 
     public func noteUserInput() {}
 
+    // MARK: Sound and subtitle timing
+
+    /// The sound, the timing and the size as a server at API level 35 has them.
+    private func refreshDialogue() {
+        let on = features().dialogueAndSubtitles
+        state.subtitleSize = on ? preferences?.playback.subtitles.drawnSize ?? .normal : .normal
+        if on, var audio = preferences?.playback.audio {
+            // The level being changed to shows from the press, as the real player's does.
+            if let soundBusy, let soundBusyLevel { audio[soundBusy] = soundBusyLevel }
+            state.sound = PlayerSound(dialogueBoost: audio.dialogueBoost, reduceLoudSounds: audio.reduceLoudSounds, busy: soundBusy,
+                                      failed: soundFailed?.0, failure: soundFailed?.1, download: state.isOffline)
+        } else {
+            state.sound = nil
+        }
+        guard on, let id = state.selectedSubtitle, let track = state.subtitles.first(where: { $0.id == id }) else {
+            state.timing = nil
+            return
+        }
+        let t = timings[id] ?? TrackTimingPreview()
+        state.timing = SubtitleTimingState(
+            trackID: id, timingMs: t.ms, shared: t.shared, burnedIn: track.burnInOnly,
+            canReset: state.isOffline ? t.ms != 0 : !t.shared && (t.ms != 0 || (t.sharedMs ?? 0) != 0),
+            canSaveForEveryone: admin && !state.isOffline && !t.shared && t.ms != 0,
+            savedForEveryone: t.savedForEveryone, save: state.isOffline ? .playOnly : t.save
+        )
+    }
+
+    /// Saves, then plays on from here with the new sound, as a server's reload would.
+    public func setSound(_ setting: SoundSetting, to level: SoundLevel) {
+        guard let preferences, let sound = state.sound, sound.enabled, sound[setting] != level else { return }
+        let before = sound[setting]
+        soundBusy = setting
+        soundBusyLevel = level
+        soundFailed = nil
+        refreshDialogue()
+        let sleep = sleep
+        Task { [weak self] in
+            do {
+                try await preferences.setLanguages(LanguageChange(setting, level))
+                // A slow server's reload, long enough to see (and for a UI test to read).
+                try? await sleep(.seconds(4))
+            } catch {
+                self?.soundFailed = (setting, SoundWords.changeFailed(error, still: before))
+            }
+            self?.soundBusy = nil
+            self?.soundBusyLevel = nil
+            self?.refreshDialogue()
+        }
+    }
+
+    public func moveSubtitleTiming(byMs deltaMs: Int) {
+        guard let timing = state.timing else { return }
+        var t = timings[timing.trackID] ?? TrackTimingPreview()
+        let next = min(max(t.ms + deltaMs, -SubtitleTimingState.limitMs), SubtitleTimingState.limitMs)
+        if t.shared { t.sharedMs = t.ms }
+        t.ms = next
+        t.shared = false
+        t.savedForEveryone = false
+        if case .failed = t.save {} else { t.save = .rest }
+        timings[timing.trackID] = t
+        updatePrompts()
+        guard !state.isOffline else { return }
+        settleTiming(timing.trackID) { _ in }
+    }
+
+    public func resetSubtitleTiming() {
+        guard let timing = state.timing, timing.canReset else { return }
+        var t = timings[timing.trackID] ?? TrackTimingPreview()
+        t.ms = state.isOffline ? 0 : t.sharedMs ?? 0
+        t.shared = !state.isOffline && (t.sharedMs ?? 0) != 0
+        t.savedForEveryone = false
+        timings[timing.trackID] = t
+        updatePrompts()
+    }
+
+    public func saveSubtitleTimingForEveryone() {
+        guard let timing = state.timing, timing.canSaveForEveryone else { return }
+        settleTiming(timing.trackID, after: .zero) { t in
+            t.shared = true
+            t.sharedMs = t.ms
+            t.savedForEveryone = true
+        }
+    }
+
+    /// A second after the last press (at once for Save for everyone), saved or refused (`-fakesSaveFails timing`).
+    private func settleTiming(_ id: String, after wait: Duration = .seconds(1), _ saved: @escaping @MainActor (inout TrackTimingPreview) -> Void) {
+        timingSave?.cancel()
+        let sleep = sleep
+        let refusal = (preferences as? FakePreferencesRepository)?.refusal
+        timingSave = Task { [weak self] in
+            guard (try? await sleep(wait)) != nil, !Task.isCancelled, let self, var t = timings[id] else { return }
+            t.save = .saving
+            timings[id] = t
+            updatePrompts()
+            try? await sleep(.milliseconds(400))
+            guard !Task.isCancelled, var t = timings[id] else { return }
+            if let refusal, refusal.refuses("timing") {
+                t.save = .failed(TimingWords.saveFailed(refusal.error))
+            } else {
+                t.save = .rest
+                saved(&t)
+            }
+            timings[id] = t
+            updatePrompts()
+        }
+    }
+
+    /// A track's timing as a play would start with it, for previews: the
+    /// person's own, or one an admin saved for everyone (`shared`).
+    public func previewTiming(_ ms: Int, shared: Bool = false) {
+        guard let id = state.selectedSubtitle else { return }
+        timings[id] = TrackTimingPreview(ms: ms, shared: shared, sharedMs: shared ? ms : nil)
+        updatePrompts()
+    }
+
     /// Shows the Still watching prompt, for previews and tests.
     public func askStillWatching() { state.askStillWatching = true }
 
@@ -257,7 +399,10 @@ public final class FakePlaybackController: PlaybackController {
         state.status = .paused
     }
 
-    public func stop() { ticker?.cancel() }
+    public func stop() {
+        ticker?.cancel()
+        timingSave?.cancel()
+    }
 
     public func close() {}
 
@@ -270,9 +415,53 @@ public final class FakePlaybackController: PlaybackController {
 @MainActor
 public final class FakePlaybackFactory: PlaybackControllerFactory {
     private let offlineFiles: @MainActor (Int) -> Bool
-    public init(offlineFiles: @escaping @MainActor (Int) -> Bool = { _ in false }) { self.offlineFiles = offlineFiles }
+    private let preferences: (any PreferencesRepository)?
+    private let features: @MainActor () -> ServerFeatures
+    private let admin: Bool
 
-    public func make() -> any PlaybackController { FakePlaybackController(offlineFiles: offlineFiles) }
+    public init(offlineFiles: @escaping @MainActor (Int) -> Bool = { _ in false }, preferences: (any PreferencesRepository)? = nil,
+                features: @escaping @MainActor () -> ServerFeatures = { ServerFeatures(apiLevel: nil) }, admin: Bool = false) {
+        self.offlineFiles = offlineFiles
+        self.preferences = preferences
+        self.features = features
+        self.admin = admin
+    }
+
+    public func make() -> any PlaybackController {
+        FakePlaybackController(offlineFiles: offlineFiles, preferences: preferences, features: features, admin: admin)
+    }
+
+    /// Timings the Cast remote saved: each person's own and the one for everyone, by file and track.
+    private var ownTimings: [String: Int] = [:]
+    private var sharedTimings: [String: Int] = [:]
+
+    /// As a server does: refused with `-fakesSaveFails timing`, for everyone only for an admin.
+    public func setSubtitleTiming(fileID: Int, trackID: String, timingMs: Int, everyone: Bool) async throws -> SavedTiming {
+        await FakeLatency.wait()
+        if let refusal = (preferences as? FakePreferencesRepository)?.refusal, refusal.refuses("timing") { throw refusal.error }
+        let key = "\(fileID)/\(trackID)"
+        if everyone {
+            guard admin else { throw APIError(status: 403, message: "Only an admin can save a timing for everyone.") }
+            sharedTimings[key] = timingMs == 0 ? nil : timingMs
+            ownTimings[key] = nil
+        } else {
+            ownTimings[key] = timingMs
+        }
+        return timing(key)
+    }
+
+    public func deleteSubtitleTiming(fileID: Int, trackID: String) async throws -> SavedTiming {
+        await FakeLatency.wait()
+        if let refusal = (preferences as? FakePreferencesRepository)?.refusal, refusal.refuses("timing") { throw refusal.error }
+        let key = "\(fileID)/\(trackID)"
+        ownTimings[key] = nil
+        return timing(key)
+    }
+
+    private func timing(_ key: String) -> SavedTiming {
+        if let own = ownTimings[key] { return SavedTiming(timingMs: own, shared: false) }
+        return SavedTiming(timingMs: sharedTimings[key] ?? 0, shared: sharedTimings[key] != nil)
+    }
 
     public func plans(fileIDs: [Int]) async -> [Int: PlaybackPlan] {
         Dictionary(uniqueKeysWithValues: fileIDs.compactMap { FakeData.plan(fileID: $0) }.map { ($0.fileID, $0) })
@@ -290,13 +479,14 @@ extension AppServices {
     /// `watchlists` puts it at API level 33, with ``FakeWatchlistsRepository``'s three watchlists.
     /// `redesign` puts it at API level 34: the cast as people with their own
     /// pages, a card's counts, the library's totals and rating filter, and
-    /// Remove from Continue watching.
-    public static func fake(signedIn: Bool = true, chosen: Bool = true, client: ClientInfo = .fakePhone, admin: Bool = true, seerr: Bool = false, seerrLinked: Bool = true, liveTV: Bool = false, liveGuide: FakeLiveGuide? = nil, downloads: Bool = false, apiLevel: Int? = nil, recordings: Bool = false, liveAutomatic: Bool = false, rows: Bool = false, follows: Bool = false, related: Bool = false, watchlists: Bool = false, several: Bool = false, redesign: Bool = false) -> AppServices {
+    /// Remove from Continue watching. `dialogue` puts it at API level 35:
+    /// Boost dialogue, Reduce loud sounds, Subtitle size and subtitle timing.
+    public static func fake(signedIn: Bool = true, chosen: Bool = true, client: ClientInfo = .fakePhone, admin: Bool = true, seerr: Bool = false, seerrLinked: Bool = true, liveTV: Bool = false, liveGuide: FakeLiveGuide? = nil, downloads: Bool = false, apiLevel: Int? = nil, recordings: Bool = false, liveAutomatic: Bool = false, rows: Bool = false, follows: Bool = false, related: Bool = false, watchlists: Bool = false, several: Bool = false, redesign: Bool = false, dialogue: Bool = false) -> AppServices {
         let liveTV = liveTV || liveGuide != nil || liveAutomatic
-        let level = redesign ? ServerFeatures.Level.redesign : watchlists ? ServerFeatures.Level.watchlists : related ? ServerFeatures.Level.related : follows ? ServerFeatures.Level.follows : rows ? ServerFeatures.Level.rows : nil
+        let level = dialogue ? ServerFeatures.Level.dialogueAndSubtitles : redesign ? ServerFeatures.Level.redesign : watchlists ? ServerFeatures.Level.watchlists : related ? ServerFeatures.Level.related : follows ? ServerFeatures.Level.follows : rows ? ServerFeatures.Level.rows : nil
         let servers = FakeServerRepository(signedIn: signedIn, chosen: chosen, admin: admin, liveTV: liveTV, liveGuide: liveGuide != nil,
                                            liveExtras: liveGuide?.extras ?? false,
-                                           apiLevel: redesign ? ServerFeatures.Level.redesign : apiLevel ?? level, several: several)
+                                           apiLevel: dialogue ? ServerFeatures.Level.dialogueAndSubtitles : redesign ? ServerFeatures.Level.redesign : apiLevel ?? level, several: several)
         let library = FakeLibraryRepository()
         library.servers = servers
         // Read here rather than passed, so both apps' fakes take it with no change to their factories.
@@ -309,6 +499,7 @@ extension AppServices {
         let watchlistsRepository = FakeWatchlistsRepository(servers: servers)
         library.watchlists = watchlistsRepository
         rowsRepository.watchlists = watchlistsRepository
+        let preferences = FakePreferencesRepository()
         let downloadRepository: any DownloadRepository = downloads ? FakeDownloadRepository(servers: servers) : UnavailableDownloads()
         let liveRepository = liveTV ? FakeLiveTVRepository(servers: servers, guide: liveGuide) : nil
         if liveAutomatic { liveRepository?.offered.automatic = true }
@@ -318,8 +509,9 @@ extension AppServices {
             auth: FakeAuthRepository(signedIn: signedIn, servers: servers, client: client, admin: admin),
             library: library,
             requests: FakeRequestsRepository(library: library, admin: admin, seerr: seerr, seerrLinked: seerrLinked),
-            preferences: FakePreferencesRepository(),
-            playback: FakePlaybackFactory(offlineFiles: { fileID in downloadRepository.downloads.contains { $0.fileID == fileID && $0.downloaded } }),
+            preferences: preferences,
+            playback: FakePlaybackFactory(offlineFiles: { fileID in downloadRepository.downloads.contains { $0.fileID == fileID && $0.downloaded } },
+                                          preferences: preferences, features: { [weak servers] in ServerFeatures(apiLevel: servers?.current?.server.apiLevel) }, admin: admin),
             images: FakeImageLoader(),
             client: client,
             liveTV: liveRepository,

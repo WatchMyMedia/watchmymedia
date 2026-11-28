@@ -78,6 +78,12 @@ func registerLiveTVSessions(h huma.API, r chi.Router, deps Deps) {
 		if err != nil {
 			return nil, err
 		}
+		// The person's sound settings apply to Live TV as to any play.
+		prefs, err := loadPreferences(ctx, deps, owner.UserID)
+		if err != nil {
+			return nil, err
+		}
+		owner.Effects = prefs.Audio.Effects()
 		if in.Body.AutoRecovery && in.Body.Quality != "auto" {
 			return nil, liveError(livetv.ErrQuality)
 		}

@@ -915,8 +915,13 @@ public final class FakePreferencesRepository: PreferencesRepository {
     public func setLanguages(_ change: LanguageChange) async throws {
         let part = change.audioLanguages != nil ? "audioLanguages"
             : change.subtitleLanguages != nil ? "subtitleLanguages"
-            : change.choice != nil ? "subtitleChoice" : "automaticDownload"
+            : change.choice != nil ? "subtitleChoice"
+            : change.dialogueBoost != nil ? "dialogueBoost"
+            : change.reduceLoudSounds != nil ? "reduceLoudSounds"
+            : change.subtitleSize != nil ? "subtitleSize" : "automaticDownload"
         try await refuse(part, in: "languages")
+        // A sound setting or the size takes a moment, as a server's save does, so the row says so.
+        if change.needsDialogueAndSubtitles { await FakeLatency.wait() }
         change.apply(to: &playback)
         if change.choice != nil { choseSubtitles = true }
         if change.audioLanguages?.isEmpty == false, !choseSubtitles {

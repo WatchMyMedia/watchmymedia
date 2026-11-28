@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -104,7 +105,15 @@ private fun PillButton(
 
 /** The gold text button ("Change", "Play this", "Sign out"). */
 @Composable
-fun GoldTextButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, color: Color = WmmColors.Accent) {
+fun GoldTextButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    color: Color = WmmColors.Accent,
+    /** Before the words, where it says who it is for (Save for everyone's person). */
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+) {
     TextButton(
         onClick = onClick,
         modifier = modifier.heightIn(min = 40.dp),
@@ -113,6 +122,7 @@ fun GoldTextButton(text: String, onClick: () -> Unit, modifier: Modifier = Modif
         colors = ButtonDefaults.textButtonColors(contentColor = color, disabledContentColor = WmmColors.TextFaint),
         contentPadding = PaddingValues(horizontal = 12.dp),
     ) {
+        if (icon != null) androidx.compose.material3.Icon(icon, contentDescription = null, modifier = Modifier.padding(end = 6.dp).size(16.dp))
         Text(text, style = buttonText(false))
     }
 }

@@ -39,6 +39,14 @@ import media.watchmy.client.model.UpNext
 import media.watchmy.client.model.UpNextPrompt
 import media.watchmy.client.model.UP_NEXT_COUNTDOWN_MS
 import media.watchmy.client.model.episodeCode
+import media.watchmy.client.model.PlayerSound
+import media.watchmy.client.model.PreferencesRepository
+import media.watchmy.client.model.SoundFailure
+import media.watchmy.client.model.SoundLevel
+import media.watchmy.client.model.SoundSetting
+import media.watchmy.client.model.SubtitleTimingState
+import media.watchmy.client.model.TIMING_SETTLE_MS
+import media.watchmy.client.model.movedTiming
 
 /**
  * A pretend player for building the player screens without a server: a 52
@@ -53,6 +61,10 @@ class FakePlaybackController(
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
     private val speed: Float = 1f,
     private val trickplay: Trickplay? = FakeData.trickplay,
+    /** The person's sound settings, which Sound saves to; null keeps them in the fake, Off to start. */
+    private val preferences: PreferencesRepository? = null,
+    /** The server can apply the sound and save subtitle timings ([SOUND_API_LEVEL]). */
+    private val soundAndTiming: Boolean = true,
 ) : PlaybackController {
     private val durationMs = 52 * 60_000L
     private val intro = Segment(SegmentKind.Intro, 60_000, 105_000)
@@ -102,7 +114,10 @@ class FakePlaybackController(
             quality = StreamQuality.Auto, qualities = StreamQuality.offered(auto = true),
             autoStep = StreamQuality.Original, bitrate = 48_000_000,
             trickplay = trickplay,
+            sound = sound().takeIf { soundAndTiming },
         )
+        timings.clear()
+        timings.putAll(STARTING_TIMINGS)
         _progress.value = PlaybackProgress(request.startMs ?: if (growing != null) 0 else 50_000, currentDuration())
         creditsDismissed = false
         ticker?.cancel()
@@ -186,7 +201,93 @@ class FakePlaybackController(
 
     override fun selectAudio(index: Int) = _state.update { it.copy(selectedAudio = index) }
 
-    override fun selectSubtitle(id: String?) = _state.update { it.copy(selectedSubtitle = id) }
+    override fun selectSubtitle(id: String?) = _state.update { it.copy(selectedSubtitle = id, timing = timingOf(id)) }
+
+    // --- sound and subtitle timing, as the server would answer ---
+
+    private var levels = mapOf(SoundSetting.DialogueBoost to SoundLevel.Off, SoundSetting.ReduceLoudSounds to SoundLevel.Off)
+    private var soundBusy: SoundSetting? = null
+    private var soundFailure: SoundFailure? = null
+
+    private fun sound(): PlayerSound {
+        val audio = preferences?.playback?.value?.audio
+        val dialogue = audio?.dialogueBoost ?: levels.getValue(SoundSetting.DialogueBoost)
+        val loud = audio?.reduceLoudSounds ?: levels.getValue(SoundSetting.ReduceLoudSounds)
+        return PlayerSound(dialogue, loud, busy = soundBusy, failed = soundFailure)
+    }
+
+    override fun setSound(setting: SoundSetting, level: SoundLevel) {
+        if (!soundAndTiming || soundBusy != null) return
+        val still = sound().level(setting)
+        if (still == level && soundFailure?.setting != setting) return
+        soundBusy = setting
+        soundFailure = null
+        levels = levels + (setting to level)
+        _state.update { it.copy(sound = sound()) }
+        scope.launch {
+            val saved = runCatching { preferences?.setSound(setting, level) }.isSuccess
+            if (!saved) {
+                levels = levels + (setting to still)
+                soundBusy = null
+                soundFailure = SoundFailure(setting, level, still)
+                _state.update { it.copy(sound = sound()) }
+                return@launch
+            }
+            // The play loads again at the same place with the new sound.
+            _state.update { it.copy(sound = sound(), status = PlayerStatus.Buffering) }
+            delay(900)
+            soundBusy = null
+            _state.update { it.copy(sound = sound(), status = PlayerStatus.Playing) }
+        }
+    }
+
+    /** Each track's timing: its ms, whether it is the shared one, the person's own, and the shared one behind it. */
+    private data class FakeTiming(val ms: Long, val shared: Boolean = false, val own: Boolean = false, val sharedMs: Long = 0, val savedAll: Boolean = false)
+
+    private val timings = mutableMapOf<String, FakeTiming>()
+    private var timingSave: Job? = null
+
+    private fun timingOf(id: String?): SubtitleTimingState? {
+        if (!soundAndTiming || id == null) return null
+        val t = timings[id] ?: FakeTiming(0)
+        return SubtitleTimingState(
+            trackId = id, ms = t.ms, shared = t.shared, own = t.own, canReset = t.own && t.ms != t.sharedMs,
+            savedForEveryone = t.savedAll, burnedIn = _state.value.subtitles.firstOrNull { it.id == id }?.burnInOnly == true,
+        )
+    }
+
+    private fun showTiming() = _state.update { it.copy(timing = timingOf(it.selectedSubtitle)) }
+
+    override fun moveSubtitleTiming(deltaMs: Long) {
+        val id = _state.value.selectedSubtitle ?: return
+        val t = timings[id] ?: FakeTiming(0)
+        val ms = movedTiming(t.ms, deltaMs)
+        if (ms == t.ms) return
+        timings[id] = t.copy(ms = ms, shared = false, own = true, savedAll = false)
+        showTiming()
+        timingSave?.cancel()
+        timingSave = scope.launch { delay(TIMING_SETTLE_MS) }
+    }
+
+    override fun resetSubtitleTiming() {
+        val id = _state.value.selectedSubtitle ?: return
+        val t = timings[id] ?: return
+        timings[id] = FakeTiming(t.sharedMs, shared = t.sharedMs != 0L, sharedMs = t.sharedMs)
+        showTiming()
+    }
+
+    override fun saveSubtitleTimingForEveryone() {
+        val id = _state.value.selectedSubtitle ?: return
+        val t = timings[id] ?: return
+        timings[id] = FakeTiming(t.ms, shared = t.ms != 0L, sharedMs = t.ms, savedAll = true)
+        showTiming()
+    }
+
+    override fun showSubtitleTiming(timingMs: Long) {
+        val id = _state.value.selectedSubtitle ?: return
+        timings[id] = (timings[id] ?: FakeTiming(0)).copy(ms = timingMs, own = true, shared = false)
+        showTiming()
+    }
 
     override fun downloadSubtitle(resultId: String) {
         val online = _state.value.online ?: return
@@ -254,6 +355,11 @@ class FakePlaybackController(
     fun clearNote() = _state.update { it.copy(note = null) }
 
     override fun noteUserInput() = Unit
+
+    private companion object {
+        /** The English SDH track has a timing an admin saved for everyone. */
+        val STARTING_TIMINGS = mapOf("s5" to FakeTiming(800, shared = true, sharedMs = 800))
+    }
 
     override fun stop() {
         ticker?.cancel()

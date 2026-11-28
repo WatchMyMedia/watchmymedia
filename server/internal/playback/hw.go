@@ -48,7 +48,13 @@ type Capabilities struct {
 	// the GPU pipeline tone maps too; doviStrip that the dovi_rpu bitstream
 	// filter (FFmpeg 7.1) can take Dolby Vision out of a copy.
 	zscale, gpuToneMap, doviStrip bool
+	// audio is which optional sound filters ffmpeg lacks, for the person's
+	// sound settings (AudioFilters).
+	audio AudioFilters
 }
+
+// AudioFilters says which of the optional sound filters ffmpeg lacks.
+func (c Capabilities) AudioFilters() AudioFilters { return c.audio }
 
 // CPUToneMap reports whether ffmpeg has the filters that map HDR to SDR on
 // the CPU (ToneMapFilters).

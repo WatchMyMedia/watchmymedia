@@ -418,6 +418,17 @@ server, and on iPad in both a regular and a compact width.
     until the remote moves it (tvOS 27 simulator: Sign in, Mark watched, Move
     up at the top; `TVUITests/BusyFocusTests.swift`), so a button may disable
     itself while it works.
+  - On Apple TV a row that takes Left and Right itself (the player's
+    Subtitle timing: Left is Earlier, Right is Later) is a UIKit view
+    (`TimingStepper` in `TV/Screens/Player/PlaybackOptions.swift`): its
+    `shouldUpdateFocus(in:)` refuses a move left or right from it and its
+    `pressesBegan` reads the arrows, repeating while held. SwiftUI's
+    `.onMoveCommand` alone doesn't stop the focus engine moving to the next
+    column. `UIFocusSystem.requestFocusUpdate(to:)` on that view, from
+    inside the SwiftUI panel, never reached it (tvOS 27.2 simulator), so a
+    button under it that hides once pressed (Reset, Save for everyone)
+    stays, dimmed, while it has focus, and goes when focus moves on;
+    otherwise focus jumped to the top of the panel.
   - On Apple TV Play/Pause goes to the focused view's `.onPlayPauseCommand`
     and nowhere else: a card plays with `playPauseCard(_:select:)`, whose
     rule is `CardPlayPause` in the Kit (a show's card opens, as Select does),

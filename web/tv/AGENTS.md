@@ -85,7 +85,16 @@ checks and tests see Samsung's.
   and recordings' New, watched and time left. These use the web's own
   calls (`personQuery` and `itemsQuery` in `../src/api/queries.ts`,
   `hideFromContinueWatching` in `../src/api/watch.ts`); another server's grid
-  pages go through `fetchItems` with that server's client.
+  pages go through `fetchItems` with that server's client. Level 35's
+  (`from35()`): Boost dialogue and Reduce loud sounds, the person's subtitle
+  size and subtitle timing, in Settings › Audio & subtitles and the player's
+  Audio and subtitles panel. Their rules are the web's (`../src/lib/sound.ts`,
+  `../src/lib/subtitleSize.ts`, `../src/lib/play/subtitleTiming.ts`); the
+  engine changes the sound (save, then reload where it is) and keeps the
+  timing, which its cue lookup subtracts. Below 35 the TV keeps its own
+  subtitle size (Playback › On this TV), and from 35 writes it up once to a
+  person who has never chosen one, which the server says by leaving the size
+  out (`session/subtitleSizeMove.ts`).
 - **Samsung's store identity** in `platform/samsung/public/config.xml` is permanent: the widget id,
   package id `cPFf0iV3Li` and application id `cPFf0iV3Li.WatchMyMedia` never
   change, and every update is signed with the same Samsung author certificate.

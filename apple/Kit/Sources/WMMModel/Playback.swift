@@ -386,6 +386,14 @@ public struct PlayerState: Hashable, Sendable {
     public var selectedSubtitle: String?
     /// The selected text subtitle's cues on screen at `positionMs`, drawn over the video.
     public var cues: [SubtitleCue] = []
+    /// How big the cues are drawn, the person's (normal on a server before API level 35).
+    public var subtitleSize: SubtitleSize = .normal
+    /// Boost dialogue and Reduce loud sounds; nil where they can't be changed
+    /// here (a server before API level 35, another server's copy).
+    public var sound: PlayerSound?
+    /// The timing of the subtitle track that is on; nil with subtitles off,
+    /// or on a server before API level 35.
+    public var timing: SubtitleTimingState?
     /// Subtitles found online; nil while not known, or when the server has no provider.
     public var online: OnlineSubtitles?
     /// The quality the viewer chose, as this server plays it (Automatic is Original on an older one).
@@ -471,6 +479,21 @@ public protocol PlaybackController: AnyObject, Observable {
 
     func selectQuality(_ quality: StreamQuality)
 
+    /// Saves a sound setting for the person, then plays on from here with
+    /// the sound the server now sends (``PlayerState/sound``).
+    func setSound(_ setting: SoundSetting, to level: SoundLevel)
+
+    /// Earlier (negative) or Later: the cues move at once, and the timing is
+    /// saved a second after the last press (a track that is part of the
+    /// picture restarts the video then).
+    func moveSubtitleTiming(byMs deltaMs: Int)
+
+    /// Reset: back to the timing saved for everyone, else in step.
+    func resetSubtitleTiming()
+
+    /// An admin's Save for everyone: this timing for everyone who plays the file.
+    func saveSubtitleTimingForEveryone()
+
     /// Any tap or seek: resets the Still watching counters.
     func noteUserInput()
 
@@ -490,6 +513,10 @@ public protocol PlaybackController: AnyObject, Observable {
 
 extension PlaybackController {
     public func describeEnd(_ line: String?) {}
+    public func setSound(_ setting: SoundSetting, to level: SoundLevel) {}
+    public func moveSubtitleTiming(byMs deltaMs: Int) {}
+    public func resetSubtitleTiming() {}
+    public func saveSubtitleTimingForEveryone() {}
 }
 
 @MainActor
@@ -500,4 +527,21 @@ public protocol PlaybackControllerFactory: AnyObject {
     /// version lists ("Direct play", "Remux to fMP4"), by file ID. Starts
     /// nothing; empty when unknown.
     func plans(fileIDs: [Int]) async -> [Int: PlaybackPlan]
+
+    /// Saves a subtitle track's timing on the server in use, outside a play
+    /// on this device: the Cast remote's, for the play on the TV (API level 35).
+    func setSubtitleTiming(fileID: Int, trackID: String, timingMs: Int, everyone: Bool) async throws -> SavedTiming
+
+    /// The Cast remote's Reset: back to the timing saved for everyone, else none.
+    func deleteSubtitleTiming(fileID: Int, trackID: String) async throws -> SavedTiming
+}
+
+extension PlaybackControllerFactory {
+    public func setSubtitleTiming(fileID: Int, trackID: String, timingMs: Int, everyone: Bool) async throws -> SavedTiming {
+        throw APIError(status: nil, message: "Update the server to save subtitle timing.")
+    }
+
+    public func deleteSubtitleTiming(fileID: Int, trackID: String) async throws -> SavedTiming {
+        throw APIError(status: nil, message: "Update the server to save subtitle timing.")
+    }
 }

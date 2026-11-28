@@ -30,6 +30,8 @@ data class PlayRequest(
      * as the person signed in there. Its progress stays on that server.
      */
     val serverId: String? = null,
+    /** The subtitle size a phone casting here asked for, which this play draws at in place of the TV's; null follows the setting. */
+    val subtitleSize: SubtitleSize? = null,
 )
 
 /**
@@ -238,11 +240,21 @@ data class PlayerUiState(
     val isOffline: Boolean = false,
     val growing: GrowingRecording? = null,
     val canCast: Boolean = true,
+    /** Boost dialogue and Reduce loud sounds; null where the server can't apply them (below [SOUND_API_LEVEL]). */
+    val sound: PlayerSound? = null,
+    /** The selected subtitle track's timing; null while subtitles are off, and where the server can't save one. */
+    val timing: SubtitleTimingState? = null,
+    /**
+     * The subtitle size this play draws at, when it isn't the screen's own
+     * (a play cast here by someone else, from their LOAD); null follows the
+     * person's setting.
+     */
+    val subtitleSize: SubtitleSize? = null,
 )
 
 /** The Audio, Subtitles and Quality pickers' part of [PlayerUiState]. */
 val PlayerUiState.tracks: PlayerTracks
-    get() = PlayerTracks(audio, selectedAudio, subtitles, selectedSubtitle, online, quality, qualities, autoStep, bitrate, mode, video, reasons, isOffline)
+    get() = PlayerTracks(audio, selectedAudio, subtitles, selectedSubtitle, online, quality, qualities, autoStep, bitrate, mode, video, reasons, isOffline, sound, timing)
 
 /**
  * What the Audio, Subtitles and Quality pickers show ([PlayerUiState.tracks]).
@@ -264,6 +276,8 @@ data class PlayerTracks(
     val video: StreamVideo? = null,
     val reasons: List<String> = emptyList(),
     val isOffline: Boolean = false,
+    val sound: PlayerSound? = null,
+    val timing: SubtitleTimingState? = null,
 )
 
 /**
@@ -341,6 +355,39 @@ interface PlaybackController {
     fun downloadSubtitle(resultId: String) = Unit
 
     fun selectQuality(quality: StreamQuality)
+
+    /**
+     * Boost dialogue or Reduce loud sounds: saves the person's choice, then
+     * plays on from where it is with the new sound. The row is busy
+     * meanwhile ([PlayerSound.busy]); a save that fails keeps the old level
+     * ([PlayerSound.failed]). Players that can't change it ignore it.
+     */
+    fun setSound(setting: SoundSetting, level: SoundLevel) = Unit
+
+    /** The person's sound settings were changed elsewhere (a phone casting here saved them): plays on from here with them. */
+    fun soundChanged() = Unit
+
+    /**
+     * Moves the selected subtitle track's timing [deltaMs] later (negative:
+     * earlier). The cues move at once; it is saved for the person once the
+     * presses stop ([TIMING_SETTLE_MS]), or held for this play where it can't be.
+     */
+    fun moveSubtitleTiming(deltaMs: Long) = Unit
+
+    /** Reset: back to the timing saved for everyone, else in step. */
+    fun resetSubtitleTiming() = Unit
+
+    /** An admin's Save for everyone: the timing becomes the one everyone who plays the file gets. */
+    fun saveSubtitleTimingForEveryone() = Unit
+
+    /** Tries a timing that didn't save again. */
+    fun retrySubtitleTiming() = Unit
+
+    /**
+     * Shows the cues [timingMs] later from now (negative: earlier) without
+     * saving it: a phone casting here moved them, and saves it itself.
+     */
+    fun showSubtitleTiming(timingMs: Long) = Unit
 
     /** Any key press, tap or seek: resets the Still watching counters. */
     fun noteUserInput()

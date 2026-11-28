@@ -841,6 +841,15 @@ type ShowsSearch struct {
 	Words         string `json:"words"`
 }
 
+type SubtitleTiming struct {
+	UserID    *int64 `json:"user_id"`
+	FileID    int64  `json:"file_id"`
+	TrackKey  string `json:"track_key"`
+	TimingMs  int64  `json:"timing_ms"`
+	FileSize  int64  `json:"file_size"`
+	UpdatedAt string `json:"updated_at"`
+}
+
 type TmdbCollection struct {
 	ID           int64   `json:"id"`
 	Name         string  `json:"name"`

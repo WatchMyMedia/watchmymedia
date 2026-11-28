@@ -1,4 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
+import { cueBlocks } from '../../../src/lib/play/cues'
 import { clock } from '../../../src/lib/clock'
 import { timeOfDay } from '../../../src/lib/liveGuide'
 import { SUBTITLE_PX, type Cue, type FilePlayback, type FilePlaybackState } from '../../player'
@@ -105,16 +107,23 @@ export function SkipButton({ playback }: Props) {
 
 const cuesOf = (s: FilePlaybackState) => ({ cues: s.subtitles.cues, size: s.subtitles.size })
 
-/** The subtitles showing, at the TV's size, inside the safe area; raised above the controls or the card when they show. */
-export function Cues({ playback, raised }: Props & { raised: boolean }) {
+/**
+ * The subtitles showing, at the person's size, inside the safe area; raised
+ * above the controls or the card when they show. With Audio and subtitles
+ * open they stay in sight beside the panel, over its dim, so a timing
+ * change shows as it is pressed.
+ */
+export function Cues({ playback, raised, beside }: Props & { raised: boolean; beside?: boolean }) {
   const { cues, size } = useSelect(playback, cuesOf)
   if (!cues.length) return null
   const style = { fontSize: `${SUBTITLE_PX[size] / 16}rem` }
-  const top = cues.filter((c) => c.top), bottom = cues.filter((c) => !c.top)
-  return <>
-    {top.length > 0 && <CueBlock cues={top} className="pl-cues pl-cues--top" style={style}/>}
-    {bottom.length > 0 && <CueBlock cues={bottom} className={`pl-cues${raised ? ' pl-cues--raised' : ''}`} style={style}/>}
+  const { top, bottom } = cueBlocks(cues)
+  const side = beside ? ' pl-cues--beside' : ''
+  const blocks = <>
+    {top.length > 0 && <CueBlock cues={top} className={`pl-cues pl-cues--top${side}`} style={style}/>}
+    {bottom.length > 0 && <CueBlock cues={bottom} className={`pl-cues${raised && !beside ? ' pl-cues--raised' : ''}${side}`} style={style}/>}
   </>
+  return beside ? createPortal(blocks, document.getElementById('root') ?? document.body) : blocks
 }
 
 function CueBlock({ cues, className, style }: { cues: readonly Cue[]; className: string; style: CSSProperties }) {

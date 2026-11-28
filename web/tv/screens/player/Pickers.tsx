@@ -7,7 +7,9 @@ import { Option, PanelLine, SidePanel } from '../../ui/Overlays'
 import { VScroll } from '../../ui/VScroll'
 import { audioLine, qualityRows, qualitySentence, streamDetails, subtitleLine, subtitlePanel, type OnlineRow, type SubtitleChoices } from './labels'
 import { PlayerIcon } from './PlayerIcons'
-import { BACK } from '../../app/keys'
+import { PanelFoot, SoundRows, TimingRows } from './SoundPanel'
+import { timingKey } from './soundWords'
+import type { TimingView } from '../../../src/lib/play/subtitleTiming'
 
 // The player's two panels from the right: Audio and subtitles, in one, and
 // Quality. A choice applies at once and the panel stays open; Return
@@ -42,7 +44,7 @@ function PanelKeys({ onKey }: { onKey(input: KeyInput): boolean }) {
 
 const Heading = ({ children }: { children: string }) => <h3 className="pl-panel__heading">{children}</h3>
 
-type PickerState = Pick<FilePlaybackState, 'audio' | 'quality' | 'mode' | 'video' | 'stream'> & { subtitles: SubtitleChoices }
+type PickerState = Pick<FilePlaybackState, 'audio' | 'quality' | 'mode' | 'video' | 'stream' | 'sound'> & { subtitles: SubtitleChoices & { timing?: TimingView } }
 
 export function PickerPanel({ picker, state, playback, onClose, onKey }: { picker: Picker; state: PickerState; playback: FilePlayback; onClose(): void; onKey(input: KeyInput): boolean }) {
   return picker === 'tracks'
@@ -50,10 +52,16 @@ export function PickerPanel({ picker, state, playback, onClose, onKey }: { picke
     : <QualityPanel state={state} playback={playback} onClose={onClose} onKey={onKey}/>
 }
 
-/** Audio and subtitles in one panel, named in words: "Surround sound", "With sounds described". */
+/**
+ * Audio and subtitles in one panel, named in words: "Surround sound", "With
+ * sounds described"; from API level 35 with Sound under the audio and
+ * Subtitle timing under the subtitles. The foot says the keys of the row
+ * focused.
+ */
 function TracksPanel({ state, playback, onClose, onKey }: { state: PickerState; playback: FilePlayback; onClose(): void; onKey(input: KeyInput): boolean }) {
   const focus = useFocus()
   const [online, setOnline] = useState(false)
+  const [focused, setFocused] = useState<string>()
   const panel = subtitlePanel(state.subtitles)
   const back = () => { setOnline(false); queueMicrotask(() => focus.focusId('tracks/more', focus.scope('modal'))) }
   if (online && panel.online) {
@@ -69,7 +77,11 @@ function TracksPanel({ state, playback, onClose, onKey }: { state: PickerState; 
   }
   const audio = state.audio.options
   const subtitles = state.subtitles.options.filter((s) => s.source !== 'opensubtitles' || s.id === state.subtitles.selected)
-  return <PlayerPanel key="tracks" title="Audio and subtitles" onClose={onClose} onKey={onKey} foot={`A choice applies straight away. ${BACK} closes this.`}>
+  const timing = state.subtitles.timing
+  const keys = (input: KeyInput) => timingKey(input.action, playback) || onKey(input)
+  return <PlayerPanel key="tracks" title="Audio and subtitles" onClose={onClose} onKey={keys}
+    foot={<PanelFoot focused={focused} timingFailed={timing?.status === 'failed'}/>}>
+    <div className="pl-panel__focus" onFocus={(e) => setFocused((e.target as HTMLElement).dataset.focus)}>
     {audio.length > 0 && <>
       <Heading>Audio</Heading>
       <div role="radiogroup" className="pl-panel__rows">
@@ -77,11 +89,14 @@ function TracksPanel({ state, playback, onClose, onKey }: { state: PickerState; 
           autoFocus={state.audio.selected === undefined && i === 0} onPress={() => playback.selectAudio(a.index)}/>)}
       </div>
     </>}
+    {state.sound && <SoundRows sound={state.sound} playback={playback}/>}
     <Heading>Subtitles</Heading>
     <div role="radiogroup" className="pl-panel__rows">
       <Option id="subtitles/off" label="Off" checked={state.subtitles.selected === undefined} onPress={() => playback.selectSubtitle(undefined)}/>
       {subtitles.map((s) => <Option key={s.id} id={`subtitles/${s.id}`} label={s.label} detail={subtitleLine(s)} checked={s.id === state.subtitles.selected} onPress={() => playback.selectSubtitle(s.id)}/>)}
       {panel.online && <Option id="tracks/more" label="Find more subtitles" next onPress={() => setOnline(true)}/>}
+    </div>
+    {timing && <TimingRows timing={timing} playback={playback}/>}
     </div>
   </PlayerPanel>
 }

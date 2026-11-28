@@ -1,10 +1,13 @@
 import type { components } from '../../src/api/schema'
 import { FakeServer, problem } from './server'
+import { sound } from './dialogue'
 
 // Settings' routes for the preview: the account's preferences, each screen's
 // rows and the lists they come from, the shows followed and the signed-in
 // devices. `mode` "savefail" refuses every change to the preferences;
-// "nosettings" doesn't answer for them at all (the not-loaded state).
+// "nosettings" doesn't answer for them at all (the not-loaded state);
+// "soundfail" refuses a sound setting's change. A sound setting or size
+// takes a moment to save, so Saving… shows.
 
 type Preferences = components['schemas']['Preferences']
 type RowLayoutEntry = components['schemas']['RowLayoutEntry']
@@ -58,19 +61,24 @@ export function registerSettings(server: FakeServer, mode: string) {
     autoplayNext: true,
     liveTVReminderMinutes: 5,
     skip: { intro: 'ask', recap: 'ask', credits: 'ask', preview: 'none', commercial: 'ask' },
-    audio: { languages: ['es', 'en'] },
-    subtitles: { languages: ['es', 'en'], mode: 'forced', foreignAudio: true, automaticDownload: true },
+    audio: { languages: ['es', 'en'], ...sound },
+    subtitles: { languages: ['es', 'en'], mode: 'forced', foreignAudio: true, automaticDownload: true, size: 'normal' },
   }
   server.route('GET', '/api/me/preferences', () => mode === 'nosettings' ? problem(503, 'preferences unavailable') : prefs)
-  server.route('PUT', '/api/me/preferences', ({ body }) => {
+  server.route('PUT', '/api/me/preferences', async ({ body }) => {
     if (mode === 'savefail') return problem(503, 'try again later')
     const b = body as components['schemas']['UpdatePreferencesInputBody']
+    const soundChange = b.audio?.dialogueBoost !== undefined || b.audio?.reduceLoudSounds !== undefined
+    if (soundChange || b.subtitles?.size !== undefined) await new Promise((resolve) => setTimeout(resolve, 900))
+    if (soundChange && mode === 'soundfail') return problem(503, 'try again later')
+    if (b.audio?.dialogueBoost !== undefined) sound.dialogueBoost = b.audio.dialogueBoost
+    if (b.audio?.reduceLoudSounds !== undefined) sound.reduceLoudSounds = b.audio.reduceLoudSounds
     prefs = {
       ...prefs,
       ...(b.autoplayNext !== undefined && { autoplayNext: b.autoplayNext }),
       ...(b.liveTVReminderMinutes !== undefined && { liveTVReminderMinutes: b.liveTVReminderMinutes }),
       skip: { ...prefs.skip, ...b.skip },
-      audio: b.audio?.languages ? { languages: b.audio.languages } : prefs.audio,
+      audio: { languages: b.audio?.languages ?? prefs.audio?.languages ?? [], ...sound },
       subtitles: { ...prefs.subtitles!, ...b.subtitles } as Preferences['subtitles'],
     }
     return prefs

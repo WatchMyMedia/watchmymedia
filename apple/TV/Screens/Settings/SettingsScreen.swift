@@ -55,7 +55,7 @@ enum SettingsFocus: Hashable {
 
 /// What takes the screen from Settings.
 private enum SettingsTask: String, Identifiable {
-    case rename, changePassword, serverSettings, languages, homeRows, privacy
+    case rename, changePassword, serverSettings, languages, homeRows, privacy, subtitleSize
 
     var id: String { rawValue }
 }
@@ -314,7 +314,29 @@ private struct SettingsView: View {
             navRow(.languages, "automatic", title: SettingsWords.automaticDownload, note: RowNote(model.saveState(.automaticDownload)),
                    value: model.subtitles.automaticDownload && model.automaticDownloadAvailable ? "On" : "Off") { task = .languages }
         }
+        if model.supportsDialogueAndSubtitles {
+            // Boost dialogue and Reduce loud sounds are menus, as Playback's choices are, and save when chosen.
+            SettingsGroup(SoundWords.heading) {
+                ForEach(SoundSetting.allCases, id: \.self) { setting in
+                    menuRow(.languages, soundKey(setting), title: setting.title, note: RowNote(model.saveState(.sound(setting))),
+                            value: model.soundLevel(setting).label,
+                            choices: SoundLevel.allCases.map { MenuChoice(value: $0, id: $0.rawValue, title: $0.label, line: nil) },
+                            chosen: model.soundLevel(setting)) { level in
+                        Task { await model.setSound(setting, to: level) }
+                    }
+                }
+            }
+            GroupFoot(SoundWords.note)
+            GroupFoot(SoundWords.appleTVNote)
+            SettingsGroup(SubtitleSizeWords.title) {
+                navRow(.languages, "size", title: SubtitleSizeWords.title, detail: SubtitleSizeWords.normalFollows,
+                       note: RowNote(model.saveState(.subtitleSize)), value: model.subtitleSize.label) { task = .subtitleSize }
+            }
+        }
     }
+
+    /// Boost dialogue's row and Reduce loud sounds'.
+    private func soundKey(_ setting: SoundSetting) -> String { setting == .dialogueBoost ? "boost" : "loud" }
 
     private func names(_ list: LanguageList) -> String? {
         let tags = model.languages(list)
@@ -639,6 +661,7 @@ private struct SettingsView: View {
             ["quality"] + SegmentKind.allCases.map { "skip-\($0.rawValue)" } + ["autoplay"] + (extras.available ? ["lead", "reminders"] : [])
         case .languages:
             (model.supportsAudioLanguages ? ["audio"] : []) + ["starting", "subtitle-languages", "automatic"]
+                + (model.supportsDialogueAndSubtitles ? ["boost", "loud", "size"] : [])
         case .notifications:
             if !follows.loaded { follows.error != nil ? ["follows-retry"] : [] } else { follows.follows.map { "follow-\($0.tmdbID)" } }
         case .homeRows: ["edit"]
@@ -768,6 +791,11 @@ private struct SettingsView: View {
         case "automatic":
             return SettingsHelp(title: SettingsWords.automaticDownload, paragraphs: [PanelWords.automaticDownloadAbout(available: model.automaticDownloadAvailable,
                                                                                                                       audioLanguages: model.supportsAudioLanguages)], hint: opens)
+        case "boost", "loud":
+            let setting: SoundSetting = key == "boost" ? .dialogueBoost : .reduceLoudSounds
+            return SettingsHelp(title: setting.title, paragraphs: [setting.line, PanelWords.soundKept], hint: changes)
+        case "size":
+            return SettingsHelp(title: SubtitleSizeWords.title, paragraphs: PanelWords.sizeAbout, hint: PanelWords.hintShowsSizes)
         case "edit":
             return SettingsHelp(title: SettingsWords.homeRows, paragraphs: [homeRows.tvIntro, listsMadeOnTheWeb], hint: opens)
         case "name":
@@ -843,6 +871,8 @@ private struct SettingsView: View {
             TVRowEditor(screen: .home, screenName: "Home")
         case .privacy:
             PrivacySheet(version: model.facts.appVersionLabel)
+        case .subtitleSize:
+            TVSubtitleSizeScreen(model: model) { task = nil }
         }
     }
 
@@ -877,6 +907,7 @@ private struct SettingsView: View {
         }
         if arguments.contains("-subtitlesSettings") && model.supportsSubtitlePreferences { task = .languages }
         if arguments.contains("-homeRowsSettings") && services.rows.available { task = .homeRows }
+        if arguments.contains("-subtitleSizeSettings") && model.supportsDialogueAndSubtitles { task = .subtitleSize }
         if arguments.contains("-renameDevice") { task = .rename }
         if arguments.contains("-changePassword") { task = .changePassword }
         if arguments.contains("-serverSettingsCode") { task = .serverSettings }

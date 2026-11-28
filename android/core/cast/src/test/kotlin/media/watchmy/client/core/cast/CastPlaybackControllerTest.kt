@@ -303,8 +303,64 @@ class CastPlaybackControllerTest {
         assertFalse("startMs" in encoded)
     }
 
+    @Test
+    fun `the TV draws the person's subtitle size, and an older server's TV gets none`() = runTest(dispatcher) {
+        preferences.setSubtitles(preferences.playback.value.subtitles.copy(size = media.watchmy.client.model.SubtitleSize.Larger))
+        controller.attach(link)
+        controller.start(request)
+        assertEquals("larger", link.loads.single().data.subtitleSize)
+        gateway.level = media.watchmy.client.model.SOUND_API_LEVEL - 1
+        controller.start(request.copy(fileId = 9102))
+        assertNull(link.loads.last().data.subtitleSize)
+    }
+
+    @Test
+    fun `a remote's sound change is saved here, then the TV is told to decide again`() = runTest(dispatcher) {
+        controller.attach(link)
+        controller.start(request)
+        link.state(StateMessage(phase = StateMessage.PLAYING, fileId = 9101, selectedSubtitle = "s4", subtitles = listOf(SubtitleInfo("s4", format = "webvtt", timingMs = 400))))
+        controller.setSound(media.watchmy.client.model.SoundSetting.DialogueBoost, media.watchmy.client.model.SoundLevel.Medium)
+        assertEquals(media.watchmy.client.model.SoundLevel.Medium, preferences.playback.value.audio.dialogueBoost)
+        assertTrue(link.sent.toString(), """{"type":"sound"}""" in link.sent)
+        assertEquals(media.watchmy.client.model.SoundSetting.DialogueBoost, controller.state.value.sound?.busy)
+    }
+
+    @Test
+    fun `a remote's timing starts where the TV is, moves its cues at once, and is saved here once it settles`() = runTest(dispatcher) {
+        controller.attach(link)
+        controller.start(request)
+        link.state(StateMessage(phase = StateMessage.PLAYING, fileId = 9101, selectedSubtitle = "s4", subtitles = listOf(SubtitleInfo("s4", format = "webvtt", timingMs = 400))))
+        assertEquals("0.4 s later", controller.state.value.timing?.label)
+        controller.moveSubtitleTiming(100)
+        controller.moveSubtitleTiming(100)
+        assertEquals(listOf("""{"type":"subtitleTiming","timingMs":500}""", """{"type":"subtitleTiming","timingMs":600}"""), link.sent.filter { "subtitleTiming" in it })
+        assertTrue(gateway.timingCalls.isEmpty())
+        testScheduler.advanceTimeBy(media.watchmy.client.model.TIMING_SETTLE_MS + 10)
+        testScheduler.runCurrent()
+        assertEquals(listOf("put 9101 s4 600"), gateway.timingCalls)
+        // Reset goes back to the one saved for everyone, and the TV shows it.
+        controller.resetSubtitleTiming()
+        assertEquals("delete 9101 s4", gateway.timingCalls.last())
+        assertEquals("""{"type":"subtitleTiming","timingMs":800}""", link.sent.last())
+        assertTrue(controller.state.value.timing!!.showsSetForEveryone)
+    }
+
     private class FakeGateway : CastGateway {
         var failure: Exception? = null
+        var level = media.watchmy.client.model.SOUND_API_LEVEL
+        val timingCalls = mutableListOf<String>()
+
+        override fun apiLevel() = level
+
+        override suspend fun setSubtitleTiming(fileId: Long, trackId: String, timingMs: Long, everyone: Boolean): media.watchmy.client.model.SavedTiming {
+            timingCalls += "put $fileId $trackId $timingMs" + if (everyone) " everyone" else ""
+            return media.watchmy.client.model.SavedTiming(timingMs, everyone)
+        }
+
+        override suspend fun resetSubtitleTiming(fileId: Long, trackId: String): media.watchmy.client.model.SavedTiming {
+            timingCalls += "delete $fileId $trackId"
+            return media.watchmy.client.model.SavedTiming(800, shared = true)
+        }
 
         override suspend fun castServer() = CastServer("srv-1", "http://192.168.1.20:27587", casting = true)
 

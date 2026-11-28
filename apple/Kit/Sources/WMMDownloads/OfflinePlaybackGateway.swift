@@ -91,6 +91,19 @@ public final class OfflinePlaybackGateway: PlaybackGateway, @unchecked Sendable 
         try await online.cancelAutomaticSubtitle(fileID: fileID, playID: playID)
     }
 
+    /// The online gateway's: a download's play is still the server's file.
+    @MainActor public var features: ServerFeatures { online.features }
+
+    /// A download's timing is for its play alone (the player saves none), so
+    /// only a play from the server reaches here.
+    public func setSubtitleTiming(fileID: Int, trackID: String, timingMs: Int, everyone: Bool) async throws -> SavedTiming {
+        try await online.setSubtitleTiming(fileID: fileID, trackID: trackID, timingMs: timingMs, everyone: everyone)
+    }
+
+    public func deleteSubtitleTiming(fileID: Int, trackID: String) async throws -> SavedTiming {
+        try await online.deleteSubtitleTiming(fileID: fileID, trackID: trackID)
+    }
+
     /// A downloaded subtitle is a file beside the media.
     public func subtitleText(_ url: URL) async throws -> String {
         guard url.isFileURL else { return try await online.subtitleText(url) }

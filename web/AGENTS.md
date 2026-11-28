@@ -86,6 +86,18 @@ the user asks in this conversation; see Authority in the root file.
   show's line is its one episode, the first to the last listed ("S3 E7 to
   E9"), or "From S3 E1" when more arrived than the feed lists, as on
   Android and Apple.
+- **Subtitles** are drawn by the player, not the browser: the active text
+  track's WebVTT (an ASS track asks for `.vtt`) is read through
+  `src/lib/play/cues.ts`, which the Cast receiver (`receiver/cues.ts`) and
+  the TV app share, and drawn by `CueLayer` at the video's time less the
+  track's subtitle timing, at the person's Subtitle size against the
+  picture's height (`src/lib/subtitleSize.ts`). The browser's text tracks
+  stay `hidden`, except in an iPhone's own full screen and picture in
+  picture, which the page can't draw over. ASS keeps JASSUB, its timing set
+  through JASSUB's `timeOffset`. The timing's rules (0.1 s steps, saved a
+  second after the last press, Reset, Save for everyone) are
+  `src/lib/play/subtitleTiming.ts`; the sound settings' words and patch are
+  `src/lib/sound.ts`. All of them need API level 35.
 - **YouTube trailers** (`src/pages/Trailer.tsx`) are the
   app's one outside frame: a plain `<iframe>` of `www.youtube-nocookie.com`,
   never YouTube's IFrame API script, and nothing drawn over it. Keep its
@@ -198,6 +210,10 @@ the user asks in this conversation; see Authority in the root file.
   `castChannel`/`castFile` send a real LOAD to record. Import the sender in
   the page from the URL the app loaded it at (Vite adds `?t=` after an
   edit), or you get a second store.
+- The receiver draws the chosen text track's cues itself (`receiver/cues.ts`)
+  and keeps CAF's text tracks off, so a sender's `subtitleTiming` moves
+  them at once and LOAD's `subtitleSize` sizes them; a `sound` command
+  decides again at the position, as a quality change does.
 - CAF keeps one Shaka player across loads, so Shaka settings carry over:
   the playback-info handler sets `abr` and `restrictions` on every load (a
   family's caps left behind made the next single output fail with Shaka

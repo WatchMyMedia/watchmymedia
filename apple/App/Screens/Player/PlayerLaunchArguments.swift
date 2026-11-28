@@ -19,6 +19,8 @@ import WMMModel
 ///     -playerCloseAfter 4                      Close after 4 s (back to portrait)
 ///     -playerScrub 0.4                         hold the scrubber's thumb at 40 %
 ///     -playerTaps 3                            three quick taps on the right (a "+20 s" run)
+///     -playerTiming 400                        the subtitle's timing, 0.4 s later (with -fakesDialogue)
+///     -playerTimingShared 600                  a timing an admin saved for everyone
 ///     -playerAutomatic slowed|recovered|failed  Automatic quality note and current step
 ///     -playerPanel episodes|audio|subtitles|quality  that panel beside the picture, or its tab under the fold (the iPhone Duo)
 @MainActor
@@ -48,6 +50,8 @@ enum PlayerLaunchArguments {
         if let ms = value(after: "-playerSeek").flatMap(Int.init) { fake.seek(toMs: ms) }
         if let id = value(after: "-playerSubtitle") { fake.selectSubtitle(id) }
         if let scene = value(after: "-playerAutomatic").flatMap(FakeAutomaticScene.init(rawValue:)) { fake.previewAutomatic(scene) }
+        if let ms = value(after: "-playerTiming").flatMap(Int.init) { fake.previewTiming(ms) }
+        if let ms = value(after: "-playerTimingShared").flatMap(Int.init) { fake.previewTiming(ms, shared: true) }
         if arguments.contains("-playerKeepControls") { model.keepsControlsUp = true }
         Task {
             // The fake plays after 0.6 s and finds online subtitles 0.8 s later.

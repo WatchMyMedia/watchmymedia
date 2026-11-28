@@ -122,4 +122,13 @@ value class ServerFeatures(val level: Int) {
 
     /** 34: a title's copies by TMDB id, and the TMDB id on Continue watching's and episode cards. */
     val copies: Boolean get() = level >= REDESIGN_API_LEVEL
+
+    /** 35: the person's Boost dialogue and Reduce loud sounds, which the server applies when it decides. */
+    val sound: Boolean get() = level >= SOUND_API_LEVEL
+
+    /** 35: the person's subtitle size, in place of a TV's own. */
+    val subtitleSize: Boolean get() = level >= SOUND_API_LEVEL
+
+    /** 35: each subtitle track's saved timing, per person and for everyone. */
+    val subtitleTiming: Boolean get() = level >= SOUND_API_LEVEL
 }

@@ -1,6 +1,11 @@
 package media.watchmy.client.tv.player
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
+import media.watchmy.client.tv.components.KeepInViewSpec
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,9 +13,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -24,6 +35,9 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Text
 import media.watchmy.client.model.PlaybackProgress
 import media.watchmy.client.model.PlayerTracks
+import media.watchmy.client.model.SOUND_HEADING
+import media.watchmy.client.model.SoundSetting
+import media.watchmy.client.tv.components.tryFocus
 import media.watchmy.client.tv.components.OptionRow
 import media.watchmy.client.tv.components.PanelGroup
 import media.watchmy.client.tv.components.TvButton
@@ -67,6 +81,7 @@ internal val PickerSection.panel: PickerSection
  * open; Back closes it. The rows are built when [tracks] change, not while
  * the countdowns and the Skip button run.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun PickerSheet(
     tracks: PlayerTracks,
@@ -74,42 +89,119 @@ internal fun PickerSheet(
     focus: Map<PickerSection, FocusRequester>,
     onChoose: (PickerChoice) -> Unit,
     modifier: Modifier = Modifier,
+    extras: TvPickerExtras = TvPickerExtras(),
+    /**
+     * A sound row's small list of Off, Medium and High, in place of the
+     * panel's rows until a choice or Back; the screen holds it, as Back
+     * reaches the screen first.
+     */
+    choosing: SoundSetting? = null,
+    onChoosing: (SoundSetting?) -> Unit = {},
 ) {
     val quality = section.panel == PickerSection.Quality
+    var area by remember { mutableStateOf(PanelArea.Track) }
+    val soundRows = remember { SoundSetting.entries.associateWith { FocusRequester() } }
+    val choiceFocus = remember { FocusRequester() }
+    val timingRow = remember { FocusRequester() }
+    // The row a list was opened from, which focus goes back to.
+    var back by remember { mutableStateOf<SoundSetting?>(null) }
+    LaunchedEffect(choosing) {
+        if (choosing != null) {
+            back = choosing
+            choiceFocus.tryFocus()
+        } else {
+            back?.let { soundRows.getValue(it).tryFocus() }
+            back = null
+        }
+    }
+    val sound = tracks.sound.takeIf { !quality }
+    val timing = tracks.timing?.takeIf { !quality && it.changeable }
+    val open = choosing
     TvSidePanel(
-        title = if (quality) "Quality" else "Audio & subtitles",
+        title = when {
+            open != null -> open.label
+            quality -> "Quality"
+            else -> "Audio & subtitles"
+        },
         modifier = modifier,
+        kicker = if (open != null) "Audio & subtitles · $SOUND_HEADING" else null,
         context = if (quality) "Lower it if the picture keeps stopping." else null,
+        // Focus on the timing: the cues beside the panel show through.
+        dim = if (area.timing && open == null) TimingDim else TvPalette.Dim,
     ) {
+        if (open != null && sound != null) {
+            SoundChoices(open, sound.level(open), choiceFocus) { level ->
+                onChoosing(null)
+                if (level != sound.level(open)) extras.onSound(open, level)
+            }
+            Box(Modifier.weight(1f))
+            PickerKeys(onTiming = false, ok = "Chooses", back = "Returns")
+            return@TvSidePanel
+        }
         val sections = remember(tracks) { pickerSections(tracks) }
-        Column(
-            Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(vertical = 10.dp),
+        // With the keys' line at the foot, the rows take the room down to it (a spacer beside them would take half).
+        val keys = !quality && (sound != null || timing != null)
+        val list = Modifier.weight(1f, fill = keys)
+        // The focused row scrolls in with room around it, so its ring and growth aren't cut at the list's edges.
+        val density = LocalDensity.current
+        val room = remember(density) { with(density) { KeepInViewSpec(leading = 40.dp.toPx(), trailing = 56.dp.toPx()) } }
+        CompositionLocalProvider(LocalBringIntoViewSpec provides room) { Column(
+            list.verticalScroll(rememberScrollState()).padding(vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             for ((s, rows) in sections) {
                 if ((s == PickerSection.Quality) != quality) continue
                 val focusAt = rows.indexOfFirst { it.selected }.coerceAtLeast(0)
-                if (!quality) PanelGroup(if (s == PickerSection.Audio) "Audio" else "Subtitles", Modifier.semantics { heading() })
+                if (!quality) PanelGroup(if (s == PickerSection.Audio) "Audio" else "Subtitles", Modifier.padding(bottom = GroupGap).semantics { heading() })
                 rows.forEachIndexed { i, row ->
                     key(row.choice) {
                         row.heading?.let {
-                            Text(it, Modifier.padding(start = 24.dp, top = 12.dp), style = TvType.Caption.copy(fontWeight = FontWeight.SemiBold), color = WmmColors.TextSoft)
+                            Text(it, Modifier.padding(start = 24.dp, top = 12.dp, bottom = GroupGap), style = TvType.Caption.copy(fontWeight = FontWeight.SemiBold), color = WmmColors.TextSoft)
                         }
                         val m = if (i == focusAt) Modifier.focusRequester(focus.getValue(s)) else Modifier
-                        PickerOption(row, onClick = { onChoose(row.choice) }, modifier = m)
-                        row.footer?.let {
-                            Text(it, Modifier.padding(horizontal = 24.dp), style = TvType.Caption, color = TvPalette.Muted)
+                        PickerOption(row, onClick = { onChoose(row.choice) }, modifier = m.onFocusChanged { if (it.isFocused) area = PanelArea.Track })
+                        row.footer?.let { PanelNote(it) }
+                    }
+                }
+                if (s == PickerSection.Audio && sound != null) {
+                    Column(Modifier.onFocusChanged { if (it.hasFocus) area = PanelArea.Sound }, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SoundRows(sound, soundRows, onOpen = onChoosing, onSound = extras.onSound)
+                    }
+                }
+                if (s == PickerSection.Subtitles && timing != null) {
+                    TimingRows(timing, extras.admin, timingRow, extras.onTiming) { on ->
+                        area = when (on) {
+                            TimingFocus.Row -> PanelArea.Timing
+                            TimingFocus.Reset -> if (timing.resetsToShared) PanelArea.ResetShared else PanelArea.Reset
+                            TimingFocus.SaveForEveryone -> PanelArea.SaveForEveryone
+                            TimingFocus.Saved -> PanelArea.Saved
                         }
                     }
                 }
             }
-        }
+        } }
         if (quality) {
             // Every choice here is kept for this TV, as the TV's own Settings keep it.
             Text("Your choice becomes this TV’s default.", Modifier.padding(horizontal = 24.dp), style = TvType.Second, color = TvPalette.Muted)
+        } else if (keys) {
+            PickerKeys(onTiming = area == PanelArea.Timing, ok = area.ok, back = "Closes this panel")
         }
     }
 }
+
+/** Which part of Audio & subtitles has focus, for the keys' line ([ok]) and the dim beside the panel. */
+private enum class PanelArea(val timing: Boolean, val ok: String) {
+    Track(false, "Chooses"),
+    Sound(false, "Opens its choices"),
+    Timing(true, "Chooses"),
+    Reset(true, "Puts it back in step"),
+    ResetShared(true, "Goes back to the timing for everyone"),
+    SaveForEveryone(true, "Saves for everyone"),
+    Saved(true, "Saved"),
+}
+
+/** Lighter over the video while the timing has focus, so its cues can be seen moving (`rgba(0,0,0,.35)`). */
+private val TimingDim = androidx.compose.ui.graphics.Color(0x59000000)
 
 /** A row of a panel: the choice and its words under it, a gold tick when it is the one in use. Dimmed when it can't be chosen. */
 @Composable

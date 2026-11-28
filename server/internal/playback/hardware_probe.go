@@ -202,6 +202,7 @@ func detectHardwareOn(ctx context.Context, ffmpeg, pref string, device *int, log
 	c.ToneMap = c.zscale
 	c.LibASS = strings.Contains(filters.output, " subtitles ")
 	c.Overlay = strings.Contains(filters.output, " overlay ")
+	c.audio = audioFiltersFrom(filters.output)
 	if strings.Contains(filters.output, " tonemapx ") {
 		help := run(ctx, []string{"-h", "filter=tonemapx"}, 15*time.Second)
 		c.DoviToneMap = help.err == nil && strings.Contains(help.output, "apply_dovi")
