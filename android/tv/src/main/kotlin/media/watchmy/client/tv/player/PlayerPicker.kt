@@ -1,6 +1,11 @@
 package media.watchmy.client.tv.player
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
+import media.watchmy.client.tv.components.KeepInViewSpec
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -76,6 +81,7 @@ internal val PickerSection.panel: PickerSection
  * open; Back closes it. The rows are built when [tracks] change, not while
  * the countdowns and the Skip button run.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun PickerSheet(
     tracks: PlayerTracks,
@@ -135,24 +141,26 @@ internal fun PickerSheet(
         val sections = remember(tracks) { pickerSections(tracks) }
         // With the keys' line at the foot, the rows take the room down to it (a spacer beside them would take half).
         val keys = !quality && (sound != null || timing != null)
-        Column(
-            Modifier.weight(1f, fill = keys).verticalScroll(rememberScrollState()).padding(vertical = 10.dp),
+        val list = Modifier.weight(1f, fill = keys)
+        // The focused row scrolls in with room around it, so its ring and growth aren't cut at the list's edges.
+        val density = LocalDensity.current
+        val room = remember(density) { with(density) { KeepInViewSpec(leading = 40.dp.toPx(), trailing = 56.dp.toPx()) } }
+        CompositionLocalProvider(LocalBringIntoViewSpec provides room) { Column(
+            list.verticalScroll(rememberScrollState()).padding(vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             for ((s, rows) in sections) {
                 if ((s == PickerSection.Quality) != quality) continue
                 val focusAt = rows.indexOfFirst { it.selected }.coerceAtLeast(0)
-                if (!quality) PanelGroup(if (s == PickerSection.Audio) "Audio" else "Subtitles", Modifier.semantics { heading() })
+                if (!quality) PanelGroup(if (s == PickerSection.Audio) "Audio" else "Subtitles", Modifier.padding(bottom = GroupGap).semantics { heading() })
                 rows.forEachIndexed { i, row ->
                     key(row.choice) {
                         row.heading?.let {
-                            Text(it, Modifier.padding(start = 24.dp, top = 12.dp), style = TvType.Caption.copy(fontWeight = FontWeight.SemiBold), color = WmmColors.TextSoft)
+                            Text(it, Modifier.padding(start = 24.dp, top = 12.dp, bottom = GroupGap), style = TvType.Caption.copy(fontWeight = FontWeight.SemiBold), color = WmmColors.TextSoft)
                         }
                         val m = if (i == focusAt) Modifier.focusRequester(focus.getValue(s)) else Modifier
                         PickerOption(row, onClick = { onChoose(row.choice) }, modifier = m.onFocusChanged { if (it.isFocused) area = PanelArea.Track })
-                        row.footer?.let {
-                            Text(it, Modifier.padding(horizontal = 24.dp), style = TvType.Caption, color = TvPalette.Muted)
-                        }
+                        row.footer?.let { PanelNote(it) }
                     }
                 }
                 if (s == PickerSection.Audio && sound != null) {
@@ -171,7 +179,7 @@ internal fun PickerSheet(
                     }
                 }
             }
-        }
+        } }
         if (quality) {
             // Every choice here is kept for this TV, as the TV's own Settings keep it.
             Text("Your choice becomes this TV’s default.", Modifier.padding(horizontal = 24.dp), style = TvType.Second, color = TvPalette.Muted)
