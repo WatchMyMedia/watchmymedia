@@ -15,6 +15,9 @@ pages have every setting and detail behind it.
   server, several servers, Chromecast and AirPlay, and offline downloads
 - [Playback and transcoding](playback.md): direct play and transcoding, audio, GPUs, 4K, HDR and
   Dolby Vision, Automatic quality, Skip Intro, seek thumbnails, trailers and subtitles
+- [Accessibility](accessibility.md): Boost dialogue, Reduce loud sounds, subtitle size and
+  subtitle timing, where each is on every app, and how they work with the device's own caption
+  settings
 - [Live TV and recording](live-tv.md): HDHomeRun tuners, listings, sharing tuners and recordings
 - [Plex, Radarr, Sonarr and Seerr](integrations.md): importing watch history from Plex, and
   requests and file management through Radarr, Sonarr and Seerr

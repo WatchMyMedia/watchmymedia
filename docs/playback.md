@@ -30,7 +30,8 @@ soundbar over ARC, a Cast TV) says so with `maxPcmChannels`, so it gets E-AC-3 5
 ### Boost dialogue and Reduce loud sounds
 
 Each person can turn on Boost dialogue and Reduce loud sounds (Off, Medium or High) in
-Settings › Audio & subtitles or in the player. The server applies them, so they work the same
+Settings › Audio & subtitles or in the player ([Accessibility](accessibility.md) says where on
+each app). The server applies them, so they work the same
 in every app, on Cast and on Live TV. While either is on, the server converts the sound of
 that person's plays even when it could have been copied: the picture is still copied where it
 can be, surround stays surround (E-AC-3 5.1 where the device takes it), and lossless sound,
