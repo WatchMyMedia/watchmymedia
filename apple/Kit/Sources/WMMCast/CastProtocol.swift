@@ -37,6 +37,9 @@ public struct CastLoadData: Codable, Sendable {
     public var quality: String?
     public var device: Device
     public var sender: Sender
+    /// Additive: the person's Subtitle size (API level 35), which the
+    /// receiver draws its cues at; absent is Normal.
+    public var subtitleSize: String?
 
     public init(grant: CastGrant, request: PlayRequest?, live: LivePlayRequest?, quality: StreamQuality, deviceID: String?, deviceName: String, senderName: String) {
         server = Server(id: grant.capability.identity.serverID, urls: grant.urls.map(\.absoluteString))
@@ -66,6 +69,12 @@ public struct CastLoad: Sendable {
 public enum CastCommand: Sendable {
     case getState, skip, playNext, watchCredits, input, stillWatching(Bool)
     case seek(Int), audio(Int), subtitle(String?), quality(String), channel(String), channelStep(Int)
+    /// The person's Boost dialogue or Reduce loud sounds changed (saved by the
+    /// sender): the receiver decides again where it is, so the server applies it.
+    case sound
+    /// Moves the cues of the subtitle on now to this timing at once (positive
+    /// is later); the sender saves the timing itself.
+    case subtitleTiming(Int)
     public func data() -> Data {
         let object: [String: Any]
         switch self {
@@ -81,6 +90,8 @@ public enum CastCommand: Sendable {
         case .quality(let id): object = ["type": "quality", "id": id]
         case .channel(let id): object = ["type": "channel", "channelId": id]
         case .channelStep(let delta): object = ["type": "channelStep", "by": delta < 0 ? -1 : 1]
+        case .sound: object = ["type": "sound"]
+        case .subtitleTiming(let ms): object = ["type": "subtitleTiming", "timingMs": ms]
         }
         return (try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])) ?? Data()
     }
