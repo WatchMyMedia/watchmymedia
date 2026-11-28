@@ -53,7 +53,7 @@ func DefaultPreferences() Preferences {
 		Skip:                  map[string]string{"intro": SkipAsk, "recap": SkipAsk, "credits": SkipAsk, "preview": SkipNone, "commercial": SkipAsk},
 		AutoplayNext:          true,
 		LiveTVReminderMinutes: defaultReminderMinutes,
-		Subtitles:             playback.SubtitlePreferences{Languages: []string{}, Mode: "forced", Size: "normal"},
+		Subtitles:             playback.SubtitlePreferences{Languages: []string{}, Mode: "forced"},
 		Audio:                 playback.AudioPreferences{Languages: []string{}, DialogueBoost: playback.EffectOff, ReduceLoudSounds: playback.EffectOff},
 	}
 }

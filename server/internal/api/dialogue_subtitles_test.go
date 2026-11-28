@@ -22,8 +22,17 @@ func TestSoundAndSubtitleSizePreferences(t *testing.T) {
 	url := srv.URL + "/api/me/preferences"
 	var p Preferences
 	doJSON(t, srv.client, http.MethodGet, url, "", &p)
-	if p.Audio.DialogueBoost != "off" || p.Audio.ReduceLoudSounds != "off" || p.Subtitles.Size != "normal" {
+	// A size nobody chose is left out, so a TV that kept its own size before
+	// can tell it apart from a person who chose Normal.
+	if p.Audio.DialogueBoost != "off" || p.Audio.ReduceLoudSounds != "off" || p.Subtitles.Size != "" {
 		t.Fatalf("defaults = audio %+v, subtitles %+v", p.Audio, p.Subtitles)
+	}
+	var raw struct {
+		Subtitles map[string]any `json:"subtitles"`
+	}
+	doJSON(t, srv.client, http.MethodGet, url, "", &raw)
+	if _, ok := raw.Subtitles["size"]; ok {
+		t.Fatalf("an unchosen size is sent: %v", raw.Subtitles)
 	}
 	if code := doJSON(t, srv.client, http.MethodPut, url, `{"audio":{"dialogueBoost":"high"}}`, &p).StatusCode; code != 200 ||
 		p.Audio.DialogueBoost != "high" || p.Audio.ReduceLoudSounds != "off" {
@@ -56,9 +65,14 @@ func TestSoundAndSubtitleSizePreferences(t *testing.T) {
 		t.Fatalf("off = %+v", p.Audio)
 	}
 	other, _ := securityTestUser(t, srv, "sam")
-	doJSON(t, other, http.MethodGet, url, "", &p)
-	if p.Audio.ReduceLoudSounds != "off" || p.Subtitles.Size != "normal" {
-		t.Fatalf("another person's = %+v %+v", p.Audio, p.Subtitles)
+	var theirs Preferences // a fresh value: decoding leaves fields the reply omits as they were
+	doJSON(t, other, http.MethodGet, url, "", &theirs)
+	if theirs.Audio.ReduceLoudSounds != "off" || theirs.Subtitles.Size != "" {
+		t.Fatalf("another person's = %+v %+v", theirs.Audio, theirs.Subtitles)
+	}
+	doJSON(t, other, http.MethodPut, url, `{"subtitles":{"size":"normal"}}`, &theirs)
+	if theirs.Subtitles.Size != "normal" {
+		t.Fatalf("a chosen Normal = %+v", theirs.Subtitles)
 	}
 }
 

@@ -9661,7 +9661,7 @@ export interface components {
             languages: string[];
             /** @description off, forced (only foreign-language parts in the audio's language), or on. */
             mode: string;
-            /** @description Subtitle size: smaller, normal, larger or largest, which apps draw at 0.79, 1, 1.21 and 1.5 times their own size. Normal by default (API level 35). */
+            /** @description Subtitle size: smaller, normal, larger or largest, which apps draw at 0.79, 1, 1.21 and 1.5 times their own size. Absent until the person chooses one, and drawn as normal then; a TV that kept its own size before API level 35 moves it up only while this is absent (API level 35). */
             size?: string;
         };
         SubtitleQuota: {

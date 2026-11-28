@@ -18,7 +18,7 @@ type SubtitlePreferences struct {
 	ForeignAudio      bool `json:"foreignAudio" required:"false" doc:"With mode forced: when the audio isn't in the person's languages, start as on does, in their subtitle languages or else their audio languages. Turned on when a person first saves audio languages without having saved a subtitle mode (API level 21)."`
 	AutomaticDownload bool `json:"automaticDownload" doc:"When mode is on (or forced with foreignAudio, for foreign audio) and no local track matches, allow one exact-file subtitle download per play. Off by default."`
 	// Size is applied by each app's own cue drawing; the server stores it.
-	Size string `json:"size" required:"false" doc:"Subtitle size: smaller, normal, larger or largest, which apps draw at 0.79, 1, 1.21 and 1.5 times their own size. Normal by default (API level 35)."`
+	Size string `json:"size,omitempty" required:"false" doc:"Subtitle size: smaller, normal, larger or largest, which apps draw at 0.79, 1, 1.21 and 1.5 times their own size. Absent until the person chooses one, and drawn as normal then; a TV that kept its own size before API level 35 moves it up only while this is absent (API level 35)."`
 }
 
 // SubtitleSizes are the sizes a person can choose, smallest first.
