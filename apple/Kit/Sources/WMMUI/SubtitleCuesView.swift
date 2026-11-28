@@ -67,23 +67,34 @@ public struct CaptionStyle: Equatable, Sendable {
 /// a backing behind each line, `bottomPadding` up from the bottom (the
 /// player lifts them clear of its controls, animated). Image subtitles
 /// never reach here: the server burns them in. A line two cues share shows
-/// once, as on Android (android/core/ui/.../SubtitleCues.kt).
+/// once, as on Android (android/core/ui/.../SubtitleCues.kt). The text is
+/// the player's base size × the system's caption size × the person's
+/// Subtitle size (``cueSize(base:caption:size:)``).
 public struct SubtitleCuesView: View {
     let cues: [SubtitleCue]
     let bottomPadding: CGFloat
     let sidePadding: CGFloat
     let baseSize: CGFloat
+    let size: SubtitleSize
     @State private var style = CaptionStyle.system()
 
-    public init(cues: [SubtitleCue], bottomPadding: CGFloat = 24, sidePadding: CGFloat = 48, baseSize: CGFloat = 20) {
+    public init(cues: [SubtitleCue], bottomPadding: CGFloat = 24, sidePadding: CGFloat = 48, baseSize: CGFloat = 20, size: SubtitleSize = .normal) {
         self.cues = cues
         self.bottomPadding = bottomPadding
         self.sidePadding = sidePadding
         self.baseSize = baseSize
+        self.size = size
+    }
+
+    /// The cue text's size: `base` (the player's own, 20 pt on iPhone and
+    /// iPad, 46 on Apple TV) × the system's relative caption size, which
+    /// Normal follows, × the Subtitle size step.
+    public static func cueSize(base: CGFloat, caption: Double, size: SubtitleSize) -> CGFloat {
+        base * CGFloat(caption) * CGFloat(size.scale)
     }
 
     /// Each cue's lines, in order, each once.
-    static func lines(_ cues: [SubtitleCue]) -> [String] {
+    public static func lines(_ cues: [SubtitleCue]) -> [String] {
         var seen = Set<String>()
         return cues
             .flatMap { $0.text.components(separatedBy: "\n") }
@@ -92,7 +103,7 @@ public struct SubtitleCuesView: View {
     }
 
     public var body: some View {
-        let size = baseSize * style.scale
+        let size = Self.cueSize(base: baseSize, caption: style.scale, size: self.size)
         let lines = Self.lines(cues)
         VStack(spacing: size * 0.14) {
             ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
@@ -111,10 +122,45 @@ public struct SubtitleCuesView: View {
         .padding(.bottom, bottomPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         .animation(.easeOut(duration: 0.2), value: bottomPadding)
+        .animation(.easeOut(duration: 0.2), value: self.size)
         .allowsHitTesting(false)
         .accessibilityElement(children: .combine)
         .onReceive(NotificationCenter.default.publisher(for: CaptionStyle.changed)) { _ in
             style = .system()
         }
+    }
+}
+
+/// One cue drawn as ``SubtitleCuesView`` draws it, at its real size: the
+/// Subtitle size previews in Settings.
+public struct SubtitleCuePreview: View {
+    let text: String
+    let baseSize: CGFloat
+    let size: SubtitleSize
+    @State private var style = CaptionStyle.system()
+
+    public init(_ text: String, baseSize: CGFloat = 20, size: SubtitleSize) {
+        self.text = text
+        self.baseSize = baseSize
+        self.size = size
+    }
+
+    public var body: some View {
+        let points = SubtitleCuesView.cueSize(base: baseSize, caption: style.scale, size: size)
+        Text(text)
+            .font(.system(size: points, weight: .medium))
+            .foregroundStyle(style.foreground)
+            .multilineTextAlignment(.center)
+            .lineLimit(1)
+            .shadow(color: style.shadow ? .black.opacity(0.8) : .clear, radius: 2, x: 0, y: 1)
+            .padding(.horizontal, points * 0.32)
+            .padding(.vertical, points * 0.09)
+            .background(style.background, in: RoundedRectangle(cornerRadius: points * 0.14))
+            .background(style.window, in: RoundedRectangle(cornerRadius: points * 0.14))
+            .animation(.easeOut(duration: 0.2), value: size)
+            .accessibilityLabel("\(text), at \(size.label)")
+            .onReceive(NotificationCenter.default.publisher(for: CaptionStyle.changed)) { _ in
+                style = .system()
+            }
     }
 }

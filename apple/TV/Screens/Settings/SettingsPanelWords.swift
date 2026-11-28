@@ -28,6 +28,19 @@ enum PanelWords {
             : "Choose On and add a subtitle language."
     }
 
+    /// Boost dialogue and Reduce loud sounds are the person's, and the player's choice is the same one.
+    static let soundKept = "Kept on the server, so every device you sign in to follows it. Changing it in the player changes it here too."
+    static let sizeAbout = [
+        "How big the subtitles this app draws are, on every device you sign in to.",
+        SubtitleSizeWords.burnedInKeep,
+    ]
+    static let hintShowsSizes = "Select shows each size over a picture · Menu goes back to the list"
+    /// Subtitle size's screen.
+    static let sizeLede = "The line at the bottom is the size subtitles will be. Yours, on every device you sign in to."
+    static let sizeHint = "Left and Right show each size · Select keeps it · Menu goes back"
+    /// The cue the screen draws at each size.
+    static let sizeSample = "Then who rang the bell?"
+
     static let chooseARoom = "Choose a room, or type another name."
     static let everyoneAbout = "On, the list shows every account’s devices, so you can sign any of them out. Off, only yours."
     static let devicesDidNotLoad = "The list didn’t load. Nothing was signed out."

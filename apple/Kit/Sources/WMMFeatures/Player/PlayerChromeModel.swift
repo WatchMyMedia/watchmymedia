@@ -671,6 +671,31 @@ public final class PlayerChromeModel {
         closePicker()
     }
 
+    /// Boost dialogue or Reduce loud sounds: saved, then the play reloads
+    /// here; the picker stays open, the row busy until it settles.
+    public func setSound(_ setting: SoundSetting, to level: SoundLevel) {
+        input()
+        controller.setSound(setting, to: level)
+    }
+
+    /// Earlier (`later` false) or Later by one step; the picker stays open
+    /// and the cues move at once (on the iPhone's sheet, which pauses, the
+    /// paused frame's cue).
+    public func moveTiming(later: Bool) {
+        input()
+        controller.moveSubtitleTiming(byMs: later ? SubtitleTimingState.stepMs : -SubtitleTimingState.stepMs)
+    }
+
+    public func resetTiming() {
+        input()
+        controller.resetSubtitleTiming()
+    }
+
+    public func saveTimingForEveryone() {
+        input()
+        controller.saveSubtitleTimingForEveryone()
+    }
+
     /// Downloads an online result; the picker stays open while it downloads and closes once it is on.
     public func download(_ resultID: String) {
         input()

@@ -100,6 +100,10 @@ final class SpyPlaybackController: PlaybackController {
     func selectSubtitle(_ id: String?) { calls.append("subtitle \(id ?? "off")") }
     func downloadSubtitle(_ resultID: String) { calls.append("download \(resultID)") }
     func selectQuality(_ quality: StreamQuality) { calls.append("quality \(quality.rawValue)") }
+    func setSound(_ setting: SoundSetting, to level: SoundLevel) { calls.append("sound \(setting.rawValue) \(level.rawValue)") }
+    func moveSubtitleTiming(byMs deltaMs: Int) { calls.append("timing \(deltaMs)") }
+    func resetSubtitleTiming() { calls.append("timing reset") }
+    func saveSubtitleTimingForEveryone() { calls.append("timing everyone") }
     func noteUserInput() { inputs += 1 }
     /// What ``describeEnd(_:)`` was told, in order.
     private(set) var ends: [String?] = []

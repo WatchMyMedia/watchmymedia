@@ -244,7 +244,7 @@ struct VideoOverlay: View {
                     .transition(.opacity)
             }
 
-            SubtitleCuesView(cues: state.cues, bottomPadding: bar ? 320 : 80, sidePadding: 160, baseSize: 46)
+            SubtitleCuesView(cues: state.cues, bottomPadding: bar ? 320 : 80, sidePadding: 160, baseSize: 46, size: state.subtitleSize)
         }
         .animation(.easeInOut(duration: 0.25), value: bar)
         .animation(.easeInOut(duration: 0.25), value: state.qualityNote)

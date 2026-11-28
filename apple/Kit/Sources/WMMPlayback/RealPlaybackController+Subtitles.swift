@@ -141,7 +141,9 @@ extension RealPlaybackController {
     }
 
     /// The cues on screen now, in file time. The track's own times are player
-    /// time: the server shifts an event playlist's cues to its start.
+    /// time: the server shifts an event playlist's cues to its start. The
+    /// track's timing moves them: a cue at *t* shows at *t* + timing, so the
+    /// cues are looked up at the position less the timing.
     func cues(_ v: Viewing, _ d: PlaybackDecision, _ p: any MediaPlayer) -> [SubtitleCue] {
         guard !v.loading || (playsOn(v) && v.pendingPositionMs == nil), let url = cueURL(v, d) else { return [] }
         guard let track = cueTracks[url] else {
@@ -149,7 +151,10 @@ extension RealPlaybackController {
             return []
         }
         let offset = v.streamClock.offsetMs
-        return track.active(at: p.positionMs).map { SubtitleCue(startMs: $0.startMs + offset, endMs: $0.endMs + offset, text: $0.text) }
+        let timing = cueTiming(v, d)
+        return track.active(at: p.positionMs - timing).map {
+            SubtitleCue(startMs: $0.startMs + offset + timing, endMs: $0.endMs + offset + timing, text: $0.text)
+        }
     }
 
     /// About 10 times a second while playing: only a change of cues is news.

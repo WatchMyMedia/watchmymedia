@@ -41,6 +41,9 @@ public enum SettingKey: Hashable, Sendable {
     case subtitleChoice
     case subtitleLanguages
     case automaticDownload
+    /// Boost dialogue or Reduce loud sounds.
+    case sound(SoundSetting)
+    case subtitleSize
     /// Signing another device out, said under Signed-in devices.
     case signedInDevices
 }

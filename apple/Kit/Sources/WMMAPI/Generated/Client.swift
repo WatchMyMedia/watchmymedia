@@ -2123,6 +2123,179 @@ public struct Client: APIProtocol {
             }
         )
     }
+    /// Save how much later or earlier a subtitle track shows, for the caller or (admins) for everyone
+    ///
+    /// From apiLevel 35. Any signed-in person who can play the file saves their own timing; with everyone, an admin saves it for everyone who plays the file. Decisions then carry it on the track as timingMs.
+    ///
+    /// - Remark: HTTP `PUT /api/files/{id}/subtitles/{track}/timing`.
+    /// - Remark: Generated from `#/paths//api/files/{id}/subtitles/{track}/timing/put(setSubtitleTiming)`.
+    public func setSubtitleTiming(_ input: Operations.SetSubtitleTiming.Input) async throws -> Operations.SetSubtitleTiming.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.SetSubtitleTiming.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/api/files/{}/subtitles/{}/timing",
+                    parameters: [
+                        input.path.id,
+                        input.path.track
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .put
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                let body: OpenAPIRuntime.HTTPBody?
+                switch input.body {
+                case let .json(value):
+                    body = try converter.setRequiredRequestBodyAsJSON(
+                        value,
+                        headerFields: &request.headerFields,
+                        contentType: "application/json; charset=utf-8"
+                    )
+                }
+                return (request, body)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.SetSubtitleTiming.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.SubtitleTiming.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(body: body))
+                default:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.SetSubtitleTiming.Output.Default.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/problem+json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/problem+json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ErrorModel.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .applicationProblemJson(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .`default`(
+                        statusCode: response.status.code,
+                        .init(body: body)
+                    )
+                }
+            }
+        )
+    }
+    /// Remove the caller's own timing for a subtitle track: back to the one saved for everyone, else in step
+    ///
+    /// From apiLevel 35. The player's Reset. A timing an admin saved for everyone stays.
+    ///
+    /// - Remark: HTTP `DELETE /api/files/{id}/subtitles/{track}/timing`.
+    /// - Remark: Generated from `#/paths//api/files/{id}/subtitles/{track}/timing/delete(deleteSubtitleTiming)`.
+    public func deleteSubtitleTiming(_ input: Operations.DeleteSubtitleTiming.Input) async throws -> Operations.DeleteSubtitleTiming.Output {
+        try await client.send(
+            input: input,
+            forOperation: Operations.DeleteSubtitleTiming.id,
+            serializer: { input in
+                let path = try converter.renderedPath(
+                    template: "/api/files/{}/subtitles/{}/timing",
+                    parameters: [
+                        input.path.id,
+                        input.path.track
+                    ]
+                )
+                var request: HTTPTypes.HTTPRequest = .init(
+                    soar_path: path,
+                    method: .delete
+                )
+                suppressMutabilityWarning(&request)
+                converter.setAcceptHeader(
+                    in: &request.headerFields,
+                    contentTypes: input.headers.accept
+                )
+                return (request, nil)
+            },
+            deserializer: { response, responseBody in
+                switch response.status.code {
+                case 200:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.DeleteSubtitleTiming.Output.Ok.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.SubtitleTiming.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .json(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .ok(.init(body: body))
+                default:
+                    let contentType = converter.extractContentTypeIfPresent(in: response.headerFields)
+                    let body: Operations.DeleteSubtitleTiming.Output.Default.Body
+                    let chosenContentType = try converter.bestContentType(
+                        received: contentType,
+                        options: [
+                            "application/problem+json"
+                        ]
+                    )
+                    switch chosenContentType {
+                    case "application/problem+json":
+                        body = try await converter.getResponseBodyAsJSON(
+                            Components.Schemas.ErrorModel.self,
+                            from: responseBody,
+                            transforming: { value in
+                                .applicationProblemJson(value)
+                            }
+                        )
+                    default:
+                        preconditionFailure("bestContentType chose an invalid content type.")
+                    }
+                    return .`default`(
+                        statusCode: response.status.code,
+                        .init(body: body)
+                    )
+                }
+            }
+        )
+    }
     /// Everything the home screen shows
     ///
     /// - Remark: HTTP `GET /api/home`.

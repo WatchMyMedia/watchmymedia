@@ -72,6 +72,24 @@ import WMMModel
         #expect(!paused.spy.calls.contains("play"))
     }
 
+    @Test func soundAndTimingKeepThePickerOpenWhereATrackClosesIt() {
+        let h = PlayerHarness()
+        h.model.openPicker(.audio)
+        h.model.setSound(.dialogueBoost, to: .high)
+        #expect(h.model.picker == .audio)
+        h.model.selectTab(.subtitles)
+        h.model.moveTiming(later: true)
+        h.model.moveTiming(later: false)
+        h.model.moveTiming(later: false)
+        h.model.resetTiming()
+        h.model.saveTimingForEveryone()
+        #expect(h.model.picker == .subtitles)
+        #expect(h.spy.state.status == .paused, "the sheet still pauses")
+        #expect(Array(h.spy.calls.suffix(6)) == ["sound dialogueBoost high", "timing 100", "timing -100", "timing -100", "timing reset", "timing everyone"])
+        h.model.pickSubtitle("s4")
+        #expect(h.model.picker == nil)
+    }
+
     @Test func choosingAnEpisodeReplacesTheRequestAndResetsScrubbing() {
         let h = PlayerHarness()
         h.model.scrub(x: 0.5, width: 1)

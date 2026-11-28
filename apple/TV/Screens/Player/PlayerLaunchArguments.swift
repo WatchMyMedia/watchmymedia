@@ -13,6 +13,8 @@ import WMMModel
 ///     -playerStillWatching               Are you still watching?
 ///     -playerStopped                     an admin's stop message
 ///     -playerError                       the can't-play state; Try again plays
+///     -playerTiming 400                        the subtitle's timing, 0.4 s later (with -fakesDialogue)
+///     -playerTimingShared 600                  a timing an admin saved for everyone
 ///     -playerAutomatic slowed|recovered|failed  Automatic quality note and current step
 ///     -playerPanel episodes|tracks|quality  a tab of the info panel, over the video
 @MainActor
@@ -43,6 +45,8 @@ enum PlayerLaunchArguments {
         if let ms = value(after: "-playerSeek").flatMap(Int.init) { fake.seek(toMs: ms) }
         if let id = value(after: "-playerSubtitle") { fake.selectSubtitle(id) }
         if let scene = value(after: "-playerAutomatic").flatMap(FakeAutomaticScene.init(rawValue:)) { fake.previewAutomatic(scene) }
+        if let ms = value(after: "-playerTiming").flatMap(Int.init) { fake.previewTiming(ms) }
+        if let ms = value(after: "-playerTimingShared").flatMap(Int.init) { fake.previewTiming(ms, shared: true) }
         Task {
             // The fake plays after 0.6 s and finds online subtitles 0.8 s later.
             try? await Task.sleep(for: .milliseconds(1_600))

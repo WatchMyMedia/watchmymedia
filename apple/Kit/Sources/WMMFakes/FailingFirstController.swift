@@ -45,6 +45,10 @@ public final class FailingFirstController: PlaybackController {
     public func selectSubtitle(_ id: String?) { base.selectSubtitle(id) }
     public func downloadSubtitle(_ resultID: String) { base.downloadSubtitle(resultID) }
     public func selectQuality(_ quality: StreamQuality) { base.selectQuality(quality) }
+    public func setSound(_ setting: SoundSetting, to level: SoundLevel) { base.setSound(setting, to: level) }
+    public func moveSubtitleTiming(byMs deltaMs: Int) { base.moveSubtitleTiming(byMs: deltaMs) }
+    public func resetSubtitleTiming() { base.resetSubtitleTiming() }
+    public func saveSubtitleTimingForEveryone() { base.saveSubtitleTimingForEveryone() }
     public func noteUserInput() { base.noteUserInput() }
     public func describeEnd(_ line: String?) { base.describeEnd(line) }
     public func stop() { base.stop() }

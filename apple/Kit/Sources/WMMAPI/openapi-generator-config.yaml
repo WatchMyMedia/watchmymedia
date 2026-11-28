@@ -76,6 +76,8 @@ filter:
     - searchSubtitles
     - downloadSubtitle
     - automaticSubtitle
+    - setSubtitleTiming
+    - deleteSubtitleTiming
     - createCastToken
     - getRequestOptions
     - searchRequestable

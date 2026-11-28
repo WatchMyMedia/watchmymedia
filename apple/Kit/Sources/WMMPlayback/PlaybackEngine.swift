@@ -30,6 +30,7 @@ public final class PlaybackEngine: PlaybackControllerFactory {
     private let clock: any PlaybackClock
     private let stillWatching: StillWatching
     private let system: any PlaybackSystem
+    private let viewerIsAdmin: @MainActor () -> Bool
     /// This device's profile, with HDR read afresh at every request.
     public let profile: any ProfileProvider
 
@@ -39,6 +40,7 @@ public final class PlaybackEngine: PlaybackControllerFactory {
     ///   - library: names bare play links and looks up the next episode; without it the player goes by the decision alone.
     ///   - images: loads Now Playing's picture (with `library`); nil shows none.
     ///   - servers: finds the server's LAN address when AirPlay starts; nil never looks.
+    ///   - viewerIsAdmin: whether the person signed in is an admin, who may save a subtitle timing for everyone.
     public init(
         gateway: any PlaybackGateway,
         preferences: any PreferencesRepository,
@@ -47,8 +49,10 @@ public final class PlaybackEngine: PlaybackControllerFactory {
         library: (any LibraryRepository)? = nil,
         images: (any ImageLoader)? = nil,
         servers: (any ServerRepository)? = nil,
-        system: any PlaybackSystem = AppleSystem()
+        system: any PlaybackSystem = AppleSystem(),
+        viewerIsAdmin: @escaping @MainActor () -> Bool = { false }
     ) {
+        self.viewerIsAdmin = viewerIsAdmin
         self.gateway = gateway
         self.preferences = preferences
         self.client = client
@@ -72,7 +76,8 @@ public final class PlaybackEngine: PlaybackControllerFactory {
             system: system,
             lookups: lookups,
             servers: servers,
-            clock: clock
+            clock: clock,
+            viewerIsAdmin: viewerIsAdmin
         )
     }
 

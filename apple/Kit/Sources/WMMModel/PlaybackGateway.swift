@@ -124,11 +124,21 @@ public struct DecisionSubtitle: Hashable, Sendable {
     public var format: String
     /// Absolute URL without the media token; nil for image formats (burn-in only).
     public var url: URL?
+    /// The person's saved timing for this track, ms: positive shows each cue
+    /// later. Their own, else the one an admin saved for everyone (API level 35).
+    public var timingMs: Int
+    /// `timingMs` is the one an admin saved for everyone, not the person's own.
+    public var timingShared: Bool
+    /// The server burned the track into the picture with `timingMs` already applied.
+    public var timingApplied: Bool
 
-    public init(option: SubtitleOption, format: String, url: URL?) {
+    public init(option: SubtitleOption, format: String, url: URL?, timingMs: Int = 0, timingShared: Bool = false, timingApplied: Bool = false) {
         self.option = option
         self.format = format
         self.url = url
+        self.timingMs = timingMs
+        self.timingShared = timingShared
+        self.timingApplied = timingApplied
     }
 }
 
@@ -399,11 +409,29 @@ public protocol PlaybackGateway: Sendable {
     /// The app's `User-Agent`, for the player's own requests for the media,
     /// as the API's requests carry it; nil leaves AVFoundation's.
     var userAgent: String? { get }
+
+    /// What the server the plays go to offers, at its API level as last refreshed.
+    @MainActor var features: ServerFeatures { get }
+
+    /// Saves a subtitle track's timing for this person, or for everyone who
+    /// plays the file (`everyone`, admins only): what applies to the person
+    /// afterwards (PUT /api/files/{id}/subtitles/{track}/timing, API level 35).
+    func setSubtitleTiming(fileID: Int, trackID: String, timingMs: Int, everyone: Bool) async throws -> SavedTiming
+
+    /// Reset: the person's own timing goes, back to the one saved for everyone, else none.
+    func deleteSubtitleTiming(fileID: Int, trackID: String) async throws -> SavedTiming
 }
 
 extension PlaybackGateway {
     @MainActor public func bound() -> any PlaybackGateway { self }
     public var userAgent: String? { nil }
+    @MainActor public var features: ServerFeatures { ServerFeatures(apiLevel: nil) }
+    public func setSubtitleTiming(fileID: Int, trackID: String, timingMs: Int, everyone: Bool) async throws -> SavedTiming {
+        throw APIError(status: nil, message: "Update the server to save subtitle timing.")
+    }
+    public func deleteSubtitleTiming(fileID: Int, trackID: String) async throws -> SavedTiming {
+        throw APIError(status: nil, message: "Update the server to save subtitle timing.")
+    }
     @MainActor public func needsTokenBeside(_ request: DecisionRequest) -> Bool { true }
     public func automaticSubtitle(fileID: Int, playID: String) async throws -> DecisionSubtitle? { nil }
     public func cancelAutomaticSubtitle(fileID: Int, playID: String) async throws {}

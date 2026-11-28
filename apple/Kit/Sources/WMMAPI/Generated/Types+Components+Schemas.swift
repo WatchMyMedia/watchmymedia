@@ -658,6 +658,33 @@ extension Components {
                 case seasonNumber
             }
         }
+        /// - Remark: Generated from `#/components/schemas/AudioEffects`.
+        public struct AudioEffects: Codable, Hashable, Sendable {
+            /// Boost dialogue: medium or high. Absent when off.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AudioEffects/dialogue`.
+            public var dialogue: Swift.String?
+            /// Reduce loud sounds: medium or high. Absent when off.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AudioEffects/loudness`.
+            public var loudness: Swift.String?
+            /// Creates a new `AudioEffects`.
+            ///
+            /// - Parameters:
+            ///   - dialogue: Boost dialogue: medium or high. Absent when off.
+            ///   - loudness: Reduce loud sounds: medium or high. Absent when off.
+            public init(
+                dialogue: Swift.String? = nil,
+                loudness: Swift.String? = nil
+            ) {
+                self.dialogue = dialogue
+                self.loudness = loudness
+            }
+            public enum CodingKeys: String, CodingKey {
+                case dialogue
+                case loudness
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/AudioPlan`.
         public struct AudioPlan: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/AudioPlan/channels`.
@@ -668,6 +695,10 @@ extension Components {
             public var codec: Swift.String?
             /// - Remark: Generated from `#/components/schemas/AudioPlan/copy`.
             public var copy: Swift.Bool
+            /// Boost dialogue and Reduce loud sounds as the server applied them to this converted track, from the person's preferences; absent when neither is on or the track is copied. From apiLevel 35.
+            ///
+            /// - Remark: Generated from `#/components/schemas/AudioPlan/effects`.
+            public var effects: Components.Schemas.AudioEffects?
             /// - Remark: Generated from `#/components/schemas/AudioPlan/index`.
             public var index: Swift.Int64
             /// Creates a new `AudioPlan`.
@@ -676,40 +707,62 @@ extension Components {
             ///   - channels:
             ///   - codec: The track's codec when copied; when converted, aac, or from apiLevel 31 also flac, eac3 or ac3.
             ///   - copy:
+            ///   - effects: Boost dialogue and Reduce loud sounds as the server applied them to this converted track, from the person's preferences; absent when neither is on or the track is copied. From apiLevel 35.
             ///   - index:
             public init(
                 channels: Swift.Int64? = nil,
                 codec: Swift.String? = nil,
                 copy: Swift.Bool,
+                effects: Components.Schemas.AudioEffects? = nil,
                 index: Swift.Int64
             ) {
                 self.channels = channels
                 self.codec = codec
                 self.copy = copy
+                self.effects = effects
                 self.index = index
             }
             public enum CodingKeys: String, CodingKey {
                 case channels
                 case codec
                 case copy
+                case effects
                 case index
             }
         }
         /// - Remark: Generated from `#/components/schemas/AudioPreferences`.
         public struct AudioPreferences: Codable, Hashable, Sendable {
+            /// Boost dialogue: off, medium or high. While it or reduceLoudSounds is on, the server converts the sound of every play of this person's except downloads (API level 35).
+            ///
+            /// - Remark: Generated from `#/components/schemas/AudioPreferences/dialogueBoost`.
+            public var dialogueBoost: Swift.String?
             /// Preferred BCP 47 languages for the audio track, in order. Empty plays the file's default track.
             ///
             /// - Remark: Generated from `#/components/schemas/AudioPreferences/languages`.
             public var languages: [Swift.String]
+            /// Reduce loud sounds: off, medium or high (API level 35).
+            ///
+            /// - Remark: Generated from `#/components/schemas/AudioPreferences/reduceLoudSounds`.
+            public var reduceLoudSounds: Swift.String?
             /// Creates a new `AudioPreferences`.
             ///
             /// - Parameters:
+            ///   - dialogueBoost: Boost dialogue: off, medium or high. While it or reduceLoudSounds is on, the server converts the sound of every play of this person's except downloads (API level 35).
             ///   - languages: Preferred BCP 47 languages for the audio track, in order. Empty plays the file's default track.
-            public init(languages: [Swift.String]) {
+            ///   - reduceLoudSounds: Reduce loud sounds: off, medium or high (API level 35).
+            public init(
+                dialogueBoost: Swift.String? = nil,
+                languages: [Swift.String],
+                reduceLoudSounds: Swift.String? = nil
+            ) {
+                self.dialogueBoost = dialogueBoost
                 self.languages = languages
+                self.reduceLoudSounds = reduceLoudSounds
             }
             public enum CodingKeys: String, CodingKey {
+                case dialogueBoost
                 case languages
+                case reduceLoudSounds
             }
         }
         /// - Remark: Generated from `#/components/schemas/AudioStream`.
@@ -13574,6 +13627,33 @@ extension Components {
                 case items
             }
         }
+        /// - Remark: Generated from `#/components/schemas/SetSubtitleTimingInputBody`.
+        public struct SetSubtitleTimingInputBody: Codable, Hashable, Sendable {
+            /// Admins only: save it for everyone who plays the file (0 removes that), and remove the admin's own timing for the track, so they hear what everyone does. A person's own timing still wins for them.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SetSubtitleTimingInputBody/everyone`.
+            public var everyone: Swift.Bool?
+            /// Milliseconds: positive shows each cue later, negative earlier. Without everyone, 0 is the person's own "in step", which wins over a timing saved for everyone.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SetSubtitleTimingInputBody/timingMs`.
+            public var timingMs: Swift.Int64
+            /// Creates a new `SetSubtitleTimingInputBody`.
+            ///
+            /// - Parameters:
+            ///   - everyone: Admins only: save it for everyone who plays the file (0 removes that), and remove the admin's own timing for the track, so they hear what everyone does. A person's own timing still wins for them.
+            ///   - timingMs: Milliseconds: positive shows each cue later, negative earlier. Without everyone, 0 is the person's own "in step", which wins over a timing saved for everyone.
+            public init(
+                everyone: Swift.Bool? = nil,
+                timingMs: Swift.Int64
+            ) {
+                self.everyone = everyone
+                self.timingMs = timingMs
+            }
+            public enum CodingKeys: String, CodingKey {
+                case everyone
+                case timingMs
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/Show`.
         public struct Show: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/Show/backdropPath`.
@@ -14272,6 +14352,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/SubtitlePreferences/mode`.
             public var mode: Swift.String
+            /// Subtitle size: smaller, normal, larger or largest, which apps draw at 0.79, 1, 1.21 and 1.5 times their own size. Normal by default (API level 35).
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubtitlePreferences/size`.
+            public var size: Swift.String?
             /// Creates a new `SubtitlePreferences`.
             ///
             /// - Parameters:
@@ -14279,22 +14363,26 @@ extension Components {
             ///   - foreignAudio: With mode forced: when the audio isn't in the person's languages, start as on does, in their subtitle languages or else their audio languages. Turned on when a person first saves audio languages without having saved a subtitle mode (API level 21).
             ///   - languages: Preferred BCP 47 languages, in order; empty until the person chooses or accepts their device's language.
             ///   - mode: off, forced (only foreign-language parts in the audio's language), or on.
+            ///   - size: Subtitle size: smaller, normal, larger or largest, which apps draw at 0.79, 1, 1.21 and 1.5 times their own size. Normal by default (API level 35).
             public init(
                 automaticDownload: Swift.Bool,
                 foreignAudio: Swift.Bool? = nil,
                 languages: [Swift.String],
-                mode: Swift.String
+                mode: Swift.String,
+                size: Swift.String? = nil
             ) {
                 self.automaticDownload = automaticDownload
                 self.foreignAudio = foreignAudio
                 self.languages = languages
                 self.mode = mode
+                self.size = size
             }
             public enum CodingKeys: String, CodingKey {
                 case automaticDownload
                 case foreignAudio
                 case languages
                 case mode
+                case size
             }
         }
         /// - Remark: Generated from `#/components/schemas/SubtitleQuota`.
@@ -14485,6 +14573,33 @@ extension Components {
                 case title
             }
         }
+        /// - Remark: Generated from `#/components/schemas/SubtitleTiming`.
+        public struct SubtitleTiming: Codable, Hashable, Sendable {
+            /// The timing the caller's plays of this track now get: their own, else the one saved for everyone, else 0.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubtitleTiming/timingMs`.
+            public var timingMs: Swift.Int64
+            /// timingMs is the one an admin saved for everyone, not the caller's own.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubtitleTiming/timingShared`.
+            public var timingShared: Swift.Bool
+            /// Creates a new `SubtitleTiming`.
+            ///
+            /// - Parameters:
+            ///   - timingMs: The timing the caller's plays of this track now get: their own, else the one saved for everyone, else 0.
+            ///   - timingShared: timingMs is the one an admin saved for everyone, not the caller's own.
+            public init(
+                timingMs: Swift.Int64,
+                timingShared: Swift.Bool
+            ) {
+                self.timingMs = timingMs
+                self.timingShared = timingShared
+            }
+            public enum CodingKeys: String, CodingKey {
+                case timingMs
+                case timingShared
+            }
+        }
         /// - Remark: Generated from `#/components/schemas/SubtitleTrack`.
         public struct SubtitleTrack: Codable, Hashable, Sendable {
             /// - Remark: Generated from `#/components/schemas/SubtitleTrack/burnInOnly`.
@@ -14595,6 +14710,18 @@ extension Components {
             }
             /// - Remark: Generated from `#/components/schemas/SubtitleTrack/source`.
             public var source: Components.Schemas.SubtitleTrack.SourcePayload?
+            /// The server burned this track into the picture with timingMs already applied: the app shows it as it comes. A change of timing needs a new decision (API level 35).
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubtitleTrack/timingApplied`.
+            public var timingApplied: Swift.Bool?
+            /// The person's saved timing for this track, in milliseconds: positive shows each cue later, negative earlier, absent for none. Their own timing, else the one an admin saved for everyone (timingShared). Saved with PUT /api/files/{id}/subtitles/{track}/timing. From apiLevel 35.
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubtitleTrack/timingMs`.
+            public var timingMs: Swift.Int64?
+            /// timingMs is the one an admin saved for everyone who plays the file, not the person's own (API level 35).
+            ///
+            /// - Remark: Generated from `#/components/schemas/SubtitleTrack/timingShared`.
+            public var timingShared: Swift.Bool?
             /// - Remark: Generated from `#/components/schemas/SubtitleTrack/title`.
             public var title: Swift.String?
             /// - Remark: Generated from `#/components/schemas/SubtitleTrack/url`.
@@ -14613,6 +14740,9 @@ extension Components {
             ///   - language:
             ///   - release: A download's release name.
             ///   - source:
+            ///   - timingApplied: The server burned this track into the picture with timingMs already applied: the app shows it as it comes. A change of timing needs a new decision (API level 35).
+            ///   - timingMs: The person's saved timing for this track, in milliseconds: positive shows each cue later, negative earlier, absent for none. Their own timing, else the one an admin saved for everyone (timingShared). Saved with PUT /api/files/{id}/subtitles/{track}/timing. From apiLevel 35.
+            ///   - timingShared: timingMs is the one an admin saved for everyone who plays the file, not the person's own (API level 35).
             ///   - title:
             ///   - url:
             public init(
@@ -14627,6 +14757,9 @@ extension Components {
                 language: Swift.String? = nil,
                 release: Swift.String? = nil,
                 source: Components.Schemas.SubtitleTrack.SourcePayload? = nil,
+                timingApplied: Swift.Bool? = nil,
+                timingMs: Swift.Int64? = nil,
+                timingShared: Swift.Bool? = nil,
                 title: Swift.String? = nil,
                 url: Swift.String? = nil
             ) {
@@ -14641,6 +14774,9 @@ extension Components {
                 self.language = language
                 self.release = release
                 self.source = source
+                self.timingApplied = timingApplied
+                self.timingMs = timingMs
+                self.timingShared = timingShared
                 self.title = title
                 self.url = url
             }
@@ -14656,6 +14792,9 @@ extension Components {
                 case language
                 case release
                 case source
+                case timingApplied
+                case timingMs
+                case timingShared
                 case title
                 case url
             }
@@ -14819,19 +14958,37 @@ extension Components {
         }
         /// - Remark: Generated from `#/components/schemas/UpdateAudioPreferences`.
         public struct UpdateAudioPreferences: Codable, Hashable, Sendable {
+            /// off, medium or high. From apiLevel 35; older servers reject it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateAudioPreferences/dialogueBoost`.
+            public var dialogueBoost: Swift.String?
             /// Ordered BCP 47 languages. An empty list clears them. Saving languages for a person who never saved a subtitle mode also turns on subtitles.foreignAudio.
             ///
             /// - Remark: Generated from `#/components/schemas/UpdateAudioPreferences/languages`.
             public var languages: [Swift.String]?
+            /// off, medium or high. From apiLevel 35; older servers reject it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateAudioPreferences/reduceLoudSounds`.
+            public var reduceLoudSounds: Swift.String?
             /// Creates a new `UpdateAudioPreferences`.
             ///
             /// - Parameters:
+            ///   - dialogueBoost: off, medium or high. From apiLevel 35; older servers reject it.
             ///   - languages: Ordered BCP 47 languages. An empty list clears them. Saving languages for a person who never saved a subtitle mode also turns on subtitles.foreignAudio.
-            public init(languages: [Swift.String]? = nil) {
+            ///   - reduceLoudSounds: off, medium or high. From apiLevel 35; older servers reject it.
+            public init(
+                dialogueBoost: Swift.String? = nil,
+                languages: [Swift.String]? = nil,
+                reduceLoudSounds: Swift.String? = nil
+            ) {
+                self.dialogueBoost = dialogueBoost
                 self.languages = languages
+                self.reduceLoudSounds = reduceLoudSounds
             }
             public enum CodingKeys: String, CodingKey {
+                case dialogueBoost
                 case languages
+                case reduceLoudSounds
             }
         }
         /// - Remark: Generated from `#/components/schemas/UpdatePreferencesInputBody`.
@@ -14946,6 +15103,10 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/UpdateSubtitlePreferences/mode`.
             public var mode: Swift.String?
+            /// smaller, normal, larger or largest. From apiLevel 35; older servers reject it.
+            ///
+            /// - Remark: Generated from `#/components/schemas/UpdateSubtitlePreferences/size`.
+            public var size: Swift.String?
             /// Creates a new `UpdateSubtitlePreferences`.
             ///
             /// - Parameters:
@@ -14953,22 +15114,26 @@ extension Components {
             ///   - foreignAudio: With mode forced, subtitles as on does when the audio isn't in the person's languages. From API level 21; older servers reject it.
             ///   - languages: Ordered BCP 47 languages. An empty list clears them.
             ///   - mode: off, forced or on.
+            ///   - size: smaller, normal, larger or largest. From apiLevel 35; older servers reject it.
             public init(
                 automaticDownload: Swift.Bool? = nil,
                 foreignAudio: Swift.Bool? = nil,
                 languages: [Swift.String]? = nil,
-                mode: Swift.String? = nil
+                mode: Swift.String? = nil,
+                size: Swift.String? = nil
             ) {
                 self.automaticDownload = automaticDownload
                 self.foreignAudio = foreignAudio
                 self.languages = languages
                 self.mode = mode
+                self.size = size
             }
             public enum CodingKeys: String, CodingKey {
                 case automaticDownload
                 case foreignAudio
                 case languages
                 case mode
+                case size
             }
         }
         /// - Remark: Generated from `#/components/schemas/UpdateWatchlistInputBody`.
