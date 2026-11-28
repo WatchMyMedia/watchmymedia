@@ -1,16 +1,19 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import type { OnlineSubtitle, SubtitleSearch, SubtitleTrack } from '../api/playback'
 import type { components } from '../api/schema'
 import { audioWords, onlineWords, playbackRows, streamStory, subtitleWords } from '../lib/play/words'
-import { CheckIcon, CloseIcon, MoreIcon, SearchIcon } from './icons'
-import { playerButton } from './playerStyles'
+import { SOUND_CHANGING, SOUND_LEVELS, SOUND_NOTE, SOUND_ROWS, SOUND_SAVED, soundFailed, type Sound, type SoundLevel, type SoundSetting } from '../lib/sound'
+import { SHARE_DONE, SHARE_HELP, SHARE_LABEL, TIMING_BURNED, TIMING_FAILED, TIMING_HELP, TIMING_SHARED, type TimingView } from '../lib/play/subtitleTiming'
+import { BurnedSubtitlesIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, MoreIcon, PeopleIcon, SearchIcon } from './icons'
+import { PHONE_SHEET_TOP, capClass, moveInGroup, playerButton } from './playerStyles'
 
 type Decision = components['schemas']['Decision']
 type MediaInfo = components['schemas']['MediaInfo']
 
+
 /**
  * The player's side sheet: Audio & subtitles, or Playback info. It sits at
- * the right of the picture from md up and along the foot at phone width.
+ * the right of the picture from md up and under it at phone width.
  * Focus goes to it on opening and back to the button that opened it on
  * closing; Escape closes. The player's own keys leave it alone.
  */
@@ -35,7 +38,7 @@ export function PlayerSheet({ title, onClose, children }: { title: string; onClo
           onClose()
         }
       }}
-      className="absolute inset-x-0 bottom-0 z-30 flex max-h-[78dvh] flex-col gap-3.5 overflow-y-auto rounded-t-2xl border-t border-line-2 bg-surface px-5 pb-6 pt-5 text-neutral-100 md:inset-x-auto md:right-0 md:top-0 md:max-h-none md:w-[400px] md:rounded-none md:border-l md:border-t-0 md:px-[22px] md:pt-[22px]"
+      className={`absolute inset-x-0 bottom-0 z-30 flex flex-col gap-3.5 overflow-y-auto rounded-t-2xl border-t border-line-2 bg-surface px-5 pb-6 pt-5 text-neutral-100 md:inset-x-auto md:right-0 md:top-0 md:w-[400px] md:rounded-none md:border-l md:border-t-0 md:px-[22px] md:pt-[22px] ${PHONE_SHEET_TOP}`}
     >
       <div className="flex items-center gap-2.5">
         <h2 className="flex-1 text-lg font-[650]">{title}</h2>
@@ -48,21 +51,10 @@ export function PlayerSheet({ title, onClose, children }: { title: string; onClo
   )
 }
 
-const capClass = 'mt-1.5 text-[11.5px] font-bold uppercase tracking-[.08em] text-dim'
 const optClass = (on: boolean) =>
   `flex min-h-[46px] w-full items-center gap-2.5 rounded-lg border px-3 py-1 text-left text-sm disabled:cursor-default disabled:opacity-50 ${on ? 'border-line-3 bg-raise font-semibold' : 'border-transparent hover:bg-surface-2'}`
 
-/** Up and Down move along a group of choices, as in a radio group. */
-function moveInGroup(e: KeyboardEvent<HTMLDivElement>) {
-  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return
-  const all = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]:not(:disabled)'))
-  const at = all.indexOf(document.activeElement as HTMLButtonElement)
-  const to = e.key === 'Home' ? 0 : e.key === 'End' ? all.length - 1 : e.key === 'ArrowDown' ? at + 1 : at - 1
-  e.preventDefault()
-  all[(to + all.length) % all.length]?.focus()
-}
-
-function Choice({ on, title, detail, disabled, onPick }: { on: boolean; title: string; detail?: string; disabled?: boolean; onPick: () => void }) {
+export function Choice({ on, title, detail, disabled, onPick }: { on: boolean; title: string; detail?: string; disabled?: boolean; onPick: () => void }) {
   return (
     <button type="button" role="radio" aria-checked={on} disabled={disabled} tabIndex={on ? 0 : -1} onClick={onPick} className={optClass(on)}>
       <span className="min-w-0 flex-1">
@@ -89,6 +81,8 @@ export function TracksPanel({
   fetching,
   note,
   remembered,
+  sound,
+  timing,
 }: {
   decision: Decision
   audioIndex: number
@@ -102,6 +96,10 @@ export function TracksPanel({
   note: string | null
   /** The show an episode's picks are kept for, which the panel's foot names. */
   remembered?: string
+  /** Boost dialogue and Reduce loud sounds, under the audio (API level 35). */
+  sound?: ReactNode
+  /** The timing of the subtitles on now, under the subtitles (API level 35). */
+  timing?: ReactNode
 }) {
   const own = decision.subtitles.filter((s) => s.source !== 'opensubtitles')
   const downloaded = decision.subtitles.filter((s) => s.source === 'opensubtitles')
@@ -124,6 +122,7 @@ export function TracksPanel({
           </div>
         </>
       )}
+      {sound}
       <h3 id="player-subs" className={capClass}>
         Subtitles
       </h3>
@@ -168,11 +167,160 @@ export function TracksPanel({
           {note}
         </p>
       )}
+      {timing}
       {remembered && (
         <p className="mt-auto border-t border-line-2 pt-3.5 text-[13px] text-neutral-400">
           <b className="font-semibold text-neutral-100">Remembered for {remembered}.</b> The next episode starts with the same choices.
         </p>
       )}
+    </>
+  )
+}
+
+/** A sound setting being changed in the player: busy while it saves and the play reloads, then saved, or failed with the value it stayed at. */
+export type SoundChange = { setting: SoundSetting; phase: 'busy' | 'ok' | 'err'; stayed?: SoundLevel } | null
+
+/**
+ * Sound, under the audio: Boost dialogue and Reduce loud sounds, each Off,
+ * Medium or High. A change saves the person's setting and plays on from the
+ * same moment with it; the panel stays open.
+ */
+export function SoundSection({ sound, change, onPick, onRetry }: { sound: Sound; change: SoundChange; onPick: (setting: SoundSetting, level: SoundLevel) => void; onRetry: () => void }) {
+  const busy = change?.phase === 'busy'
+  return (
+    <>
+      <h3 className={capClass}>Sound</h3>
+      <div className="flex flex-col gap-4">
+        {SOUND_ROWS.map((row) => {
+          const mine = change?.setting === row.id ? change : null
+          return (
+            <div key={row.id} className="flex flex-col gap-[7px]">
+              <span id={`player-${row.id}`} className="text-sm font-medium">{row.label}</span>
+              <p id={`player-${row.id}-help`} className="text-[12.5px] leading-[1.45] text-neutral-400">{row.help}</p>
+              <div role="radiogroup" aria-labelledby={`player-${row.id}`} aria-describedby={`player-${row.id}-help`} onKeyDown={moveInGroup} className="flex w-full rounded-[9px] border border-line-2 bg-ground p-[3px]">
+                {SOUND_LEVELS.map((level) => {
+                  const on = sound[row.id] === level.id
+                  return (
+                    <button key={level.id} type="button" role="radio" aria-checked={on} tabIndex={on ? 0 : -1} disabled={busy}
+                      onClick={() => !on && onPick(row.id, level.id)}
+                      className={`inline-flex min-h-[34px] flex-1 basis-0 items-center justify-center gap-[7px] rounded-md px-2 text-[13px] disabled:cursor-default ${on ? 'bg-raise font-semibold text-neutral-100 ring-1 ring-inset ring-line-3' : `text-neutral-400 hover:text-neutral-100 ${busy ? 'opacity-45' : ''}`}`}>
+                      {on && mine?.phase === 'busy' && <Spin />}
+                      {level.label}
+                    </button>
+                  )
+                })}
+              </div>
+              {mine?.phase === 'busy' && <p role="status" className="flex items-center gap-1.5 text-[12.5px] text-neutral-300"><Spin />{SOUND_CHANGING}</p>}
+              {mine?.phase === 'ok' && <p role="status" className="flex items-center gap-1.5 text-[12.5px] text-emerald-300"><CheckIcon size={14} />{SOUND_SAVED}</p>}
+              {mine?.phase === 'err' && (
+                <p role="alert" className="text-[12.5px] text-red-300">
+                  {soundFailed(mine.stayed ?? 'off')}{' '}
+                  <button type="button" onClick={onRetry} className="min-h-7 px-0.5 font-semibold text-neutral-100 underline underline-offset-2">Try again</button>
+                </p>
+              )}
+            </div>
+          )
+        })}
+        <p className="rounded-lg border border-line-2 p-3 text-[12.5px] leading-[1.45] text-neutral-400">{SOUND_NOTE}</p>
+      </div>
+    </>
+  )
+}
+
+function Spin() {
+  return <span aria-hidden="true" className="inline-block size-3 shrink-0 animate-spin rounded-full border-2 border-current border-r-transparent motion-reduce:animate-none" />
+}
+
+/** Holding Earlier or Later repeats it: once at the press, then every 0.1 s after 0.4 s. */
+function useHeldRepeat(act: () => void) {
+  const timer = useRef<number | undefined>(undefined)
+  const pressed = useRef(false)
+  const stop = () => {
+    window.clearTimeout(timer.current)
+    window.clearInterval(timer.current)
+    timer.current = undefined
+  }
+  useEffect(() => stop, [])
+  return {
+    onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => {
+      if (e.button !== 0) return
+      pressed.current = true
+      act()
+      stop()
+      timer.current = window.setTimeout(() => { timer.current = window.setInterval(act, 100) }, 400)
+    },
+    onPointerUp: stop,
+    onPointerLeave: stop,
+    onPointerCancel: stop,
+    // The keyboard's Enter and Space click without a pointer press.
+    onClick: () => {
+      if (pressed.current) pressed.current = false
+      else act()
+    },
+  }
+}
+
+/**
+ * Subtitle timing, under the subtitles while a track is on: Earlier and
+ * Later by 0.1 s (held, they repeat; the arrow keys do the same), Reset
+ * when it would change something, and Save for everyone for admins. The
+ * cues move as it changes.
+ */
+export function TimingSection({ view, onStep, onReset, onShare, onRetry }: { view: TimingView; onStep: (by: 1 | -1) => void; onReset: () => void; onShare: () => void; onRetry: () => void }) {
+  const earlier = useHeldRepeat(() => onStep(-1))
+  const later = useHeldRepeat(() => onStep(1))
+  const button = 'btn min-h-10 shrink-0 gap-1.5 px-3'
+  return (
+    <>
+      <h3 id="player-timing" className={capClass}>Subtitle timing</h3>
+      <div className="flex flex-col gap-2.5">
+        <div
+          role="group"
+          aria-labelledby="player-timing"
+          aria-describedby="player-timing-help"
+          className="flex items-center gap-1.5"
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+              e.preventDefault()
+              onStep(e.key === 'ArrowLeft' ? -1 : 1)
+            }
+          }}
+        >
+          <button type="button" className={button} {...earlier}><ChevronLeftIcon size={16} />Earlier</button>
+          <output aria-live="polite" className="flex min-w-0 flex-auto flex-col items-center text-center text-[14.5px] font-semibold whitespace-nowrap tabular-nums">
+            {view.words}
+            {view.setForEveryone && <small className="text-[11.5px] font-medium text-neutral-400">{TIMING_SHARED}</small>}
+          </output>
+          <button type="button" className={button} {...later}>Later<ChevronRightIcon size={16} /></button>
+          {view.canReset ? (
+            <button type="button" onClick={onReset} className="btn btn-ghost min-h-10 w-[66px] shrink-0 px-0">Reset</button>
+          ) : (
+            <span aria-hidden="true" className="w-[66px] shrink-0" />
+          )}
+        </div>
+        <p id="player-timing-help" className="text-[12.5px] leading-[1.45] text-neutral-400">{TIMING_HELP}</p>
+        {view.burned && (
+          <p className="flex gap-[9px] rounded-lg border border-line-2 p-3 text-[12.5px] leading-[1.45] text-neutral-300">
+            <BurnedSubtitlesIcon size={16} className="mt-px shrink-0" />
+            <span>{TIMING_BURNED}</span>
+          </p>
+        )}
+        {view.status === 'failed' && (
+          <p role="alert" className="text-[12.5px] text-red-300">
+            {TIMING_FAILED}{' '}
+            <button type="button" onClick={onRetry} className="min-h-7 px-0.5 font-semibold text-neutral-100 underline underline-offset-2">Try again</button>
+          </p>
+        )}
+        {view.canShare && (
+          <div className="flex flex-col items-start gap-[7px] border-t border-line-2 pt-3">
+            <button type="button" onClick={onShare} aria-describedby="player-share-help" className="btn btn-sm gap-1.5"><PeopleIcon size={16} />{SHARE_LABEL}</button>
+            <p id="player-share-help" className="text-[12.5px] leading-[1.45] text-neutral-400">{SHARE_HELP}</p>
+          </div>
+        )}
+        {view.status === 'shared' && (
+          <p role="status" className="flex items-center gap-1.5 border-t border-line-2 pt-3 text-[12.5px] text-emerald-300"><CheckIcon size={14} />{SHARE_DONE}</p>
+        )}
+      </div>
     </>
   )
 }

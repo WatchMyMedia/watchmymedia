@@ -305,7 +305,9 @@ has (never a commentary or audio description), otherwise on the file’s default
 adds audio languages without having chosen how subtitles start gets subtitles for audio they
 don’t follow. Subtitle size (Smaller, Normal, Larger, Largest) is each person's too, and each
 app draws its subtitles at it; subtitles drawn with their own styles (ASS) and those burned
-into the picture keep theirs. Subtitle timing moves a track's subtitles earlier or later for a
+into the picture keep theirs. The browser and the Cast receiver draw text subtitles
+themselves, sized against the picture; Safari's own full screen on an iPhone, and picture in
+picture, show the browser's subtitles instead, without the size or timing. Subtitle timing moves a track's subtitles earlier or later for a
 file whose subtitles are out of step, in steps of 0.1 s and up to a minute either way. It is
 saved for that person, for that track of that file, so their other devices play it in step;
 an admin can also save it for everyone who plays the file, and a person's own timing still

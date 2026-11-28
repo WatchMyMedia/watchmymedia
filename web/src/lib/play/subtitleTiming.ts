@@ -102,6 +102,7 @@ export class SubtitleTiming {
   private revision = 0
   private closed = false
   private snapshot: TimingView = IDLE_VIEW
+  private admin: boolean
 
   constructor(private readonly opts: {
     saver: TimingSaver
@@ -110,7 +111,16 @@ export class SubtitleTiming {
     /** A burned-in track's timing was saved: start the play again here so the server applies it. */
     onBurnedSaved?: (target: TimingTarget) => void
     timers?: Timers
-  }) {}
+  }) {
+    this.admin = opts.admin
+  }
+
+  /** Whether the person may save for everyone, which can change while a play lasts (an admin away from home). */
+  setAdmin(admin: boolean) {
+    if (admin === this.admin) return
+    this.admin = admin
+    this.publish()
+  }
 
   private get timers() { return this.opts.timers ?? browserTimers }
 
@@ -174,7 +184,7 @@ export class SubtitleTiming {
   /** An admin's Save for everyone: this timing becomes the file's, and their own goes. */
   share() {
     const target = this.target
-    if (!target || this.closed || !this.opts.admin) return
+    if (!target || this.closed || !this.admin) return
     this.timers.clearTimeout(this.timer)
     const revision = ++this.revision
     this.status = 'saving'
@@ -244,7 +254,7 @@ export class SubtitleTiming {
       setForEveryone: this.onShared && this.ms !== 0,
       canReset: own && this.ms !== base,
       resetTo: base,
-      canShare: this.opts.admin && !this.burned && own && this.ms !== base && this.status !== 'saving',
+      canShare: this.admin && !this.burned && own && this.ms !== base && this.status !== 'saving',
       burned: this.burned,
       status: this.status,
     }

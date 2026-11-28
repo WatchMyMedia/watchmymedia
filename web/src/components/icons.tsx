@@ -189,3 +189,18 @@ export const StarIcon = ({ size = 14, className }: IconProps) => (
     <path d="m12 2.8 2.85 5.78 6.37.93-4.61 4.49 1.09 6.35L12 17.35l-5.7 3 1.09-6.35L2.78 9.5l6.37-.93z" />
   </svg>
 )
+export const PeopleIcon = (p: IconProps) => (
+  <Line {...p} strokeWidth={1.9}>
+    <circle cx="9" cy="8" r="3.2" />
+    <path d="M3.5 19a5.5 5.5 0 0 1 11 0" />
+    <circle cx="17" cy="9" r="2.5" />
+    <path d="M16 14.2a4.5 4.5 0 0 1 5 4.8" />
+  </Line>
+)
+/** Subtitles drawn into the picture. */
+export const BurnedSubtitlesIcon = (p: IconProps) => (
+  <Line {...p}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="M7 15h6M15 15h2" />
+  </Line>
+)
