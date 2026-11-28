@@ -1,4 +1,6 @@
 import type { components } from '../api/schema'
+import { soundOf, soundPatch, type Sound } from './sound'
+import { subtitleSizeOf, type SubtitleSize } from './subtitleSize'
 
 type Saved = components['schemas']['Preferences']
 type Patch = components['schemas']['UpdatePreferencesInputBody']
@@ -91,3 +93,29 @@ export const commonLanguages: readonly string[] = ['en', 'es', 'fr', 'de', 'it',
 
 /** The most languages the server keeps in one list. */
 export const MAX_LANGUAGES = 16
+
+/**
+ * The sound settings and the subtitle size, which join the page's draft on
+ * a server at API level 35 and are saved with the rest.
+ */
+export type SoundSizeDraft = { sound: Sound; size: SubtitleSize }
+
+export function soundSizeOf(p: Saved): SoundSizeDraft {
+  return { sound: soundOf(p), size: subtitleSizeOf(p) }
+}
+
+/** Only what changed of the sound and the size; null when nothing did. */
+export function soundSizePatch(saved: SoundSizeDraft, draft: SoundSizeDraft): Patch | null {
+  const patch: Patch = { ...soundPatch(saved.sound, draft.sound) }
+  if (saved.size !== draft.size) patch.subtitles = { size: draft.size }
+  return Object.keys(patch).length ? patch : null
+}
+
+/** Two partial saves as one request: their audio and subtitle fields side by side. */
+export function joinPatches(a: Patch | null, b: Patch | null): Patch | null {
+  if (!a || !b) return a ?? b
+  const patch: Patch = { ...a, ...b }
+  if (a.audio || b.audio) patch.audio = { ...a.audio, ...b.audio }
+  if (a.subtitles || b.subtitles) patch.subtitles = { ...a.subtitles, ...b.subtitles }
+  return patch
+}
