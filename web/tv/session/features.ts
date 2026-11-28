@@ -1,3 +1,5 @@
+import { SOUND_LEVEL } from '../../src/lib/sound'
+
 // What a server's API level lets the app offer. A feature from a later level
 // turns on by the server's own `apiLevel`, and below it the app asks that
 // server nothing new and behaves as it did.
@@ -12,4 +14,16 @@ export const LEVEL_34 = 34
 
 export function from34(apiLevel: number | undefined): boolean {
   return (apiLevel ?? 0) >= LEVEL_34
+}
+
+/**
+ * API level 35: Boost dialogue and Reduce loud sounds, the person's
+ * subtitle size and subtitle timing. Below it the player and Settings show
+ * none of them, ask that server nothing about them, and the TV keeps its own
+ * subtitle size.
+ */
+export const LEVEL_35 = SOUND_LEVEL
+
+export function from35(apiLevel: number | undefined): boolean {
+  return (apiLevel ?? 0) >= LEVEL_35
 }

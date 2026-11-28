@@ -164,6 +164,16 @@ export function playOrPause() {
   void send({ type: 'input' })
 }
 
+/** The person's sound settings changed: the TV plays on from where it is with them. */
+export function castSound() {
+  void send({ type: 'sound' })
+}
+
+/** Moves the TV's subtitles to this timing at once; the caller saves it. */
+export function castSubtitleTiming(timingMs: number) {
+  void send({ type: 'subtitleTiming', timingMs })
+}
+
 /** Seeks to a file position. */
 export function seekCast(positionMs: number) {
   void send({ type: 'seek', positionMs: Math.max(0, Math.floor(positionMs)) })
@@ -179,6 +189,8 @@ export type CastRequest = {
   quality?: string
   title?: string
   subtitle?: string
+  /** The person's subtitle size, which the TV draws its cues at. */
+  subtitleSize?: LoadData['subtitleSize']
 }
 
 /** Asks the connected TV to play a file, as the signed-in user. */
@@ -206,6 +218,7 @@ export async function castFile(req: CastRequest): Promise<void> {
       quality: req.quality,
       device: { name: session.getCastDevice().friendlyName },
       sender: { name: senderName() },
+      ...(req.subtitleSize ? { subtitleSize: req.subtitleSize } : {}),
     }
     const info = new chrome.cast.media.MediaInfo(contentId(req.fileId), 'video/mp4')
     const meta = new chrome.cast.media.GenericMediaMetadata()

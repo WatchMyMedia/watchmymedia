@@ -32,10 +32,17 @@ import { RemotePlayer } from './RemotePlayer'
 import { clock as clockText } from '../lib/clock'
 import { DEFAULT_VOLUME, chosenSubtitle, episodeName, lastWithFile, parseVolume, playerTitle, previousInSeason, previousSeason, segmentMarks, stepVolume, timeLeftLine, volumeLabel, type VolumeSetting } from '../lib/play/words'
 import { CastButton } from '../components/Cast'
-import { InfoPanel, PlayerMoreMenu, PlayerSheet, TracksPanel } from '../components/PlayerPanels'
+import { InfoPanel, PlayerMoreMenu, PlayerSheet, SoundSection, TimingSection, TracksPanel } from '../components/PlayerPanels'
+import { CueLayer } from '../components/PlayerCues'
+import { useCues, usePictureBox, useSubtitleTiming } from '../components/usePlayerCues'
+import { useSoundChange } from '../components/useSoundChange'
+import { subtitleTimingSaver } from '../api/subtitleTiming'
+import { soundAndSubtitlesOn } from '../lib/sound'
+import { subtitleSizeOf } from '../lib/subtitleSize'
+import { useAuth } from '../authContext'
 import { setShowTracks } from '../api/showTracks'
 import { playerPickBody } from '../lib/showTracks'
-import { playerButton } from '../components/playerStyles'
+import { PHONE_PICTURE, playerButton } from '../components/playerStyles'
 import { ReportProblemDialog } from '../components/ReportProblemDialog'
 import { useNow } from '../components/useNow'
 import { ArrowLeftIcon, Back10Icon, Forward10Icon, FullscreenIcon, NextIcon, PauseIcon, PipIcon, PlayIcon, PreviousIcon, SubtitlesIcon, VolumeIcon } from '../components/icons'
@@ -239,6 +246,13 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, audio, 
   const navigate = useNavigate()
   const ass = useAssRenderer(videoRef)
   const qc = useQueryClient()
+  const auth = useAuth()
+  // The sound settings, the subtitle size and subtitle timing need API level 35.
+  const newer = soundAndSubtitlesOn(apiLevel)
+  const box = usePictureBox(videoRef, rootRef)
+  const wide = useWide()
+  // Safari's own full screen on an iPhone draws the browser's subtitles, not ours.
+  const [nativeFull, setNativeFull] = useState(false)
   const native = prefersNativeHls()
   const recoveryEnabled = (apiLevel ?? 0) >= 24 && !native && !recordingId
   const airplay = useAirPlay(videoRef)
@@ -457,6 +471,10 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, audio, 
   )
   const latestLoad = useRef(load)
   useEffect(() => { latestLoad.current = load }, [load])
+  const [timingSaver] = useState(() => subtitleTimingSaver())
+  // Burned-in subtitles take a saved timing from the server: play on from here with it.
+  const replayHere = useCallback(() => void latestLoad.current(posRef.current, { resume: false }), [])
+  const timing = useSubtitleTiming(timingSaver, !!auth.user?.isAdmin && auth.adminAllowed, replayHere)
 
   // Provider work follows the first playing frame and never delays deciding a stream.
   useEffect(() => {
@@ -695,38 +713,61 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, audio, 
     [stopByAdmin],
   )
 
-  // Subtitles: WebVTT through <track>; ASS through the WASM renderer; on
-  // Safari's VOD path, the playlist's renditions in the decision's order,
-  // which an Apple TV shows too.
+  // Subtitles: the player draws text subtitles itself (CueLayer), from the
+  // track's WebVTT, so a timing moves them at once and the person's size
+  // scales them; ASS through the WASM renderer, with its own styles. The
+  // browser's text tracks stay hidden: side-loaded <track>s, and on
+  // Safari's VOD path the playlist's renditions in the decision's order,
+  // which an Apple TV shows too. Only an iPhone's own full screen and
+  // picture in picture, which the page can't draw over, show the browser's.
   const nativeVod = native && decision?.protocol === 'hls' && decision.playlist === 'vod'
+  const subtitle = decision?.subtitles.find((s) => s.id === subtitleId)
+  const burnedIn = !!subtitle && (subtitle.format === 'image' || subtitle.burnInOnly || decision?.burnIn?.id === subtitle.id)
+  const styledAss = subtitle?.format === 'ass' && !nativeVod && !burnedIn
+  const cueUrl = subtitle?.url && !burnedIn && !styledAss ? subtitle.url.replace(/\.ass(?=\?|$)/, '.vtt') : undefined
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
     const onAdd = () => setTextTracks(video.textTracks.length)
+    const onBegin = () => setNativeFull(true)
+    const onEnd = () => setNativeFull(false)
     video.textTracks.addEventListener('addtrack', onAdd)
-    return () => video.textTracks.removeEventListener('addtrack', onAdd)
+    video.addEventListener('webkitbeginfullscreen', onBegin)
+    video.addEventListener('webkitendfullscreen', onEnd)
+    return () => {
+      video.textTracks.removeEventListener('addtrack', onAdd)
+      video.removeEventListener('webkitbeginfullscreen', onBegin)
+      video.removeEventListener('webkitendfullscreen', onEnd)
+    }
   }, [])
   useEffect(() => {
     const video = videoRef.current
     if (!video || !decision) return
     const track = decision.subtitles.find((s) => s.id === subtitleId)
-    for (const t of Array.from(video.textTracks)) t.mode = 'disabled'
+    let active: TextTrack | undefined
     if (nativeVod) {
       const renditions = Array.from(video.textTracks).filter((t) => t.kind === 'subtitles' || t.kind === 'captions')
       const i = decision.subtitles.filter((s) => s.format !== 'image').findIndex((s) => s.id === subtitleId)
-      if (i >= 0 && renditions[i]) renditions[i].mode = 'showing'
-      return
+      if (i >= 0) active = renditions[i]
+    } else if (track?.format === 'webvtt') {
+      active = Array.from(video.querySelectorAll('track')).find((t) => t.dataset.id === track.id)?.track ?? undefined
     }
-    if (track?.format === 'ass' && track.url) {
-      ass.show(track.url)
-      return
-    }
-    ass.hide()
-    if (track?.format === 'webvtt') {
-      const el = Array.from(video.querySelectorAll('track')).find((t) => t.dataset.id === track.id)
-      if (el?.track) el.track.mode = 'showing'
-    }
-  }, [decision, subtitleId, ass, nativeVod, textTracks])
+    for (const t of Array.from(video.textTracks)) if (t !== active) t.mode = 'disabled'
+    if (active) active.mode = nativeFull || pip ? 'showing' : 'hidden'
+    if (!nativeVod && track?.format === 'ass' && track.url && !burnedIn) ass.show(track.url)
+    else ass.hide()
+  }, [decision, subtitleId, ass, nativeVod, textTracks, nativeFull, pip, burnedIn])
+
+  // The timing of the subtitles on now, from the decision; changes move the
+  // cues at once and are saved for the person.
+  useEffect(() => {
+    timing.control.track(newer && subtitle && !recordingId ? { fileId, trackId: subtitle.id } : undefined, subtitle, burnedIn)
+  }, [timing.control, newer, subtitle, recordingId, fileId, burnedIn])
+  const timingMs = burnedIn ? 0 : timing.view.ms
+  useEffect(() => ass.setTiming(styledAss ? timingMs : 0), [ass, styledAss, timingMs])
+  const cues = useCues(videoRef, cueUrl, timingMs)
+  const subtitleSize = newer ? subtitleSizeOf(prefs) : 'normal'
+  const sound = useSoundChange(() => latestLoad.current(posRef.current, { resume: false }))
 
   // A pick during an episode is kept for its show, so the next episodes start the same way.
   const keepForShow = (pick: Parameters<typeof playerPickBody>[0]) => {
@@ -983,13 +1024,24 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, audio, 
         poke()
       }}
     >
-      <video ref={videoRef} className="h-full w-full" playsInline x-webkit-airplay={recordingId ? "deny" : "allow"} onDoubleClick={toggleFullscreen}>
+      <video ref={videoRef} className={`h-full w-full ${sheet ? PHONE_PICTURE : ''}`} playsInline x-webkit-airplay={recordingId ? "deny" : "allow"} onDoubleClick={toggleFullscreen}>
         {!nativeVod && decision?.subtitles
           .filter((s) => s.format === 'webvtt' && s.url)
           .map((s) => (
             <track key={s.url} data-id={s.id} kind="subtitles" src={s.url} srcLang={s.language || 'und'} label={s.title || s.language || s.id} />
           ))}
       </video>
+
+      {!airplay.active && (
+        <CueLayer
+          cues={cues}
+          box={box}
+          size={subtitleSize}
+          // Over the controls while they show; at phone width the open sheet hides them.
+          raise={controlsShown && !(sheet && !wide) ? (wide ? 150 : 120) : 0}
+          rightInset={sheet && wide ? 400 : 0}
+        />
+      )}
 
       {segment && showSkip && !showNext && !sheet && (
         <SkipButton key={segment.id} label={SKIP_LABELS[segment.kind] ?? 'Skip'} controlsVisible={controlsShown} autoAfterMs={autoAfter} onSkip={skipSegment} />
@@ -1193,6 +1245,10 @@ function LocalPlayer({ fileId, recordingId, start, title, back, trailer, audio, 
             online={showOnline ? found : undefined}
             fetching={fetching}
             note={subNote}
+            sound={newer && <SoundSection sound={sound.sound} change={sound.change} onPick={sound.pick} onRetry={sound.retry} />}
+            timing={newer && subtitle && !recordingId && (
+              <TimingSection view={timing.view} onStep={(by) => timing.control.step(by)} onReset={() => timing.control.reset()} onShare={() => timing.control.share()} onRetry={() => timing.control.retry()} />
+            )}
           />
         </PlayerSheet>
       )}
@@ -1232,4 +1288,17 @@ function AirPlayIcon() {
       <path d="M12 14l5 6H7z" fill="currentColor" stroke="none" />
     </svg>
   )
+}
+
+/** From md up the player's sheet sits beside the picture; below it, under. */
+function useWide(): boolean {
+  const query = '(min-width: 768px)'
+  const [wide, setWide] = useState(() => typeof window === 'undefined' || window.matchMedia(query).matches)
+  useEffect(() => {
+    const m = window.matchMedia(query)
+    const on = () => setWide(m.matches)
+    m.addEventListener('change', on)
+    return () => m.removeEventListener('change', on)
+  }, [])
+  return wide
 }

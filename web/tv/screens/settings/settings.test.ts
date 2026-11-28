@@ -76,6 +76,12 @@ describe('a setting saved at once', () => {
     expect(settle(saving, 'autoplay')).toEqual({})
     expect(fail(saving, 'autoplay', 'On', { autoplayNext: false }).autoplay).toEqual({ state: 'failed', still: 'On', retry: { autoplayNext: false } })
   })
+
+  it('says Saved in a row that confirms (the sound settings, Subtitle size)', () => {
+    const saving = begin({}, 'sound/dialogueBoost')
+    expect(settle(saving, 'sound/dialogueBoost', true)).toEqual({ 'sound/dialogueBoost': { state: 'saved' } })
+    expect(fail(saving, 'sound/dialogueBoost', 'Off', { audio: { dialogueBoost: 'high' } })['sound/dialogueBoost']).toMatchObject({ state: 'failed', still: 'Off' })
+  })
 })
 
 describe('Home rows on the TV', () => {

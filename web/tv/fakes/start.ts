@@ -1,7 +1,7 @@
 import type { components } from '../../src/api/schema'
 import { REQUIRED_API_LEVEL } from '../session/session'
 import { WATCHLISTS_API_LEVEL } from '../screens/watchlists/watchlistTv'
-import { LEVEL_34 } from '../session/features'
+import { LEVEL_34, LEVEL_35 } from '../session/features'
 import { FakeServer, problem } from './server'
 import { FAKE_USER } from './data'
 import { LAKESIDE, type FakeIdentity } from './others'
@@ -24,8 +24,9 @@ const APPROVE_AFTER_MS = 8000
 export function registerStart(server: FakeServer, mode: string, identity: FakeIdentity = LAKESIDE) {
   const info: ServerInfo = {
     id: identity.id, name: identity.name, version: mode === 'old' ? 'v1.7.0' : 'v1.8.0', platform: 'linux',
-    // A server keeps watchlists from level 33; ?fakes=nowatchlists is one that doesn't yet, and ?fakes=level33 one without level 34's people, counts and copies.
-    apiLevel: mode === 'old' ? REQUIRED_API_LEVEL - 1 : mode === 'nowatchlists' ? REQUIRED_API_LEVEL : mode === 'level33' ? WATCHLISTS_API_LEVEL : LEVEL_34,
+    // A server keeps watchlists from level 33; ?fakes=nowatchlists is one that doesn't yet, ?fakes=level33 one without level 34's people, counts and copies,
+    // and ?fakes=level34 one without level 35's sound settings, subtitle size and timing.
+    apiLevel: mode === 'old' ? REQUIRED_API_LEVEL - 1 : mode === 'nowatchlists' ? REQUIRED_API_LEVEL : mode === 'level33' ? WATCHLISTS_API_LEVEL : mode === 'level34' ? LEVEL_34 : LEVEL_35,
     setupRequired: mode === 'setup', turnstile: false, casting: false,
   }
   server.route('GET', '/api/server', () => info, { open: true })

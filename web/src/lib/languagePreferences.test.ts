@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  joinPatches, soundSizeOf, soundSizePatch,
   automaticAvailable, choiceOf, draftOf, emptySubtitleText, foreignAudioTurnedOn, languageList, languagePatch, moveLanguage, subtitleChoices, subtitleFields,
   type LanguageDraft,
 } from './languagePreferences'
@@ -99,5 +100,25 @@ describe('Automatic download and the empty subtitle list', () => {
   it('says subtitles fall back to the audio languages only when they will', () => {
     expect(emptySubtitleText(draft({ choice: 'foreign', audio: ['es'] }))).toContain('use your audio languages')
     expect(emptySubtitleText(draft({ choice: 'on', audio: ['es'] }))).toBe('No subtitle language yet. Add one below.')
+  })
+})
+
+describe('the sound and the size in the same save', () => {
+  const base = { dialogueBoost: 'off', reduceLoudSounds: 'off' } as const
+  it('reads a server without them as Off and Normal', () => {
+    expect(soundSizeOf(saved({ mode: 'on' }))).toEqual({ sound: base, size: 'normal' })
+  })
+
+  it('sends only the settings that changed, beside the languages', () => {
+    const before = { sound: base, size: 'normal' as const }
+    expect(soundSizePatch(before, before)).toBeNull()
+    const sound = soundSizePatch(before, { sound: { ...base, reduceLoudSounds: 'high' }, size: 'larger' })
+    expect(sound).toEqual({ audio: { reduceLoudSounds: 'high' }, subtitles: { size: 'larger' } })
+    expect(joinPatches({ audio: { languages: ['es'] }, subtitles: { mode: 'on', foreignAudio: false } }, sound)).toEqual({
+      audio: { languages: ['es'], reduceLoudSounds: 'high' },
+      subtitles: { mode: 'on', foreignAudio: false, size: 'larger' },
+    })
+    expect(joinPatches(null, null)).toBeNull()
+    expect(joinPatches(null, sound)).toBe(sound)
   })
 })

@@ -6,7 +6,7 @@ import { PlayerError, type Decision, type Progress, type SubtitleSearch, type Su
 import { PlaybackFailure } from './player'
 import type { Clock } from './clock'
 import { FakePlayer } from './fake-player'
-import { DEFAULT_SETTINGS, failureOf, FilePlayback, playbackSettings, type FileRequest, type PlaybackSettings } from './playback'
+import { DEFAULT_SETTINGS, failureOf, FilePlayback, playbackSettings, type FileRequest, type PlaybackContext, type PlaybackSettings } from './playback'
 import { SEND_AFTER_MS } from './seek'
 import { samsungProfiles } from '../platform/samsung/profile'
 import { STUCK_MESSAGE, STUCK_MS, STUCK_UNSEEN_MS } from './stuck'
@@ -31,12 +31,12 @@ const vtt = (track: string) => `WEBVTT\n\n00:00:10.000 --> 00:00:12.000\n${track
 const textTrack: SubtitleTrack = { id: 's3', codec: 'subrip', format: 'webvtt', burnInOnly: false, default: false, external: false, forced: false, language: 'en', url: '/api/files/1/subtitles/s3.vtt' }
 const imageTrack: SubtitleTrack = { id: 's4', codec: 'hdmv_pgs_subtitle', format: 'image', burnInOnly: true, default: false, external: false, forced: false, language: 'en' }
 
-function harness(o: { decide?: Route; progress?: Route; settings?: Partial<PlaybackSettings>; routes?: Record<string, Route>; fetchText?: (url: string) => Promise<string> } = {}) {
+function harness(o: { decide?: Route; progress?: Route; settings?: Partial<PlaybackSettings>; routes?: Record<string, Route>; fetchText?: (url: string) => Promise<string>; ctx?: Partial<PlaybackContext> } = {}) {
   vi.useFakeTimers({ now: 10 * HOUR })
   const sent: Sent[] = []
   const fetcher = async (request: Request) => {
     const path = new URL(request.url).pathname
-    const text = request.method === 'POST' || request.method === 'PUT' ? await request.text() : ''
+    const text = request.method === 'POST' || request.method === 'PUT' || request.method === 'DELETE' ? await request.text() : ''
     const body = text ? JSON.parse(text) as Record<string, unknown> : undefined
     sent.push({ method: request.method, path, body })
     const route = (reply: unknown) => reply instanceof Response ? reply : Response.json(reply)
@@ -62,6 +62,7 @@ function harness(o: { decide?: Route; progress?: Route; settings?: Partial<Playb
     api, player, profiles: samsungProfiles, client: { deviceId: 'tv-1', platform: 'tizen' }, settings: () => settings, stillWatching: still, clock,
     mediaUrl: (path, token) => `https://tv.example${path}${path.includes('?') ? '&' : '?'}access_token=${token}`,
     saveQuality: (id) => saved.push(id), fetchText: o.fetchText ?? (async () => vtt('cue')), loadImage: async (url) => { images.push(url) },
+    ...o.ctx,
   })
   const of = (method: string, suffix: string) => sent.filter((r) => r.method === method && r.path.endsWith(suffix))
   return {
@@ -749,5 +750,147 @@ describe('settings', () => {
   it('reads the person’s preferences, dropping skip modes it does not know', () => {
     expect(playbackSettings({ autoplayNext: false, skip: { intro: 'auto', recap: 'sometimes' } }, { quality: '1080', subtitleSize: 'larger' }))
       .toEqual({ ...DEFAULT_SETTINGS, quality: '1080', subtitleSize: 'larger', autoplayNext: false, skip: { intro: 'auto' }, subtitles: undefined })
+  })
+})
+
+describe('sound and subtitle timing (API level 35)', () => {
+  const prefsReply = (audio: Record<string, string>) => ({ autoplayNext: true, skip: {}, audio: { languages: [], ...audio }, subtitles: { languages: [], mode: 'off', automaticDownload: false, size: 'normal' } })
+
+  it('offers neither below API level 35, and asks that server nothing about them', async () => {
+    const h = harness({ decide: () => decision({ subtitles: [{ ...textTrack, timingMs: 400 }] }), ctx: { apiLevel: 34 } })
+    await started(h)
+    h.c.selectSubtitle('s3')
+    h.c.changeSound('dialogueBoost', 'high')
+    h.c.stepTiming(1)
+    await h.run(11_000)
+    expect(h.c.snapshot().sound).toBeUndefined()
+    expect(h.c.snapshot().subtitles.timing).toBeUndefined()
+    // The decision's timing isn't used either: the cue shows when the file has it.
+    expect(h.c.snapshot().subtitles.cues.map((c) => c.lines[0])).toEqual(['cue one'])
+    expect(h.sent.filter((r) => r.method === 'PUT' && !r.path.endsWith('/progress'))).toEqual([])
+  })
+
+  it('shows the sound the server applied, saves a change and reloads the play where it is', async () => {
+    let applied: Record<string, string> = {}
+    const h = harness({
+      ctx: { apiLevel: 35, onPreferences: (p) => saved.push(p) },
+      decide: () => decision({ audio: { copy: !Object.keys(applied).length, index: 1, codec: 'aac', channels: 2, ...(Object.keys(applied).length && { effects: applied }) } }),
+      routes: { 'PUT /api/me/preferences': async (body) => { await new Promise((r) => setTimeout(r, 500)); applied = { dialogue: (body?.audio as { dialogueBoost: string }).dialogueBoost }; return prefsReply(body?.audio as Record<string, string>) } },
+    })
+    const saved: unknown[] = []
+    await started(h)
+    await h.run(30_000)
+    expect(h.c.snapshot().sound).toEqual({ dialogueBoost: 'off', reduceLoudSounds: 'off' })
+    h.c.changeSound('dialogueBoost', 'high')
+    await h.settle()
+    expect(h.c.snapshot().sound).toMatchObject({ dialogueBoost: 'high', busy: 'dialogueBoost', busyFromMs: 30_000 })
+    await h.run(500)
+    expect(h.sent.find((r) => r.method === 'PUT' && r.path === '/api/me/preferences')?.body).toEqual({ audio: { dialogueBoost: 'high' } })
+    expect(saved).toHaveLength(1)
+    expect(h.decisions()).toHaveLength(2)
+    expect(h.decisions()[1].body).toMatchObject({ startMs: 30_500, playId: 'aaaaaaaaaaaaaaaa' })
+    await h.run(500)
+    expect(h.c.snapshot().sound).toEqual({ dialogueBoost: 'high', reduceLoudSounds: 'off' })
+  })
+
+  it('keeps the play and says what the sound stayed at when the change can’t be saved', async () => {
+    const h = harness({ ctx: { apiLevel: 35 }, routes: { 'PUT /api/me/preferences': () => new Response(null, { status: 503 }) } })
+    await started(h)
+    h.c.changeSound('reduceLoudSounds', 'medium')
+    await h.run(500)
+    expect(h.c.snapshot().sound).toEqual({ dialogueBoost: 'off', reduceLoudSounds: 'off', failed: 'reduceLoudSounds', stayed: 'off' })
+    expect(h.decisions()).toHaveLength(1)
+  })
+
+  it('moves the cues at once both ways, and saves the timing a second after the last press', async () => {
+    const h = harness({
+      ctx: { apiLevel: 35 },
+      decide: () => decision({ subtitles: [textTrack] }),
+      routes: { 'PUT /api/files/1/subtitles/s3/timing': (body) => ({ timingMs: body?.timingMs, timingShared: false }) },
+    })
+    await started(h)
+    h.c.selectSubtitle('s3')
+    await h.run(9_800)
+    // At 9.8 s the first cue (10 s) isn't due; 0.3 s earlier it is.
+    expect(h.c.snapshot().subtitles.cues).toEqual([])
+    h.c.stepTiming(-1); h.c.stepTiming(-1); h.c.stepTiming(-1)
+    await h.settle()
+    expect(h.c.snapshot().subtitles.timing).toMatchObject({ ms: -300, words: '0.3 s earlier', status: 'changed' })
+    expect(h.c.snapshot().subtitles.cues.map((c) => c.lines[0])).toEqual(['cue one'])
+    // Later again, past In step: at 10.2 s with 0.4 s later the cue isn't due yet.
+    await h.run(400)
+    for (let i = 0; i < 7; i++) h.c.stepTiming(1)
+    await h.settle()
+    expect(h.c.snapshot().subtitles.timing?.words).toBe('0.4 s later')
+    expect(h.c.snapshot().subtitles.cues).toEqual([])
+    expect(h.sent.filter((r) => r.path.endsWith('/timing'))).toEqual([])
+    await h.run(1000)
+    expect(h.sent.filter((r) => r.path.endsWith('/timing')).map((r) => r.body)).toEqual([{ timingMs: 400 }])
+    expect(h.c.snapshot().subtitles.cues.map((c) => c.lines[0])).toEqual(['cue one'])
+  })
+
+  it('starts at a shared timing, and Reset goes back to it', async () => {
+    const h = harness({
+      ctx: { apiLevel: 35 },
+      decide: () => decision({ subtitles: [{ ...textTrack, timingMs: 800, timingShared: true }] }),
+      routes: {
+        'PUT /api/files/1/subtitles/s3/timing': (body) => ({ timingMs: body?.timingMs, timingShared: false }),
+        'DELETE /api/files/1/subtitles/s3/timing': () => ({ timingMs: 800, timingShared: true }),
+      },
+    })
+    await started(h)
+    h.c.selectSubtitle('s3')
+    await h.settle()
+    expect(h.c.snapshot().subtitles.timing).toMatchObject({ ms: 800, setForEveryone: true, canReset: false, canShare: false })
+    h.c.stepTiming(1)
+    await h.run(1500)
+    expect(h.c.snapshot().subtitles.timing).toMatchObject({ ms: 900, canReset: true, resetTo: 800 })
+    h.c.resetTiming()
+    await h.settle()
+    expect(h.sent.at(-1)).toMatchObject({ method: 'DELETE', path: '/api/files/1/subtitles/s3/timing' })
+    expect(h.c.snapshot().subtitles.timing).toMatchObject({ ms: 800, setForEveryone: true, canReset: false })
+  })
+
+  it('lets an admin save a timing for everyone', async () => {
+    const h = harness({
+      ctx: { apiLevel: 35, admin: true },
+      decide: () => decision({ subtitles: [textTrack] }),
+      routes: { 'PUT /api/files/1/subtitles/s3/timing': (body) => ({ timingMs: body?.timingMs, timingShared: !!body?.everyone }) },
+    })
+    await started(h)
+    h.c.selectSubtitle('s3')
+    h.c.stepTiming(1)
+    await h.settle()
+    expect(h.c.snapshot().subtitles.timing?.canShare).toBe(true)
+    h.c.shareTiming()
+    await h.run(1500)
+    expect(h.sent.filter((r) => r.path.endsWith('/timing')).map((r) => r.body)).toEqual([{ timingMs: 100, everyone: true }])
+    expect(h.c.snapshot().subtitles.timing).toMatchObject({ status: 'shared', setForEveryone: true })
+  })
+
+  it('restarts a burned-in track’s play once its timing is saved', async () => {
+    const h = harness({
+      ctx: { apiLevel: 35 },
+      decide: (body) => decision({ subtitles: [textTrack, imageTrack], burnIn: body?.burnIn ? imageTrack : undefined, mode: body?.burnIn ? 'transcode' : 'direct' }),
+      routes: { 'PUT /api/files/1/subtitles/s4/timing': (body) => ({ timingMs: body?.timingMs, timingShared: false }) },
+    })
+    await started(h)
+    h.c.selectSubtitle('s4')
+    await h.run(1000)
+    expect(h.decisions()).toHaveLength(2)
+    h.c.stepTiming(1)
+    await h.settle()
+    expect(h.c.snapshot().subtitles.timing).toMatchObject({ burned: true, words: '0.1 s later' })
+    await h.run(1500)
+    expect(h.decisions()).toHaveLength(3)
+    expect(h.decisions()[2].body).toMatchObject({ subtitleId: 's4', burnIn: true })
+  })
+
+  it('has no timing for a recording, which has no file to keep it for', async () => {
+    const h = harness({ ctx: { apiLevel: 35 }, decide: () => decision({ subtitles: [textTrack] }) })
+    await started(h, { kind: 'recording', recordingId: 'r1' })
+    h.c.selectSubtitle('s3')
+    await h.settle()
+    expect(h.c.snapshot().subtitles.timing).toBeUndefined()
   })
 })

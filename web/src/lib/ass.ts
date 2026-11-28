@@ -4,6 +4,9 @@ type Renderer = {
   ready: Promise<void>
   renderer: { setTrackByUrl(url: string): Promise<void> }
   destroy(): Promise<void>
+  /** Seconds added to the video's time before drawing (JASSUB 2.x keeps it as a plain field). */
+  timeOffset: number
+  _demandRender?: (repaint?: boolean) => Promise<void>
   _worker?: Worker
 }
 
@@ -23,6 +26,9 @@ function stop(r: Renderer) {
 export function useAssRenderer(videoRef: RefObject<HTMLVideoElement | null>) {
   const renderer = useRef<Renderer | null>(null)
   const currentUrl = useRef<string>('')
+  // A subtitle timing: JASSUB draws at the video's time plus its offset, so
+  // cues shown 0.4 s later are drawn from 0.4 s earlier in the track.
+  const offset = useRef(0)
 
   useEffect(
     () => () => {
@@ -49,7 +55,7 @@ export function useAssRenderer(videoRef: RefObject<HTMLVideoElement | null>) {
             const { default: JASSUB } = await import('jassub')
             // hide() or another show() while the module loaded.
             if (currentUrl.current !== url || renderer.current) return
-            renderer.current = new JASSUB({ video, subUrl: url }) as unknown as Renderer
+            renderer.current = new JASSUB({ video, subUrl: url, timeOffset: offset.current }) as unknown as Renderer
           } catch (e) {
             console.warn('ASS renderer unavailable', e)
           }
@@ -59,6 +65,16 @@ export function useAssRenderer(videoRef: RefObject<HTMLVideoElement | null>) {
         currentUrl.current = ''
         if (renderer.current) stop(renderer.current)
         renderer.current = null
+      },
+      /** Moves the cues by a subtitle timing in milliseconds (positive later), drawing again at once while paused. */
+      setTiming: (ms: number) => {
+        const seconds = -ms / 1000
+        if (offset.current === seconds) return
+        offset.current = seconds
+        const r = renderer.current
+        if (!r) return
+        r.timeOffset = seconds
+        void r._demandRender?.(true)?.catch(() => undefined)
       },
     }),
     [videoRef],
