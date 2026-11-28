@@ -82,6 +82,8 @@ data class LoadData(
     val subtitleMode: String? = null,
     /** original, 2160, 1080, 720, 480, 360, or auto where the caster's server can do Automatic. */
     val quality: String? = null,
+    /** API level 35: the person's subtitle size, smaller, normal, larger or largest, from the sender's copy of their preferences. */
+    val subtitleSize: String? = null,
     val device: LoadDevice? = null,
     val sender: LoadSender? = null,
 )
@@ -143,6 +145,13 @@ data class SubtitleInfo(
     val format: String,
     val forced: Boolean? = null,
     val burnInOnly: Boolean? = null,
+    /**
+     * The track's timing on the receiver now (positive: later), and whether
+     * it is the one an admin saved for everyone: where a remote's Subtitle
+     * timing starts. Null from receivers that don't say.
+     */
+    val timingMs: Long? = null,
+    val timingShared: Boolean? = null,
 )
 
 @Serializable
@@ -238,6 +247,12 @@ sealed interface CastCommand {
     /** Live TV: the next (1) or previous (-1) channel the viewer may watch. */
     data class ChannelStep(val by: Int) : CastCommand
 
+    /** The sender changed a sound setting (and saved it): decide again at the current position, as for a quality change. */
+    data object Sound : CastCommand
+
+    /** Show the subtitles [timingMs] later (negative: earlier) from now; the sender saves the timing itself. */
+    data class SubtitleTiming(val timingMs: Long) : CastCommand
+
     fun encode(): String = toJson().toString()
 
     private fun toJson(): JsonObject = when (this) {
@@ -274,6 +289,11 @@ sealed interface CastCommand {
             put("type", "channelStep")
             put("by", by)
         }
+        Sound -> type("sound")
+        is SubtitleTiming -> buildJsonObject {
+            put("type", "subtitleTiming")
+            put("timingMs", timingMs)
+        }
     }
 
     companion object {
@@ -296,6 +316,8 @@ sealed interface CastCommand {
                 "input" -> Input
                 "channel" -> p("channelId")?.contentOrNull?.let(::Channel)
                 "channelStep" -> p("by")?.intOrNull?.takeIf { it == 1 || it == -1 }?.let(::ChannelStep)
+                "sound" -> Sound
+                "subtitleTiming" -> p("timingMs")?.longOrNull?.let(::SubtitleTiming)
                 else -> null
             }
         }.getOrNull()

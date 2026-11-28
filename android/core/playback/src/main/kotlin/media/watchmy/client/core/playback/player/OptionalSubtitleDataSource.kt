@@ -9,6 +9,7 @@ import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.TransferListener
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.io.InterruptedIOException
 
 /**
  * Optional side-loaded text is bounded and buffered before extraction. A failed
@@ -43,6 +44,9 @@ internal class OptionalSubtitleDataSource(
                 val header = it.take(32).toByteArray().toString(Charsets.UTF_8).removePrefix("\uFEFF")
                 if (!Regex("^WEBVTT(?:[ \t\r\n]|$)").containsMatchIn(header)) throw IOException("Invalid WebVTT subtitle")
             }
+        } catch (e: InterruptedIOException) {
+            // The player stopped loading it (the track turned off, or the play moved on): not a failure.
+            throw e
         } catch (_: IOException) {
             failed(track)
             EMPTY_VTT

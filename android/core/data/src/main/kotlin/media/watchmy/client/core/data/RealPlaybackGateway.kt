@@ -33,6 +33,9 @@ import media.watchmy.client.model.StreamProtocol
 import media.watchmy.client.model.StreamQuality
 import media.watchmy.client.model.SubtitleRequestMode
 import media.watchmy.client.core.api.models.AutomaticSubtitleInputBody
+import media.watchmy.client.core.api.models.SetSubtitleTimingInputBody
+import media.watchmy.client.core.api.models.SubtitleTrack
+import media.watchmy.client.model.SavedTiming
 import media.watchmy.client.model.Trickplay
 import java.net.URLEncoder
 import kotlin.coroutines.cancellation.CancellationException
@@ -57,6 +60,8 @@ internal class RealPlaybackGateway(
         if (fixed === server) return this
         return RealPlaybackGateway(fixed, deviceName, deviceId, { signedInMediaToken(fixed) }, onlineSubtitles)
     }
+    override val savesForPerson: Boolean get() = server !is CastTokenAccess
+
     override suspend fun decide(request: DecisionRequest): PlaybackDecision {
         val features = server.features()
         val body = Request(
@@ -143,12 +148,25 @@ internal class RealPlaybackGateway(
     override suspend fun automaticSubtitle(fileId: Long, playId: String): DecisionSubtitle? {
         if (!onlineSubtitles || !server.features().subtitlePreferences) return null
         val (base, reply) = server.call { base, client -> base to PlaybackApi(base, client).automaticSubtitle(fileId, AutomaticSubtitleInputBody(playId = playId)) }
-        return reply.track?.let { s -> DecisionSubtitle(s.toOption(), s.format.value, s.url?.takeIf { it.isNotBlank() }?.let { absolute(base, it) }) }
+        return reply.track?.toDecisionSubtitle(base, server.features())
     }
 
     override suspend fun cancelAutomaticSubtitle(fileId: Long, playId: String) {
         if (!onlineSubtitles || !server.features().subtitlePreferences) return
         server.call { base, client -> PlaybackApi(base, client).automaticSubtitle(fileId, AutomaticSubtitleInputBody(playId = playId, cancel = true)) }
+    }
+
+    override suspend fun setSubtitleTiming(fileId: Long, trackId: String, timingMs: Long, everyone: Boolean): SavedTiming {
+        if (!server.features().subtitleTiming) throw ApiException(503, "Update the server to save subtitle timing.")
+        val body = SetSubtitleTimingInputBody(timingMs = timingMs, everyone = everyone.takeIf { it })
+        val reply = server.call { base, client -> PlaybackApi(base, client).setSubtitleTiming(fileId, trackId, body) }
+        return SavedTiming(reply.timingMs, reply.timingShared)
+    }
+
+    override suspend fun resetSubtitleTiming(fileId: Long, trackId: String): SavedTiming {
+        if (!server.features().subtitleTiming) throw ApiException(503, "Update the server to save subtitle timing.")
+        val reply = server.call { base, client -> PlaybackApi(base, client).deleteSubtitleTiming(fileId, trackId) }
+        return SavedTiming(reply.timingMs, reply.timingShared)
     }
 
     /** This device's name as it is now, when the request is from this device (the name is editable). */
@@ -237,9 +255,7 @@ internal class RealPlaybackGateway(
                 resumeMs = resumeMs,
                 audio = audioTracks.map { it.toModel() },
                 selectedAudio = audio.index.toInt().takeIf { it >= 0 },
-                subtitles = subtitles.map { s ->
-                    DecisionSubtitle(s.toOption(), s.format.value, s.url?.takeIf { it.isNotBlank() }?.let { absolute(base, it) })
-                },
+                subtitles = subtitles.map { it.toDecisionSubtitle(base, features) },
                 burnInSubtitleId = burnIn?.id,
                 segments = segments.mapNotNull { it.toModel() },
                 creditsMs = creditsMs,
@@ -252,12 +268,24 @@ internal class RealPlaybackGateway(
                 trickplay = trickplay?.takeIf { features.trickplay }?.toModel(base, sheetToken),
                 subtitleId = subtitleId,
                 subtitlePreferencesSupported = features.subtitlePreferences,
+                soundSupported = features.sound,
                 growing = growing?.takeIf { features.liveRecordings && playlist == Decision.Playlist.event }?.let {
                     val start = epochMs(it.startedAt)
                     val end = epochMs(it.endsAt)
                     if (start != null && end != null && end > start) GrowingRecording(start, end) else null
                 },
                 mediaToken = mediaToken?.takeIf { features.tokenWithDecision && it.token.isNotBlank() }?.toModel(base),
+            )
+        }
+
+        /** A decision's track, its URL absolute on [base], with its saved timing where the server keeps one. */
+        fun SubtitleTrack.toDecisionSubtitle(base: String, features: ServerFeatures): DecisionSubtitle {
+            val timing = features.subtitleTiming
+            return DecisionSubtitle(
+                toOption(), format.value, url?.takeIf { it.isNotBlank() }?.let { absolute(base, it) },
+                timingMs = timingMs?.takeIf { timing } ?: 0,
+                timingShared = timing && timingShared == true,
+                timingApplied = timing && timingApplied == true,
             )
         }
 

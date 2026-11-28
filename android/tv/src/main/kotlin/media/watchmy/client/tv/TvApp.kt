@@ -1,6 +1,8 @@
 package media.watchmy.client.tv
 
+import android.util.Log
 import androidx.compose.foundation.background
+import kotlinx.coroutines.CancellationException
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -89,6 +91,17 @@ fun TvApp(deepLink: String? = null, deepLinkKey: Any? = deepLink) {
                 user == null -> SignInScreen(onSwitchServer = { picking = true })
                 // Each sign-in's screens keep their ViewModels to themselves, cleared when it ends.
                 else -> key(server?.server?.id, user) {
+                    // This TV's own subtitle size becomes the person's once, on a server that keeps one.
+                    val preferences = LocalAppServices.current.preferences
+                    LaunchedEffect(server?.server?.apiLevel) {
+                        try {
+                            preferences.moveSubtitleSizeUp()
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Log.w("WatchMyMedia", "Couldn't give this TV's subtitle size to the account", e)
+                        }
+                    }
                     SessionViewModels {
                         TvNavHost(
                             onAddServer = switcher::startAdding,

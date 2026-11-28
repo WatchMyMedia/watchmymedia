@@ -122,6 +122,12 @@ data class DecisionSubtitle(
     val format: String,
     /** Absolute URL without the media token; null for image formats (burn-in only). */
     val url: String?,
+    /** The person's saved timing for the track (positive: later), from [SOUND_API_LEVEL]; 0 for none. */
+    val timingMs: Long = 0,
+    /** [timingMs] is the one an admin saved for everyone, not the person's own. */
+    val timingShared: Boolean = false,
+    /** The server burned the track in with [timingMs] already applied: a change needs a new decision. */
+    val timingApplied: Boolean = false,
 )
 
 /** The server's answer: how to play the file, and what the player needs to know about it. */
@@ -165,6 +171,8 @@ data class PlaybackDecision(
     val subtitleId: String? = null,
     val isOffline: Boolean = false,
     val subtitlePreferencesSupported: Boolean = false,
+    /** The server applies the person's sound settings and saves subtitle timings ([SOUND_API_LEVEL]). */
+    val soundSupported: Boolean = false,
     val growing: GrowingRecording? = null,
     /**
      * A media token that came with the decision: the server's, from
@@ -280,6 +288,13 @@ interface PlaybackGateway {
     /** One immutable server/account context for the lifetime of a player. */
     fun bind(): PlaybackGateway = this
 
+    /**
+     * The calls are made as a signed-in person, who can save their sound
+     * settings and subtitle timings; false for a play cast to this TV, whose
+     * cast token can't, and whose sender saves them.
+     */
+    val savesForPerson: Boolean get() = true
+
     suspend fun decide(request: DecisionRequest): PlaybackDecision
 
     suspend fun reportProgress(report: ProgressReport): ProgressReply
@@ -306,4 +321,16 @@ interface PlaybackGateway {
     suspend fun automaticSubtitle(fileId: Long, playId: String): DecisionSubtitle? = null
 
     suspend fun cancelAutomaticSubtitle(fileId: Long, playId: String) = Unit
+
+    /**
+     * Saves [timingMs] for subtitle track [trackId] (the decision's id) of the
+     * file: the caller's own, or with [everyone] (admins) the one everyone gets.
+     * Returns the timing the caller's plays now get. From [SOUND_API_LEVEL].
+     */
+    suspend fun setSubtitleTiming(fileId: Long, trackId: String, timingMs: Long, everyone: Boolean = false): SavedTiming =
+        throw ApiException(503, "Update the server to save subtitle timing.")
+
+    /** Reset: removes the caller's own timing for the track, and returns the one their plays now get. */
+    suspend fun resetSubtitleTiming(fileId: Long, trackId: String): SavedTiming =
+        throw ApiException(503, "Update the server to save subtitle timing.")
 }

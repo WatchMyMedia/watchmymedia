@@ -2,6 +2,8 @@ package media.watchmy.client.core.playback.player
 
 import android.content.Context
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.core.net.toUri
@@ -118,6 +120,10 @@ class ExoMediaPlayer(
             }
 
             override fun onTracksChanged(tracks: Tracks) {
+                if (textRestarting && tracks.groups.none { it.type == C.TRACK_TYPE_TEXT && it.isSelected }) {
+                    textRestarting = false
+                    exo.trackSelectionParameters = exo.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false).build()
+                }
                 applyPending(tracks)
                 // An HLS variant's FRAME-RATE, or the file's: known before the first frame.
                 frameRateOf(tracks)?.let(::noteFrameRate)
@@ -231,6 +237,7 @@ class ExoMediaPlayer(
                         .setMimeType(it.mimeType)
                         .setLabel(it.label)
                         .setLanguage(it.language)
+                        .setTimeOffsetUs(it.timingMs * 1_000)
                         .build()
                 },
             )
@@ -243,6 +250,8 @@ class ExoMediaPlayer(
         pendingAudio = source.audioOrdinal
         expectedAudioTracks = source.audioTracks
         pendingText = source.text
+        textRestarting = false
+        handler.removeCallbacks(restart)
         // A new decision: its stalls count afresh, and its first buffering is its start.
         stallCounter.load()
         meter.load(source.hls)
@@ -276,6 +285,49 @@ class ExoMediaPlayer(
         applyPending(exo.currentTracks)
     }
 
+    /**
+     * Media3 1.12 moves a side-loaded track's cues by its configuration's
+     * time offset, and takes a new one through replaceMediaItem without
+     * preparing the stream again. Its text renderer has already read the
+     * cues up to a second ahead, and the paused frame's, at the old timing,
+     * and a seek to where the player is does nothing (Media3 skips a seek to
+     * the position it is at). While it plays, cues further on come at the
+     * new timing by themselves, and once the presses pause ([TEXT_RESTART_MS])
+     * turning text off and on again ([restartText]) gives the renderer a new
+     * stream from here for the ones it holds, and leaves the picture and the
+     * sound alone; each restart loads the track again, so not one a press.
+     * Paused, the player renders only about once a second, so the cue came
+     * back that late: a seek a millisecond on reads it again at once, and
+     * the paused frame stays as it is.
+     */
+    override fun setSubtitleTiming(id: String, timingMs: Long) {
+        val item = exo.currentMediaItem ?: return
+        val configurations = item.localConfiguration?.subtitleConfigurations ?: return
+        val offsetUs = timingMs * 1_000
+        if (configurations.none { it.id == id && it.timeOffsetUs != offsetUs }) return
+        val moved = configurations.map { if (it.id == id) it.buildUpon().setTimeOffsetUs(offsetUs).build() else it }
+        exo.replaceMediaItem(exo.currentMediaItemIndex, item.buildUpon().setSubtitleConfigurations(moved).build())
+        handler.removeCallbacks(restart)
+        if (exo.playWhenReady) handler.postDelayed(restart, TEXT_RESTART_MS) else exo.seekTo(exo.currentPosition + 1)
+    }
+
+    private val handler = Handler(Looper.getMainLooper())
+    private val restart = Runnable { restartText() }
+
+    /** Set while text is off for [restartText]: the tracks' next change, which says it is off, turns it on again. */
+    private var textRestarting = false
+
+    /**
+     * Turns the text track off, and on again once the player has taken it off
+     * (two changes at once would reach its thread as the second alone).
+     */
+    private fun restartText() {
+        val params = exo.trackSelectionParameters
+        if (C.TRACK_TYPE_TEXT in params.disabledTrackTypes || textRestarting) return
+        textRestarting = true
+        exo.trackSelectionParameters = params.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build()
+    }
+
     override fun selectAudio(ordinal: Int): Boolean {
         val group = audioGroups(exo.currentTracks).getOrNull(ordinal) ?: return false
         if (!group.isTrackSupported(0)) return false
@@ -292,6 +344,7 @@ class ExoMediaPlayer(
 
     override fun release() {
         listener = null
+        handler.removeCallbacks(restart)
         exo.release()
     }
 
@@ -490,3 +543,6 @@ internal fun renewableMediaUri(uri: Uri, token: MediaToken): Uri {
     val signed = token.signing(url)
     return if (signed === url) uri else Uri.parse(signed)
 }
+
+/** How long after the last timing press the text renderer reads its cues again (while playing). */
+private const val TEXT_RESTART_MS = 300L

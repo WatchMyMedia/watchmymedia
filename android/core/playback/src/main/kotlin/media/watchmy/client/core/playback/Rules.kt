@@ -119,11 +119,15 @@ internal fun PlaybackDecision.embeddedSubtitles(): List<EmbeddedSubtitle> =
     if (!readsSubtitlesInFile()) emptyList()
     else subtitles.filter { it.option.source == SubtitleSource.Embedded }.map { EmbeddedSubtitle(it.option.id, it.option.language) }
 
-/** How to show the subtitle [id] in this decision's stream. */
-internal fun textSelection(d: PlaybackDecision, id: String?): TextSelection {
+/**
+ * How to show the subtitle [id] in this decision's stream. A track in
+ * [sideloaded] plays from the server's copy of it, which a timing moved it to.
+ */
+internal fun textSelection(d: PlaybackDecision, id: String?, sideloaded: Set<String> = emptySet()): TextSelection {
     if (id == null || id == d.burnInSubtitleId) return TextSelection.Off
     val track = d.subtitles.firstOrNull { it.option.id == id } ?: return TextSelection.Off
     if (track.format == "image") return TextSelection.Off
+    if (id in sideloaded && track.url != null) return TextSelection.Sideloaded(id)
     if (d.readsSubtitlesInFile() && track.option.source == SubtitleSource.Embedded) return TextSelection.Embedded(id)
     if (d.hasRenditions()) {
         // The master playlist lists every text subtitle except one burned in, in the decision's order.

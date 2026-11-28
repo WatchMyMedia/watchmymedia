@@ -14,7 +14,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import media.watchmy.client.model.ON_EVERY_DEVICE
+import media.watchmy.client.model.SOUND_HEADING
+import media.watchmy.client.model.SOUND_NOTE
 import media.watchmy.client.model.SaveFailure
+import media.watchmy.client.model.SoundSetting
 import media.watchmy.client.model.listLine
 import media.watchmy.client.model.subtitleLanguageLabel
 import media.watchmy.client.presentation.settings.LanguageList
@@ -145,6 +148,22 @@ internal fun ColumnScope.LanguagesPane(
         ) { Value("", chevron = true) }
         Note("Commentary and audio description are never chosen for you. You can pick them in the player.", color = WmmColors.TextFaint)
     }
+    if (state.soundAvailable) {
+        SubHeading(SOUND_HEADING, top = 16.dp)
+        for (setting in SoundSetting.entries) {
+            val level = state.playback.audio.level(setting)
+            val key = SettingKey.Sound(setting)
+            SettingRow(
+                setting.label,
+                onClick = state.onOk(key, calls) { calls.show(setting.overlay) },
+                description = setting.help,
+                focusKey = "sound:${setting.name}",
+                status = state.status(key, level.label),
+                enabled = ready,
+            ) { Value(level.label, chevron = true) }
+        }
+        Note(SOUND_NOTE)
+    }
     SettingRow(
         "Start subtitles",
         onClick = state.onOk(SettingKey.SubtitleChoice, calls) { calls.show(Overlay.SubtitleChoice) },
@@ -207,5 +226,22 @@ internal fun ColumnScope.LanguagesPane(
         status = state.status(SettingKey.AutomaticSubtitles, if (on) "On" else "Off"),
         enabled = ready,
     ) { Toggle(on, Modifier.alpha(if (automatic) 1f else 0.45f)) }
+    if (state.soundAvailable) {
+        val size = subtitles.size
+        SettingRow(
+            "Subtitle size",
+            onClick = state.onOk(SettingKey.AccountSubtitleSize, calls) { calls.show(Overlay.AccountSubtitleSize) },
+            focusKey = "subtitles:size",
+            status = state.status(SettingKey.AccountSubtitleSize, size.label),
+            enabled = ready,
+        ) { Value(size.label, chevron = true) }
+    }
 }
+
+/** The side panel a sound row opens. */
+internal val SoundSetting.overlay: Overlay
+    get() = when (this) {
+        SoundSetting.DialogueBoost -> Overlay.DialogueBoost
+        SoundSetting.ReduceLoudSounds -> Overlay.ReduceLoudSounds
+    }
 

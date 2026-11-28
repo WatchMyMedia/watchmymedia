@@ -27,6 +27,8 @@ import media.watchmy.client.model.SubtitleSize
 import media.watchmy.client.model.SubtitlePreferences
 import media.watchmy.client.model.SubtitleMode
 import media.watchmy.client.model.ApiException
+import media.watchmy.client.model.SoundLevel
+import media.watchmy.client.model.SoundSetting
 
 /**
  * Skip modes, autoplay and the audio and subtitle preferences live on the
@@ -116,6 +118,38 @@ internal class RealPreferencesRepository(private val store: LocalStore, private 
         return basedOn != SubtitleChoice.ForeignAudio && saved.subtitles.choice == SubtitleChoice.ForeignAudio
     }
 
+    override suspend fun setSound(setting: SoundSetting, level: SoundLevel) {
+        if (!http.features().sound) throw ApiException(503, "Update the server to change the sound.")
+        change({ it.copy(audio = it.audio.with(setting, level)) }) { before ->
+            if (before.audio.level(setting) == level) null else UpdatePreferencesInputBody(audio = soundPatch(setting, level))
+        }
+    }
+
+    /**
+     * A TV's own subtitle size, offered once to each person on a server that
+     * keeps a size per person: saved for one who has none (the server sends
+     * no size), and never again for them on this server, whatever they had.
+     */
+    override suspend fun moveSubtitleSizeUp(): Boolean {
+        val size = store.device.value.subtitleSize
+        if (size == SubtitleSize.Normal || !http.features().subtitleSize) return false
+        val (session, revision) = store.requestSnapshot()
+        val user = session?.account?.userId ?: return false
+        if (user in session.server.subtitleSizeOffered) return false
+        val access = http.bind(session)
+        val saved = access.call { base, client -> UsersApi(base, client).getPreferences() }.subtitles?.propertySize
+        val moved = saved == null && run {
+            change({ it.copy(subtitles = it.subtitles.copy(size = size)) }) {
+                UpdatePreferencesInputBody(subtitles = UpdateSubtitlePreferences(propertySize = size.id))
+            }
+            true
+        }
+        store.updateAndSave { current ->
+            if (store.revision != revision) current else current.withServer(session.server.id) { it.copy(subtitleSizeOffered = it.subtitleSizeOffered + user) }
+        }
+        return moved
+    }
+
     override suspend fun setQuality(quality: StreamQuality) {
         store.updateAndSave { it.copy(quality = quality.id) }
     }
@@ -194,8 +228,11 @@ internal class RealPreferencesRepository(private val store: LocalStore, private 
         val saved = session.server.subtitlePreferences?.takeIf { it.userId == session.account?.userId && it.baseUrl == session.server.baseUrl }
             ?: return PlaybackPreferences()
         return PlaybackPreferences(
-            subtitles = SubtitlePreferences(saved.languages, SubtitleMode.entries.firstOrNull { it.id == saved.mode } ?: SubtitleMode.Off, saved.automaticDownload, saved.foreignAudio),
-            audio = AudioPreferences(saved.audioLanguages),
+            subtitles = SubtitlePreferences(
+                saved.languages, SubtitleMode.entries.firstOrNull { it.id == saved.mode } ?: SubtitleMode.Off, saved.automaticDownload, saved.foreignAudio,
+                size = SubtitleSize.byId(saved.size),
+            ),
+            audio = AudioPreferences(saved.audioLanguages, SoundLevel.byId(saved.dialogueBoost), SoundLevel.byId(saved.reduceLoudSounds)),
         )
     }
 
@@ -207,6 +244,9 @@ internal class RealPreferencesRepository(private val store: LocalStore, private 
             if (store.revision != revision || (expectedGeneration != null && generation.get() != expectedGeneration)) current else current.withServer(session.server.id) { server ->
                 server.copy(subtitlePreferences = StoredSubtitlePreferences(
                     user.userId, server.baseUrl, subtitles.languages, subtitles.mode.id, subtitles.automaticDownload, subtitles.foreignAudio, value.audio.languages,
+                    size = subtitles.size.id.takeIf { subtitles.size != SubtitleSize.Normal },
+                    dialogueBoost = value.audio.dialogueBoost.id.takeIf { value.audio.dialogueBoost != SoundLevel.Off },
+                    reduceLoudSounds = value.audio.reduceLoudSounds.id.takeIf { value.audio.reduceLoudSounds != SoundLevel.Off },
                 ))
             }
         }
@@ -220,15 +260,24 @@ internal class RealPreferencesRepository(private val store: LocalStore, private 
  * chosen.
  */
 internal fun subtitlePatch(before: SubtitlePreferences, after: SubtitlePreferences, apiLevel: Int): UpdateSubtitlePreferences? {
-    val flag = ServerFeatures(apiLevel).audioLanguages
+    val features = ServerFeatures(apiLevel)
+    val flag = features.audioLanguages
     val choiceChanged = if (flag) before.choice != after.choice else before.mode != after.mode
     val patch = UpdateSubtitlePreferences(
         automaticDownload = after.automaticDownload.takeIf { it != before.automaticDownload },
         foreignAudio = after.foreignAudio.takeIf { flag && choiceChanged },
         languages = after.languages.takeIf { it != before.languages },
         mode = after.mode.id.takeIf { choiceChanged },
+        // Older servers refuse a size.
+        propertySize = after.size.id.takeIf { features.subtitleSize && it != before.size.id },
     )
     return patch.takeIf { it != UpdateSubtitlePreferences() }
+}
+
+/** The one sound field [setting] sends, at [level]; the other stays out of the request. */
+internal fun soundPatch(setting: SoundSetting, level: SoundLevel): UpdateAudioPreferences = when (setting) {
+    SoundSetting.DialogueBoost -> UpdateAudioPreferences(dialogueBoost = level.id)
+    SoundSetting.ReduceLoudSounds -> UpdateAudioPreferences(reduceLoudSounds = level.id)
 }
 
 internal fun Preferences.toModel() = PlaybackPreferences(
@@ -243,7 +292,9 @@ internal fun Preferences.toModel() = PlaybackPreferences(
         mode = SubtitleMode.entries.firstOrNull { it.id == value.mode } ?: SubtitleMode.Off,
         automaticDownload = value.automaticDownload,
         foreignAudio = value.foreignAudio == true,
+        size = SubtitleSize.byId(value.propertySize),
     ) } ?: SubtitlePreferences(),
     // Servers before audio languages send none: every file plays its default track.
-    audio = AudioPreferences(audio?.languages.orEmpty()),
+    // Servers before the sound settings send neither: Off.
+    audio = AudioPreferences(audio?.languages.orEmpty(), SoundLevel.byId(audio?.dialogueBoost), SoundLevel.byId(audio?.reduceLoudSounds)),
 )

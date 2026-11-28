@@ -56,7 +56,11 @@ class FakeAppServices(
     }
     override val preferences = FakePreferencesRepository(servers.current)
     override val playback = object : PlaybackControllerFactory {
-        override fun create(): PlaybackController = FakePlaybackController(trickplay = FakeData.trickplay.takeIf { level() >= TRICKPLAY_API_LEVEL })
+        override fun create(): PlaybackController = FakePlaybackController(
+            trickplay = FakeData.trickplay.takeIf { level() >= TRICKPLAY_API_LEVEL },
+            preferences = preferences,
+            soundAndTiming = level() >= media.watchmy.client.model.SOUND_API_LEVEL,
+        )
 
         override suspend fun plans(fileIds: List<Long>): Map<Long, PlaybackPlan> = fileIds.mapNotNull(FakeData::plan).associateBy { it.fileId }
 

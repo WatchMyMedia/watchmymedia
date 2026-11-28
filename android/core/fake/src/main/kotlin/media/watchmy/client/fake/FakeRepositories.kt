@@ -76,7 +76,7 @@ private suspend fun latency() {
  * feature. A fake server at a lower level hides what its level lacks, as a
  * real one does.
  */
-const val FAKE_SERVER_API_LEVEL = 34
+const val FAKE_SERVER_API_LEVEL = 35
 
 /** The asset URL of one of the fakes' fictional backdrops ([FakeData.backdrop]); null for any other path. */
 fun fakeArtUrl(path: String?): String? =
@@ -592,7 +592,7 @@ class FakePreferencesRepository(server: StateFlow<SavedServer?>? = null) : Prefe
         val turnOn = languages.isNotEmpty() && !modeChosen && !before.subtitles.foreignAudio
         if (turnOn) modeChosen = true
         val subtitles = if (turnOn) before.subtitles.copy(foreignAudio = true) else before.subtitles
-        prefs.value = before.copy(audio = media.watchmy.client.model.AudioPreferences(languages.toList()), subtitles = subtitles)
+        prefs.value = before.copy(audio = before.audio.copy(languages = languages.toList()), subtitles = subtitles)
         return turnOn && before.subtitles.choice != media.watchmy.client.model.SubtitleChoice.ForeignAudio && subtitles.choice == media.watchmy.client.model.SubtitleChoice.ForeignAudio
     }
 
@@ -612,4 +612,28 @@ class FakePreferencesRepository(server: StateFlow<SavedServer?>? = null) : Prefe
     override suspend fun setAudioPassthrough(mode: AudioPassthrough) = d.update { it.copy(audioPassthrough = mode) }
 
     override suspend fun setSubtitleSize(size: SubtitleSize) = d.update { it.copy(subtitleSize = size) }
+
+    /** Tests: the next sound or subtitle save fails, as with no connection, and the old value stays. */
+    var failNextSave = false
+
+    override suspend fun setSound(setting: media.watchmy.client.model.SoundSetting, level: media.watchmy.client.model.SoundLevel) {
+        latency()
+        if (failNextSave) {
+            failNextSave = false
+            throw ApiException(null, "Couldn’t reach the server.", java.io.IOException("offline"))
+        }
+        prefs.value = prefs.value.copy(audio = prefs.value.audio.with(setting, level))
+    }
+
+    /** The TV's own size, offered once, as the real one does when the person has none. */
+    private var sizeOffered = false
+
+    override suspend fun moveSubtitleSizeUp(): Boolean {
+        val size = d.value.subtitleSize
+        if (sizeOffered || size == SubtitleSize.Normal) return false
+        sizeOffered = true
+        if (prefs.value.subtitles.size != SubtitleSize.Normal) return false
+        prefs.value = prefs.value.copy(subtitles = prefs.value.subtitles.copy(size = size))
+        return true
+    }
 }
