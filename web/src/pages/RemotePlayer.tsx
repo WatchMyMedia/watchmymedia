@@ -1,12 +1,23 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { castFile, playOrPause, seekCast, send, stopCasting, takeHandover, useCast } from '../cast/sender'
+import { castFile, castSound, castSubtitleTiming, playOrPause, seekCast, send, stopCasting, takeHandover, useCast, whenCast } from '../cast/sender'
+import type { StateMessage } from '../cast/protocol'
 import { CastIcon } from '../components/Cast'
 import { StillWatchingCard } from '../components/StillWatchingCard'
+import { Choice, PlayerSheet, SoundSection, TimingSection } from '../components/PlayerPanels'
+import { capClass, moveInGroup } from '../components/playerStyles'
+import { useSubtitleTiming } from '../components/usePlayerCues'
+import { useSoundChange } from '../components/useSoundChange'
+import { SubtitlesIcon } from '../components/icons'
 import { formatDuration } from '../lib/format'
 import { SKIP_LABELS } from '../lib/play/rules'
-import { serverQuery } from '../api/queries'
+import { audioWords, subtitleWords } from '../lib/play/words'
+import { soundAndSubtitlesOn } from '../lib/sound'
+import { subtitleSizeOf } from '../lib/subtitleSize'
+import { subtitleTimingSaver } from '../api/subtitleTiming'
+import { preferencesQuery, serverQuery } from '../api/queries'
+import { useAuth } from '../authContext'
 import { AUTO, qualitiesFor, qualityById, saveQuality, savedQuality, stepName } from '../lib/quality'
 
 type Props = { fileId: number; start?: number; title?: string; back?: string; onLocal: () => void }
@@ -28,12 +39,16 @@ export function RemotePlayer({ fileId, start, title, back, onLocal }: Props) {
   const server = useQuery(serverQuery)
   const apiLevel = server.data?.apiLevel
   const levelKnown = server.data !== undefined || server.failureCount > 0
+  const newer = soundAndSubtitlesOn(apiLevel)
+  const prefs = useQuery(preferencesQuery)
+  const prefsKnown = prefs.data !== undefined || prefs.failureCount > 0
+  const [panel, setPanel] = useState(false)
 
   // Start this file on the TV unless it is on already; once, so a TV that
   // refuses it is not asked again and again.
   const tried = useRef(false)
   useEffect(() => {
-    if (!connected || playingHere || asked || tried.current || !levelKnown) return
+    if (!connected || playingHere || asked || tried.current || !levelKnown || !prefsKnown) return
     tried.current = true
     const h = takeHandover(fileId)
     void castFile({
@@ -44,8 +59,10 @@ export function RemotePlayer({ fileId, start, title, back, onLocal }: Props) {
       subtitleMode: h?.subtitleMode,
       quality: h?.quality ?? savedQuality(apiLevel).id,
       title: h?.title ?? title,
+      // The TV draws its subtitles at the person's size.
+      subtitleSize: newer ? subtitleSizeOf(prefs.data) : undefined,
     }).catch(() => undefined)
-  }, [connected, playingHere, asked, fileId, start, title, levelKnown, apiLevel])
+  }, [connected, playingHere, asked, fileId, start, title, levelKnown, apiLevel, prefsKnown, newer, prefs.data])
 
   // The TV moved on to another file (the next episode): follow it.
   const moved = connected && asked && !!r?.fileId && r.fileId !== fileId && r.phase === 'playing'
@@ -63,7 +80,7 @@ export function RemotePlayer({ fileId, start, title, back, onLocal }: Props) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLSelectElement) return
+      if (e.target instanceof HTMLSelectElement || (e.target instanceof Element && e.target.closest('[data-player-keys="off"]'))) return
       if (e.key === ' ' || e.key === 'k') {
         e.preventDefault()
         playOrPause()
@@ -79,7 +96,7 @@ export function RemotePlayer({ fileId, start, title, back, onLocal }: Props) {
   const device = cast.deviceName ?? 'your TV'
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-ground text-white">
+    <div className={`fixed inset-0 z-50 flex flex-col bg-ground text-white ${panel && state ? 'md:pr-[400px]' : ''}`}>
       <div className="flex items-center gap-4 p-4">
         <Link to="/" href={back} className="rounded-md border border-white/20 px-3 py-1.5 text-sm hover:bg-white/10">
           ‹ Back
@@ -198,34 +215,16 @@ export function RemotePlayer({ fileId, start, title, back, onLocal }: Props) {
               {formatDuration(time * 1000)} / {formatDuration(duration * 1000)}
             </span>
             <div className="ml-auto flex flex-wrap items-center gap-2">
-              {state.audio && state.audio.length > 1 && (
-                <select
-                  value={state.selectedAudio ?? ''}
-                  aria-label="Audio"
-                  onChange={(e) => void send({ type: 'audio', index: Number(e.target.value) })}
-                  className="min-h-[36px] rounded-md border border-white/20 bg-black/60 px-2 text-sm"
+              {((state.audio?.length ?? 0) > 1 || (state.subtitles?.length ?? 0) > 0 || newer) && (
+                <button
+                  type="button"
+                  aria-expanded={panel}
+                  onClick={() => setPanel(!panel)}
+                  className={`inline-flex min-h-[36px] items-center gap-2 rounded-md border border-white/20 px-3 text-sm hover:bg-white/10 ${panel ? 'bg-white/12' : ''}`}
                 >
-                  {state.audio.map((a) => (
-                    <option key={a.index} value={a.index}>
-                      {[a.language?.toUpperCase(), a.codec.toUpperCase(), a.channels ? `${a.channels}ch` : '', a.title].filter(Boolean).join(' · ')}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {state.subtitles && state.subtitles.length > 0 && (
-                <select
-                  value={state.selectedSubtitle ?? ''}
-                  aria-label="Subtitles"
-                  onChange={(e) => void send({ type: 'subtitle', id: e.target.value || null })}
-                  className="min-h-[36px] rounded-md border border-white/20 bg-black/60 px-2 text-sm"
-                >
-                  <option value="">Subtitles off</option>
-                  {state.subtitles.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {[s.language?.toUpperCase() || 'und', s.title, s.forced ? 'forced' : '', s.burnInOnly ? 'burned in, restarts playback' : ''].filter(Boolean).join(' · ')}
-                    </option>
-                  ))}
-                </select>
+                  <SubtitlesIcon size={18} />
+                  Audio &amp; subtitles
+                </button>
               )}
               <select
                 value={state.quality ?? 'original'}
@@ -247,6 +246,77 @@ export function RemotePlayer({ fileId, start, title, back, onLocal }: Props) {
           </div>
         </div>
       )}
+
+      {panel && state && (
+        <PlayerSheet title="Audio & subtitles" onClose={() => setPanel(false)}>
+          <RemoteTracks state={state} fileId={fileId} device={device} newer={newer} />
+        </PlayerSheet>
+      )}
     </div>
+  )
+}
+
+/**
+ * The TV's Audio & subtitles, from this browser: its audio and subtitle
+ * tracks, and on a server at API level 35 the person's sound settings and
+ * the subtitle timing. A sound change saves the setting and has the TV play
+ * on with it from where it is; a timing moves the TV's cues at once and is
+ * saved for the person, as in the player.
+ */
+function RemoteTracks({ state, fileId, device, newer }: { state: StateMessage; fileId: number; device: string; newer: boolean }) {
+  const auth = useAuth()
+  const audio = state.audio ?? []
+  const subtitles = state.subtitles ?? []
+  const subtitle = subtitles.find((s) => s.id === state.selectedSubtitle)
+  const burned = !!subtitle && (subtitle.format === 'image' || !!subtitle.burnInOnly)
+  const [saver] = useState(() => subtitleTimingSaver())
+  // A burned-in track's timing needs the TV to decide again, as a sound change does.
+  const replay = useCallback(() => castSound(), [])
+  const timing = useSubtitleTiming(saver, !!auth.user?.isAdmin && auth.adminAllowed, replay)
+  useEffect(() => {
+    timing.control.track(newer && subtitle ? { fileId, trackId: subtitle.id } : undefined, subtitle, burned)
+  }, [timing.control, newer, subtitle, fileId, burned])
+  // Each change of the timing here goes to the TV at once.
+  const sent = useRef<number | undefined>(undefined)
+  const ms = timing.view.ms
+  useEffect(() => {
+    if (!subtitle || burned) return
+    if (sent.current !== undefined && ms !== sent.current) castSubtitleTiming(ms)
+    sent.current = ms
+  }, [ms, subtitle, burned])
+  const sound = useSoundChange(async () => {
+    castSound()
+    // The TV decides again: it reports loading, then playing from the same moment.
+    await whenCast((c) => c.receiver?.phase === 'loading', 3000)
+    await whenCast((c) => c.receiver?.phase === 'playing', 20_000)
+  })
+  return (
+    <>
+      <p className="-mt-1.5 text-[12.5px] text-neutral-400">Changes apply on {device}.</p>
+      {audio.length > 0 && (
+        <>
+          <h3 id="remote-audio" className={capClass}>Audio</h3>
+          <div role="radiogroup" aria-labelledby="remote-audio" onKeyDown={moveInGroup} className="flex flex-col gap-1">
+            {audio.map((a) => {
+              const w = audioWords(a)
+              const on = a.index === (state.selectedAudio ?? audio[0].index)
+              return <Choice key={a.index} on={on} title={w.title} detail={w.detail} onPick={() => !on && void send({ type: 'audio', index: a.index })} />
+            })}
+          </div>
+        </>
+      )}
+      {newer && <SoundSection sound={sound.sound} change={sound.change} onPick={sound.pick} onRetry={sound.retry} />}
+      <h3 id="remote-subs" className={capClass}>Subtitles</h3>
+      <div role="radiogroup" aria-labelledby="remote-subs" onKeyDown={moveInGroup} className="flex flex-col gap-1">
+        <Choice on={!state.selectedSubtitle} title="Off" onPick={() => void send({ type: 'subtitle', id: null })} />
+        {subtitles.map((s) => {
+          const w = subtitleWords(s)
+          return <Choice key={s.id} on={s.id === state.selectedSubtitle} title={w.title} detail={w.detail} onPick={() => void send({ type: 'subtitle', id: s.id })} />
+        })}
+      </div>
+      {newer && subtitle && (
+        <TimingSection view={timing.view} onStep={(by) => timing.control.step(by)} onReset={() => timing.control.reset()} onShare={() => timing.control.share()} onRetry={() => timing.control.retry()} />
+      )}
+    </>
   )
 }
