@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, ty
 import type { OnlineSubtitle, SubtitleSearch, SubtitleTrack } from '../api/playback'
 import type { components } from '../api/schema'
 import { audioWords, onlineWords, playbackRows, streamStory, subtitleWords } from '../lib/play/words'
-import { SOUND_CHANGING, SOUND_LEVELS, SOUND_NOTE, SOUND_ROWS, SOUND_SAVED, soundFailed, type Sound, type SoundLevel, type SoundSetting } from '../lib/sound'
+import { SOUND_CHANGING, SOUND_LEVELS, SOUND_NOTE, SOUND_ROWS, SOUND_SAVED, soundFailed, type Sound, type SoundChangeState, type SoundLevel, type SoundSetting } from '../lib/sound'
 import { SHARE_DONE, SHARE_HELP, SHARE_LABEL, TIMING_BURNED, TIMING_FAILED, TIMING_HELP, TIMING_SHARED, type TimingView } from '../lib/play/subtitleTiming'
 import { BurnedSubtitlesIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, CloseIcon, MoreIcon, PeopleIcon, SearchIcon } from './icons'
 import { PHONE_SHEET_TOP, capClass, moveInGroup, playerButton } from './playerStyles'
@@ -178,7 +178,7 @@ export function TracksPanel({
 }
 
 /** A sound setting being changed in the player: busy while it saves and the play reloads, then saved, or failed with the value it stayed at. */
-export type SoundChange = { setting: SoundSetting; phase: 'busy' | 'ok' | 'err'; stayed?: SoundLevel } | null
+export type SoundChange = SoundChangeState | null
 
 /**
  * Sound, under the audio: Boost dialogue and Reduce loud sounds, each Off,

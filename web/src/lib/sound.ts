@@ -59,3 +59,29 @@ export function soundPatch(saved: Sound, next: Sound): Patch | null {
   for (const row of SOUND_ROWS) if (saved[row.id] !== next[row.id]) audio[row.id] = next[row.id]
   return Object.keys(audio).length ? { audio } : null
 }
+
+/** A change in a player: busy while it saves and the play goes on with it, then saved, or failed with the value it stayed at. */
+export type SoundChangeState = { setting: SoundSetting; phase: 'busy' | 'ok' | 'err'; stayed?: SoundLevel }
+
+/**
+ * Changes one sound setting from a player: save the person's setting, then
+ * have the play go on from where it is with it (the server applies it when
+ * it decides). A refused save changes nothing and says what it stayed at;
+ * a play that then fails to reload says so itself, the setting being saved.
+ */
+export async function changeSound(setting: SoundSetting, level: SoundLevel, saved: Sound, deps: {
+  save: (patch: Patch) => Promise<unknown>
+  apply: () => Promise<unknown>
+  report: (state: SoundChangeState) => void
+}): Promise<boolean> {
+  deps.report({ setting, phase: 'busy' })
+  try {
+    await deps.save({ audio: { [setting]: level } })
+  } catch {
+    deps.report({ setting, phase: 'err', stayed: saved[setting] })
+    return false
+  }
+  await deps.apply().catch(() => undefined)
+  deps.report({ setting, phase: 'ok' })
+  return true
+}

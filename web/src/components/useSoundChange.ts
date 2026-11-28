@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { preferencesQuery, useUpdatePreferences } from '../api/queries'
-import { soundOf, type Sound, type SoundLevel, type SoundSetting } from '../lib/sound'
+import { changeSound, soundOf, type Sound, type SoundLevel, type SoundSetting } from '../lib/sound'
 import type { SoundChange } from './PlayerPanels'
 
 /**
@@ -30,22 +30,16 @@ export function useSoundChange(apply: () => Promise<unknown>): { sound: Sound; c
 
   const pick = (setting: SoundSetting, level: SoundLevel) => {
     if (change?.phase === 'busy') return
-    const stayed = saved[setting]
     last.current = { setting, level }
     setPending({ setting, level })
-    setChange({ setting, phase: 'busy' })
-    void update.mutateAsync({ audio: { [setting]: level } }).then(
-      async () => {
-        // The setting is saved: a play that then fails to reload says so itself.
-        await latestApply.current().catch(() => undefined)
-        setPending(null)
-        setChange({ setting, phase: 'ok' })
+    void changeSound(setting, level, saved, {
+      save: (patch) => update.mutateAsync(patch),
+      apply: () => latestApply.current(),
+      report: (state) => {
+        if (state.phase !== 'busy') setPending(null)
+        setChange(state)
       },
-      () => {
-        setPending(null)
-        setChange({ setting, phase: 'err', stayed })
-      },
-    )
+    })
   }
 
   return {
