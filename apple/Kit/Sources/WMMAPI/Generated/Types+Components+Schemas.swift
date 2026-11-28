@@ -14352,7 +14352,7 @@ extension Components {
             ///
             /// - Remark: Generated from `#/components/schemas/SubtitlePreferences/mode`.
             public var mode: Swift.String
-            /// Subtitle size: smaller, normal, larger or largest, which apps draw at 0.79, 1, 1.21 and 1.5 times their own size. Normal by default (API level 35).
+            /// Subtitle size: smaller, normal, larger or largest, which apps draw at 0.79, 1, 1.21 and 1.5 times their own size. Absent until the person chooses one, and drawn as normal then; a TV that kept its own size before API level 35 moves it up only while this is absent (API level 35).
             ///
             /// - Remark: Generated from `#/components/schemas/SubtitlePreferences/size`.
             public var size: Swift.String?
@@ -14363,7 +14363,7 @@ extension Components {
             ///   - foreignAudio: With mode forced: when the audio isn't in the person's languages, start as on does, in their subtitle languages or else their audio languages. Turned on when a person first saves audio languages without having saved a subtitle mode (API level 21).
             ///   - languages: Preferred BCP 47 languages, in order; empty until the person chooses or accepts their device's language.
             ///   - mode: off, forced (only foreign-language parts in the audio's language), or on.
-            ///   - size: Subtitle size: smaller, normal, larger or largest, which apps draw at 0.79, 1, 1.21 and 1.5 times their own size. Normal by default (API level 35).
+            ///   - size: Subtitle size: smaller, normal, larger or largest, which apps draw at 0.79, 1, 1.21 and 1.5 times their own size. Absent until the person chooses one, and drawn as normal then; a TV that kept its own size before API level 35 moves it up only while this is absent (API level 35).
             public init(
                 automaticDownload: Swift.Bool,
                 foreignAudio: Swift.Bool? = nil,
