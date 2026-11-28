@@ -33,7 +33,6 @@ import media.watchmy.client.model.PlayerTracks
 import media.watchmy.client.model.SOUND_HEADING
 import media.watchmy.client.model.SoundSetting
 import media.watchmy.client.tv.components.tryFocus
-import media.watchmy.client.ui.onBack
 import media.watchmy.client.tv.components.OptionRow
 import media.watchmy.client.tv.components.PanelGroup
 import media.watchmy.client.tv.components.TvButton
@@ -85,18 +84,29 @@ internal fun PickerSheet(
     onChoose: (PickerChoice) -> Unit,
     modifier: Modifier = Modifier,
     extras: TvPickerExtras = TvPickerExtras(),
+    /**
+     * A sound row's small list of Off, Medium and High, in place of the
+     * panel's rows until a choice or Back; the screen holds it, as Back
+     * reaches the screen first.
+     */
+    choosing: SoundSetting? = null,
+    onChoosing: (SoundSetting?) -> Unit = {},
 ) {
     val quality = section.panel == PickerSection.Quality
-    // A sound row's small list of Off, Medium and High, in place of the panel's rows until a choice or Back.
-    var choosing by remember { mutableStateOf<SoundSetting?>(null) }
     var area by remember { mutableStateOf(PanelArea.Track) }
     val soundRows = remember { SoundSetting.entries.associateWith { FocusRequester() } }
     val choiceFocus = remember { FocusRequester() }
     val timingRow = remember { FocusRequester() }
+    // The row a list was opened from, which focus goes back to.
     var back by remember { mutableStateOf<SoundSetting?>(null) }
     LaunchedEffect(choosing) {
-        if (choosing != null) choiceFocus.tryFocus()
-        else back?.let { soundRows.getValue(it).tryFocus() }.also { back = null }
+        if (choosing != null) {
+            back = choosing
+            choiceFocus.tryFocus()
+        } else {
+            back?.let { soundRows.getValue(it).tryFocus() }
+            back = null
+        }
     }
     val sound = tracks.sound.takeIf { !quality }
     val timing = tracks.timing?.takeIf { !quality && it.changeable }
@@ -107,10 +117,7 @@ internal fun PickerSheet(
             quality -> "Quality"
             else -> "Audio & subtitles"
         },
-        modifier = modifier.onBack(enabled = open != null) {
-            back = open
-            choosing = null
-        },
+        modifier = modifier,
         kicker = if (open != null) "Audio & subtitles · $SOUND_HEADING" else null,
         context = if (quality) "Lower it if the picture keeps stopping." else null,
         // Focus on the timing: the cues beside the panel show through.
@@ -118,8 +125,7 @@ internal fun PickerSheet(
     ) {
         if (open != null && sound != null) {
             SoundChoices(open, sound.level(open), choiceFocus) { level ->
-                back = open
-                choosing = null
+                onChoosing(null)
                 if (level != sound.level(open)) extras.onSound(open, level)
             }
             Box(Modifier.weight(1f))
@@ -127,8 +133,10 @@ internal fun PickerSheet(
             return@TvSidePanel
         }
         val sections = remember(tracks) { pickerSections(tracks) }
+        // With the keys' line at the foot, the rows take the room down to it (a spacer beside them would take half).
+        val keys = !quality && (sound != null || timing != null)
         Column(
-            Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(vertical = 10.dp),
+            Modifier.weight(1f, fill = keys).verticalScroll(rememberScrollState()).padding(vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             for ((s, rows) in sections) {
@@ -149,7 +157,7 @@ internal fun PickerSheet(
                 }
                 if (s == PickerSection.Audio && sound != null) {
                     Column(Modifier.onFocusChanged { if (it.hasFocus) area = PanelArea.Sound }, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        SoundRows(sound, soundRows, onOpen = { choosing = it }, onSound = extras.onSound)
+                        SoundRows(sound, soundRows, onOpen = onChoosing, onSound = extras.onSound)
                     }
                 }
                 if (s == PickerSection.Subtitles && timing != null) {
@@ -167,8 +175,7 @@ internal fun PickerSheet(
         if (quality) {
             // Every choice here is kept for this TV, as the TV's own Settings keep it.
             Text("Your choice becomes this TV’s default.", Modifier.padding(horizontal = 24.dp), style = TvType.Second, color = TvPalette.Muted)
-        } else if (sound != null || timing != null) {
-            Box(Modifier.weight(1f))
+        } else if (keys) {
             PickerKeys(onTiming = area == PanelArea.Timing, ok = area.ok, back = "Closes this panel")
         }
     }

@@ -50,6 +50,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import media.watchmy.client.model.EpisodeDetail
 import media.watchmy.client.model.ImageSize
 import media.watchmy.client.model.PlayRequest
+import media.watchmy.client.model.SoundSetting
 import media.watchmy.client.model.PlaybackController
 import media.watchmy.client.model.PlayerEvent
 import media.watchmy.client.model.PlayerStatus
@@ -208,6 +209,8 @@ private fun PlayerContent(
     val shownMs = { seek.displayed(progress.value.positionMs) }
     var controlsVisible by remember { mutableStateOf(true) }
     var picker by remember { mutableStateOf<PickerSection?>(null) }
+    // A sound row's small list in Audio & subtitles: Back goes back to the panel's rows first.
+    var soundChoice by remember { mutableStateOf<SoundSetting?>(null) }
     var pickerOpenedFromControls by remember { mutableStateOf(false) }
     val episodeList = episodes?.state?.collectAsStateWithLifecycle()?.value
     var episodesOpen by remember { mutableStateOf(false) }
@@ -259,6 +262,7 @@ private fun PlayerContent(
     fun closePicker() {
         val opened = picker ?: return
         picker = null
+        soundChoice = null
         controlsVisible = pickerOpenedFromControls
         shell.wanted = if (pickerOpenedFromControls) focus.openers.getValue(opened) else null
     }
@@ -351,6 +355,10 @@ private fun PlayerContent(
     fun onBack() {
         controller.noteUserInput()
         shell.noteInput()
+        if (soundChoice != null && picker != null) {
+            soundChoice = null
+            return
+        }
         val current = overlayOf(controller.state.value, picker, episodesOpen)
         when (backAction(current, controlsVisible, area)) {
             BackAction.Leave -> if (current == Overlay.Message) finishMessage() else leave(true)
@@ -553,7 +561,10 @@ private fun PlayerContent(
                 }
             } else {
                 Entering(fadeIn(tween(180))) {
-                    PickerSheet(state.tracks, open, focus.picker, onChoose = { choose(controller, it) }, extras = pickerExtras(controller, admin))
+                    PickerSheet(
+                        state.tracks, open, focus.picker, onChoose = { choose(controller, it) }, extras = pickerExtras(controller, admin),
+                        choosing = soundChoice, onChoosing = { soundChoice = it },
+                    )
                 }
             }
         }

@@ -593,11 +593,11 @@ fun SettingsScreen(
                     vm.setAccountSubtitleSize(it)
                 },
                 onDismiss = { overlay = null },
+                // No spacer above Back's line: it would take half the room the four sizes need.
                 footer = {
                     SubtitlePreview(peek, Modifier.padding(top = 8.dp))
                     Note(SUBTITLE_SIZE_PICTURE_NOTE, Modifier.padding(top = 10.dp))
-                    Box(Modifier.weight(1f))
-                    BackClosesNote()
+                    BackClosesNote(Modifier.padding(top = 12.dp))
                 },
             )
         }
