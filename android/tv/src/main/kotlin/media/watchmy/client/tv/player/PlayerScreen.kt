@@ -492,11 +492,9 @@ private fun PlayerContent(
         focusKeys = arrayOf<Any?>(controlsVisible, overlay, skipShown),
         onFocusChanged = { if (it.isFocused || !it.hasFocus) area = FocusArea.Root },
     ) {
-        VideoLayer(
-            controller, state, imageUrl, raisedSubtitles = chromeVisible || overlay == Overlay.UpNext,
-            // Audio & subtitles from the right: the cues move left of it, where the timing can be seen.
-            besidePanel = overlay == Overlay.Picker && picker?.panel == PickerSection.Audio,
-        )
+        // Audio & subtitles from the right: the cues move left of it, above its dim, where the timing can be seen.
+        val cuesBesidePanel = overlay == Overlay.Picker && picker?.panel == PickerSection.Audio
+        VideoLayer(controller, state, imageUrl, raisedSubtitles = chromeVisible || overlay == Overlay.UpNext, cues = !cuesBesidePanel)
 
         AnimatedVisibility(chromeVisible, Modifier.fillMaxSize(), enter = fadeIn(tween(150)), exit = fadeOut(tween(250))) {
             Box(Modifier.fillMaxSize()) { PlayerChrome(state, shownMs, readProgress, chromeFocus, chromeActions, seek, episodes = episodeList?.playingCode?.takeIf { episodeList.available }) }
@@ -566,6 +564,7 @@ private fun PlayerContent(
                         choosing = soundChoice, onChoosing = { soundChoice = it },
                     )
                 }
+                if (cuesBesidePanel) VideoCues(controller, state, raised = false, besidePanel = true)
             }
         }
 
@@ -674,6 +673,28 @@ private fun choose(controller: PlaybackController, choice: PickerChoice) = when 
 }
 
 /**
+ * The text subtitles over the video. Beside Audio & subtitles
+ * ([besidePanel]) they are drawn above the panel's dim, centred in the
+ * picture left of it, so the timing can be watched as it moves.
+ */
+@OptIn(UnstableApi::class)
+@Composable
+private fun VideoCues(controller: PlaybackController, state: PlayerUiState, raised: Boolean, besidePanel: Boolean) {
+    val player = controller.player.collectAsStateWithLifecycle().value ?: return
+    val device by LocalAppServices.current.preferences.device.collectAsStateWithLifecycle()
+    SubtitleCues(
+        player,
+        fontSize = 48.sp,
+        sidePadding = if (besidePanel) SafeX else 160.dp,
+        modifier = if (besidePanel) Modifier.padding(end = PanelWidth - SafeX) else Modifier,
+        bottomPadding = if (raised) 270.dp else 72.dp,
+        topPadding = 72.dp,
+        // The person's size where the server keeps one (or the size of a play cast here); the TV's own before that.
+        look = CaptionLook.Default.at(playerSubtitleSize(state.subtitleSize, deviceOwn = device.subtitleSize)),
+    )
+}
+
+/**
  * The video through Media3's Compose surface (ContentFrame: PlayerSurface
  * sized to the video's aspect, with a shutter until the first frame), with
  * text subtitles over it; without a player (the fakes) the backdrop, dimmed.
@@ -681,22 +702,13 @@ private fun choose(controller: PlaybackController, choice: PickerChoice) = when 
  */
 @OptIn(UnstableApi::class)
 @Composable
-private fun VideoLayer(controller: PlaybackController, state: PlayerUiState, imageUrl: (String?, ImageSize) -> String?, raisedSubtitles: Boolean, besidePanel: Boolean = false) {
+private fun VideoLayer(controller: PlaybackController, state: PlayerUiState, imageUrl: (String?, ImageSize) -> String?, raisedSubtitles: Boolean, cues: Boolean = true) {
     val player = controller.player.collectAsStateWithLifecycle().value
     val device by LocalAppServices.current.preferences.device.collectAsStateWithLifecycle()
     if (player != null) {
         MatchFrameRate(state.frameRate, enabled = device.matchFrameRate)
         ContentFrame(player, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-        SubtitleCues(
-            player,
-            fontSize = 48.sp,
-            sidePadding = if (besidePanel) SafeX else 160.dp,
-            modifier = if (besidePanel) Modifier.padding(end = PanelWidth - SafeX) else Modifier,
-            bottomPadding = if (raisedSubtitles) 270.dp else 72.dp,
-            topPadding = 72.dp,
-            // The person's size where the server keeps one (or the size of a play cast here); the TV's own before that.
-            look = CaptionLook.Default.at(playerSubtitleSize(state.subtitleSize, deviceOwn = device.subtitleSize)),
-        )
+        if (cues) VideoCues(controller, state, raised = raisedSubtitles, besidePanel = false)
     } else {
         Artwork(imageUrl(state.backdropPath, ImageSize.W1280), seed = state.title.ifEmpty { "player" }, contentDescription = null, modifier = Modifier.fillMaxSize())
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))

@@ -95,7 +95,7 @@ private const val PRESS_OK_AGAIN = "Press OK to try again."
  */
 @Composable
 internal fun ColumnScope.SoundRows(sound: PlayerSound, rows: Map<SoundSetting, FocusRequester>, onOpen: (SoundSetting) -> Unit, onSound: (SoundSetting, SoundLevel) -> Unit) {
-    PanelGroup(SOUND_HEADING, Modifier.semantics { heading() })
+    PanelGroup(SOUND_HEADING, Modifier.padding(bottom = GroupGap).semantics { heading() })
     for (setting in SoundSetting.entries) {
         val failure = sound.failed?.takeIf { it.setting == setting }
         val busy = sound.busy == setting
@@ -119,7 +119,7 @@ internal fun ColumnScope.SoundRows(sound: PlayerSound, rows: Map<SoundSetting, F
             chevron = !busy,
         )
     }
-    Text(SOUND_NOTE, Modifier.padding(horizontal = 24.dp), style = TvType.Caption, color = TvPalette.Muted)
+    PanelNote(SOUND_NOTE)
 }
 
 /**
@@ -140,7 +140,7 @@ internal fun ColumnScope.SoundChoices(setting: SoundSetting, current: SoundLevel
             )
         }
     }
-    Text(SOUND_NOTE, Modifier.padding(horizontal = 24.dp), style = TvType.Caption, color = TvPalette.Muted)
+    PanelNote(SOUND_NOTE)
 }
 
 /**
@@ -158,7 +158,7 @@ internal fun ColumnScope.TimingRows(
     onTiming: (TimingAction) -> Unit,
     onFocus: (TimingFocus) -> Unit,
 ) {
-    PanelGroup(SUBTITLE_TIMING, Modifier.semantics { heading() })
+    PanelGroup(SUBTITLE_TIMING, Modifier.padding(bottom = GroupGap).semantics { heading() })
     TimingRow(timing, onTiming, Modifier.focusRequester(row).onFocusChanged { if (it.isFocused) onFocus(TimingFocus.Row) })
     if (timing.canReset) {
         PanelRow(TIMING_RESET, onClick = { onTiming(TimingAction.Reset) }, modifier = Modifier.onFocusChanged { if (it.isFocused) onFocus(TimingFocus.Reset) })
@@ -174,8 +174,8 @@ internal fun ColumnScope.TimingRows(
             chosen = savedAll,
         )
     }
-    if (timing.burnedIn) Text(BURNED_IN_TIMING_NOTE, Modifier.padding(horizontal = 24.dp), style = TvType.Caption, color = TvPalette.Muted)
-    Text(timing.help, Modifier.padding(horizontal = 24.dp), style = TvType.Caption, color = TvPalette.Muted)
+    if (timing.burnedIn) PanelNote(BURNED_IN_TIMING_NOTE)
+    PanelNote(timing.help)
 }
 
 @Composable
@@ -252,6 +252,19 @@ private fun TimingEnd(text: String, before: Boolean, focused: Boolean, held: Boo
 }
 
 private val FailRed = Color(0xFFFCA5A5)
+
+/**
+ * Room between a group's heading and its first row, and between a row and
+ * a line under it: a focused row's ring (4 dp out, 4 dp thick) and growth
+ * reach past its edge, and would cut through them.
+ */
+internal val GroupGap = 8.dp
+
+/** A grey line under a group's rows, clear of the focused row above it. */
+@Composable
+internal fun PanelNote(text: String, modifier: Modifier = Modifier) {
+    Text(text, modifier.padding(start = 24.dp, end = 24.dp, top = GroupGap), style = TvType.Caption, color = TvPalette.Muted)
+}
 
 /** The keys' line at the panel's foot: on the timing row, how it moves; elsewhere what OK does and that Back closes. */
 @Composable
