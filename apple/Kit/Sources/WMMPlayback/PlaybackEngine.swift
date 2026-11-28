@@ -81,6 +81,15 @@ public final class PlaybackEngine: PlaybackControllerFactory {
         )
     }
 
+    /// The Cast remote's timing, through the same calls as a play's.
+    public func setSubtitleTiming(fileID: Int, trackID: String, timingMs: Int, everyone: Bool) async throws -> SavedTiming {
+        try await gateway.setSubtitleTiming(fileID: fileID, trackID: trackID, timingMs: timingMs, everyone: everyone)
+    }
+
+    public func deleteSubtitleTiming(fileID: Int, trackID: String) async throws -> SavedTiming {
+        try await gateway.deleteSubtitleTiming(fileID: fileID, trackID: trackID)
+    }
+
     /// Plans for this device's profile at the chosen quality; empty when the server cannot say.
     public func plans(fileIDs: [Int]) async -> [Int: PlaybackPlan] {
         guard let plans = try? await gateway.plans(profile: profile.current(), quality: preferences.quality, fileIDs: fileIDs) else { return [:] }

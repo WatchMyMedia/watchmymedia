@@ -11,6 +11,9 @@ public final class FakeCastTransport: CastTransport {
     public var mediaSessionID: Int? { status.sessionID }
     public var failLoads = false
     public var automaticallyAcknowledge = true
+    /// How long the fake TV takes to play again after a sound change; nil leaves
+    /// it loading until a test says otherwise with ``finishReload()``.
+    public var soundReload: Duration? = .milliseconds(1_500)
     public private(set) var loads: [CastLoad] = []
     public private(set) var commands: [Data] = []
     public private(set) var stopped = 0
@@ -48,8 +51,32 @@ public final class FakeCastTransport: CastTransport {
         case "subtitle": state["selectedSubtitle"] = object["id"]
         case "quality": state["quality"] = object["id"]
         case "stillWatching": state["stillWatching"] = false
+        case "subtitleTiming":
+            // The TV's cues move: its state says the track's timing now.
+            let ms = object["timingMs"] as? Int ?? 0
+            if let selected = state["selectedSubtitle"] as? String, var subtitles = state["subtitles"] as? [[String: Any]],
+               let i = subtitles.firstIndex(where: { $0["id"] as? String == selected }) {
+                subtitles[i]["timingMs"] = ms
+                state["subtitles"] = subtitles
+            }
+        case "sound":
+            // The TV decides again where it is: loading, then playing.
+            state["phase"] = "loading"
+            if let soundReload {
+                Task { [weak self] in
+                    try? await Task.sleep(for: soundReload)
+                    self?.finishReload()
+                }
+            }
         default: break
         }
+        publish()
+    }
+
+    /// The reload a sound change started is playing.
+    public func finishReload() {
+        guard state["phase"] as? String == "loading" else { return }
+        state["phase"] = "playing"
         publish()
     }
     public func play() { status.status = .playing; publish() }

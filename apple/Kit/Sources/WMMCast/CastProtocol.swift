@@ -101,7 +101,12 @@ public struct CastReceiverState: Decodable, Sendable {
     public struct SegmentInfo: Decodable, Sendable { var kind: String; var startMs: Int; var endMs: Int?; var final: Bool? }
     public struct SkipInfo: Decodable, Sendable { var kind: String; var endMs: Int; var auto: Bool }
     public struct Audio: Decodable, Sendable { var index: Int; var codec: String; var channels: Int; var language: String?; var title: String?; var `default`: Bool }
-    public struct Subtitle: Decodable, Sendable { var id: String; var language: String?; var title: String?; var format: String; var forced: Bool?; var burnInOnly: Bool? }
+    public struct Subtitle: Decodable, Sendable {
+        var id: String; var language: String?; var title: String?; var format: String; var forced: Bool?; var burnInOnly: Bool?
+        /// The track's timing on the TV now, ms (positive is later), and whether
+        /// it is the one an admin saved for everyone; absent from older receivers.
+        var timingMs: Int?; var timingShared: Bool?
+    }
     public struct Next: Decodable, Sendable {
         var fileId: Int; var showTitle: String; var seasonNumber: Int; var episodeNumber: Int; var title: String; var secondsLeft: Int?
         var model: UpNext { UpNext(fileID: fileId, episodeID: 0, showID: 0, showTitle: showTitle, season: seasonNumber, episode: episodeNumber, title: title) }
