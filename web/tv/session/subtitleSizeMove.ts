@@ -10,7 +10,7 @@ import { from35 } from './features'
 // Subtitle size is the person's from API level 35, kept on their server and
 // the same on all their devices. Before that each TV kept its own
 // (Settings › Playback › On this TV); a TV whose own size isn't Normal moves
-// it up once, to a person on that server whose size is still Normal, so
+// it up once, to a person on that server who has never chosen a size, so
 // nobody finds their subtitles shrunk by the change. Below level 35 the TV
 // keeps using its own.
 
@@ -24,13 +24,13 @@ export const moveKey = (serverId: string, userId: number) => `${serverId}/${user
 
 /**
  * What this TV writes up to the person, if anything: its own size, when it
- * isn't Normal and the person's still is. The server answers Normal for a
- * person who never chose a size, so Normal is taken as not chosen. Nothing
- * before level 35, before the preferences are in, or once done.
+ * isn't Normal and the person has never chosen one (the server leaves the
+ * size out until they do, so a chosen Normal is kept). Nothing before level
+ * 35, before the preferences are in, or once done.
  */
 export function sizeToMove(apiLevel: number | undefined, preferences: Pick<Preferences, 'subtitles'> | undefined, own: SubtitleSize, done: boolean): SubtitleSize | undefined {
   if (done || !from35(apiLevel) || !preferences) return undefined
-  if (subtitleSize(preferences.subtitles?.size) !== 'normal') return undefined
+  if (preferences.subtitles?.size) return undefined
   return own === 'normal' ? undefined : own
 }
 

@@ -93,7 +93,8 @@ checks and tests see Samsung's.
   engine changes the sound (save, then reload where it is) and keeps the
   timing, which its cue lookup subtracts. Below 35 the TV keeps its own
   subtitle size (Playback › On this TV), and from 35 writes it up once to a
-  person still on Normal (`session/subtitleSizeMove.ts`).
+  person who has never chosen one, which the server says by leaving the size
+  out (`session/subtitleSizeMove.ts`).
 - **Samsung's store identity** in `platform/samsung/public/config.xml` is permanent: the widget id,
   package id `cPFf0iV3Li` and application id `cPFf0iV3Li.WatchMyMedia` never
   change, and every update is signed with the same Samsung author certificate.

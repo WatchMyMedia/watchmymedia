@@ -4,15 +4,16 @@ import { moveKey, playerSubtitleSize, sizeToMove } from './subtitleSizeMove'
 const prefs = (size?: string) => ({ subtitles: { languages: [], mode: 'off', automaticDownload: false, ...(size && { size }) } })
 
 describe('subtitle size moving up to the person', () => {
-  it('moves this TV’s own size once, to a person still on Normal, on a server from level 35', () => {
-    expect(sizeToMove(35, prefs('normal'), 'larger', false)).toBe('larger')
+  it('moves this TV’s own size once, to a person who never chose one, on a server from level 35', () => {
     expect(sizeToMove(35, prefs(), 'largest', false)).toBe('largest')
+    expect(sizeToMove(35, prefs(), 'smaller', false)).toBe('smaller')
     // Once done, never again.
-    expect(sizeToMove(35, prefs('normal'), 'larger', true)).toBeUndefined()
+    expect(sizeToMove(35, prefs(), 'larger', true)).toBeUndefined()
   })
 
-  it('moves nothing when the TV is on Normal or the person chose a size', () => {
-    expect(sizeToMove(35, prefs('normal'), 'normal', false)).toBeUndefined()
+  it('moves nothing when the TV is on Normal or the person chose a size, Normal included', () => {
+    expect(sizeToMove(35, prefs(), 'normal', false)).toBeUndefined()
+    expect(sizeToMove(35, prefs('normal'), 'larger', false)).toBeUndefined()
     expect(sizeToMove(35, prefs('smaller'), 'larger', false)).toBeUndefined()
   })
 
