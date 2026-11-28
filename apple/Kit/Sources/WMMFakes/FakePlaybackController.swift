@@ -280,7 +280,7 @@ public final class FakePlaybackController: PlaybackController {
     /// The sound, the timing and the size as a server at API level 35 has them.
     private func refreshDialogue() {
         let on = features().dialogueAndSubtitles
-        state.subtitleSize = on ? preferences?.playback.subtitles.size ?? .normal : .normal
+        state.subtitleSize = on ? preferences?.playback.subtitles.drawnSize ?? .normal : .normal
         if on, var audio = preferences?.playback.audio {
             // The level being changed to shows from the press, as the real player's does.
             if let soundBusy, let soundBusyLevel { audio[soundBusy] = soundBusyLevel }

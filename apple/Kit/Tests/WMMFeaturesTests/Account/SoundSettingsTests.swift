@@ -77,6 +77,19 @@ import WMMModel
         #expect(model.saveState(.subtitleSize) == .failed("Couldn’t save, so it’s still Larger. Check your connection and choose again."))
     }
 
+    @Test func normalChosenOverNoSizeIsSavedAsAChoice() async {
+        let preferences = FailingPreferences()
+        preferences.failure = nil
+        let model = model(preferences: preferences)
+        #expect(preferences.playback.subtitles.size == nil, "no size chosen yet")
+        #expect(model.subtitleSize == .normal, "drawn as Normal")
+        await model.setSubtitleSize(.normal)
+        #expect(preferences.languageChanges == [LanguageChange(subtitleSize: .normal)], "Apple TV's Select on Normal chooses it")
+        #expect(preferences.playback.subtitles.size == .normal)
+        await model.setSubtitleSize(.normal)
+        #expect(preferences.languageChanges.count == 1, "once chosen, Normal again changes nothing")
+    }
+
     @Test func aServerBeforeLevel35OffersNeither() async {
         let preferences = FailingPreferences()
         preferences.failure = nil

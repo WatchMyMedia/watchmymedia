@@ -33,7 +33,9 @@ struct DialoguePreferencesRepositoryTests {
         try await h.services.preferences.refresh()
         #expect(h.services.preferences.playback.audio.dialogueBoost == .off)
         #expect(h.services.preferences.playback.audio.reduceLoudSounds == .off)
-        #expect(h.services.preferences.playback.subtitles.size == .normal)
+        // Absent until chosen: drawn as Normal, and kept apart from a Normal the person chose.
+        #expect(h.services.preferences.playback.subtitles.size == nil)
+        #expect(h.services.preferences.playback.subtitles.drawnSize == .normal)
     }
 
     @Test func aSoundSettingOrTheSizeSendsOnlyItself() async throws {
@@ -53,6 +55,20 @@ struct DialoguePreferencesRepositoryTests {
         #expect(h.services.preferences.playback.subtitles.size == .largest)
     }
 
+    @Test func anotherChangeNeverWritesASizeThePersonDidntChoose() async throws {
+        try await signIn(level: ServerFeatures.Level.dialogueAndSubtitles)
+        h.router.on("PUT /api/me/preferences", .json(#"{"skip":{},"autoplayNext":true,"subtitles":{"languages":["en"],"mode":"on","automaticDownload":false}}"#))
+        try await h.services.preferences.setLanguages(LanguageChange(subtitleLanguages: ["en"], choice: .on))
+        let body = try h.body(h.router.last("PUT /api/me/preferences"))
+        #expect((body["subtitles"] as? [String: Any])?["size"] == nil, "no size goes with a change that isn't one")
+        #expect(h.services.preferences.playback.subtitles.size == nil)
+        // Choosing Normal is a choice: it is sent.
+        h.router.on("PUT /api/me/preferences", .json(#"{"skip":{},"autoplayNext":true,"subtitles":{"languages":["en"],"mode":"on","automaticDownload":false,"size":"normal"}}"#))
+        try await h.services.preferences.setLanguages(LanguageChange(subtitleSize: .normal))
+        #expect(try h.body(h.router.last("PUT /api/me/preferences")) as NSDictionary == ["subtitles": ["size": "normal"]])
+        #expect(h.services.preferences.playback.subtitles.size == .normal)
+    }
+
     @Test func noneOfThemGoesToAServerBelowLevel35() async throws {
         try await signIn(level: ServerFeatures.Level.dialogueAndSubtitles - 1)
         for change in [LanguageChange(.dialogueBoost, .medium), LanguageChange(.reduceLoudSounds, .high), LanguageChange(subtitleSize: .smaller)] {
@@ -60,7 +76,7 @@ struct DialoguePreferencesRepositoryTests {
         }
         #expect(h.router.requests("PUT /api/me/preferences").isEmpty)
         #expect(h.services.preferences.playback.audio.dialogueBoost == .off)
-        #expect(h.services.preferences.playback.subtitles.size == .normal)
+        #expect(h.services.preferences.playback.subtitles.size == nil)
     }
 
     @Test func aRefusedSoundSettingGoesBack() async throws {

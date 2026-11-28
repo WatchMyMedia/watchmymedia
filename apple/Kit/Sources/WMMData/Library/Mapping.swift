@@ -639,7 +639,8 @@ extension Components.Schemas.SubtitlePreferences {
     /// downloads any, which could spend the server's quota; the languages
     /// stay, so a change saved here doesn't clear them.
     var model: SubtitlePreferences {
-        let size = size.flatMap(SubtitleSize.init(rawValue:)) ?? .normal
+        // Absent until the person chooses one (a size this app doesn't know too): drawn as Normal, never written back.
+        let size = size.flatMap(SubtitleSize.init(rawValue:))
         guard let mode = SubtitleMode(rawValue: mode) else { return SubtitlePreferences(languages: languages, mode: .off, size: size) }
         return SubtitlePreferences(languages: languages, mode: mode, foreignAudio: foreignAudio ?? false, automaticDownload: automaticDownload, size: size)
     }

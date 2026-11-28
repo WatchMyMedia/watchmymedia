@@ -235,7 +235,7 @@ public final class SettingsModel {
     public func soundLevel(_ setting: SoundSetting) -> SoundLevel { audio[setting] }
 
     /// The subtitle size, as shown.
-    public var subtitleSize: SubtitleSize { subtitles.size }
+    public var subtitleSize: SubtitleSize { subtitles.drawnSize }
 
     /// Saves a sound setting at once; its row says Saving, then what it did or why it couldn't.
     public func setSound(_ setting: SoundSetting, to level: SoundLevel) async {
@@ -346,7 +346,7 @@ public final class SettingsModel {
             SettingsWords.listValue(tags).map { "your \(noun)s are still \($0)" } ?? "you still have no \(noun)"
         }
         if let (setting, _) = change.sound { return saveFailed(error, stillValue: saved.audio[setting].label) }
-        if change.subtitleSize != nil { return saveFailed(error, stillValue: saved.subtitles.size.label) }
+        if change.subtitleSize != nil { return saveFailed(error, stillValue: saved.subtitles.drawnSize.label) }
         if change.audioLanguages != nil { return saveFailed(error, still: list(saved.audio.languages, "audio language"), retry: .tryAgain) }
         if change.subtitleLanguages != nil { return saveFailed(error, still: list(saved.subtitles.languages, "subtitle language"), retry: .tryAgain) }
         if change.choice != nil { return saveFailed(error, stillValue: saved.subtitles.choice.label) }

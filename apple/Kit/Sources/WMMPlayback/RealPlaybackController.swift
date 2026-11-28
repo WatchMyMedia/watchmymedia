@@ -1028,7 +1028,7 @@ public final class RealPlaybackController: PlaybackController {
         settleSound(v, ready: !v.loading && v.loadReady)
         s.sound = playerSound(v, d)
         s.timing = timingState(v, d)
-        s.subtitleSize = features.dialogueAndSubtitles ? prefs.subtitles.size : .normal
+        s.subtitleSize = features.dialogueAndSubtitles ? prefs.subtitles.drawnSize : .normal
         s.cues = cues(v, d, p)
         s.online = v.online
         s.quality = asked

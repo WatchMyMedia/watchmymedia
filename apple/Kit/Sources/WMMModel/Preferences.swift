@@ -148,16 +148,22 @@ public struct SubtitlePreferences: Hashable, Sendable {
     /// older apps read and save Forced only and leave it alone.
     public var foreignAudio: Bool
     public var automaticDownload: Bool
-    /// How big the subtitles the apps draw are (API level 35).
-    public var size: SubtitleSize
+    /// How big the subtitles the apps draw are (API level 35); nil until the
+    /// person chooses one, which draws as Normal. Kept apart from a chosen
+    /// Normal, so a TV with a size of its own can tell "never chose" (and
+    /// write its own up once) from "chose Normal".
+    public var size: SubtitleSize?
 
-    public init(languages: [String] = [], mode: SubtitleMode = .forced, foreignAudio: Bool = false, automaticDownload: Bool = false, size: SubtitleSize = .normal) {
+    public init(languages: [String] = [], mode: SubtitleMode = .forced, foreignAudio: Bool = false, automaticDownload: Bool = false, size: SubtitleSize? = nil) {
         self.languages = languages
         self.mode = mode
         self.foreignAudio = foreignAudio
         self.automaticDownload = automaticDownload
         self.size = size
     }
+
+    /// The size subtitles are drawn at: the person's, else Normal.
+    public var drawnSize: SubtitleSize { size ?? .normal }
 
     /// How subtitles start, as the settings pages list it.
     public var choice: SubtitleChoice {
