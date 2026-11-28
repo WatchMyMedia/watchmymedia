@@ -237,6 +237,9 @@ class RealPlaybackController(
 
         /** The sound row whose change is reloading the play, until the load it made has its first frame ([soundLoad]). */
         var soundBusy: SoundSetting? = null
+
+        /** The busy row's new level, shown from the press, before the preferences have it. */
+        var soundWanted: SoundLevel? = null
         var soundLoad: Int? = null
         var soundFailure: SoundFailure? = null
 
@@ -516,6 +519,7 @@ class RealPlaybackController(
         val still = preferences.playback.value.audio.level(setting)
         if (still == level && v.soundFailure?.setting != setting) return
         v.soundBusy = setting
+        v.soundWanted = level
         v.soundFailure = null
         refresh(0)
         scope.launch {
@@ -1064,8 +1068,10 @@ class RealPlaybackController(
     /** Boost dialogue and Reduce loud sounds as the player shows them; null where the server can't apply them or this player can't save them. */
     private fun soundState(v: Viewing, d: PlaybackDecision): PlayerSound? {
         if (!d.soundSupported || !gateway.savesForPerson) return null
-        val audio = preferences.playback.value.audio
-        return PlayerSound(audio.dialogueBoost, audio.reduceLoudSounds, busy = v.soundBusy, failed = v.soundFailure, download = d.isOffline)
+        val busy = v.soundBusy
+        val wanted = v.soundWanted
+        val audio = preferences.playback.value.audio.let { if (busy != null && wanted != null) it.with(busy, wanted) else it }
+        return PlayerSound(audio.dialogueBoost, audio.reduceLoudSounds, busy = busy, failed = v.soundFailure, download = d.isOffline)
     }
 
     /**

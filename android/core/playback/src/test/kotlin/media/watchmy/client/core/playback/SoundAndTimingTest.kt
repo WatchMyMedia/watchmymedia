@@ -43,6 +43,8 @@ class SoundAndTimingTest {
         h.advance(30_000)
         h.player.readyOnLoad = false
         h.controller.setSound(SoundSetting.DialogueBoost, SoundLevel.High)
+        // The row shows its new level from the press, before the save has answered.
+        assertEquals(SoundLevel.High, h.state.sound?.dialogueBoost)
         h.run()
         assertEquals(SoundLevel.High, h.prefs.playback.value.audio.dialogueBoost)
         assertEquals(2, h.gateway.decisions.size)

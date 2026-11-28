@@ -104,6 +104,7 @@ class CastPlaybackController(
 
     /** A sound row whose change is saved and with the TV, until it plays on with it ([soundJob]). */
     private var soundBusy: SoundSetting? = null
+    private var soundWanted: SoundLevel? = null
     private var soundFailure: SoundFailure? = null
     private var soundJob: Job? = null
 
@@ -262,6 +263,7 @@ class CastPlaybackController(
         val still = preferences.playback.value.audio.level(setting)
         if (still == level && soundFailure?.setting != setting) return
         soundBusy = setting
+        soundWanted = level
         soundFailure = null
         render()
         soundJob?.cancel()
@@ -511,8 +513,10 @@ class CastPlaybackController(
             mode = playbackModeOf(r?.mode),
             note = note,
             sound = if (features.sound && r?.fileId != null) {
-                val audio = preferences.playback.value.audio
-                PlayerSound(audio.dialogueBoost, audio.reduceLoudSounds, busy = soundBusy, failed = soundFailure)
+                val busy = soundBusy
+                val wanted = soundWanted
+                val audio = preferences.playback.value.audio.let { if (busy != null && wanted != null) it.with(busy, wanted) else it }
+                PlayerSound(audio.dialogueBoost, audio.reduceLoudSounds, busy = busy, failed = soundFailure)
             } else null,
             timing = timingKey()?.let { key ->
                 val t = timing(key)
