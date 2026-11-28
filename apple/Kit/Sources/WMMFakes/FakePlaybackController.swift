@@ -431,6 +431,38 @@ public final class FakePlaybackFactory: PlaybackControllerFactory {
         FakePlaybackController(offlineFiles: offlineFiles, preferences: preferences, features: features, admin: admin)
     }
 
+    /// Timings the Cast remote saved: each person's own and the one for everyone, by file and track.
+    private var ownTimings: [String: Int] = [:]
+    private var sharedTimings: [String: Int] = [:]
+
+    /// As a server does: refused with `-fakesSaveFails timing`, for everyone only for an admin.
+    public func setSubtitleTiming(fileID: Int, trackID: String, timingMs: Int, everyone: Bool) async throws -> SavedTiming {
+        await FakeLatency.wait()
+        if let refusal = (preferences as? FakePreferencesRepository)?.refusal, refusal.refuses("timing") { throw refusal.error }
+        let key = "\(fileID)/\(trackID)"
+        if everyone {
+            guard admin else { throw APIError(status: 403, message: "Only an admin can save a timing for everyone.") }
+            sharedTimings[key] = timingMs == 0 ? nil : timingMs
+            ownTimings[key] = nil
+        } else {
+            ownTimings[key] = timingMs
+        }
+        return timing(key)
+    }
+
+    public func deleteSubtitleTiming(fileID: Int, trackID: String) async throws -> SavedTiming {
+        await FakeLatency.wait()
+        if let refusal = (preferences as? FakePreferencesRepository)?.refusal, refusal.refuses("timing") { throw refusal.error }
+        let key = "\(fileID)/\(trackID)"
+        ownTimings[key] = nil
+        return timing(key)
+    }
+
+    private func timing(_ key: String) -> SavedTiming {
+        if let own = ownTimings[key] { return SavedTiming(timingMs: own, shared: false) }
+        return SavedTiming(timingMs: sharedTimings[key] ?? 0, shared: sharedTimings[key] != nil)
+    }
+
     public func plans(fileIDs: [Int]) async -> [Int: PlaybackPlan] {
         Dictionary(uniqueKeysWithValues: fileIDs.compactMap { FakeData.plan(fileID: $0) }.map { ($0.fileID, $0) })
     }

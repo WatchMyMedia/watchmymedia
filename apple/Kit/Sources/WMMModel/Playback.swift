@@ -527,4 +527,21 @@ public protocol PlaybackControllerFactory: AnyObject {
     /// version lists ("Direct play", "Remux to fMP4"), by file ID. Starts
     /// nothing; empty when unknown.
     func plans(fileIDs: [Int]) async -> [Int: PlaybackPlan]
+
+    /// Saves a subtitle track's timing on the server in use, outside a play
+    /// on this device: the Cast remote's, for the play on the TV (API level 35).
+    func setSubtitleTiming(fileID: Int, trackID: String, timingMs: Int, everyone: Bool) async throws -> SavedTiming
+
+    /// The Cast remote's Reset: back to the timing saved for everyone, else none.
+    func deleteSubtitleTiming(fileID: Int, trackID: String) async throws -> SavedTiming
+}
+
+extension PlaybackControllerFactory {
+    public func setSubtitleTiming(fileID: Int, trackID: String, timingMs: Int, everyone: Bool) async throws -> SavedTiming {
+        throw APIError(status: nil, message: "Update the server to save subtitle timing.")
+    }
+
+    public func deleteSubtitleTiming(fileID: Int, trackID: String) async throws -> SavedTiming {
+        throw APIError(status: nil, message: "Update the server to save subtitle timing.")
+    }
 }
