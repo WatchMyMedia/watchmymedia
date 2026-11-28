@@ -28,6 +28,8 @@ import WMMPlayback
 /// three shows followed and one that left the library, Home's New from shows
 /// you follow, and a second new-episode check that finds two shows' arrivals.
 /// `-fakesManyNewEpisodes` makes it seven shows.
+/// `-fakesDialogue` puts it at API level 35: Boost dialogue and Reduce loud
+/// sounds, Subtitle size, and subtitle timing in the player.
 /// `-fakesRedesign` puts it at API level 34: the cast as people who open
 /// their titles, a card's counts, the library's totals and rating filter,
 /// and Remove from Continue watching (`-fakesServers` does too).
@@ -57,7 +59,8 @@ enum ServicesFactory {
             profile: profile,
             library: data.library,
             images: data.images,
-            servers: data.servers
+            servers: data.servers,
+            viewerIsAdmin: { data.auth.user?.isAdmin == true }
         )
         let services = data.makeAppServices(
             playback: playback, livePlayback: LivePlaybackEngine(repository: data.liveTV, profile: profile, userAgent: APIPlaybackGateway.userAgent), downloads: downloads.repository
@@ -98,7 +101,8 @@ enum ServicesFactory {
             related: arguments.contains("-fakesRelated"),
             watchlists: arguments.contains("-fakesWatchlists"),
             several: arguments.contains("-fakesServers"),
-            redesign: arguments.contains("-fakesRedesign") || arguments.contains("-fakesServers")
+            redesign: arguments.contains("-fakesRedesign") || arguments.contains("-fakesServers"),
+            dialogue: arguments.contains("-fakesDialogue")
         )
         if arguments.contains("-fakesSlowServer") {
             (services.library as? FakeLibraryRepository)?.otherServerDelay = .milliseconds(2500)

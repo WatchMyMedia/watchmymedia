@@ -94,7 +94,7 @@ public struct SubtitleCuesView: View {
     }
 
     /// Each cue's lines, in order, each once.
-    static func lines(_ cues: [SubtitleCue]) -> [String] {
+    public static func lines(_ cues: [SubtitleCue]) -> [String] {
         var seen = Set<String>()
         return cues
             .flatMap { $0.text.components(separatedBy: "\n") }

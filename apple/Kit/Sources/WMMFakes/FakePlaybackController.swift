@@ -42,6 +42,7 @@ public final class FakePlaybackController: PlaybackController {
     /// Each track's timing this play, and the one saved for everyone where there is one.
     @ObservationIgnored private var timings: [String: TrackTimingPreview] = [:]
     @ObservationIgnored private var soundBusy: SoundSetting?
+    @ObservationIgnored private var soundBusyLevel: SoundLevel?
     @ObservationIgnored private var soundFailed: (SoundSetting, String)?
     @ObservationIgnored private var timingSave: Task<Void, Never>?
 
@@ -280,7 +281,9 @@ public final class FakePlaybackController: PlaybackController {
     private func refreshDialogue() {
         let on = features().dialogueAndSubtitles
         state.subtitleSize = on ? preferences?.playback.subtitles.size ?? .normal : .normal
-        if on, let audio = preferences?.playback.audio {
+        if on, var audio = preferences?.playback.audio {
+            // The level being changed to shows from the press, as the real player's does.
+            if let soundBusy, let soundBusyLevel { audio[soundBusy] = soundBusyLevel }
             state.sound = PlayerSound(dialogueBoost: audio.dialogueBoost, reduceLoudSounds: audio.reduceLoudSounds, busy: soundBusy,
                                       failed: soundFailed?.0, failure: soundFailed?.1, download: state.isOffline)
         } else {
@@ -304,17 +307,20 @@ public final class FakePlaybackController: PlaybackController {
         guard let preferences, let sound = state.sound, sound.enabled, sound[setting] != level else { return }
         let before = sound[setting]
         soundBusy = setting
+        soundBusyLevel = level
         soundFailed = nil
         refreshDialogue()
         let sleep = sleep
         Task { [weak self] in
             do {
                 try await preferences.setLanguages(LanguageChange(setting, level))
-                try? await sleep(.milliseconds(1_200))
+                // A slow server's reload, long enough to see (and for a UI test to read).
+                try? await sleep(.seconds(4))
             } catch {
                 self?.soundFailed = (setting, SoundWords.changeFailed(error, still: before))
             }
             self?.soundBusy = nil
+            self?.soundBusyLevel = nil
             self?.refreshDialogue()
         }
     }

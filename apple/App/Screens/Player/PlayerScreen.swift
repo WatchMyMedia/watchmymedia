@@ -216,7 +216,7 @@ private struct PlayerContent: View {
                 )
 
                 if !pictureInPicture.isActive {
-                    PlayerCues(clock: model.clock, bottomPadding: controlsOver ? insets.bottom + lift + 8 : insets.bottom + 8, sidePadding: insets.leading)
+                    PlayerCues(clock: model.clock, size: state.subtitleSize, bottomPadding: controlsOver ? insets.bottom + lift + 8 : insets.bottom + 8, sidePadding: insets.leading)
 
                     // Taps on the video: show or hide the controls; double taps on a side seek;
                     // a pinch fills or fits.
@@ -323,11 +323,13 @@ private struct PlayerContent: View {
 /// The subtitle cues, the only part of the video's overlay that follows them.
 private struct PlayerCues: View {
     let clock: PlayerClock
+    /// The person's Subtitle size, on top of the system's caption size.
+    let size: SubtitleSize
     let bottomPadding: CGFloat
     let sidePadding: CGFloat
 
     var body: some View {
-        SubtitleCuesView(cues: clock.cues, bottomPadding: bottomPadding, sidePadding: sidePadding)
+        SubtitleCuesView(cues: clock.cues, bottomPadding: bottomPadding, sidePadding: sidePadding, size: size)
     }
 }
 
