@@ -1,6 +1,6 @@
 {
   "id": "media.watchmy.client",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "vendor": "Eldwick Software",
   "type": "web",
   "main": "index.html",

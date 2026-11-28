@@ -5,6 +5,76 @@ What each release changes, newest first, written for the people who run WatchMyM
 workflow puts the section on the GitHub release. A pre-release such as
 `v0.4.0-rc.1` uses the section of the release it leads to.
 
+## 2.3.0
+
+Dialogue people can hear and subtitles people can read, in every app: Boost dialogue and Reduce
+loud sounds, subtitles moved earlier or later for a track that's out of step, and a subtitle
+size that follows each person. An app for LG TVs is built from the Samsung TV app's code.
+
+- This release changes the server's database. Back up before updating: Settings › Backups ›
+  Back up now, or `watchmymedia backup`. Going back to 2.2.0 afterwards needs that backup.
+
+**Dialogue and loud sounds**
+
+- Boost dialogue makes voices clearer over music and effects, and Reduce loud sounds brings loud
+  scenes closer to the level of speech, for watching quietly. Each is Off, Medium or High, in
+  Settings › Audio & subtitles and in the player's Audio & subtitles, on the web, Android phones,
+  tablets and TVs, iPhone, iPad, Apple TV and the Samsung TV app. They're each person's, the same
+  on all their devices, and they apply on Cast and Live TV too.
+- The server applies them as it converts the sound, so they sound the same in every app. While
+  either is on, a person's sound is converted even when it could have been copied: the picture
+  is still copied where it can be and surround stays surround (Dolby Digital Plus 5.1 where the
+  device takes it), while lossless sound, Dolby Atmos and passthrough to a receiver come back
+  once both are Off. Downloads keep the film's own sound.
+- Changing one while watching picks up at the same moment. Activity names them on each play
+  ("dialogue boosted (high)").
+- Apps released before 2.3.0 get a person's settings too once they've chosen them in a 2.3.0 app,
+  since the server applies them.
+
+**Subtitles**
+
+- Subtitle timing, in the player's Audio & subtitles: Earlier and Later in tenths of a second,
+  for a track whose subtitles come too soon or too late. It's saved for that track of that file,
+  so the person's other devices play it in step, and Reset puts it back. An admin can also save
+  a track's timing for everyone who plays the file; anyone's own timing still wins for them.
+- Subtitle size: Smaller, Normal, Larger or Largest, in Settings › Audio & subtitles with a
+  preview, the same on all the person's devices. On iPhone, iPad, Apple TV and Android phones,
+  Normal follows the device's own caption size. On Android TV and in the Samsung TV app, Subtitle
+  size moves from Playback › On this TV: a TV that had its own size gives it to the person once,
+  unless they've already chosen one.
+- The web app and the Cast receiver now draw text subtitles themselves, sized against the
+  picture. Subtitles with their own styles keep their size and take the timing; subtitles
+  burned into the picture keep their size, and a change of timing starts the play again where it
+  was. Safari's own full screen on an iPhone and picture in picture show the browser's subtitles,
+  without the size or timing.
+- Casting from the web, Android, iPhone or iPad offers the same sound settings and subtitle
+  timing for what's playing on the TV.
+
+**LG TVs**
+
+- The Samsung TV app is now one TV app with a half for each make of TV, and the LG half is new:
+  the TV's video player through hls.js, the Magic Remote's pointer, Back at Home handed to webOS,
+  and a Go to channel button in place of number keys. It installs on an LG TV in Developer Mode;
+  it isn't in LG's Content Store and hasn't yet been tried on an LG TV.
+
+**Fixes**
+
+- On iPhone and iPad with several servers, the line over Movies and TV Shows says the same count
+  as the bar, every server's titles included.
+- On iPad, Settings' About row fits on one line.
+
+**Versions**
+
+- The server, the Docker image, the Debian, Ubuntu and Fedora packages, the Mac app, the Windows
+  app and the Android app are 2.3.0. The Mac and Windows apps of 2.2.0 offer the update under
+  Check for updates. The iPhone, iPad and Apple TV apps are 2.3.0 once the App Store approves
+  them, and the Samsung TV app's 2.3.0 follows its earlier versions through Samsung's review.
+- The 2.3.0 apps work with older servers, without the sound settings, subtitle timing or a
+  person's subtitle size; there the TVs keep their own size.
+- The sound settings were measured on test material and tried in browsers, emulators and
+  simulators against test servers. They have not yet been tried on a real TV or phone, or tuned
+  by ear on real films.
+
 ## 2.2.0
 
 The web app and the Android TV, Apple TV and Samsung TV apps are redrawn to lead with what a

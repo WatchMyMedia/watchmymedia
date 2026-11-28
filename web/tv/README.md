@@ -14,11 +14,13 @@ Tizen 9.0 with Chrome 120. It matches the Android TV app's features, Live TV
 included.
 It needs a server at API level 32 or newer (WatchMyMedia 1.8.0). It has
 been signed with a Samsung certificate and run on that TV (below). Its first
-version, 1.0.0, went to Samsung's review on 2026-11-20. This code is 2.2.0
+version, 1.0.0, went to Samsung's review on 2026-11-20. This code is 2.3.0
 (`platform/samsung/public/config.xml`): 2.0.0 added several servers, 2.1.0 added watchlists,
-which need a server at API level 33 (WatchMyMedia 2.1.0), and 2.2.0 redraws
+which need a server at API level 33 (WatchMyMedia 2.1.0), 2.2.0 redraws
 the app for the couch, with people, Remove from Continue watching and one card
-a title across servers, which need API level 34 (WatchMyMedia 2.2.0). It goes
+a title across servers, which need API level 34 (WatchMyMedia 2.2.0), and 2.3.0 adds Boost
+dialogue, Reduce loud sounds, subtitle timing and the person's subtitle size, which need API
+level 35 (WatchMyMedia 2.3.0). It goes
 to Samsung once 1.0.0 is approved.
 
 ### Where it stands
@@ -91,7 +93,7 @@ certificate.
 The LG TV app: a packaged webOS web app for 2024 and later LG TVs (webOS 24,
 whose web engine is Chromium 108), the same app as Samsung's with LG's
 half. It needs the same servers. Its store identity is `appinfo.json`'s id,
-`media.watchmy.client` (`platform/lg/public/appinfo.json`), at 2.2.0 with
+`media.watchmy.client` (`platform/lg/public/appinfo.json`), at 2.3.0 with
 the Samsung app.
 
 ### Where it stands
